@@ -31,6 +31,10 @@ go.work.sum
 .fleet/
 .kate-swp
 
+# Build output
+web/dist/
+nexmap
+
 # AI
 CLAUDE.md
 .claude/
