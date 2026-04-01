@@ -25,3 +25,12 @@ go.work.sum
 # env file
 .env
 
+# IDEs
+.vscode/
+.idea/
+.fleet/
+.kate-swp
+
+# AI
+CLAUDE.md
+.claude/
