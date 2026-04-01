@@ -23,6 +23,7 @@ func defaults() *Config {
 		Host:     DefaultHost,
 		Port:     DefaultPort,
 		LogLevel: DefaultLogLevel,
+		LogFile:  DefaultLogFile,
 	}
 }
 
@@ -36,6 +37,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_LOGLEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
+	if v := os.Getenv("NEXMAP_LOGFILE"); v != "" {
+		cfg.LogFile = v
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -45,6 +49,7 @@ func applyFlags(cfg *Config, args []string) error {
 	host := fs.String("host", "", "")
 	port := fs.String("port", "", "")
 	logLevel := fs.String("log-level", "", "")
+	logFile := fs.String("log-file", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("config: flags: %w", err)
@@ -58,6 +63,8 @@ func applyFlags(cfg *Config, args []string) error {
 			cfg.Port = *port
 		case "log-level":
 			cfg.LogLevel = *logLevel
+		case "log-file":
+			cfg.LogFile = *logFile
 		}
 	})
 
