@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ['...', 'just', 'tailwindcss_4']
+
+[phases.install]
+cmds = ['go install github.com/a-h/templ/cmd/templ@latest']
+
+[phases.build]
+cmds = ['just all']
+
+[start]
+cmd = './nexmap'
