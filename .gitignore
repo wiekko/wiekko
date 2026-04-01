@@ -35,6 +35,12 @@ go.work.sum
 web/dist/
 nexmap
 
+# Go templ output (generated *_templ.go files, not hand-written helpers)
+*_templ.go
+
 # AI
 CLAUDE.md
 .claude/
+
+# Mac
+.DS_Store
