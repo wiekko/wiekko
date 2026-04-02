@@ -38,7 +38,7 @@ func (s *sessionStore) GetByID(ctx context.Context, id string) (*model.Session, 
 	var sess model.Session
 	err := row.Scan(&sess.ID, &sess.UserID, &sess.CSRFToken, &sess.CreatedAt, &sess.ExpiresAt,
 		&sess.IPAddress, &sess.UserAgent)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
 	if err != nil {

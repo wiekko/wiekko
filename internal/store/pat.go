@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -37,7 +38,7 @@ func (s *patStore) GetByTokenHash(ctx context.Context, hash string) (*model.PAT,
 		`SELECT id, user_id, name, token_hash, token_prefix, last_used_at, expires_at, created_at, revoked_at
 		 FROM personal_access_tokens WHERE token_hash = ?`, hash)
 	pat, err := scanPAT(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("token not found: %w", err)
 	}
 	return pat, err

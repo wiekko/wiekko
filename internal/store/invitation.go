@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -38,7 +39,7 @@ func (s *invitationStore) GetByTokenHash(ctx context.Context, hash string) (*mod
 		`SELECT id, email, token_hash, invited_by, product_id, role, accepted_at, expires_at, created_at
 		 FROM invitations WHERE token_hash = ?`, hash)
 	inv, err := scanInvitation(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("invitation not found: %w", err)
 	}
 	return inv, err
