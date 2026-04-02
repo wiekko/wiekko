@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/logging"
+	"nexmap.net/internal/router"
+	"nexmap.net/internal/server"
 )
 
 func main() {
@@ -35,4 +40,17 @@ func main() {
 			slog.Error("failed to close logCloser", "err", err)
 		}
 	}(logCloser)
+
+	// Set up signal-based context for graceful shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Build the handler and start the server.
+	handler := router.New()
+	if err := server.Run(ctx, cfg, handler); err != nil {
+		slog.Error("server error", "err", err)
+		os.Exit(1)
+	}
+
+	slog.Info("server stopped")
 }
