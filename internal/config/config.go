@@ -5,6 +5,8 @@ const (
 	DefaultPort     = "8080"
 	DefaultLogLevel = "info"
 	DefaultLogFile  = ""
+	DefaultDBDriver = "sqlite"
+	DefaultDBDsn    = "nexmap.db"
 )
 
 type Config struct {
@@ -12,4 +14,6 @@ type Config struct {
 	Port     string
 	LogLevel string
 	LogFile  string
+	DBDriver string
+	DBDsn    string
 }

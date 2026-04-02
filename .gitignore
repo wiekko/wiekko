@@ -34,6 +34,7 @@ go.work.sum
 # Build output
 web/dist/
 /nexmap
+/nexmap.db
 
 # Go templ output (generated *_templ.go files, not hand-written helpers)
 *_templ.go

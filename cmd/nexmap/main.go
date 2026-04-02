@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"nexmap.net/internal/config"
+	"nexmap.net/internal/database"
 	"nexmap.net/internal/logging"
 	"nexmap.net/internal/router"
 	"nexmap.net/internal/server"
@@ -40,6 +41,21 @@ func main() {
 			slog.Error("failed to close logCloser", "err", err)
 		}
 	}(logCloser)
+
+	// Open database connection.
+	db, err := database.Open(cfg)
+	if err != nil {
+		slog.Error("failed to open database", "driver", cfg.DBDriver, "err", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Run database migrations.
+	if err := database.Migrate(db, cfg.DBDriver); err != nil {
+		slog.Error("failed to run migrations", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("database ready", "driver", cfg.DBDriver)
 
 	// Set up signal-based context for graceful shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
