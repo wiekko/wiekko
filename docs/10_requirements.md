@@ -8,6 +8,7 @@
 * **AR-002**: Adhere to SOA: Wherever applicable, encapsulate tasks in dedicated services
 * **AR-003**: Adhere to DRY: Don't repeat yourself
 * **AR-004**: Adhere to SOLID
+* **AR-005**: Wherever possible, code shall be covered by unit tests
 
 ### Deployment
 
