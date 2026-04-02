@@ -30,7 +30,10 @@ func TestInvitationCreate(t *testing.T) {
 				RawToken string `json:"raw_token"`
 			} `json:"data"`
 		}
-		json.NewDecoder(w.Body).Decode(&body)
+		err := json.NewDecoder(w.Body).Decode(&body)
+		if err != nil {
+			t.Fatalf("error decoding JSON body: %v", err)
+		}
 		if body.Data.RawToken == "" {
 			t.Fatal("raw_token is empty")
 		}

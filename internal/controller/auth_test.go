@@ -53,7 +53,10 @@ func TestAuthLogin(t *testing.T) {
 				CSRFToken string `json:"csrf_token"`
 			} `json:"data"`
 		}
-		json.NewDecoder(w.Body).Decode(&body)
+		err := json.NewDecoder(w.Body).Decode(&body)
+		if err != nil {
+			t.Fatalf("error decoding JSON body: %v", err)
+		}
 		if body.Data.CSRFToken == "" {
 			t.Fatal("csrf_token is empty in response")
 		}

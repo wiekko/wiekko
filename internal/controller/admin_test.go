@@ -171,7 +171,10 @@ func TestAdminGetSettings(t *testing.T) {
 	var body struct {
 		Data map[string]string `json:"data"`
 	}
-	json.NewDecoder(w.Body).Decode(&body)
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("error decoding JSON body: %v", err)
+	}
 	if body.Data["moderation_enabled"] != "true" {
 		t.Fatalf("moderation_enabled = %q, want %q", body.Data["moderation_enabled"], "true")
 	}

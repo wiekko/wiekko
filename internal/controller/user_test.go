@@ -29,7 +29,10 @@ func TestGetMe(t *testing.T) {
 			Username string `json:"username"`
 		} `json:"data"`
 	}
-	json.NewDecoder(w.Body).Decode(&body)
+	err := json.NewDecoder(w.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("error decoding JSON body: %v", err)
+	}
 	if body.Data.Username != "alice" {
 		t.Fatalf("username = %q, want %q", body.Data.Username, "alice")
 	}

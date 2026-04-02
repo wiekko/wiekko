@@ -43,7 +43,10 @@ func TestRequireAuth_Unauthenticated(t *testing.T) {
 	var envelope struct {
 		Error struct{ Code string } `json:"error"`
 	}
-	json.NewDecoder(w.Body).Decode(&envelope)
+	err := json.NewDecoder(w.Body).Decode(&envelope)
+	if err != nil {
+		t.Fatalf("error decoding JSON body: %v", err)
+	}
 	if envelope.Error.Code != "UNAUTHORIZED" {
 		t.Fatalf("code = %q, want %q", envelope.Error.Code, "UNAUTHORIZED")
 	}
