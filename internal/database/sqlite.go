@@ -26,7 +26,10 @@ func openSQLite(dsn string) (*sql.DB, error) {
 	}
 	for _, p := range pragmas {
 		if _, err := db.Exec(p); err != nil {
-			db.Close()
+			errInner := db.Close()
+			if errInner != nil {
+				return nil, errInner
+			}
 			return nil, fmt.Errorf("sqlite pragma %q: %w", p, err)
 		}
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"io"
 	"log/slog"
 	"os"
@@ -48,7 +49,12 @@ func main() {
 		slog.Error("failed to open database", "driver", cfg.DBDriver, "err", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			slog.Error("failed to close db", "driver", cfg.DBDriver, "err", err)
+		}
+	}(db)
 
 	// Run database migrations.
 	if err := database.Migrate(db, cfg.DBDriver); err != nil {

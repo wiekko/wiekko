@@ -53,7 +53,7 @@ func applyEnv(cfg *Config) {
 func applyFlags(cfg *Config, args []string) error {
 	fs := flag.NewFlagSet("nexmap", flag.ContinueOnError)
 
-	// Pointers to shadow vars; only applied when flag.Visit reports them set.
+	// Pointers to shadow vars; only applied when `flag.Visit` reports them set.
 	host := fs.String("host", "", "")
 	port := fs.String("port", "", "")
 	logLevel := fs.String("log-level", "", "")

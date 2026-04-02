@@ -31,7 +31,10 @@ func Open(cfg *config.Config) (*sql.DB, error) {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		errInner := db.Close()
+		if errInner != nil {
+			return nil, errInner
+		}
 		return nil, fmt.Errorf("database ping: %w", err)
 	}
 
