@@ -42,7 +42,7 @@ func (s *settingStore) GetAll(ctx context.Context) (map[string]string, error) {
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
 		if err != nil {
-			slog.Error("failed to close rows: %v", err)
+			slog.Error("failed to close rows", "err", err)
 		}
 	}(rows)
 
