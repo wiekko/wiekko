@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -118,7 +119,7 @@ func (s *userStore) Count(ctx context.Context) (int64, error) {
 func (s *userStore) getOne(ctx context.Context, query string, args ...any) (*model.User, error) {
 	row := s.db.QueryRowContext(ctx, query, args...)
 	u, err := scanUser(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
 	return u, err
