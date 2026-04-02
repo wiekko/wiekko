@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 )
 
 func Load(args []string) (*Config, error) {
@@ -20,12 +22,15 @@ func Load(args []string) (*Config, error) {
 
 func defaults() *Config {
 	return &Config{
-		Host:     DefaultHost,
-		Port:     DefaultPort,
-		LogLevel: DefaultLogLevel,
-		LogFile:  DefaultLogFile,
-		DBDriver: DefaultDBDriver,
-		DBDsn:    DefaultDBDsn,
+		Host:             DefaultHost,
+		Port:             DefaultPort,
+		LogLevel:         DefaultLogLevel,
+		LogFile:          DefaultLogFile,
+		DBDriver:         DefaultDBDriver,
+		DBDsn:            DefaultDBDsn,
+		SessionTTL:       DefaultSessionTTL,
+		PBKDF2Iterations: DefaultPBKDF2Iterations,
+		CookieSecure:     DefaultCookieSecure,
 	}
 }
 
@@ -48,6 +53,19 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_DB_DSN"); v != "" {
 		cfg.DBDsn = v
 	}
+	if v := os.Getenv("NEXMAP_SESSION_TTL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.SessionTTL = d
+		}
+	}
+	if v := os.Getenv("NEXMAP_PBKDF2_ITERATIONS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.PBKDF2Iterations = n
+		}
+	}
+	if v := os.Getenv("NEXMAP_COOKIE_SECURE"); v != "" {
+		cfg.CookieSecure = v == "true" || v == "1"
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -60,6 +78,9 @@ func applyFlags(cfg *Config, args []string) error {
 	logFile := fs.String("log-file", "", "")
 	dbDriver := fs.String("db-driver", "", "")
 	dbDsn := fs.String("db-dsn", "", "")
+	sessionTTL := fs.String("session-ttl", "", "")
+	pbkdf2Iter := fs.String("pbkdf2-iterations", "", "")
+	cookieSecure := fs.String("cookie-secure", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("config: flags: %w", err)
@@ -79,6 +100,16 @@ func applyFlags(cfg *Config, args []string) error {
 			cfg.DBDriver = *dbDriver
 		case "db-dsn":
 			cfg.DBDsn = *dbDsn
+		case "session-ttl":
+			if d, err := time.ParseDuration(*sessionTTL); err == nil {
+				cfg.SessionTTL = d
+			}
+		case "pbkdf2-iterations":
+			if n, err := strconv.Atoi(*pbkdf2Iter); err == nil && n > 0 {
+				cfg.PBKDF2Iterations = n
+			}
+		case "cookie-secure":
+			cfg.CookieSecure = *cookieSecure == "true" || *cookieSecure == "1"
 		}
 	})
 

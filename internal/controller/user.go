@@ -1,0 +1,85 @@
+package controller
+
+import (
+	"net/http"
+
+	"nexmap.net/internal/httputil"
+	"nexmap.net/internal/middleware"
+	"nexmap.net/internal/service"
+)
+
+// UserController handles current-user endpoints.
+type UserController struct {
+	user *service.UserService
+}
+
+// NewUser creates a UserController.
+func NewUser(user *service.UserService) *UserController {
+	return &UserController{user: user}
+}
+
+// GetMe handles GET /user/me.
+func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	httputil.JSON(w, http.StatusOK, userToJSON(user))
+}
+
+// UpdateMe handles PATCH /user/me.
+func (c *UserController) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+
+	var req struct {
+		Email       *string `json:"email"`
+		DisplayName *string `json:"display_name"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	updated, err := c.user.UpdateProfile(r.Context(), user.ID, service.UpdateProfileInput{
+		Email:       req.Email,
+		DisplayName: req.DisplayName,
+	})
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "UPDATE_FAILED", err.Error())
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, userToJSON(updated))
+}
+
+// ChangePassword handles POST /user/me/password.
+func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+	if req.OldPassword == "" || req.NewPassword == "" {
+		httputil.Error(w, http.StatusBadRequest, "MISSING_FIELDS", "Old and new passwords are required")
+		return
+	}
+
+	if err := c.user.ChangePassword(r.Context(), user.ID, req.OldPassword, req.NewPassword); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "PASSWORD_CHANGE_FAILED", err.Error())
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, map[string]string{"status": "password_changed"})
+}
+
+// RequestDeletion handles POST /user/me/delete.
+func (c *UserController) RequestDeletion(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+
+	if err := c.user.RequestDeletion(r.Context(), user.ID); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "DELETION_FAILED", err.Error())
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, map[string]string{"status": "deletion_requested"})
+}
