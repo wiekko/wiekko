@@ -1,6 +1,10 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+
+	"nexmap.net/internal/crypto"
+)
 
 // Store groups all data access interfaces.
 type Store struct {
@@ -12,12 +16,12 @@ type Store struct {
 }
 
 // New creates a Store backed by the given database connection.
-func New(db *sql.DB) *Store {
+func New(db *sql.DB, keys *crypto.KeyRing) *Store {
 	return &Store{
-		User:       &userStore{db: db},
+		User:       &userStore{db: db, keys: keys},
 		Session:    &sessionStore{db: db},
 		PAT:        &patStore{db: db},
 		Setting:    &settingStore{db: db},
-		Invitation: &invitationStore{db: db},
+		Invitation: &invitationStore{db: db, keys: keys},
 	}
 }

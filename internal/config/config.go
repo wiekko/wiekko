@@ -24,4 +24,5 @@ type Config struct {
 	SessionTTL       time.Duration
 	PBKDF2Iterations int
 	CookieSecure     bool
+	EncryptionKey    string
 }

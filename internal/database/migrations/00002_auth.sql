@@ -17,8 +17,6 @@ INSERT INTO settings (key, value) VALUES ('password_require_special', 'false');
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,
-    email         TEXT NOT NULL UNIQUE,
-    display_name  TEXT NOT NULL DEFAULT '',
     password_hash TEXT NOT NULL,
     is_admin      INTEGER NOT NULL DEFAULT 0,
     status        TEXT NOT NULL DEFAULT 'active',
@@ -67,7 +65,6 @@ CREATE INDEX IF NOT EXISTS idx_product_roles_product_id ON product_roles(product
 
 CREATE TABLE IF NOT EXISTS invitations (
     id           TEXT PRIMARY KEY,
-    email        TEXT NOT NULL,
     token_hash   TEXT NOT NULL UNIQUE,
     invited_by   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     product_id   TEXT,
@@ -77,9 +74,25 @@ CREATE TABLE IF NOT EXISTS invitations (
     created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_invitations_token_hash ON invitations(token_hash);
-CREATE INDEX IF NOT EXISTS idx_invitations_email ON invitations(email);
+
+CREATE TABLE IF NOT EXISTS personal_data (
+    id          TEXT PRIMARY KEY,
+    owner_table TEXT NOT NULL,
+    owner_id    TEXT NOT NULL,
+    field_name  TEXT NOT NULL,
+    ciphertext  TEXT NOT NULL,
+    key_id      TEXT NOT NULL,
+    blind_index TEXT,
+    UNIQUE(owner_table, owner_id, field_name)
+);
+CREATE INDEX IF NOT EXISTS idx_pd_owner ON personal_data(owner_table, owner_id);
+CREATE INDEX IF NOT EXISTS idx_pd_blind ON personal_data(blind_index) WHERE blind_index IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pd_unique_user_email
+    ON personal_data(blind_index)
+    WHERE owner_table = 'users' AND field_name = 'email';
 
 -- +goose Down
+DROP TABLE IF EXISTS personal_data;
 DROP TABLE IF EXISTS invitations;
 DROP TABLE IF EXISTS product_roles;
 DROP TABLE IF EXISTS personal_access_tokens;

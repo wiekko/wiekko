@@ -66,6 +66,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_COOKIE_SECURE"); v != "" {
 		cfg.CookieSecure = v == "true" || v == "1"
 	}
+	if v := os.Getenv("NEXMAP_ENCRYPTION_KEY"); v != "" {
+		cfg.EncryptionKey = v
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {

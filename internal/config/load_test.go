@@ -11,6 +11,7 @@ func clearNexmapEnv(t *testing.T) {
 		"NEXMAP_HOST", "NEXMAP_PORT", "NEXMAP_LOGLEVEL", "NEXMAP_LOGFILE",
 		"NEXMAP_DB_DRIVER", "NEXMAP_DB_DSN", "NEXMAP_SESSION_TTL",
 		"NEXMAP_PBKDF2_ITERATIONS", "NEXMAP_COOKIE_SECURE",
+		"NEXMAP_ENCRYPTION_KEY",
 	} {
 		t.Setenv(key, "")
 	}
@@ -50,6 +51,9 @@ func TestDefaults(t *testing.T) {
 	}
 	if cfg.CookieSecure != DefaultCookieSecure {
 		t.Errorf("CookieSecure = %v, want %v", cfg.CookieSecure, DefaultCookieSecure)
+	}
+	if cfg.EncryptionKey != "" {
+		t.Errorf("EncryptionKey = %q, want empty", cfg.EncryptionKey)
 	}
 }
 
@@ -184,6 +188,19 @@ func TestEnvCookieSecure(t *testing.T) {
 				t.Errorf("CookieSecure = %v, want %v", cfg.CookieSecure, tc.want)
 			}
 		})
+	}
+}
+
+func TestEnvEncryptionKey(t *testing.T) {
+	clearNexmapEnv(t)
+	t.Setenv("NEXMAP_ENCRYPTION_KEY", `[{"id":"1","key":"dGVzdC1rZXktMzItYnl0ZXMtbG9uZy1wYWQtaGVyZSE="}]`)
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.EncryptionKey == "" {
+		t.Error("EncryptionKey should not be empty")
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 
 	"nexmap.net/internal/auth/builtin"
 	"nexmap.net/internal/config"
+	"nexmap.net/internal/crypto"
 	"nexmap.net/internal/database"
 	"nexmap.net/internal/logging"
 	"nexmap.net/internal/model"
@@ -71,8 +72,15 @@ func main() {
 	}
 	slog.Info("database ready", "driver", cfg.DBDriver)
 
+	// Initialize encryption key ring for personal data.
+	keys, err := crypto.NewKeyRing(cfg.EncryptionKey)
+	if err != nil {
+		slog.Error("failed to initialize encryption", "err", err)
+		os.Exit(1)
+	}
+
 	// Create store, auth provider, and services.
-	st := store.New(db)
+	st := store.New(db, keys)
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
 	svc := service.New(st, provider, cfg)
 
