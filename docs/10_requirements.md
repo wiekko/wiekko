@@ -232,6 +232,7 @@
 * **UR-006**: Settings dialogs shall auto-save changes without requiring a save button. Forms for creating or editing entities (defects, requirements, etc.) shall use explicit submit buttons.
 * **UR-007**: Common actions shall be accessible via keyboard shortcuts
 * **UR-008**: Keyboard shortcuts shall be discoverable (e.g. via a help overlay)
+* **UR-009**: The Web UI shall be available in light and dark mode (users can choose)
 
 ### Backlog Management
 
