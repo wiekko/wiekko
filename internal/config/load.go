@@ -31,6 +31,7 @@ func defaults() *Config {
 		SessionTTL:       DefaultSessionTTL,
 		PBKDF2Iterations: DefaultPBKDF2Iterations,
 		CookieSecure:     DefaultCookieSecure,
+		DevMode:          DefaultDevMode,
 	}
 }
 
