@@ -169,3 +169,488 @@ func (m *MockAuthProvider) VerifyPassword(password, hash string) error {
 func (m *MockAuthProvider) SupportsPasswordChange() bool {
 	return m.SupportsPasswordChangeFunc()
 }
+
+// MockProductRoleStore implements store.ProductRoleStore with configurable function fields.
+type MockProductRoleStore struct {
+	CreateFunc              func(ctx context.Context, role *model.ProductRole) error
+	GetByUserAndProductFunc func(ctx context.Context, userID, productID string) (*model.ProductRole, error)
+	UpdateFunc              func(ctx context.Context, role *model.ProductRole) error
+	DeleteFunc              func(ctx context.Context, userID, productID string) error
+	ListByProductIDFunc     func(ctx context.Context, productID string) ([]*model.ProductRole, error)
+	ListByUserIDFunc        func(ctx context.Context, userID string) ([]*model.ProductRole, error)
+}
+
+func (m *MockProductRoleStore) Create(ctx context.Context, role *model.ProductRole) error {
+	return m.CreateFunc(ctx, role)
+}
+func (m *MockProductRoleStore) GetByUserAndProduct(ctx context.Context, userID, productID string) (*model.ProductRole, error) {
+	return m.GetByUserAndProductFunc(ctx, userID, productID)
+}
+func (m *MockProductRoleStore) Update(ctx context.Context, role *model.ProductRole) error {
+	return m.UpdateFunc(ctx, role)
+}
+func (m *MockProductRoleStore) Delete(ctx context.Context, userID, productID string) error {
+	return m.DeleteFunc(ctx, userID, productID)
+}
+func (m *MockProductRoleStore) ListByProductID(ctx context.Context, productID string) ([]*model.ProductRole, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+func (m *MockProductRoleStore) ListByUserID(ctx context.Context, userID string) ([]*model.ProductRole, error) {
+	return m.ListByUserIDFunc(ctx, userID)
+}
+
+// MockProductStore implements store.ProductStore with configurable function fields.
+type MockProductStore struct {
+	CreateFunc  func(ctx context.Context, product *model.Product) error
+	GetByIDFunc func(ctx context.Context, id string) (*model.Product, error)
+	UpdateFunc  func(ctx context.Context, product *model.Product) error
+	DeleteFunc  func(ctx context.Context, id string) error
+	ListFunc    func(ctx context.Context) ([]*model.Product, error)
+}
+
+func (m *MockProductStore) Create(ctx context.Context, product *model.Product) error {
+	return m.CreateFunc(ctx, product)
+}
+func (m *MockProductStore) GetByID(ctx context.Context, id string) (*model.Product, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockProductStore) Update(ctx context.Context, product *model.Product) error {
+	return m.UpdateFunc(ctx, product)
+}
+func (m *MockProductStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockProductStore) List(ctx context.Context) ([]*model.Product, error) {
+	return m.ListFunc(ctx)
+}
+
+// MockAuditStore implements store.AuditStore with configurable function fields.
+type MockAuditStore struct {
+	CreateFunc       func(ctx context.Context, entry *model.AuditEntry) error
+	ListByEntityFunc func(ctx context.Context, entityType, entityID string) ([]*model.AuditEntry, error)
+}
+
+func (m *MockAuditStore) Create(ctx context.Context, entry *model.AuditEntry) error {
+	return m.CreateFunc(ctx, entry)
+}
+func (m *MockAuditStore) ListByEntity(ctx context.Context, entityType, entityID string) ([]*model.AuditEntry, error) {
+	return m.ListByEntityFunc(ctx, entityType, entityID)
+}
+
+// MockComponentStore implements store.ComponentStore with configurable function fields.
+type MockComponentStore struct {
+	CreateFunc          func(ctx context.Context, c *model.Component) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.Component, error)
+	UpdateFunc          func(ctx context.Context, c *model.Component) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.Component, error)
+}
+
+func (m *MockComponentStore) Create(ctx context.Context, c *model.Component) error {
+	return m.CreateFunc(ctx, c)
+}
+func (m *MockComponentStore) GetByID(ctx context.Context, id string) (*model.Component, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockComponentStore) Update(ctx context.Context, c *model.Component) error {
+	return m.UpdateFunc(ctx, c)
+}
+func (m *MockComponentStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockComponentStore) ListByProductID(ctx context.Context, productID string) ([]*model.Component, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+
+// MockFunctionalityStore implements store.FunctionalityStore with configurable function fields.
+type MockFunctionalityStore struct {
+	CreateFunc            func(ctx context.Context, f *model.Functionality) error
+	GetByIDFunc           func(ctx context.Context, id string) (*model.Functionality, error)
+	UpdateFunc            func(ctx context.Context, f *model.Functionality) error
+	DeleteFunc            func(ctx context.Context, id string) error
+	ListByProductIDFunc   func(ctx context.Context, productID string) ([]*model.Functionality, error)
+	ListByComponentIDFunc func(ctx context.Context, componentID string) ([]*model.Functionality, error)
+}
+
+func (m *MockFunctionalityStore) Create(ctx context.Context, f *model.Functionality) error {
+	return m.CreateFunc(ctx, f)
+}
+func (m *MockFunctionalityStore) GetByID(ctx context.Context, id string) (*model.Functionality, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockFunctionalityStore) Update(ctx context.Context, f *model.Functionality) error {
+	return m.UpdateFunc(ctx, f)
+}
+func (m *MockFunctionalityStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockFunctionalityStore) ListByProductID(ctx context.Context, productID string) ([]*model.Functionality, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+func (m *MockFunctionalityStore) ListByComponentID(ctx context.Context, componentID string) ([]*model.Functionality, error) {
+	return m.ListByComponentIDFunc(ctx, componentID)
+}
+
+// MockMilestoneStore implements store.MilestoneStore with configurable function fields.
+type MockMilestoneStore struct {
+	CreateFunc          func(ctx context.Context, m *model.Milestone) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.Milestone, error)
+	UpdateFunc          func(ctx context.Context, m *model.Milestone) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.Milestone, error)
+}
+
+func (m *MockMilestoneStore) Create(ctx context.Context, ms *model.Milestone) error {
+	return m.CreateFunc(ctx, ms)
+}
+func (m *MockMilestoneStore) GetByID(ctx context.Context, id string) (*model.Milestone, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockMilestoneStore) Update(ctx context.Context, ms *model.Milestone) error {
+	return m.UpdateFunc(ctx, ms)
+}
+func (m *MockMilestoneStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockMilestoneStore) ListByProductID(ctx context.Context, productID string) ([]*model.Milestone, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+
+// MockSprintStore implements store.SprintStore with configurable function fields.
+type MockSprintStore struct {
+	CreateFunc          func(ctx context.Context, sprint *model.Sprint) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.Sprint, error)
+	UpdateFunc          func(ctx context.Context, sprint *model.Sprint) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.Sprint, error)
+}
+
+func (m *MockSprintStore) Create(ctx context.Context, sprint *model.Sprint) error {
+	return m.CreateFunc(ctx, sprint)
+}
+func (m *MockSprintStore) GetByID(ctx context.Context, id string) (*model.Sprint, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockSprintStore) Update(ctx context.Context, sprint *model.Sprint) error {
+	return m.UpdateFunc(ctx, sprint)
+}
+func (m *MockSprintStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockSprintStore) ListByProductID(ctx context.Context, productID string) ([]*model.Sprint, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+
+// MockStatusStore implements store.StatusStore with configurable function fields.
+type MockStatusStore struct {
+	CreateFunc          func(ctx context.Context, status *model.Status) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.Status, error)
+	UpdateFunc          func(ctx context.Context, status *model.Status) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID, entityType string) ([]*model.Status, error)
+	GetDefaultFunc      func(ctx context.Context, productID, entityType string) (*model.Status, error)
+}
+
+func (m *MockStatusStore) Create(ctx context.Context, status *model.Status) error {
+	return m.CreateFunc(ctx, status)
+}
+func (m *MockStatusStore) GetByID(ctx context.Context, id string) (*model.Status, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockStatusStore) Update(ctx context.Context, status *model.Status) error {
+	return m.UpdateFunc(ctx, status)
+}
+func (m *MockStatusStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockStatusStore) ListByProductID(ctx context.Context, productID, entityType string) ([]*model.Status, error) {
+	return m.ListByProductIDFunc(ctx, productID, entityType)
+}
+func (m *MockStatusStore) GetDefault(ctx context.Context, productID, entityType string) (*model.Status, error) {
+	return m.GetDefaultFunc(ctx, productID, entityType)
+}
+
+// MockPyramidLevelStore implements store.PyramidLevelStore with configurable function fields.
+type MockPyramidLevelStore struct {
+	CreateFunc          func(ctx context.Context, pl *model.PyramidLevel) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.PyramidLevel, error)
+	UpdateFunc          func(ctx context.Context, pl *model.PyramidLevel) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.PyramidLevel, error)
+}
+
+func (m *MockPyramidLevelStore) Create(ctx context.Context, pl *model.PyramidLevel) error {
+	return m.CreateFunc(ctx, pl)
+}
+func (m *MockPyramidLevelStore) GetByID(ctx context.Context, id string) (*model.PyramidLevel, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockPyramidLevelStore) Update(ctx context.Context, pl *model.PyramidLevel) error {
+	return m.UpdateFunc(ctx, pl)
+}
+func (m *MockPyramidLevelStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockPyramidLevelStore) ListByProductID(ctx context.Context, productID string) ([]*model.PyramidLevel, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+
+// MockRuntimeEnvironmentStore implements store.RuntimeEnvironmentStore with configurable function fields.
+type MockRuntimeEnvironmentStore struct {
+	CreateFunc          func(ctx context.Context, env *model.RuntimeEnvironment) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.RuntimeEnvironment, error)
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.RuntimeEnvironment, error)
+}
+
+func (m *MockRuntimeEnvironmentStore) Create(ctx context.Context, env *model.RuntimeEnvironment) error {
+	return m.CreateFunc(ctx, env)
+}
+func (m *MockRuntimeEnvironmentStore) GetByID(ctx context.Context, id string) (*model.RuntimeEnvironment, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockRuntimeEnvironmentStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockRuntimeEnvironmentStore) ListByProductID(ctx context.Context, productID string) ([]*model.RuntimeEnvironment, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+
+// MockRequirementStore implements store.RequirementStore with configurable function fields.
+type MockRequirementStore struct {
+	CreateFunc          func(ctx context.Context, r *model.Requirement) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.Requirement, error)
+	UpdateFunc          func(ctx context.Context, r *model.Requirement) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error)
+	ListByParentIDFunc  func(ctx context.Context, parentID string) ([]*model.Requirement, error)
+	ListBySprintIDFunc  func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
+	AssignFunc          func(ctx context.Context, a *model.Assignment) error
+	UnassignFunc        func(ctx context.Context, requirementID, userID string) error
+	ListAssigneesFunc   func(ctx context.Context, requirementID string) ([]*model.Assignment, error)
+}
+
+func (m *MockRequirementStore) Create(ctx context.Context, r *model.Requirement) error {
+	return m.CreateFunc(ctx, r)
+}
+func (m *MockRequirementStore) GetByID(ctx context.Context, id string) (*model.Requirement, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockRequirementStore) Update(ctx context.Context, r *model.Requirement) error {
+	return m.UpdateFunc(ctx, r)
+}
+func (m *MockRequirementStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockRequirementStore) ListByProductID(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error) {
+	return m.ListByProductIDFunc(ctx, productID, filter)
+}
+func (m *MockRequirementStore) ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error) {
+	return m.ListByParentIDFunc(ctx, parentID)
+}
+func (m *MockRequirementStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error) {
+	return m.ListBySprintIDFunc(ctx, sprintID)
+}
+func (m *MockRequirementStore) Assign(ctx context.Context, a *model.Assignment) error {
+	return m.AssignFunc(ctx, a)
+}
+func (m *MockRequirementStore) Unassign(ctx context.Context, requirementID, userID string) error {
+	return m.UnassignFunc(ctx, requirementID, userID)
+}
+func (m *MockRequirementStore) ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error) {
+	return m.ListAssigneesFunc(ctx, requirementID)
+}
+
+// MockDefectStore implements store.DefectStore with configurable function fields.
+type MockDefectStore struct {
+	CreateFunc          func(ctx context.Context, d *model.Defect) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.Defect, error)
+	UpdateFunc          func(ctx context.Context, d *model.Defect) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
+	ListBySprintIDFunc  func(ctx context.Context, sprintID string) ([]*model.Defect, error)
+	AssignFunc          func(ctx context.Context, a *model.Assignment) error
+	UnassignFunc        func(ctx context.Context, defectID, userID string) error
+	ListAssigneesFunc   func(ctx context.Context, defectID string) ([]*model.Assignment, error)
+	AddLinkFunc         func(ctx context.Context, link *model.DefectLink) error
+	RemoveLinkFunc      func(ctx context.Context, id string) error
+	ListLinksFunc       func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
+}
+
+func (m *MockDefectStore) Create(ctx context.Context, d *model.Defect) error {
+	return m.CreateFunc(ctx, d)
+}
+func (m *MockDefectStore) GetByID(ctx context.Context, id string) (*model.Defect, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockDefectStore) Update(ctx context.Context, d *model.Defect) error {
+	return m.UpdateFunc(ctx, d)
+}
+func (m *MockDefectStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockDefectStore) ListByProductID(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error) {
+	return m.ListByProductIDFunc(ctx, productID, filter)
+}
+func (m *MockDefectStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error) {
+	return m.ListBySprintIDFunc(ctx, sprintID)
+}
+func (m *MockDefectStore) Assign(ctx context.Context, a *model.Assignment) error {
+	return m.AssignFunc(ctx, a)
+}
+func (m *MockDefectStore) Unassign(ctx context.Context, defectID, userID string) error {
+	return m.UnassignFunc(ctx, defectID, userID)
+}
+func (m *MockDefectStore) ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error) {
+	return m.ListAssigneesFunc(ctx, defectID)
+}
+func (m *MockDefectStore) AddLink(ctx context.Context, link *model.DefectLink) error {
+	return m.AddLinkFunc(ctx, link)
+}
+func (m *MockDefectStore) RemoveLink(ctx context.Context, id string) error {
+	return m.RemoveLinkFunc(ctx, id)
+}
+func (m *MockDefectStore) ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error) {
+	return m.ListLinksFunc(ctx, defectID)
+}
+
+// MockCommentStore implements store.CommentStore with configurable function fields.
+type MockCommentStore struct {
+	CreateFunc      func(ctx context.Context, c *model.Comment) error
+	GetByIDFunc     func(ctx context.Context, id string) (*model.Comment, error)
+	UpdateFunc      func(ctx context.Context, c *model.Comment) error
+	DeleteFunc      func(ctx context.Context, id string) error
+	ListByOwnerFunc func(ctx context.Context, ownerType, ownerID string) ([]*model.Comment, error)
+}
+
+func (m *MockCommentStore) Create(ctx context.Context, c *model.Comment) error {
+	return m.CreateFunc(ctx, c)
+}
+func (m *MockCommentStore) GetByID(ctx context.Context, id string) (*model.Comment, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockCommentStore) Update(ctx context.Context, c *model.Comment) error {
+	return m.UpdateFunc(ctx, c)
+}
+func (m *MockCommentStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockCommentStore) ListByOwner(ctx context.Context, ownerType, ownerID string) ([]*model.Comment, error) {
+	return m.ListByOwnerFunc(ctx, ownerType, ownerID)
+}
+
+// MockAttachmentStore implements store.AttachmentStore with configurable function fields.
+type MockAttachmentStore struct {
+	CreateFunc      func(ctx context.Context, a *model.Attachment) error
+	GetByIDFunc     func(ctx context.Context, id string) (*model.Attachment, error)
+	DeleteFunc      func(ctx context.Context, id string) error
+	ListByOwnerFunc func(ctx context.Context, ownerType, ownerID string) ([]*model.Attachment, error)
+}
+
+func (m *MockAttachmentStore) Create(ctx context.Context, a *model.Attachment) error {
+	return m.CreateFunc(ctx, a)
+}
+func (m *MockAttachmentStore) GetByID(ctx context.Context, id string) (*model.Attachment, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockAttachmentStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockAttachmentStore) ListByOwner(ctx context.Context, ownerType, ownerID string) ([]*model.Attachment, error) {
+	return m.ListByOwnerFunc(ctx, ownerType, ownerID)
+}
+
+// MockTestCaseStore implements store.TestCaseStore with configurable function fields.
+type MockTestCaseStore struct {
+	CreateFunc               func(ctx context.Context, tc *model.TestCase) error
+	GetByIDFunc              func(ctx context.Context, id string) (*model.TestCase, error)
+	UpdateFunc               func(ctx context.Context, tc *model.TestCase) error
+	DeleteFunc               func(ctx context.Context, id string) error
+	ListByProductIDFunc      func(ctx context.Context, productID string) ([]*model.TestCase, error)
+	LinkRequirementFunc      func(ctx context.Context, link *model.TestCaseRequirement) error
+	UnlinkRequirementFunc    func(ctx context.Context, testCaseID, requirementID string) error
+	ListRequirementLinksFunc func(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
+	AddEnvironmentFunc       func(ctx context.Context, id, testCaseID, environmentID string) error
+	RemoveEnvironmentFunc    func(ctx context.Context, testCaseID, environmentID string) error
+	ListEnvironmentsFunc     func(ctx context.Context, testCaseID string) ([]string, error)
+}
+
+func (m *MockTestCaseStore) Create(ctx context.Context, tc *model.TestCase) error {
+	return m.CreateFunc(ctx, tc)
+}
+func (m *MockTestCaseStore) GetByID(ctx context.Context, id string) (*model.TestCase, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockTestCaseStore) Update(ctx context.Context, tc *model.TestCase) error {
+	return m.UpdateFunc(ctx, tc)
+}
+func (m *MockTestCaseStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockTestCaseStore) ListByProductID(ctx context.Context, productID string) ([]*model.TestCase, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+func (m *MockTestCaseStore) LinkRequirement(ctx context.Context, link *model.TestCaseRequirement) error {
+	return m.LinkRequirementFunc(ctx, link)
+}
+func (m *MockTestCaseStore) UnlinkRequirement(ctx context.Context, testCaseID, requirementID string) error {
+	return m.UnlinkRequirementFunc(ctx, testCaseID, requirementID)
+}
+func (m *MockTestCaseStore) ListRequirementLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error) {
+	return m.ListRequirementLinksFunc(ctx, testCaseID)
+}
+func (m *MockTestCaseStore) AddEnvironment(ctx context.Context, id, testCaseID, environmentID string) error {
+	return m.AddEnvironmentFunc(ctx, id, testCaseID, environmentID)
+}
+func (m *MockTestCaseStore) RemoveEnvironment(ctx context.Context, testCaseID, environmentID string) error {
+	return m.RemoveEnvironmentFunc(ctx, testCaseID, environmentID)
+}
+func (m *MockTestCaseStore) ListEnvironments(ctx context.Context, testCaseID string) ([]string, error) {
+	return m.ListEnvironmentsFunc(ctx, testCaseID)
+}
+
+// MockTestingCampaignStore implements store.TestingCampaignStore with configurable function fields.
+type MockTestingCampaignStore struct {
+	CreateFunc          func(ctx context.Context, tc *model.TestingCampaign) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.TestingCampaign, error)
+	UpdateFunc          func(ctx context.Context, tc *model.TestingCampaign) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.TestingCampaign, error)
+}
+
+func (m *MockTestingCampaignStore) Create(ctx context.Context, tc *model.TestingCampaign) error {
+	return m.CreateFunc(ctx, tc)
+}
+func (m *MockTestingCampaignStore) GetByID(ctx context.Context, id string) (*model.TestingCampaign, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockTestingCampaignStore) Update(ctx context.Context, tc *model.TestingCampaign) error {
+	return m.UpdateFunc(ctx, tc)
+}
+func (m *MockTestingCampaignStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockTestingCampaignStore) ListByProductID(ctx context.Context, productID string) ([]*model.TestingCampaign, error) {
+	return m.ListByProductIDFunc(ctx, productID)
+}
+
+// MockCampaignResultStore implements store.CampaignResultStore with configurable function fields.
+type MockCampaignResultStore struct {
+	CreateFunc                   func(ctx context.Context, cr *model.CampaignResult) error
+	UpdateFunc                   func(ctx context.Context, cr *model.CampaignResult) error
+	GetByCampaignAndTestCaseFunc func(ctx context.Context, campaignID, testCaseID, environmentID string) (*model.CampaignResult, error)
+	ListByCampaignIDFunc         func(ctx context.Context, campaignID string) ([]*model.CampaignResult, error)
+}
+
+func (m *MockCampaignResultStore) Create(ctx context.Context, cr *model.CampaignResult) error {
+	return m.CreateFunc(ctx, cr)
+}
+func (m *MockCampaignResultStore) Update(ctx context.Context, cr *model.CampaignResult) error {
+	return m.UpdateFunc(ctx, cr)
+}
+func (m *MockCampaignResultStore) GetByCampaignAndTestCase(ctx context.Context, campaignID, testCaseID, environmentID string) (*model.CampaignResult, error) {
+	return m.GetByCampaignAndTestCaseFunc(ctx, campaignID, testCaseID, environmentID)
+}
+func (m *MockCampaignResultStore) ListByCampaignID(ctx context.Context, campaignID string) ([]*model.CampaignResult, error) {
+	return m.ListByCampaignIDFunc(ctx, campaignID)
+}

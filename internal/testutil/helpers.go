@@ -87,3 +87,248 @@ func FutureRFC3339(d time.Duration) string {
 func PastRFC3339(d time.Duration) string {
 	return time.Now().UTC().Add(-d).Format(time.RFC3339)
 }
+
+// MakeProduct returns a product with sensible defaults.
+func MakeProduct(overrides ...func(*model.Product)) *model.Product {
+	now := time.Now().UTC().Format(time.RFC3339)
+	p := &model.Product{
+		ID:             "product-001",
+		Name:           "Test Product",
+		Description:    "A test product",
+		EstimationMode: model.EstimationModeDisabled,
+		WorkflowMode:   model.WorkflowModeKanban,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	for _, fn := range overrides {
+		fn(p)
+	}
+	return p
+}
+
+// MakeProductRole returns a product role with sensible defaults.
+func MakeProductRole(overrides ...func(*model.ProductRole)) *model.ProductRole {
+	now := time.Now().UTC().Format(time.RFC3339)
+	pr := &model.ProductRole{
+		ID:        "role-001",
+		UserID:    "user-001",
+		ProductID: "product-001",
+		Role:      model.RoleOwner,
+		CreatedAt: now,
+	}
+	for _, fn := range overrides {
+		fn(pr)
+	}
+	return pr
+}
+
+// MakeComponent returns a component with sensible defaults.
+func MakeComponent(overrides ...func(*model.Component)) *model.Component {
+	now := time.Now().UTC().Format(time.RFC3339)
+	c := &model.Component{
+		ID:          "component-001",
+		ProductID:   "product-001",
+		Name:        "Test Component",
+		Description: "A test component",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	for _, fn := range overrides {
+		fn(c)
+	}
+	return c
+}
+
+// MakeFunctionality returns a functionality with sensible defaults.
+func MakeFunctionality(overrides ...func(*model.Functionality)) *model.Functionality {
+	now := time.Now().UTC().Format(time.RFC3339)
+	f := &model.Functionality{
+		ID:          "functionality-001",
+		ProductID:   "product-001",
+		ComponentID: "component-001",
+		Name:        "Test Functionality",
+		Description: "A test functionality",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	for _, fn := range overrides {
+		fn(f)
+	}
+	return f
+}
+
+// MakeMilestone returns a milestone with sensible defaults.
+func MakeMilestone(overrides ...func(*model.Milestone)) *model.Milestone {
+	now := time.Now().UTC().Format(time.RFC3339)
+	m := &model.Milestone{
+		ID:          "milestone-001",
+		ProductID:   "product-001",
+		Name:        "Test Milestone",
+		Description: "A test milestone",
+		Type:        model.MilestoneTypePlanning,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	for _, fn := range overrides {
+		fn(m)
+	}
+	return m
+}
+
+// MakeSprint returns a sprint with sensible defaults.
+func MakeSprint(overrides ...func(*model.Sprint)) *model.Sprint {
+	now := time.Now().UTC().Format(time.RFC3339)
+	s := &model.Sprint{
+		ID:        "sprint-001",
+		ProductID: "product-001",
+		Name:      "Test Sprint",
+		StartDate: now,
+		EndDate:   FutureRFC3339(14 * 24 * time.Hour),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	for _, fn := range overrides {
+		fn(s)
+	}
+	return s
+}
+
+// MakeStatus returns a status with sensible defaults.
+func MakeStatus(overrides ...func(*model.Status)) *model.Status {
+	now := time.Now().UTC().Format(time.RFC3339)
+	s := &model.Status{
+		ID:         "status-001",
+		ProductID:  "product-001",
+		EntityType: "requirement",
+		Name:       "Open",
+		Position:   0,
+		IsDefault:  true,
+		CreatedAt:  now,
+	}
+	for _, fn := range overrides {
+		fn(s)
+	}
+	return s
+}
+
+// MakeRequirement returns a requirement with sensible defaults.
+func MakeRequirement(overrides ...func(*model.Requirement)) *model.Requirement {
+	now := time.Now().UTC().Format(time.RFC3339)
+	r := &model.Requirement{
+		ID:        "req-001",
+		ProductID: "product-001",
+		Category:  model.RequirementCategoryFunctionality,
+		Title:     "Test Requirement",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	for _, fn := range overrides {
+		fn(r)
+	}
+	return r
+}
+
+// MakeDefect returns a defect with sensible defaults.
+func MakeDefect(overrides ...func(*model.Defect)) *model.Defect {
+	now := time.Now().UTC().Format(time.RFC3339)
+	d := &model.Defect{
+		ID:          "defect-001",
+		ProductID:   "product-001",
+		Title:       "Test Defect",
+		Criticality: model.DefectCriticalityMedium,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	for _, fn := range overrides {
+		fn(d)
+	}
+	return d
+}
+
+// MakeTestCase returns a test case with sensible defaults.
+func MakeTestCase(overrides ...func(*model.TestCase)) *model.TestCase {
+	now := time.Now().UTC().Format(time.RFC3339)
+	tc := &model.TestCase{
+		ID:            "tc-001",
+		ProductID:     "product-001",
+		Title:         "Test Case",
+		ExecutionMode: model.ExecutionModeManual,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	for _, fn := range overrides {
+		fn(tc)
+	}
+	return tc
+}
+
+// MakeTestingCampaign returns a testing campaign with sensible defaults.
+func MakeTestingCampaign(overrides ...func(*model.TestingCampaign)) *model.TestingCampaign {
+	now := time.Now().UTC().Format(time.RFC3339)
+	c := &model.TestingCampaign{
+		ID:        "campaign-001",
+		ProductID: "product-001",
+		Name:      "Test Campaign",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	for _, fn := range overrides {
+		fn(c)
+	}
+	return c
+}
+
+// MakeComment returns a comment with sensible defaults.
+func MakeComment(overrides ...func(*model.Comment)) *model.Comment {
+	now := time.Now().UTC().Format(time.RFC3339)
+	c := &model.Comment{
+		ID:        "comment-001",
+		OwnerType: "requirement",
+		OwnerID:   "req-001",
+		UserID:    "user-001",
+		Body:      "Test comment",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	for _, fn := range overrides {
+		fn(c)
+	}
+	return c
+}
+
+// MakeAttachment returns an attachment with sensible defaults.
+func MakeAttachment(overrides ...func(*model.Attachment)) *model.Attachment {
+	now := time.Now().UTC().Format(time.RFC3339)
+	a := &model.Attachment{
+		ID:          "attachment-001",
+		OwnerType:   "requirement",
+		OwnerID:     "req-001",
+		UserID:      "user-001",
+		Filename:    "test.pdf",
+		ContentType: "application/pdf",
+		Size:        1024,
+		StoragePath: "/tmp/test.pdf",
+		CreatedAt:   now,
+	}
+	for _, fn := range overrides {
+		fn(a)
+	}
+	return a
+}
+
+// MakeAuditEntry returns an audit entry with sensible defaults.
+func MakeAuditEntry(overrides ...func(*model.AuditEntry)) *model.AuditEntry {
+	now := time.Now().UTC().Format(time.RFC3339)
+	e := &model.AuditEntry{
+		ID:         "audit-001",
+		EntityType: "product",
+		EntityID:   "product-001",
+		UserID:     "user-001",
+		Action:     "create",
+		CreatedAt:  now,
+	}
+	for _, fn := range overrides {
+		fn(e)
+	}
+	return e
+}
