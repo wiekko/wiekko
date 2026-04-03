@@ -152,12 +152,7 @@ func (s *userStore) List(ctx context.Context, filter UserFilter) ([]*model.User,
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			slog.Error("failed to close rows", "err", err)
-		}
-	}(rows)
+	defer closeRows(rows)
 
 	var users []*model.User
 	for rows.Next() {
@@ -188,6 +183,13 @@ func (s *userStore) getOne(ctx context.Context, query string, args ...any) (*mod
 // scanner is satisfied by both *sql.Row and *sql.Rows.
 type scanner interface {
 	Scan(dest ...any) error
+}
+
+// closeRows closes sql.Rows and logs any error.
+func closeRows(rows *sql.Rows) {
+	if err := rows.Close(); err != nil {
+		slog.Error("failed to close rows", "err", err)
+	}
 }
 
 func (s *userStore) scanUser(sc scanner) (*model.User, error) {

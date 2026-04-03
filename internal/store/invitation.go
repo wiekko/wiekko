@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -84,12 +83,7 @@ func (s *invitationStore) List(ctx context.Context) ([]*model.Invitation, error)
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			slog.Error("failed to close rows", "err", err)
-		}
-	}(rows)
+	defer closeRows(rows)
 
 	var invs []*model.Invitation
 	for rows.Next() {

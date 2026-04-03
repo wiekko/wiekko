@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 )
 
 // SettingStore defines data access operations for instance settings.
@@ -40,12 +39,7 @@ func (s *settingStore) GetAll(ctx context.Context) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			slog.Error("failed to close rows", "err", err)
-		}
-	}(rows)
+	defer closeRows(rows)
 
 	settings := make(map[string]string)
 	for rows.Next() {

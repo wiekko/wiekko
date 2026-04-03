@@ -233,8 +233,8 @@ func TestValidatePAT(t *testing.T) {
 		}
 	}
 
-	t.Run("valid token", func(t *testing.T) {
-		pat := testutil.MakePAT(func(p *model.PAT) { p.TokenHash = tokenHash })
+	assertValidPAT := func(t *testing.T, pat *model.PAT) {
+		t.Helper()
 		svc := newAuthService(
 			&testutil.MockUserStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return activeUser, nil },
@@ -247,6 +247,11 @@ func TestValidatePAT(t *testing.T) {
 		if user.ID != activeUser.ID {
 			t.Fatalf("user.ID = %q, want %q", user.ID, activeUser.ID)
 		}
+	}
+
+	t.Run("valid token", func(t *testing.T) {
+		pat := testutil.MakePAT(func(p *model.PAT) { p.TokenHash = tokenHash })
+		assertValidPAT(t, pat)
 	})
 
 	t.Run("missing prefix", func(t *testing.T) {
@@ -300,18 +305,7 @@ func TestValidatePAT(t *testing.T) {
 			p.TokenHash = tokenHash
 			p.ExpiresAt = "" // no expiry
 		})
-		svc := newAuthService(
-			&testutil.MockUserStore{
-				GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return activeUser, nil },
-			}, nil, makePATStore(pat), nil,
-		)
-		user, err := svc.ValidatePAT(context.Background(), rawToken)
-		if err != nil {
-			t.Fatalf("ValidatePAT: %v", err)
-		}
-		if user.ID != activeUser.ID {
-			t.Fatalf("user.ID = %q, want %q", user.ID, activeUser.ID)
-		}
+		assertValidPAT(t, pat)
 	})
 
 	t.Run("user not active", func(t *testing.T) {

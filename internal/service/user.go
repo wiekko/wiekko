@@ -44,17 +44,9 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*model
 		return nil, errors.New("self-registration is disabled")
 	}
 
-	policy, err := s.loadPasswordPolicy(ctx)
+	hash, err := s.validateAndHashPassword(ctx, input.Password)
 	if err != nil {
-		return nil, fmt.Errorf("load password policy: %w", err)
-	}
-	if err := s.provider.ValidatePassword(input.Password, policy); err != nil {
 		return nil, err
-	}
-
-	hash, err := s.provider.HashPassword(input.Password)
-	if err != nil {
-		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
 	moderation, _ := s.settings.Get(ctx, "moderation_enabled")
@@ -96,17 +88,9 @@ func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, inp
 		return nil, errors.New("invitation expired")
 	}
 
-	policy, err := s.loadPasswordPolicy(ctx)
+	hash, err := s.validateAndHashPassword(ctx, input.Password)
 	if err != nil {
-		return nil, fmt.Errorf("load password policy: %w", err)
-	}
-	if err := s.provider.ValidatePassword(input.Password, policy); err != nil {
 		return nil, err
-	}
-
-	hash, err := s.provider.HashPassword(input.Password)
-	if err != nil {
-		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -168,16 +152,9 @@ func (s *UserService) ChangePassword(ctx context.Context, id, oldPassword, newPa
 	if err := s.provider.VerifyPassword(oldPassword, user.PasswordHash); err != nil {
 		return errors.New("current password is incorrect")
 	}
-	policy, err := s.loadPasswordPolicy(ctx)
+	hash, err := s.validateAndHashPassword(ctx, newPassword)
 	if err != nil {
-		return fmt.Errorf("load password policy: %w", err)
-	}
-	if err := s.provider.ValidatePassword(newPassword, policy); err != nil {
 		return err
-	}
-	hash, err := s.provider.HashPassword(newPassword)
-	if err != nil {
-		return fmt.Errorf("hash password: %w", err)
 	}
 	return s.users.UpdatePassword(ctx, id, hash)
 }
@@ -194,16 +171,9 @@ func (s *UserService) RequestDeletion(ctx context.Context, id string) error {
 
 // AdminSetPassword sets a new password for any user (admin only).
 func (s *UserService) AdminSetPassword(ctx context.Context, targetID, newPassword string) error {
-	policy, err := s.loadPasswordPolicy(ctx)
+	hash, err := s.validateAndHashPassword(ctx, newPassword)
 	if err != nil {
-		return fmt.Errorf("load password policy: %w", err)
-	}
-	if err := s.provider.ValidatePassword(newPassword, policy); err != nil {
 		return err
-	}
-	hash, err := s.provider.HashPassword(newPassword)
-	if err != nil {
-		return fmt.Errorf("hash password: %w", err)
 	}
 	return s.users.UpdatePassword(ctx, targetID, hash)
 }
@@ -233,6 +203,23 @@ func (s *UserService) AdminApproveUser(ctx context.Context, targetID string) err
 		return errors.New("user is not pending approval")
 	}
 	return s.users.UpdateStatus(ctx, targetID, model.UserStatusActive)
+}
+
+// validateAndHashPassword loads the password policy, validates the password against it,
+// and returns the hashed password.
+func (s *UserService) validateAndHashPassword(ctx context.Context, password string) (string, error) {
+	policy, err := s.loadPasswordPolicy(ctx)
+	if err != nil {
+		return "", fmt.Errorf("load password policy: %w", err)
+	}
+	if err := s.provider.ValidatePassword(password, policy); err != nil {
+		return "", err
+	}
+	hash, err := s.provider.HashPassword(password)
+	if err != nil {
+		return "", fmt.Errorf("hash password: %w", err)
+	}
+	return hash, nil
 }
 
 func (s *UserService) loadPasswordPolicy(ctx context.Context) (auth.PasswordPolicy, error) {

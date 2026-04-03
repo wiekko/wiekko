@@ -2,7 +2,6 @@ package controller_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -40,19 +39,7 @@ func TestPATCreate(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d, body: %s", w.Code, http.StatusCreated, w.Body.String())
 		}
-
-		var body struct {
-			Data struct {
-				RawToken string `json:"raw_token"`
-			} `json:"data"`
-		}
-		err := json.NewDecoder(w.Body).Decode(&body)
-		if err != nil {
-			t.Fatalf("error decoding JSON body: %v", err)
-		}
-		if body.Data.RawToken == "" {
-			t.Fatal("raw_token is empty")
-		}
+		decodeRawToken(t, w)
 	})
 
 	t.Run("missing name", func(t *testing.T) {

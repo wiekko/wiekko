@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"nexmap.net/internal/model"
 )
@@ -51,12 +50,7 @@ func (s *patStore) ListByUserID(ctx context.Context, userID string) ([]*model.PA
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			slog.Error("failed to close rows", "err", err)
-		}
-	}(rows)
+	defer closeRows(rows)
 
 	var pats []*model.PAT
 	for rows.Next() {

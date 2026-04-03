@@ -2,9 +2,11 @@ package controller_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+	"testing"
 
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/config"
@@ -64,6 +66,23 @@ func newTestEnv() *testEnv {
 		Provider:    provider,
 		Services:    svc,
 	}
+}
+
+// decodeRawToken decodes a JSON response body and returns the raw_token field.
+func decodeRawToken(t *testing.T, w *httptest.ResponseRecorder) string {
+	t.Helper()
+	var body struct {
+		Data struct {
+			RawToken string `json:"raw_token"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("error decoding JSON body: %v", err)
+	}
+	if body.Data.RawToken == "" {
+		t.Fatal("raw_token is empty")
+	}
+	return body.Data.RawToken
 }
 
 func authedRequest(method, target, body string, user *model.User) (*httptest.ResponseRecorder, *http.Request) {
