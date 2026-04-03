@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"io/fs"
 
 	"github.com/pressly/goose/v3"
 
@@ -11,7 +12,12 @@ import (
 
 // Migrate applies all pending database migrations.
 func Migrate(db *sql.DB, driver string) error {
-	goose.SetBaseFS(migrations.FS)
+	baseFS, dir, err := migrationFS(driver)
+	if err != nil {
+		return err
+	}
+
+	goose.SetBaseFS(baseFS)
 
 	dialect, err := gooseDialect(driver)
 	if err != nil {
@@ -22,11 +28,22 @@ func Migrate(db *sql.DB, driver string) error {
 		return fmt.Errorf("goose set dialect: %w", err)
 	}
 
-	if err := goose.Up(db, "."); err != nil {
+	if err := goose.Up(db, dir); err != nil {
 		return fmt.Errorf("goose up: %w", err)
 	}
 
 	return nil
+}
+
+func migrationFS(driver string) (fs.FS, string, error) {
+	switch driver {
+	case "sqlite":
+		return migrations.SQLiteFS, "sqlite", nil
+	case "postgres":
+		return migrations.PostgresFS, "postgres", nil
+	default:
+		return nil, "", fmt.Errorf("unsupported driver for migrations: %q", driver)
+	}
 }
 
 func gooseDialect(driver string) (string, error) {

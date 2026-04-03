@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -180,18 +179,6 @@ func (s *userStore) getOne(ctx context.Context, query string, args ...any) (*mod
 	return u, err
 }
 
-// scanner is satisfied by both *sql.Row and *sql.Rows.
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-// closeRows closes sql.Rows and logs any error.
-func closeRows(rows *sql.Rows) {
-	if err := rows.Close(); err != nil {
-		slog.Error("failed to close rows", "err", err)
-	}
-}
-
 func (s *userStore) scanUser(sc scanner) (*model.User, error) {
 	var u model.User
 	var isAdmin, totpEnabled int
@@ -288,11 +275,4 @@ func (s *userStore) updatePersonalData(ctx context.Context, tx *sql.Tx, user *mo
 	}
 
 	return nil
-}
-
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }

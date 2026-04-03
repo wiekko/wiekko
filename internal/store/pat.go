@@ -88,10 +88,3 @@ func scanPAT(s scanner) (*model.PAT, error) {
 	pat.RevokedAt = revokedAt.String
 	return &pat, nil
 }
-
-func nullableText(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
-}

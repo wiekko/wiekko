@@ -52,17 +52,6 @@ CREATE TABLE IF NOT EXISTS personal_access_tokens (
 CREATE INDEX IF NOT EXISTS idx_pat_user_id ON personal_access_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_pat_token_hash ON personal_access_tokens(token_hash);
 
-CREATE TABLE IF NOT EXISTS product_roles (
-    id         TEXT PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    product_id TEXT NOT NULL,
-    role       TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    UNIQUE(user_id, product_id)
-);
-CREATE INDEX IF NOT EXISTS idx_product_roles_user_id ON product_roles(user_id);
-CREATE INDEX IF NOT EXISTS idx_product_roles_product_id ON product_roles(product_id);
-
 CREATE TABLE IF NOT EXISTS invitations (
     id           TEXT PRIMARY KEY,
     token_hash   TEXT NOT NULL UNIQUE,
@@ -94,7 +83,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_pd_unique_user_email
 -- +goose Down
 DROP TABLE IF EXISTS personal_data;
 DROP TABLE IF EXISTS invitations;
-DROP TABLE IF EXISTS product_roles;
 DROP TABLE IF EXISTS personal_access_tokens;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS users;
