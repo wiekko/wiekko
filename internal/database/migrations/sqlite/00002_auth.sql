@@ -13,6 +13,7 @@ INSERT INTO settings (key, value) VALUES ('password_require_uppercase', 'true');
 INSERT INTO settings (key, value) VALUES ('password_require_lowercase', 'true');
 INSERT INTO settings (key, value) VALUES ('password_require_digit', 'true');
 INSERT INTO settings (key, value) VALUES ('password_require_special', 'false');
+INSERT INTO settings (key, value) VALUES ('product_creation_enabled', 'true');
 
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,

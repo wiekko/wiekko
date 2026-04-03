@@ -13,6 +13,7 @@ type Store struct {
 	PAT                PATStore
 	Setting            SettingStore
 	Invitation         InvitationStore
+	ProductRole        ProductRoleStore
 	Product            ProductStore
 	Component          ComponentStore
 	Functionality      FunctionalityStore
@@ -39,6 +40,7 @@ func New(db *sql.DB, keys *crypto.KeyRing) *Store {
 		PAT:                &patStore{db: db},
 		Setting:            &settingStore{db: db},
 		Invitation:         &invitationStore{db: db, keys: keys},
+		ProductRole:        &productRoleStore{db: db},
 		Product:            &productStore{db: db},
 		Component:          &componentStore{db: db},
 		Functionality:      &functionalityStore{db: db},

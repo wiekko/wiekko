@@ -13,11 +13,21 @@ type Services struct {
 	PAT        *PATService
 	Setting    *SettingService
 	Invitation *InvitationService
+	Product    *ProductService
+	Component  *ComponentService
+	Milestone  *MilestoneService
+	Backlog    *BacklogService
+	Testing    *TestingService
+	Comment    *CommentService
+	Audit      *AuditService
 }
 
 // New creates the application service layer.
 func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services {
 	settingSvc := &SettingService{settings: st.Setting}
+
+	authz := &Authorizer{productRoles: st.ProductRole}
+
 	return &Services{
 		Auth: &AuthService{
 			users:    st.User,
@@ -39,6 +49,51 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services 
 		Setting: settingSvc,
 		Invitation: &InvitationService{
 			invitations: st.Invitation,
+		},
+		Product: &ProductService{
+			products:     st.Product,
+			productRoles: st.ProductRole,
+			settings:     st.Setting,
+			audit:        st.Audit,
+			authz:        authz,
+		},
+		Component: &ComponentService{
+			components:      st.Component,
+			functionalities: st.Functionality,
+			audit:           st.Audit,
+			authz:           authz,
+		},
+		Milestone: &MilestoneService{
+			milestones:    st.Milestone,
+			sprints:       st.Sprint,
+			statuses:      st.Status,
+			pyramidLevels: st.PyramidLevel,
+			runtimeEnvs:   st.RuntimeEnvironment,
+			audit:         st.Audit,
+			authz:         authz,
+		},
+		Backlog: &BacklogService{
+			requirements: st.Requirement,
+			defects:      st.Defect,
+			audit:        st.Audit,
+			authz:        authz,
+		},
+		Testing: &TestingService{
+			testCases:       st.TestCase,
+			campaigns:       st.TestingCampaign,
+			campaignResults: st.CampaignResult,
+			audit:           st.Audit,
+			authz:           authz,
+		},
+		Comment: &CommentService{
+			comments:    st.Comment,
+			attachments: st.Attachment,
+			audit:       st.Audit,
+			authz:       authz,
+		},
+		Audit: &AuditService{
+			audit: st.Audit,
+			authz: authz,
 		},
 	}
 }

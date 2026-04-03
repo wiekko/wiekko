@@ -16,6 +16,7 @@ var knownSettings = map[string]bool{
 	"password_require_lowercase": true,
 	"password_require_digit":     true,
 	"password_require_special":   true,
+	"product_creation_enabled":   true,
 }
 
 // SettingService handles instance settings.

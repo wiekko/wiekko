@@ -1,0 +1,476 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/internal/store"
+)
+
+// BacklogService handles requirements and defects.
+type BacklogService struct {
+	requirements store.RequirementStore
+	defects      store.DefectStore
+	audit        store.AuditStore
+	authz        *Authorizer
+}
+
+// --- Requirements ---
+
+// CreateRequirementInput contains the fields required to create a requirement.
+type CreateRequirementInput struct {
+	ProductID        string
+	ParentID         string
+	Category         string
+	Title            string
+	Description      string
+	DefinitionOfDone string
+	StatusID         string
+	MilestoneID      string
+	SprintID         string
+	Estimation       string
+	Priority         int
+	IsCoarse         bool
+}
+
+// UpdateRequirementInput contains the fields that can be updated on a requirement.
+type UpdateRequirementInput struct {
+	Category         *string
+	Title            *string
+	Description      *string
+	DefinitionOfDone *string
+	StatusID         *string
+	MilestoneID      *string
+	SprintID         *string
+	Estimation       *string
+	Priority         *int
+	IsCoarse         *bool
+	IsActive         *bool
+}
+
+// CreateRequirement creates a new requirement. Requires owner role.
+func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User, input CreateRequirementInput) (*model.Requirement, error) {
+	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+
+	if input.Title == "" {
+		return nil, errors.New("requirement title is required")
+	}
+	if input.Category == "" {
+		input.Category = model.RequirementCategoryFunctionality
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	r := &model.Requirement{
+		ID:               uuid.New().String(),
+		ProductID:        input.ProductID,
+		ParentID:         input.ParentID,
+		Category:         input.Category,
+		Title:            input.Title,
+		Description:      input.Description,
+		DefinitionOfDone: input.DefinitionOfDone,
+		StatusID:         input.StatusID,
+		MilestoneID:      input.MilestoneID,
+		SprintID:         input.SprintID,
+		Estimation:       input.Estimation,
+		Priority:         input.Priority,
+		IsCoarse:         input.IsCoarse,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if err := s.requirements.Create(ctx, r); err != nil {
+		return nil, fmt.Errorf("create requirement: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "requirement", EntityID: r.ID,
+		UserID: user.ID, Action: "create", CreatedAt: now,
+	})
+
+	return r, nil
+}
+
+// GetRequirement returns a requirement by ID. Requires viewer role.
+func (s *BacklogService) GetRequirement(ctx context.Context, user *model.User, productID, id string) (*model.Requirement, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.requirements.GetByID(ctx, id)
+}
+
+// UpdateRequirement modifies a requirement. Developer can update status/is_active (FR-407);
+// full field updates require owner.
+func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User, productID, id string, input UpdateRequirementInput) (*model.Requirement, error) {
+	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := s.requirements.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if input.StatusID != nil {
+		r.StatusID = *input.StatusID
+	}
+	if input.IsActive != nil {
+		r.IsActive = *input.IsActive
+	}
+
+	// Fields that require owner role.
+	if input.Category != nil || input.Title != nil || input.Description != nil ||
+		input.DefinitionOfDone != nil || input.MilestoneID != nil ||
+		input.SprintID != nil || input.Estimation != nil ||
+		input.Priority != nil || input.IsCoarse != nil {
+		if isDeveloper {
+			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
+		}
+		if input.Category != nil {
+			r.Category = *input.Category
+		}
+		if input.Title != nil {
+			r.Title = *input.Title
+		}
+		if input.Description != nil {
+			r.Description = *input.Description
+		}
+		if input.DefinitionOfDone != nil {
+			r.DefinitionOfDone = *input.DefinitionOfDone
+		}
+		if input.MilestoneID != nil {
+			r.MilestoneID = *input.MilestoneID
+		}
+		if input.SprintID != nil {
+			r.SprintID = *input.SprintID
+		}
+		if input.Estimation != nil {
+			r.Estimation = *input.Estimation
+		}
+		if input.Priority != nil {
+			r.Priority = *input.Priority
+		}
+		if input.IsCoarse != nil {
+			r.IsCoarse = *input.IsCoarse
+		}
+	}
+	r.UpdatedAt = now
+
+	if err := s.requirements.Update(ctx, r); err != nil {
+		return nil, fmt.Errorf("update requirement: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "requirement", EntityID: r.ID,
+		UserID: user.ID, Action: "update", CreatedAt: now,
+	})
+
+	return r, nil
+}
+
+// DeleteRequirement removes a requirement. Requires owner role.
+func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User, productID, id string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := s.requirements.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete requirement: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "requirement", EntityID: id,
+		UserID: user.ID, Action: "delete", CreatedAt: now,
+	})
+
+	return nil
+}
+
+// ListRequirements returns requirements for a product. Requires viewer role.
+func (s *BacklogService) ListRequirements(ctx context.Context, user *model.User, productID string, filter store.RequirementFilter) ([]*model.Requirement, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.requirements.ListByProductID(ctx, productID, filter)
+}
+
+// ListChildRequirements returns child requirements. Requires viewer role.
+func (s *BacklogService) ListChildRequirements(ctx context.Context, user *model.User, productID, parentID string) ([]*model.Requirement, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.requirements.ListByParentID(ctx, parentID)
+}
+
+// AssignRequirement assigns a user to a requirement. Requires owner role.
+func (s *BacklogService) AssignRequirement(ctx context.Context, user *model.User, productID, reqID, targetUserID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	return s.requirements.Assign(ctx, &model.Assignment{
+		ID:        uuid.New().String(),
+		TargetID:  reqID,
+		UserID:    targetUserID,
+		CreatedAt: now,
+	})
+}
+
+// UnassignRequirement removes a user from a requirement. Requires owner role.
+func (s *BacklogService) UnassignRequirement(ctx context.Context, user *model.User, productID, reqID, targetUserID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	return s.requirements.Unassign(ctx, reqID, targetUserID)
+}
+
+// ListRequirementAssignees returns assignees for a requirement. Requires viewer role.
+func (s *BacklogService) ListRequirementAssignees(ctx context.Context, user *model.User, productID, reqID string) ([]*model.Assignment, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.requirements.ListAssignees(ctx, reqID)
+}
+
+// --- Defects ---
+
+// CreateDefectInput contains the fields required to create a defect.
+type CreateDefectInput struct {
+	ProductID   string
+	Title       string
+	Description string
+	Criticality string
+	StatusID    string
+	MilestoneID string
+	SprintID    string
+	Estimation  string
+	Priority    int
+}
+
+// UpdateDefectInput contains the fields that can be updated on a defect.
+type UpdateDefectInput struct {
+	Title       *string
+	Description *string
+	Criticality *string
+	StatusID    *string
+	MilestoneID *string
+	SprintID    *string
+	Estimation  *string
+	Priority    *int
+	IsActive    *bool
+}
+
+// CreateDefect creates a new defect. Requires tester role.
+func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, input CreateDefectInput) (*model.Defect, error) {
+	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleTester); err != nil {
+		return nil, err
+	}
+
+	if input.Title == "" {
+		return nil, errors.New("defect title is required")
+	}
+	if input.Criticality == "" {
+		input.Criticality = model.DefectCriticalityMedium
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	d := &model.Defect{
+		ID:          uuid.New().String(),
+		ProductID:   input.ProductID,
+		Title:       input.Title,
+		Description: input.Description,
+		Criticality: input.Criticality,
+		StatusID:    input.StatusID,
+		MilestoneID: input.MilestoneID,
+		SprintID:    input.SprintID,
+		Estimation:  input.Estimation,
+		Priority:    input.Priority,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := s.defects.Create(ctx, d); err != nil {
+		return nil, fmt.Errorf("create defect: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
+		UserID: user.ID, Action: "create", CreatedAt: now,
+	})
+
+	return d, nil
+}
+
+// GetDefect returns a defect by ID. Requires viewer role.
+func (s *BacklogService) GetDefect(ctx context.Context, user *model.User, productID, id string) (*model.Defect, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.defects.GetByID(ctx, id)
+}
+
+// UpdateDefect modifies a defect. Developer can update status/is_active (FR-407);
+// full field updates require owner.
+func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, productID, id string, input UpdateDefectInput) (*model.Defect, error) {
+	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := s.defects.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if input.StatusID != nil {
+		d.StatusID = *input.StatusID
+	}
+	if input.IsActive != nil {
+		d.IsActive = *input.IsActive
+	}
+
+	// Fields that require owner role.
+	if input.Title != nil || input.Description != nil || input.Criticality != nil ||
+		input.MilestoneID != nil || input.SprintID != nil ||
+		input.Estimation != nil || input.Priority != nil {
+		if isDeveloper {
+			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
+		}
+		if input.Title != nil {
+			d.Title = *input.Title
+		}
+		if input.Description != nil {
+			d.Description = *input.Description
+		}
+		if input.Criticality != nil {
+			d.Criticality = *input.Criticality
+		}
+		if input.MilestoneID != nil {
+			d.MilestoneID = *input.MilestoneID
+		}
+		if input.SprintID != nil {
+			d.SprintID = *input.SprintID
+		}
+		if input.Estimation != nil {
+			d.Estimation = *input.Estimation
+		}
+		if input.Priority != nil {
+			d.Priority = *input.Priority
+		}
+	}
+	d.UpdatedAt = now
+
+	if err := s.defects.Update(ctx, d); err != nil {
+		return nil, fmt.Errorf("update defect: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
+		UserID: user.ID, Action: "update", CreatedAt: now,
+	})
+
+	return d, nil
+}
+
+// DeleteDefect removes a defect. Requires owner role.
+func (s *BacklogService) DeleteDefect(ctx context.Context, user *model.User, productID, id string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := s.defects.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete defect: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "defect", EntityID: id,
+		UserID: user.ID, Action: "delete", CreatedAt: now,
+	})
+
+	return nil
+}
+
+// ListDefects returns defects for a product. Requires viewer role.
+func (s *BacklogService) ListDefects(ctx context.Context, user *model.User, productID string, filter store.DefectFilter) ([]*model.Defect, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.defects.ListByProductID(ctx, productID, filter)
+}
+
+// AssignDefect assigns a user to a defect. Requires owner role.
+func (s *BacklogService) AssignDefect(ctx context.Context, user *model.User, productID, defID, targetUserID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	return s.defects.Assign(ctx, &model.Assignment{
+		ID:        uuid.New().String(),
+		TargetID:  defID,
+		UserID:    targetUserID,
+		CreatedAt: now,
+	})
+}
+
+// UnassignDefect removes a user from a defect. Requires owner role.
+func (s *BacklogService) UnassignDefect(ctx context.Context, user *model.User, productID, defID, targetUserID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	return s.defects.Unassign(ctx, defID, targetUserID)
+}
+
+// ListDefectAssignees returns assignees for a defect. Requires viewer role.
+func (s *BacklogService) ListDefectAssignees(ctx context.Context, user *model.User, productID, defID string) ([]*model.Assignment, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.defects.ListAssignees(ctx, defID)
+}
+
+// AddDefectLink adds a link from a defect to another entity. Requires tester role.
+func (s *BacklogService) AddDefectLink(ctx context.Context, user *model.User, productID, defID, targetType, targetID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleTester); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	return s.defects.AddLink(ctx, &model.DefectLink{
+		ID:         uuid.New().String(),
+		DefectID:   defID,
+		TargetType: targetType,
+		TargetID:   targetID,
+		CreatedAt:  now,
+	})
+}
+
+// RemoveDefectLink removes a defect link. Requires developer role.
+func (s *BacklogService) RemoveDefectLink(ctx context.Context, user *model.User, productID, linkID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
+		return err
+	}
+	return s.defects.RemoveLink(ctx, linkID)
+}
+
+// ListDefectLinks returns links for a defect. Requires viewer role.
+func (s *BacklogService) ListDefectLinks(ctx context.Context, user *model.User, productID, defID string) ([]*model.DefectLink, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.defects.ListLinks(ctx, defID)
+}
