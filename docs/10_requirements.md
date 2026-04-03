@@ -85,9 +85,11 @@
 
 ### Data Security
 
-* **SR-301**: All personal data shall be encrypted at rest (GDPR compliance)
-* **SR-302**: Log entries shall never contain personal or other sensitive data
-* **SR-303**: Passwords shall be stored as salted hash (bcrypt or pbkdf2) with high computation cost
+* **SR-301**: All personal data (as defined by GDPR Art. 4(1), e.g. email addresses, display names) shall be encrypted at application level using AES-256-GCM, stored in a dedicated `personal_data` table with a blind index (HMAC) for equality lookups.
+* **SR-302**: The encryption key shall be provided via environment variable (per AR-103). Key rotation shall be supported by storing a key version identifier alongside each ciphertext.
+* **SR-303**: Log entries shall never contain personal or other sensitive data
+* **SR-304**: Passwords shall be stored as salted hash (bcrypt or pbkdf2) with high computation cost
+* **SR-305**: Data subject access (GDPR Art. 15) and right to erasure (GDPR Art. 17) shall be supported by centralising all personal data in the `personal_data` table.
 
 ## Functionality
 
