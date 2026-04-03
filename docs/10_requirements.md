@@ -124,6 +124,10 @@
 * **FR-029**: A `sprint` can be linked to a `milestone` ("leads towards" / "enables")
 * **FR-030**: All text fields (descriptions, comments, definitions of done) shall support Markdown formatting
 * **FR-031**: All changes to `products`, `components`, `functionalities`, `requirements`, `test cases`, `defects`, `milestones` and `sprints` shall be recorded in an audit trail (who changed what, when)
+* **FR-032**: `test cases` can have one `pyramid level` (or none if feature isn't used).
+* **FR-033**: `pyramid levels` are defined per product (default: "unit", "integration", "system", "acceptance")
+* **FR-034**: `pyramid levels` can be hierarchical, i.e. have a parent level (optional, max depth: 2)
+* **FR-035**: `pyramid levels` are orthogonal to execution mode (FR-017)
 
 ### Administration
 
@@ -175,6 +179,7 @@
 * **FR-326**: Product owners shall be able to refine a requirement (break down into child requirements)
 * **FR-327**: Product owners shall be able to assign requirements and defects to users
 * **FR-328**: Product owners shall be able to configure the estimation mechanism for their product (e.g. story points, t-shirt sizes, hours) or disable it entirely
+* **FR-329**: Product owners shall be able to configure the pyramid levels for their product
 
 ### Development
 
@@ -238,3 +243,5 @@
 * **UR-202**: Test case status in a campaign shall be visualized using icons and colors
 * **UR-203**: Use collapsible sections by component to structure the test campaign status overview
 * **UR-204**: Test progress metrics shall be displayed (e.g. percentage passed, failed, pending; progress over time)
+* **UR-205**: Users shall be able to group and/or filter `test cases` by their `pyramid level` attribute (if defined)
+* **UR-206**: Product owners shall be able to use the `pyramid level` attribute to select test cases for a test campaign
