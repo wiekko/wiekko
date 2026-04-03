@@ -51,7 +51,7 @@ func (s *userStore) Create(ctx context.Context, user *model.User) error {
 	if err != nil {
 		return fmt.Errorf("user create: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO users (id, username, password_hash, is_admin, status, totp_secret, totp_enabled, created_at, updated_at)
@@ -92,7 +92,7 @@ func (s *userStore) Update(ctx context.Context, user *model.User) error {
 	if err != nil {
 		return fmt.Errorf("user update: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx,
 		`UPDATE users SET username = ?, is_admin = ?, status = ?, updated_at = ? WHERE id = ?`,
@@ -124,7 +124,7 @@ func (s *userStore) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("user delete: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `DELETE FROM personal_data WHERE owner_table = 'users' AND owner_id = ?`, id)
 	if err != nil {

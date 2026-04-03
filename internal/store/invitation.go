@@ -38,7 +38,7 @@ func (s *invitationStore) Create(ctx context.Context, inv *model.Invitation) err
 	if err != nil {
 		return fmt.Errorf("invitation create: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO invitations (id, token_hash, invited_by, product_id, role, accepted_at, expires_at, created_at)
@@ -107,7 +107,7 @@ func (s *invitationStore) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("invitation delete: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.ExecContext(ctx, `DELETE FROM personal_data WHERE owner_table = 'invitations' AND owner_id = ?`, id)
 	if err != nil {
