@@ -1,0 +1,45 @@
+package ui
+
+import "fmt"
+
+// ProgressBar renders a horizontal progress indicator.
+// Color: "indigo", "green", "yellow", "red". Defaults to "indigo".
+templ ProgressBar(percent int, color, label string) {
+	<div class="w-full">
+		if label != "" {
+			<div class="mb-1 flex items-center justify-between">
+				<span class="text-sm font-medium text-gray-700">{ label }</span>
+				<span class="text-sm text-gray-500">{ fmt.Sprintf("%d%%", percent) }</span>
+			</div>
+		}
+		<div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+			<div
+				class={ "h-full rounded-full transition-all", progressColor(color) }
+				style={ fmt.Sprintf("width: %d%%", clampPercent(percent)) }
+			></div>
+		</div>
+	</div>
+}
+
+func progressColor(color string) string {
+	switch color {
+	case "green":
+		return "bg-green-500"
+	case "yellow":
+		return "bg-yellow-500"
+	case "red":
+		return "bg-red-500"
+	default:
+		return "bg-indigo-600"
+	}
+}
+
+func clampPercent(p int) int {
+	if p < 0 {
+		return 0
+	}
+	if p > 100 {
+		return 100
+	}
+	return p
+}

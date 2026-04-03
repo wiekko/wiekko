@@ -1,0 +1,91 @@
+package patterns
+
+import "nexmap.net/web/templates/ui"
+
+// SidebarNav renders the left navigation panel.
+templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
+	<aside class="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
+		<!-- Logo -->
+		<div class="flex h-16 items-center gap-3 border-b border-gray-200 px-4">
+			<img src="/static/img/logo.svg" alt="Nexmap" class="h-8 w-auto"/>
+			<span class="text-lg font-bold text-gray-900">Nexmap</span>
+		</div>
+		<!-- Product context -->
+		if productName != "" {
+			<div class="border-b border-gray-200 px-4 py-3">
+				<p class="text-xs font-medium uppercase tracking-wider text-gray-500">Product</p>
+				<p class="mt-1 truncate text-sm font-semibold text-gray-900">{ productName }</p>
+			</div>
+		}
+		<!-- Navigation -->
+		<nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+			@SidebarLink("Dashboard", "/", "home", activeSection == "dashboard", "")
+			if productID != "" {
+				@SidebarSection("Backlog") {
+					@SidebarLink("Requirements", "/products/"+productID+"/requirements", "clipboard-list", activeSection == "requirements", "")
+					@SidebarLink("Defects", "/products/"+productID+"/defects", "bug", activeSection == "defects", "")
+				}
+				@SidebarSection("Testing") {
+					@SidebarLink("Test Cases", "/products/"+productID+"/test-cases", "beaker", activeSection == "test-cases", "")
+					@SidebarLink("Campaigns", "/products/"+productID+"/campaigns", "flag", activeSection == "campaigns", "")
+				}
+				@SidebarSection("Structure") {
+					@SidebarLink("Components", "/products/"+productID+"/components", "folder", activeSection == "components", "")
+					@SidebarLink("Functionalities", "/products/"+productID+"/functionalities", "folder", activeSection == "functionalities", "")
+					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
+					@SidebarLink("Sprints", "/products/"+productID+"/sprints", "clock", activeSection == "sprints", "")
+				}
+			}
+			if isAdmin {
+				@SidebarSection("Admin") {
+					@SidebarLink("Users", "/admin/users", "users", activeSection == "admin-users", "")
+					@SidebarLink("Settings", "/admin/settings", "settings", activeSection == "admin-settings", "")
+					@SidebarLink("Invitations", "/admin/invitations", "link", activeSection == "admin-invitations", "")
+				}
+			}
+		</nav>
+	</aside>
+}
+
+// SidebarSection renders a group of nav links with a heading.
+templ SidebarSection(title string) {
+	<div class="pt-4">
+		<p class="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{ title }</p>
+		<div class="mt-2 space-y-1">
+			{ children... }
+		</div>
+	</div>
+}
+
+// SidebarLink renders a single navigation item.
+templ SidebarLink(label, href, icon string, active bool, badge string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+			sidebarLinkClass(active) }
+	>
+		<span class={ sidebarIconClass(active) }>
+			@ui.Icon(icon, "md")
+		</span>
+		<span class="flex-1">{ label }</span>
+		if badge != "" {
+			<span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+				{ badge }
+			</span>
+		}
+	</a>
+}
+
+func sidebarLinkClass(active bool) string {
+	if active {
+		return "bg-indigo-50 text-indigo-700"
+	}
+	return "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+}
+
+func sidebarIconClass(active bool) string {
+	if active {
+		return "text-indigo-500"
+	}
+	return "text-gray-400 group-hover:text-gray-500"
+}

@@ -1,0 +1,68 @@
+package ui
+
+// DropdownMenu renders a positioned dropdown menu using CSS :focus-within.
+// The trigger (e.g., a button) is provided as the first child, menu items follow.
+templ DropdownMenu(id string) {
+	<div id={ id } class="relative inline-block text-left">
+		{ children... }
+	</div>
+}
+
+// DropdownTrigger wraps the button that opens the dropdown.
+templ DropdownTrigger() {
+	<div class="peer">
+		{ children... }
+	</div>
+}
+
+// DropdownContent renders the dropdown panel, shown on peer focus-within.
+templ DropdownContent() {
+	<div class="invisible absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white opacity-0 shadow-lg ring-1 ring-black/5 transition-all duration-100 peer-focus-within:visible peer-focus-within:opacity-100">
+		<div class="py-1" role="menu" aria-orientation="vertical">
+			{ children... }
+		</div>
+	</div>
+}
+
+// DropdownItem renders a single item in the dropdown menu.
+// If href is set, renders an anchor. If hxPost is set, renders a button.
+templ DropdownItem(label, href, icon string, danger bool) {
+	if href != "" {
+		<a
+			href={ templ.SafeURL(href) }
+			class={ "flex w-full items-center gap-2 px-4 py-2 text-sm",
+				dropdownItemColor(danger) }
+			role="menuitem"
+		>
+			if icon != "" {
+				@Icon(icon, "sm")
+			}
+			{ label }
+		</a>
+	} else {
+		<button
+			type="button"
+			class={ "flex w-full items-center gap-2 px-4 py-2 text-sm",
+				dropdownItemColor(danger) }
+			role="menuitem"
+		>
+			if icon != "" {
+				@Icon(icon, "sm")
+			}
+			{ label }
+			{ children... }
+		</button>
+	}
+}
+
+// DropdownDivider renders a separator line between menu items.
+templ DropdownDivider() {
+	<div class="my-1 border-t border-gray-100"></div>
+}
+
+func dropdownItemColor(danger bool) string {
+	if danger {
+		return "text-red-700 hover:bg-red-50"
+	}
+	return "text-gray-700 hover:bg-gray-100"
+}

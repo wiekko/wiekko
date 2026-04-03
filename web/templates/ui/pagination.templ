@@ -1,0 +1,114 @@
+package ui
+
+import "fmt"
+
+// Pagination renders page navigation with prev/next and page numbers.
+templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
+	if totalPages > 1 {
+		<nav aria-label="Pagination" class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+			<div class="flex flex-1 justify-between sm:hidden">
+				if currentPage > 1 {
+					<a
+						href={ templ.SafeURL(pageURL(baseURL, currentPage-1)) }
+						hx-get={ pageURL(baseURL, currentPage-1) }
+						hx-target={ hxTarget }
+						hx-swap="innerHTML"
+						hx-push-url="true"
+						class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+					>
+						Previous
+					</a>
+				}
+				if currentPage < totalPages {
+					<a
+						href={ templ.SafeURL(pageURL(baseURL, currentPage+1)) }
+						hx-get={ pageURL(baseURL, currentPage+1) }
+						hx-target={ hxTarget }
+						hx-swap="innerHTML"
+						hx-push-url="true"
+						class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+					>
+						Next
+					</a>
+				}
+			</div>
+			<div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+				<p class="text-sm text-gray-700">
+					Page <span class="font-medium">{ fmt.Sprintf("%d", currentPage) }</span> of <span class="font-medium">{ fmt.Sprintf("%d", totalPages) }</span>
+				</p>
+				<div class="flex gap-1">
+					if currentPage > 1 {
+						<a
+							href={ templ.SafeURL(pageURL(baseURL, currentPage-1)) }
+							hx-get={ pageURL(baseURL, currentPage-1) }
+							hx-target={ hxTarget }
+							hx-swap="innerHTML"
+							hx-push-url="true"
+							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
+						>
+							@Icon("chevron-left", "sm")
+						</a>
+					}
+					for _, page := range pageRange(currentPage, totalPages) {
+						if page == currentPage {
+							<span class="relative z-10 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">
+								{ fmt.Sprintf("%d", page) }
+							</span>
+						} else {
+							<a
+								href={ templ.SafeURL(pageURL(baseURL, page)) }
+								hx-get={ pageURL(baseURL, page) }
+								hx-target={ hxTarget }
+								hx-swap="innerHTML"
+								hx-push-url="true"
+								class="relative inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
+							>
+								{ fmt.Sprintf("%d", page) }
+							</a>
+						}
+					}
+					if currentPage < totalPages {
+						<a
+							href={ templ.SafeURL(pageURL(baseURL, currentPage+1)) }
+							hx-get={ pageURL(baseURL, currentPage+1) }
+							hx-target={ hxTarget }
+							hx-swap="innerHTML"
+							hx-push-url="true"
+							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
+						>
+							@Icon("chevron-right", "sm")
+						</a>
+					}
+				</div>
+			</div>
+		</nav>
+	}
+}
+
+func pageURL(base string, page int) string {
+	sep := "?"
+	for _, c := range base {
+		if c == '?' {
+			sep = "&"
+			break
+		}
+	}
+	return base + sep + "page=" + fmt.Sprintf("%d", page)
+}
+
+func pageRange(current, total int) []int {
+	const window = 2
+	start := current - window
+	if start < 1 {
+		start = 1
+	}
+	end := current + window
+	if end > total {
+		end = total
+	}
+	pages := make([]int, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		pages = append(pages, i)
+	}
+	return pages
+}

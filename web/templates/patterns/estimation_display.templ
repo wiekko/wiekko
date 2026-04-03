@@ -1,0 +1,24 @@
+package patterns
+
+import "nexmap.net/web/templates/ui"
+
+// EstimationBadge renders the estimation value formatted for the product's estimation mode.
+// Modes: "story_points", "tshirt_sizes", "hours", "disabled".
+templ EstimationBadge(value, mode string) {
+	if mode != "disabled" && value != "" {
+		@ui.Badge(formatEstimation(value, mode), "indigo")
+	}
+}
+
+func formatEstimation(value, mode string) string {
+	switch mode {
+	case "story_points":
+		return value + " pts"
+	case "tshirt_sizes":
+		return value
+	case "hours":
+		return value + "h"
+	default:
+		return value
+	}
+}

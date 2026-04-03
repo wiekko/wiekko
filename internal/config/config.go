@@ -12,6 +12,7 @@ const (
 	DefaultSessionTTL       = 24 * time.Hour
 	DefaultPBKDF2Iterations = 600_000
 	DefaultCookieSecure     = true
+	DefaultDevMode          = false
 )
 
 type Config struct {
@@ -25,4 +26,5 @@ type Config struct {
 	PBKDF2Iterations int
 	CookieSecure     bool
 	EncryptionKey    string
+	DevMode          bool
 }

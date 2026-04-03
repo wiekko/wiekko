@@ -1,0 +1,114 @@
+package ui
+
+// ButtonProps configures a Button.
+type ButtonProps struct {
+	Label    string
+	Variant  string // "primary", "secondary", "danger", "ghost"
+	Size     string // "sm", "md", "lg"
+	Disabled bool
+	Type     string // "button", "submit"
+	HxPost   string
+	HxPatch  string
+	HxDelete string
+	HxTarget string
+	HxSwap   string
+}
+
+// Button renders a styled button. Children are rendered inside, after the label.
+templ Button(props ButtonProps) {
+	<button
+		type={ buttonType(props.Type) }
+		class={ "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+			buttonVariant(props.Variant),
+			buttonSize(props.Size) }
+		disabled?={ props.Disabled }
+		if props.HxPost != "" {
+			hx-post={ props.HxPost }
+		}
+		if props.HxPatch != "" {
+			hx-patch={ props.HxPatch }
+		}
+		if props.HxDelete != "" {
+			hx-delete={ props.HxDelete }
+		}
+		if props.HxTarget != "" {
+			hx-target={ props.HxTarget }
+		}
+		if props.HxSwap != "" {
+			hx-swap={ props.HxSwap }
+		}
+	>
+		if props.Label != "" {
+			{ props.Label }
+		}
+		{ children... }
+	</button>
+}
+
+// IconButton renders a compact button containing only an icon.
+templ IconButton(icon, ariaLabel, variant, size string) {
+	<button
+		type="button"
+		aria-label={ ariaLabel }
+		class={ "inline-flex items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+			buttonVariant(variant),
+			iconButtonSize(size) }
+	>
+		@Icon(icon, size)
+	</button>
+}
+
+// LinkButton renders an anchor styled as a button.
+templ LinkButton(href, label, variant, size string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2",
+			buttonVariant(variant),
+			buttonSize(size) }
+	>
+		{ label }
+		{ children... }
+	</a>
+}
+
+func buttonType(t string) string {
+	if t == "submit" {
+		return "submit"
+	}
+	return "button"
+}
+
+func buttonVariant(variant string) string {
+	switch variant {
+	case "secondary":
+		return "bg-white text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:ring-indigo-500"
+	case "danger":
+		return "bg-red-600 text-white hover:bg-red-500 focus:ring-red-500"
+	case "ghost":
+		return "text-gray-700 hover:bg-gray-100 focus:ring-indigo-500"
+	default: // primary
+		return "bg-indigo-600 text-white hover:bg-indigo-500 focus:ring-indigo-500"
+	}
+}
+
+func buttonSize(size string) string {
+	switch size {
+	case "sm":
+		return "px-2.5 py-1.5 text-xs"
+	case "lg":
+		return "px-4 py-2.5 text-base"
+	default:
+		return "px-3 py-2 text-sm"
+	}
+}
+
+func iconButtonSize(size string) string {
+	switch size {
+	case "sm":
+		return "p-1"
+	case "lg":
+		return "p-2.5"
+	default:
+		return "p-2"
+	}
+}

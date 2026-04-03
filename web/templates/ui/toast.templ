@@ -1,0 +1,85 @@
+package ui
+
+// ToastContainer renders a fixed-position container for toast notifications.
+// Toasts are injected via htmx OOB swaps targeting this container.
+templ ToastContainer() {
+	<div id="toast-container" class="pointer-events-none fixed right-0 top-0 z-50 flex flex-col items-end gap-2 p-4">
+	</div>
+}
+
+// Toast renders a single notification.
+// Variant: "success", "error", "info", "warning".
+// Use hx-swap-oob="afterbegin:#toast-container" in server responses to inject.
+templ Toast(message, variant string) {
+	<div
+		class={ "pointer-events-auto w-80 animate-toast rounded-lg p-4 shadow-lg ring-1 ring-black/5", toastBg(variant) }
+		role="alert"
+	>
+		<div class="flex items-center gap-3">
+			<div class={ "shrink-0", toastIconColor(variant) }>
+				@Icon(toastIcon(variant), "md")
+			</div>
+			<p class={ "text-sm font-medium", toastTextColor(variant) }>{ message }</p>
+		</div>
+	</div>
+}
+
+// ToastOOB renders a toast with the OOB swap attribute so it can be included
+// in any htmx response to show a notification.
+templ ToastOOB(message, variant string) {
+	<div hx-swap-oob="afterbegin:#toast-container">
+		@Toast(message, variant)
+	</div>
+}
+
+func toastBg(variant string) string {
+	switch variant {
+	case "success":
+		return "bg-green-50"
+	case "error":
+		return "bg-red-50"
+	case "warning":
+		return "bg-yellow-50"
+	default: // info
+		return "bg-blue-50"
+	}
+}
+
+func toastIconColor(variant string) string {
+	switch variant {
+	case "success":
+		return "text-green-500"
+	case "error":
+		return "text-red-500"
+	case "warning":
+		return "text-yellow-500"
+	default:
+		return "text-blue-500"
+	}
+}
+
+func toastTextColor(variant string) string {
+	switch variant {
+	case "success":
+		return "text-green-800"
+	case "error":
+		return "text-red-800"
+	case "warning":
+		return "text-yellow-800"
+	default:
+		return "text-blue-800"
+	}
+}
+
+func toastIcon(variant string) string {
+	switch variant {
+	case "success":
+		return "check"
+	case "error":
+		return "x"
+	case "warning":
+		return "alert-triangle"
+	default:
+		return "eye"
+	}
+}

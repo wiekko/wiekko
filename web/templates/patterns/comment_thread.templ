@@ -1,0 +1,66 @@
+package patterns
+
+import (
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// CommentList renders a list of comments with an add form.
+templ CommentList(comments []templates.CommentView, hxPost, csrfToken string) {
+	<div class="space-y-4">
+		if len(comments) == 0 {
+			@ui.EmptyState("", "No comments yet", "Start the conversation by adding a comment.", "", "")
+		} else {
+			<div id="comments" class="space-y-4">
+				for _, c := range comments {
+					@commentItem(c)
+				}
+			</div>
+		}
+		<div class="border-t border-gray-200 pt-4">
+			@CommentForm(hxPost, csrfToken)
+		</div>
+	</div>
+}
+
+templ commentItem(c templates.CommentView) {
+	<div class="flex gap-3" id={ "comment-" + c.ID }>
+		@ui.UserAvatar(c.AuthorName, "md")
+		<div class="flex-1">
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-medium text-gray-900">{ c.AuthorName }</span>
+				<span class="text-xs text-gray-500">{ c.CreatedAt }</span>
+			</div>
+			<div class="mt-1 text-sm text-gray-700">
+				{ c.Body }
+			</div>
+		</div>
+	</div>
+}
+
+// CommentForm renders a new comment form using htmx.
+templ CommentForm(hxPost, csrfToken string) {
+	<form
+		hx-post={ hxPost }
+		hx-target="#comments"
+		hx-swap="beforeend"
+		class="flex gap-3"
+	>
+		<input type="hidden" name="_csrf" value={ csrfToken }/>
+		<div class="flex-1">
+			<textarea
+				name="body"
+				rows="2"
+				placeholder="Add a comment..."
+				required
+				class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm"
+			></textarea>
+		</div>
+		@ui.Button(ui.ButtonProps{
+			Label:   "Comment",
+			Variant: "primary",
+			Size:    "sm",
+			Type:    "submit",
+		})
+	</form>
+}

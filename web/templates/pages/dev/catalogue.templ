@@ -1,0 +1,547 @@
+package dev
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+templ CataloguePage() {
+	@layout.Base(templates.PageMeta{Title: "Component Catalogue"}) {
+		<div class="mx-auto max-w-7xl space-y-16 px-6 py-8">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-900">Component Catalogue</h1>
+				<p class="mt-2 text-gray-500">Visual reference for all Nexmap UI components.</p>
+			</div>
+
+			<!-- Typography -->
+			@section("Typography") {
+				<h1 class="text-3xl font-bold text-gray-900">Heading 1</h1>
+				<h2 class="text-2xl font-bold text-gray-900">Heading 2</h2>
+				<h3 class="text-xl font-semibold text-gray-900">Heading 3</h3>
+				<h4 class="text-lg font-semibold text-gray-900">Heading 4</h4>
+				<p class="text-sm text-gray-700">Body text — The quick brown fox jumps over the lazy dog.</p>
+				<p class="text-xs text-gray-500">Caption text — secondary information.</p>
+				<code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-sm text-gray-800">inline code</code>
+			}
+
+			<!-- Icons -->
+			@section("Icons") {
+				<div class="flex flex-wrap gap-4">
+					for _, name := range iconNames() {
+						<div class="flex flex-col items-center gap-1 rounded-lg border border-gray-200 p-3">
+							@ui.Icon(name, "md")
+							<span class="text-xs text-gray-500">{ name }</span>
+						</div>
+					}
+				</div>
+				<div class="mt-4 flex items-center gap-4">
+					<div class="flex items-center gap-2">
+						@ui.Icon("home", "sm")
+						<span class="text-xs text-gray-500">sm</span>
+					</div>
+					<div class="flex items-center gap-2">
+						@ui.Icon("home", "md")
+						<span class="text-xs text-gray-500">md</span>
+					</div>
+					<div class="flex items-center gap-2">
+						@ui.Icon("home", "lg")
+						<span class="text-xs text-gray-500">lg</span>
+					</div>
+				</div>
+			}
+
+			<!-- Buttons -->
+			@section("Buttons") {
+				<div class="space-y-4">
+					<div class="flex flex-wrap items-center gap-3">
+						@ui.Button(ui.ButtonProps{Label: "Primary", Variant: "primary", Size: "md"})
+						@ui.Button(ui.ButtonProps{Label: "Secondary", Variant: "secondary", Size: "md"})
+						@ui.Button(ui.ButtonProps{Label: "Danger", Variant: "danger", Size: "md"})
+						@ui.Button(ui.ButtonProps{Label: "Ghost", Variant: "ghost", Size: "md"})
+						@ui.Button(ui.ButtonProps{Label: "Disabled", Variant: "primary", Size: "md", Disabled: true})
+					</div>
+					<div class="flex flex-wrap items-center gap-3">
+						@ui.Button(ui.ButtonProps{Label: "Small", Variant: "primary", Size: "sm"})
+						@ui.Button(ui.ButtonProps{Label: "Medium", Variant: "primary", Size: "md"})
+						@ui.Button(ui.ButtonProps{Label: "Large", Variant: "primary", Size: "lg"})
+					</div>
+					<div class="flex flex-wrap items-center gap-3">
+						@ui.Button(ui.ButtonProps{Label: "With Icon", Variant: "primary", Size: "md"}) {
+							@ui.Icon("plus", "sm")
+						}
+						@ui.IconButton("edit", "Edit", "secondary", "md")
+						@ui.IconButton("trash", "Delete", "danger", "md")
+						@ui.LinkButton("#", "Link Button", "secondary", "md")
+					</div>
+				</div>
+			}
+
+			<!-- Badges -->
+			@section("Badges") {
+				<div class="space-y-4">
+					<div class="flex flex-wrap gap-2">
+						@ui.Badge("Green", "green")
+						@ui.Badge("Yellow", "yellow")
+						@ui.Badge("Red", "red")
+						@ui.Badge("Blue", "blue")
+						@ui.Badge("Indigo", "indigo")
+						@ui.Badge("Amber", "amber")
+						@ui.Badge("Gray", "gray")
+					</div>
+					<div class="flex flex-wrap gap-2">
+						@patterns.StatusBadge("Open", false)
+						@patterns.StatusBadge("Closed", true)
+						@patterns.PriorityBadge(1)
+						@patterns.PriorityBadge(2)
+						@patterns.PriorityBadge(3)
+						@patterns.PriorityBadge(4)
+						@patterns.PriorityBadge(5)
+					</div>
+					<div class="flex flex-wrap gap-2">
+						@patterns.CriticalityBadge("critical")
+						@patterns.CriticalityBadge("high")
+						@patterns.CriticalityBadge("medium")
+						@patterns.CriticalityBadge("low")
+					</div>
+					<div class="flex flex-wrap gap-2">
+						@patterns.CategoryBadge("architecture")
+						@patterns.CategoryBadge("security")
+						@patterns.CategoryBadge("functionality")
+						@patterns.CategoryBadge("ux")
+					</div>
+					<div class="flex flex-wrap gap-2">
+						@patterns.RoleBadge("owner")
+						@patterns.RoleBadge("developer")
+						@patterns.RoleBadge("tester")
+						@patterns.RoleBadge("viewer")
+					</div>
+					<div class="flex flex-wrap gap-2">
+						@patterns.EstimationBadge("5", "story_points")
+						@patterns.EstimationBadge("M", "tshirt_sizes")
+						@patterns.EstimationBadge("8", "hours")
+					</div>
+				</div>
+			}
+
+			<!-- Inputs -->
+			@section("Inputs") {
+				<div class="grid max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+					@ui.TextInput(ui.InputProps{ID: "demo-text", Name: "text", Label: "Text Input", Placeholder: "Enter text..."})
+					@ui.TextInput(ui.InputProps{ID: "demo-email", Name: "email", Label: "Email", Type: "email", Placeholder: "you@example.com"})
+					@ui.TextInput(ui.InputProps{ID: "demo-password", Name: "password", Label: "Password", Type: "password", Placeholder: "••••••••"})
+					@ui.TextInput(ui.InputProps{ID: "demo-error", Name: "error", Label: "With Error", Value: "bad value", Error: "This field is invalid"})
+					@ui.TextInput(ui.InputProps{ID: "demo-disabled", Name: "disabled", Label: "Disabled", Value: "Can't edit", Disabled: true})
+					@ui.TextInput(ui.InputProps{ID: "demo-help", Name: "help", Label: "With Help", HelpText: "This is help text"})
+					@ui.TextInput(ui.InputProps{ID: "demo-required", Name: "required", Label: "Required Field", Required: true})
+					@ui.DateInput(ui.InputProps{ID: "demo-date", Name: "date", Label: "Date Input"})
+				</div>
+				<div class="mt-6 max-w-2xl space-y-6">
+					@ui.TextArea(ui.TextAreaProps{ID: "demo-textarea", Name: "textarea", Label: "Textarea", Placeholder: "Write something...", Rows: 3})
+					@ui.Select(ui.SelectProps{
+						ID: "demo-select", Name: "select", Label: "Select",
+						Options: []templates.SelectOption{
+							{Value: "", Label: "Choose an option..."},
+							{Value: "a", Label: "Option A"},
+							{Value: "b", Label: "Option B"},
+							{Value: "c", Label: "Option C"},
+						},
+					})
+					<div class="space-y-2">
+						@ui.Checkbox("demo-check1", "check1", "Unchecked checkbox", false, false)
+						@ui.Checkbox("demo-check2", "check2", "Checked checkbox", true, false)
+						@ui.Checkbox("demo-check3", "check3", "Disabled checkbox", false, true)
+					</div>
+				</div>
+			}
+
+			<!-- Cards -->
+			@section("Cards") {
+				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+					@ui.Card() {
+						@ui.CardHeader("Simple Card") {
+							@ui.Button(ui.ButtonProps{Label: "Action", Variant: "secondary", Size: "sm"})
+						}
+						@ui.CardBody() {
+							<p class="text-sm text-gray-500">Card body content goes here.</p>
+						}
+						@ui.CardFooter() {
+							@ui.Button(ui.ButtonProps{Label: "Cancel", Variant: "secondary", Size: "sm"})
+							@ui.Button(ui.ButtonProps{Label: "Save", Variant: "primary", Size: "sm"})
+						}
+					}
+					@ui.Card() {
+						@ui.CardBody() {
+							<p class="text-sm text-gray-500">A card with only a body — no header or footer.</p>
+						}
+					}
+				</div>
+			}
+
+			<!-- Table -->
+			@section("Table") {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.SortHeader("Name", "name", "name", "asc", "#", "#table-body")
+						@ui.SortHeader("Status", "status", "name", "", "#", "#table-body")
+						@ui.TableHeader() {
+							Priority
+						}
+						@ui.TableHeader() {
+							Actions
+						}
+					}
+					@ui.TableBody("table-body") {
+						@ui.TableRow("") {
+							@ui.TableCell() {
+								Login page redesign
+							}
+							@ui.TableCell() {
+								@patterns.StatusBadge("Open", false)
+							}
+							@ui.TableCell() {
+								@patterns.PriorityBadge(1)
+							}
+							@ui.TableCellMuted() {
+								@ui.IconButton("edit", "Edit", "ghost", "sm")
+							}
+						}
+						@ui.TableRow("") {
+							@ui.TableCell() {
+								API authentication
+							}
+							@ui.TableCell() {
+								@patterns.StatusBadge("Closed", true)
+							}
+							@ui.TableCell() {
+								@patterns.PriorityBadge(3)
+							}
+							@ui.TableCellMuted() {
+								@ui.IconButton("edit", "Edit", "ghost", "sm")
+							}
+						}
+					}
+				}
+			}
+
+			<!-- Breadcrumbs -->
+			@section("Breadcrumbs") {
+				<div class="space-y-4">
+					@ui.Breadcrumb([]templates.BreadcrumbItem{
+						{Label: "Products", Href: "#"},
+						{Label: "Nexmap", Href: "#"},
+						{Label: "Requirements"},
+					})
+					@ui.Breadcrumb([]templates.BreadcrumbItem{
+						{Label: "Home", Href: "#"},
+						{Label: "Current Page"},
+					})
+				</div>
+			}
+
+			<!-- Tabs -->
+			@section("Tabs") {
+				@ui.TabGroup([]templates.TabDef{
+					{ID: "overview", Label: "Overview", Active: true},
+					{ID: "comments", Label: "Comments"},
+					{ID: "history", Label: "History"},
+				})
+				@ui.TabPanel("overview") {
+					<p class="text-sm text-gray-500">Overview tab content goes here.</p>
+				}
+			}
+
+			<!-- Pagination -->
+			@section("Pagination") {
+				@ui.Pagination(3, 10, "#", "#main")
+			}
+
+			<!-- Avatars -->
+			@section("Avatars") {
+				<div class="flex items-center gap-4">
+					@ui.UserAvatar("Alice Johnson", "sm")
+					@ui.UserAvatar("Bob Smith", "md")
+					@ui.UserAvatar("Charlie Brown", "lg")
+					@ui.UserAvatar("Diana Prince", "md")
+					@ui.UserAvatar("Eve Adams", "md")
+				</div>
+			}
+
+			<!-- Tooltips -->
+			@section("Tooltips") {
+				<div class="flex gap-6">
+					@ui.Tooltip("This is a tooltip") {
+						@ui.Button(ui.ButtonProps{Label: "Hover me", Variant: "secondary", Size: "md"})
+					}
+					@ui.Tooltip("Another tooltip") {
+						<span class="text-sm text-indigo-600 underline">Hover this text</span>
+					}
+				</div>
+			}
+
+			<!-- Progress Bars -->
+			@section("Progress Bars") {
+				<div class="max-w-md space-y-4">
+					@ui.ProgressBar(75, "indigo", "Sprint Progress")
+					@ui.ProgressBar(90, "green", "Campaign Pass Rate")
+					@ui.ProgressBar(30, "yellow", "Coverage")
+					@ui.ProgressBar(15, "red", "Overdue Items")
+				</div>
+			}
+
+			<!-- Spinners -->
+			@section("Spinners") {
+				<div class="flex items-center gap-6">
+					@ui.LoadingSpinner("sm")
+					@ui.LoadingSpinner("md")
+					@ui.LoadingSpinner("lg")
+					@ui.HtmxIndicator()
+				</div>
+				<div class="mt-4">
+					<p class="mb-2 text-sm text-gray-500">Skeleton rows (3 columns):</p>
+					<table class="w-full max-w-lg">
+						<tbody>
+							@ui.SkeletonRow(3)
+							@ui.SkeletonRow(3)
+						</tbody>
+					</table>
+				</div>
+			}
+
+			<!-- Empty State -->
+			@section("Empty States") {
+				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+					<div class="rounded-lg border border-dashed border-gray-300 p-4">
+						@ui.EmptyState("clipboard-list", "No requirements", "Get started by creating a new requirement.", "New Requirement", "#")
+					</div>
+					<div class="rounded-lg border border-dashed border-gray-300 p-4">
+						@ui.EmptyState("bug", "No defects found", "All clear! No defects match your filters.", "", "")
+					</div>
+				</div>
+			}
+
+			<!-- Dropdowns -->
+			@section("Dropdowns") {
+				<div class="flex gap-8">
+					@ui.DropdownMenu("demo-dropdown") {
+						@ui.DropdownTrigger() {
+							@ui.Button(ui.ButtonProps{Label: "Actions", Variant: "secondary", Size: "md"}) {
+								@ui.Icon("chevron-down", "sm")
+							}
+						}
+						@ui.DropdownContent() {
+							@ui.DropdownItem("Edit", "#", "edit", false)
+							@ui.DropdownItem("Duplicate", "#", "folder", false)
+							@ui.DropdownDivider()
+							@ui.DropdownItem("Delete", "#", "trash", true)
+						}
+					}
+				</div>
+			}
+
+			<!-- Toast Notifications -->
+			@section("Toast Notifications") {
+				<div class="space-y-3">
+					@ui.Toast("Operation completed successfully.", "success")
+					@ui.Toast("Something went wrong. Please try again.", "error")
+					@ui.Toast("Please review the changes before proceeding.", "warning")
+					@ui.Toast("A new version is available.", "info")
+				</div>
+			}
+
+			<!-- Forms Pattern -->
+			@section("Form Patterns") {
+				<div class="max-w-2xl space-y-6">
+					@patterns.FormError("There was a problem with your submission.")
+					@patterns.FormSection("General Information", "Basic details about the item.") {
+						@ui.TextInput(ui.InputProps{ID: "form-name", Name: "name", Label: "Name", Placeholder: "Enter name...", Required: true})
+						@ui.Select(ui.SelectProps{
+							ID: "form-category", Name: "category", Label: "Category",
+							Options: []templates.SelectOption{
+								{Value: "functionality", Label: "Functionality"},
+								{Value: "architecture", Label: "Architecture"},
+								{Value: "security", Label: "Security"},
+								{Value: "ux", Label: "UX"},
+							},
+						})
+					}
+					@patterns.FormActions("Create", "#")
+				</div>
+			}
+
+			<!-- List Page Header -->
+			@section("List Page Header") {
+				@patterns.ListPageHeader("Requirements", "#", "New Requirement", 42)
+			}
+
+			<!-- Detail Page Header -->
+			@section("Detail Page Header") {
+				@patterns.DetailPageHeader(
+					[]templates.BreadcrumbItem{
+						{Label: "Products", Href: "#"},
+						{Label: "Nexmap", Href: "#"},
+						{Label: "REQ-001"},
+					},
+					"Login page redesign",
+					"Created by Alice Johnson · Updated 2 hours ago",
+					"#",
+					"#",
+					"demo-csrf-token",
+				) {
+					@patterns.StatusBadge("Open", false)
+				}
+			}
+
+			<!-- Detail Fields -->
+			@section("Detail Fields") {
+				@patterns.DetailGrid() {
+					@patterns.DetailField("Status", "Open")
+					@patterns.DetailField("Priority", "High")
+					@patterns.DetailField("Category", "Functionality")
+					@patterns.DetailField("Sprint", "Sprint 14")
+					@patterns.DetailField("Estimation", "5 story points")
+					@patterns.DetailField("Empty Field", "")
+				}
+			}
+
+			<!-- Search -->
+			@section("Search Input") {
+				<div class="max-w-md">
+					@patterns.SearchInput("Search requirements...", "#", "#results")
+				</div>
+			}
+
+			<!-- Filter Bar -->
+			@section("Filter Bar") {
+				<div class="space-y-4">
+					<div class="flex flex-wrap gap-2">
+						@patterns.FilterChip("Status", "Open")
+						@patterns.FilterChip("Category", "Functionality")
+					</div>
+					@patterns.FilterBar("#", "#results") {
+						<div class="w-40">
+							@ui.Select(ui.SelectProps{
+								ID: "filter-status", Name: "status", Label: "Status",
+								Options: []templates.SelectOption{
+									{Value: "", Label: "All"},
+									{Value: "open", Label: "Open"},
+									{Value: "closed", Label: "Closed"},
+								},
+							})
+						</div>
+						<div class="w-40">
+							@ui.Select(ui.SelectProps{
+								ID: "filter-category", Name: "category", Label: "Category",
+								Options: []templates.SelectOption{
+									{Value: "", Label: "All"},
+									{Value: "functionality", Label: "Functionality"},
+									{Value: "security", Label: "Security"},
+								},
+							})
+						</div>
+					}
+				</div>
+			}
+
+			<!-- Comment Thread -->
+			@section("Comment Thread") {
+				<div class="max-w-2xl">
+					@patterns.CommentList(
+						[]templates.CommentView{
+							{ID: "1", AuthorName: "Alice Johnson", Body: "This looks good. I think we should also consider the edge case when the user session expires.", CreatedAt: "2 hours ago", IsOwner: false},
+							{ID: "2", AuthorName: "Bob Smith", Body: "Agreed. I'll add a test case for that.", CreatedAt: "1 hour ago", IsOwner: true},
+						},
+						"#",
+						"demo-csrf-token",
+					)
+				</div>
+			}
+
+			<!-- Attachment List -->
+			@section("Attachment List") {
+				<div class="max-w-2xl">
+					@patterns.AttachmentList(
+						[]patterns.AttachmentView{
+							{ID: "1", Filename: "mockup-v2.png", ContentType: "image/png", Size: "245 KB", DownloadURL: "#", DeleteURL: "#"},
+							{ID: "2", Filename: "api-spec.pdf", ContentType: "application/pdf", Size: "1.2 MB", DownloadURL: "#", DeleteURL: "#"},
+						},
+						"demo-csrf-token",
+					)
+				</div>
+			}
+
+			<!-- Assignment Picker -->
+			@section("Assignment Picker") {
+				<div class="max-w-md">
+					@patterns.AssigneeList(
+						[]templates.AssigneeView{
+							{UserID: "1", DisplayName: "Alice Johnson"},
+							{UserID: "2", DisplayName: "Bob Smith"},
+						},
+						"#",
+						"demo-csrf-token",
+					)
+					@patterns.AssigneeAdd(
+						[]templates.MemberView{
+							{UserID: "3", DisplayName: "Charlie Brown", Role: "developer"},
+							{UserID: "4", DisplayName: "Diana Prince", Role: "tester"},
+						},
+						"#",
+						"demo-csrf-token",
+					)
+				</div>
+			}
+
+			<!-- Audit Trail -->
+			@section("Audit Trail") {
+				<div class="max-w-2xl">
+					@patterns.AuditTimeline([]templates.AuditEntryView{
+						{ID: "1", UserName: "Alice Johnson", Action: "create", CreatedAt: "3 days ago"},
+						{ID: "2", UserName: "Bob Smith", Action: "update", FieldName: "status", OldValue: "New", NewValue: "Open", CreatedAt: "2 days ago"},
+						{ID: "3", UserName: "Alice Johnson", Action: "update", FieldName: "priority", OldValue: "3", NewValue: "1", CreatedAt: "1 day ago"},
+					})
+				</div>
+			}
+
+			<!-- Modal -->
+			@section("Modal (Confirm Dialog)") {
+				<p class="text-sm text-gray-500">Modals are rendered into the <code>#modal</code> container via htmx. Here's a static preview:</p>
+				<div class="mt-4 rounded-lg border border-gray-200 p-6">
+					<div class="mx-auto max-w-md rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
+						<div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+							<h3 class="text-lg font-semibold text-gray-900">Delete Requirement</h3>
+						</div>
+						<div class="px-6 py-4">
+							<p class="text-sm text-gray-500">Are you sure you want to delete this requirement? This action cannot be undone.</p>
+							<div class="mt-4 flex justify-end gap-3">
+								@ui.Button(ui.ButtonProps{Label: "Cancel", Variant: "secondary", Size: "md"})
+								@ui.Button(ui.ButtonProps{Label: "Delete", Variant: "danger", Size: "md"})
+							</div>
+						</div>
+					</div>
+				</div>
+			}
+
+		</div>
+	}
+}
+
+templ section(title string) {
+	<div class="space-y-4">
+		<h2 class="border-b border-gray-200 pb-2 text-xl font-bold text-gray-900">{ title }</h2>
+		{ children... }
+	</div>
+}
+
+func iconNames() []string {
+	return []string{
+		"plus", "edit", "trash", "search", "filter",
+		"chevron-right", "chevron-down", "chevron-left",
+		"check", "x", "alert-triangle",
+		"bug", "clipboard-list", "beaker", "calendar",
+		"flag", "users", "settings", "logout",
+		"home", "folder", "eye", "link",
+		"upload", "download", "clock",
+	}
+}

@@ -1,0 +1,12 @@
+package ui
+
+// Tooltip renders a CSS-only hover tooltip around its children.
+templ Tooltip(text string) {
+	<span class="group/tooltip relative inline-flex">
+		{ children... }
+		<span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover/tooltip:opacity-100">
+			{ text }
+			<span class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></span>
+		</span>
+	</span>
+}

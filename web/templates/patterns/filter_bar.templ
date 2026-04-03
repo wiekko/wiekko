@@ -1,0 +1,29 @@
+package patterns
+
+import "nexmap.net/web/templates/ui"
+
+// FilterBar renders a horizontal bar with filter controls.
+// Filter inputs are provided as children (e.g., Select, TextInput).
+templ FilterBar(hxGet, hxTarget string) {
+	<div
+		class="flex flex-wrap items-end gap-4 rounded-lg bg-gray-50 p-4"
+		hx-get={ hxGet }
+		hx-target={ hxTarget }
+		hx-swap="innerHTML"
+		hx-trigger="change"
+		hx-include="[name]"
+		hx-push-url="true"
+	>
+		{ children... }
+	</div>
+}
+
+// FilterChip renders an active filter indicator with a remove button.
+templ FilterChip(label, value string) {
+	<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-700/10 ring-inset">
+		{ label }: { value }
+		<button type="button" class="ml-1 text-indigo-500 hover:text-indigo-700">
+			@ui.Icon("x", "sm")
+		</button>
+	</span>
+}

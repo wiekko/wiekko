@@ -69,6 +69,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_ENCRYPTION_KEY"); v != "" {
 		cfg.EncryptionKey = v
 	}
+	if v := os.Getenv("NEXMAP_DEV_MODE"); v != "" {
+		cfg.DevMode = v == "true" || v == "1"
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {

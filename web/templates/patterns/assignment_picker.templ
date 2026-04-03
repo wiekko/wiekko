@@ -1,0 +1,69 @@
+package patterns
+
+import (
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// AssigneeList renders the list of assigned users with remove capability.
+templ AssigneeList(assignees []templates.AssigneeView, removeBaseURL, csrfToken string) {
+	<div class="space-y-4">
+		if len(assignees) == 0 {
+			@ui.EmptyState("users", "No assignees", "Add team members to this item.", "", "")
+		} else {
+			<ul id="assignees" class="space-y-2">
+				for _, a := range assignees {
+					@assigneeItem(a, removeBaseURL, csrfToken)
+				}
+			</ul>
+		}
+	</div>
+}
+
+templ assigneeItem(a templates.AssigneeView, removeBaseURL, csrfToken string) {
+	<li class="flex items-center justify-between rounded-md px-3 py-2 hover:bg-gray-50" id={ "assignee-" + a.UserID }>
+		<div class="flex items-center gap-2">
+			@ui.UserAvatar(a.DisplayName, "sm")
+			<span class="text-sm font-medium text-gray-900">{ a.DisplayName }</span>
+		</div>
+		if removeBaseURL != "" {
+			<button
+				type="button"
+				class="text-gray-400 hover:text-red-500"
+				hx-delete={ removeBaseURL + "/" + a.UserID }
+				hx-target={ "#assignee-" + a.UserID }
+				hx-swap="outerHTML"
+			>
+				@ui.Icon("x", "sm")
+			</button>
+		}
+	</li>
+}
+
+// AssigneeAdd renders a dropdown to add a new assignee.
+templ AssigneeAdd(members []templates.MemberView, hxPost, csrfToken string) {
+	<form
+		hx-post={ hxPost }
+		hx-target="#assignees"
+		hx-swap="beforeend"
+		class="flex items-center gap-3 pt-3"
+	>
+		<input type="hidden" name="_csrf" value={ csrfToken }/>
+		<select
+			name="user_id"
+			required
+			class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm"
+		>
+			<option value="">Select member…</option>
+			for _, m := range members {
+				<option value={ m.UserID }>{ m.DisplayName } ({ m.Role })</option>
+			}
+		</select>
+		@ui.Button(ui.ButtonProps{
+			Label:   "Add",
+			Variant: "secondary",
+			Size:    "sm",
+			Type:    "submit",
+		})
+	</form>
+}

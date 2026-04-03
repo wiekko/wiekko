@@ -1,0 +1,60 @@
+package ui
+
+import "strings"
+
+// UserAvatar renders a circular initials-based avatar with a deterministic color.
+// Sizes: "sm" (24px), "md" (32px), "lg" (40px).
+templ UserAvatar(displayName, size string) {
+	<span
+		class={ "inline-flex items-center justify-center rounded-full font-medium text-white",
+			avatarSize(size),
+			avatarColor(displayName) }
+		title={ displayName }
+	>
+		{ initials(displayName) }
+	</span>
+}
+
+func initials(name string) string {
+	parts := strings.Fields(name)
+	switch len(parts) {
+	case 0:
+		return "?"
+	case 1:
+		return strings.ToUpper(parts[0][:1])
+	default:
+		return strings.ToUpper(parts[0][:1] + parts[len(parts)-1][:1])
+	}
+}
+
+func avatarSize(size string) string {
+	switch size {
+	case "sm":
+		return "h-6 w-6 text-xs"
+	case "lg":
+		return "h-10 w-10 text-sm"
+	default:
+		return "h-8 w-8 text-xs"
+	}
+}
+
+func avatarColor(name string) string {
+	colors := []string{
+		"bg-indigo-500",
+		"bg-emerald-500",
+		"bg-amber-500",
+		"bg-rose-500",
+		"bg-cyan-500",
+		"bg-violet-500",
+		"bg-orange-500",
+		"bg-teal-500",
+	}
+	hash := 0
+	for _, c := range name {
+		hash = hash*31 + int(c)
+	}
+	if hash < 0 {
+		hash = -hash
+	}
+	return colors[hash%len(colors)]
+}

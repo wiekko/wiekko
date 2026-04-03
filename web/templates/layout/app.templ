@@ -1,0 +1,45 @@
+package templates
+
+import (
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// AppLayoutProps holds the data needed by the app layout.
+type AppLayoutProps struct {
+	Meta          templates.PageMeta
+	DisplayName   string
+	IsAdmin       bool
+	ActiveSection string
+	ProductID     string
+	ProductName   string
+}
+
+// AppLayout renders the authenticated app shell: sidebar + header + content + toast container.
+templ AppLayout(props AppLayoutProps) {
+	@Base(props.Meta) {
+		<div
+			class="flex h-full"
+			if props.Meta.CSRFToken != "" {
+				hx-headers={ `{"X-CSRF-Token":"` + props.Meta.CSRFToken + `"}` }
+			}
+		>
+			<!-- Sidebar -->
+			@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.IsAdmin)
+			<!-- Main area -->
+			<div class="flex flex-1 flex-col overflow-hidden">
+				<!-- Header -->
+				@patterns.AppHeader(props.DisplayName, props.Meta.CSRFToken, props.IsAdmin)
+				<!-- Content -->
+				<main id="main-content" class="flex-1 overflow-y-auto p-6">
+					{ children... }
+				</main>
+			</div>
+		</div>
+		<!-- Toast container -->
+		@ui.ToastContainer()
+		<!-- Modal container -->
+		@ui.ModalContainer()
+	}
+}

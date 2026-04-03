@@ -1,0 +1,118 @@
+package ui
+
+// Table renders a responsive table wrapper.
+templ Table() {
+	<div class="overflow-x-auto">
+		<table class="min-w-full divide-y divide-gray-200">
+			{ children... }
+		</table>
+	</div>
+}
+
+// TableHead renders a table header row.
+templ TableHead() {
+	<thead class="bg-gray-50">
+		<tr>
+			{ children... }
+		</tr>
+	</thead>
+}
+
+// TableHeader renders a column header cell.
+templ TableHeader() {
+	<th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+		{ children... }
+	</th>
+}
+
+// SortHeader renders a clickable sortable column header using htmx.
+templ SortHeader(label, sortField, currentSort, currentDir, hxGet, hxTarget string) {
+	<th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+		<button
+			type="button"
+			class="group inline-flex items-center gap-1"
+			hx-get={ buildSortURL(hxGet, sortField, currentSort, currentDir) }
+			hx-target={ hxTarget }
+			hx-swap="innerHTML"
+		>
+			{ label }
+			<span class={ "text-gray-400", sortIndicatorClass(sortField, currentSort) }>
+				if sortField == currentSort && currentDir == "desc" {
+					@Icon("chevron-down", "sm")
+				} else {
+					@Icon("chevron-right", "sm")
+				}
+			</span>
+		</button>
+	</th>
+}
+
+// TableBody renders a table body with an htmx target id.
+templ TableBody(id string) {
+	<tbody
+		if id != "" {
+			id={ id }
+		}
+		class="divide-y divide-gray-200 bg-white"
+	>
+		{ children... }
+	</tbody>
+}
+
+// TableRow renders a table row with optional htmx click navigation.
+templ TableRow(hxGet string) {
+	<tr
+		if hxGet != "" {
+			hx-get={ hxGet }
+			hx-push-url="true"
+			hx-target="#main-content"
+			hx-swap="innerHTML"
+		}
+		class={ "transition-colors", rowClass(hxGet) }
+	>
+		{ children... }
+	</tr>
+}
+
+// TableCell renders a table data cell.
+templ TableCell() {
+	<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+		{ children... }
+	</td>
+}
+
+// TableCellMuted renders a table data cell with muted text.
+templ TableCellMuted() {
+	<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+		{ children... }
+	</td>
+}
+
+func rowClass(hxGet string) string {
+	if hxGet != "" {
+		return "cursor-pointer hover:bg-gray-50"
+	}
+	return ""
+}
+
+func sortIndicatorClass(sortField, currentSort string) string {
+	if sortField == currentSort {
+		return "text-indigo-600"
+	}
+	return "invisible group-hover:visible"
+}
+
+func buildSortURL(base, field, currentSort, currentDir string) string {
+	dir := "asc"
+	if field == currentSort && currentDir == "asc" {
+		dir = "desc"
+	}
+	sep := "?"
+	for _, c := range base {
+		if c == '?' {
+			sep = "&"
+			break
+		}
+	}
+	return base + sep + "sort=" + field + "&dir=" + dir
+}

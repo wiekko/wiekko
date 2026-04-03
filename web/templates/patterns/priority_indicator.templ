@@ -1,0 +1,89 @@
+package patterns
+
+import (
+	"fmt"
+	"nexmap.net/web/templates/ui"
+)
+
+// PriorityBadge renders a color-coded priority indicator.
+// 1=critical (red), 2=high (amber), 3=medium (yellow), 4=low (blue), 5+=info (gray).
+templ PriorityBadge(priority int) {
+	@ui.Badge(fmt.Sprintf("P%d", priority), priorityColor(priority))
+}
+
+// CriticalityBadge renders a badge for defect criticality.
+// Values: "critical", "high", "medium", "low".
+templ CriticalityBadge(criticality string) {
+	@ui.Badge(criticality, criticalityColor(criticality))
+}
+
+// CategoryBadge renders a badge for requirement category.
+// Values: "architecture", "security", "functionality", "ux".
+templ CategoryBadge(category string) {
+	@ui.Badge(category, categoryColor(category))
+}
+
+// RoleBadge renders a badge for a user's product role.
+templ RoleBadge(role string) {
+	@ui.Badge(role, roleColor(role))
+}
+
+func priorityColor(p int) string {
+	switch p {
+	case 1:
+		return "red"
+	case 2:
+		return "amber"
+	case 3:
+		return "yellow"
+	case 4:
+		return "blue"
+	default:
+		return "gray"
+	}
+}
+
+func criticalityColor(c string) string {
+	switch c {
+	case "critical":
+		return "red"
+	case "high":
+		return "amber"
+	case "medium":
+		return "yellow"
+	case "low":
+		return "blue"
+	default:
+		return "gray"
+	}
+}
+
+func categoryColor(c string) string {
+	switch c {
+	case "architecture":
+		return "indigo"
+	case "security":
+		return "red"
+	case "functionality":
+		return "blue"
+	case "ux":
+		return "green"
+	default:
+		return "gray"
+	}
+}
+
+func roleColor(r string) string {
+	switch r {
+	case "owner":
+		return "indigo"
+	case "developer":
+		return "blue"
+	case "tester":
+		return "green"
+	case "viewer":
+		return "gray"
+	default:
+		return "gray"
+	}
+}

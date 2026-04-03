@@ -1,0 +1,236 @@
+package ui
+
+import "nexmap.net/web/templates"
+
+// InputProps configures a text input field.
+type InputProps struct {
+	ID          string
+	Name        string
+	Label       string
+	Value       string
+	Placeholder string
+	Type        string // "text", "email", "password", "number", "url"
+	Required    bool
+	Disabled    bool
+	Error       string
+	HelpText    string
+}
+
+// TextInput renders a labeled text input with optional error and help text.
+templ TextInput(props InputProps) {
+	<div>
+		if props.Label != "" {
+			<label for={ props.ID } class="block text-sm font-medium text-gray-700">
+				{ props.Label }
+				if props.Required {
+					<span class="text-red-500">*</span>
+				}
+			</label>
+		}
+		<div class="mt-1">
+			<input
+				type={ inputType(props.Type) }
+				id={ props.ID }
+				name={ props.Name }
+				value={ props.Value }
+				placeholder={ props.Placeholder }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm",
+					inputRing(props.Error),
+					disabledClass(props.Disabled) }
+				if props.Error != "" {
+					aria-invalid="true"
+					aria-describedby={ props.ID + "-error" }
+				}
+			/>
+		</div>
+		if props.Error != "" {
+			<p id={ props.ID + "-error" } class="mt-1 text-sm text-red-600">{ props.Error }</p>
+		} else if props.HelpText != "" {
+			<p class="mt-1 text-sm text-gray-500">{ props.HelpText }</p>
+		}
+	</div>
+}
+
+// TextAreaProps configures a textarea field.
+type TextAreaProps struct {
+	ID          string
+	Name        string
+	Label       string
+	Value       string
+	Placeholder string
+	Rows        int
+	Required    bool
+	Disabled    bool
+	Error       string
+	HelpText    string
+}
+
+// TextArea renders a labeled textarea.
+templ TextArea(props TextAreaProps) {
+	<div>
+		if props.Label != "" {
+			<label for={ props.ID } class="block text-sm font-medium text-gray-700">
+				{ props.Label }
+				if props.Required {
+					<span class="text-red-500">*</span>
+				}
+			</label>
+		}
+		<div class="mt-1">
+			<textarea
+				id={ props.ID }
+				name={ props.Name }
+				rows={ textAreaRows(props.Rows) }
+				placeholder={ props.Placeholder }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm",
+					inputRing(props.Error),
+					disabledClass(props.Disabled) }
+				if props.Error != "" {
+					aria-invalid="true"
+					aria-describedby={ props.ID + "-error" }
+				}
+			>{ props.Value }</textarea>
+		</div>
+		if props.Error != "" {
+			<p id={ props.ID + "-error" } class="mt-1 text-sm text-red-600">{ props.Error }</p>
+		} else if props.HelpText != "" {
+			<p class="mt-1 text-sm text-gray-500">{ props.HelpText }</p>
+		}
+	</div>
+}
+
+// SelectProps configures a select dropdown.
+type SelectProps struct {
+	ID       string
+	Name     string
+	Label    string
+	Value    string
+	Options  []templates.SelectOption
+	Required bool
+	Disabled bool
+	Error    string
+	HelpText string
+}
+
+// Select renders a labeled select dropdown.
+templ Select(props SelectProps) {
+	<div>
+		if props.Label != "" {
+			<label for={ props.ID } class="block text-sm font-medium text-gray-700">
+				{ props.Label }
+				if props.Required {
+					<span class="text-red-500">*</span>
+				}
+			</label>
+		}
+		<div class="mt-1">
+			<select
+				id={ props.ID }
+				name={ props.Name }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm",
+					inputRing(props.Error),
+					disabledClass(props.Disabled) }
+			>
+				for _, opt := range props.Options {
+					<option value={ opt.Value } selected?={ opt.Value == props.Value || opt.Selected }>
+						{ opt.Label }
+					</option>
+				}
+			</select>
+		</div>
+		if props.Error != "" {
+			<p id={ props.ID + "-error" } class="mt-1 text-sm text-red-600">{ props.Error }</p>
+		} else if props.HelpText != "" {
+			<p class="mt-1 text-sm text-gray-500">{ props.HelpText }</p>
+		}
+	</div>
+}
+
+// Checkbox renders a labeled checkbox input.
+templ Checkbox(id, name, label string, checked, disabled bool) {
+	<div class="flex items-center gap-2">
+		<input
+			type="checkbox"
+			id={ id }
+			name={ name }
+			checked?={ checked }
+			disabled?={ disabled }
+			class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+		/>
+		if label != "" {
+			<label for={ id } class="text-sm text-gray-700">{ label }</label>
+		}
+	</div>
+}
+
+// DateInput renders a labeled date input.
+templ DateInput(props InputProps) {
+	@TextInput(InputProps{
+		ID:          props.ID,
+		Name:        props.Name,
+		Label:       props.Label,
+		Value:       props.Value,
+		Placeholder: props.Placeholder,
+		Type:        "date",
+		Required:    props.Required,
+		Disabled:    props.Disabled,
+		Error:       props.Error,
+		HelpText:    props.HelpText,
+	})
+}
+
+func inputType(t string) string {
+	switch t {
+	case "email", "password", "number", "url", "date":
+		return t
+	default:
+		return "text"
+	}
+}
+
+func inputRing(errMsg string) string {
+	if errMsg != "" {
+		return "ring-red-300 focus:ring-red-500"
+	}
+	return "ring-gray-300"
+}
+
+func disabledClass(disabled bool) string {
+	if disabled {
+		return "bg-gray-50 text-gray-500"
+	}
+	return ""
+}
+
+func textAreaRows(rows int) string {
+	if rows <= 0 {
+		rows = 4
+	}
+	return itoa(rows)
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	s := ""
+	neg := false
+	if n < 0 {
+		neg = true
+		n = -n
+	}
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	if neg {
+		s = "-" + s
+	}
+	return s
+}

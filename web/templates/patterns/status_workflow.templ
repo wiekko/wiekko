@@ -1,0 +1,47 @@
+package patterns
+
+import (
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// StatusBadge renders a colored badge for a status.
+templ StatusBadge(name string, isClosed bool) {
+	@ui.Badge(name, statusColor(isClosed))
+}
+
+// StatusTransition renders a dropdown to change status via htmx PATCH.
+templ StatusTransition(currentStatusID string, statuses []templates.StatusView, hxPatch string) {
+	@ui.DropdownMenu("status-transition") {
+		@ui.DropdownTrigger() {
+			<button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none">
+				for _, s := range statuses {
+					if s.ID == currentStatusID {
+						@StatusBadge(s.Name, s.IsClosed)
+					}
+				}
+				@ui.Icon("chevron-down", "sm")
+			</button>
+		}
+		@ui.DropdownContent() {
+			for _, s := range statuses {
+				if s.ID != currentStatusID {
+					@ui.DropdownItem(s.Name, "", "", false) {
+						<span
+							hx-patch={ hxPatch }
+							hx-vals={ `{"status_id":"` + s.ID + `"}` }
+							hx-swap="outerHTML"
+						></span>
+					}
+				}
+			}
+		}
+	}
+}
+
+func statusColor(isClosed bool) string {
+	if isClosed {
+		return "gray"
+	}
+	return "green"
+}
