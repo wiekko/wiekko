@@ -90,6 +90,7 @@
 * **SR-303**: Log entries shall never contain personal or other sensitive data
 * **SR-304**: Passwords shall be stored as salted hash (bcrypt or pbkdf2) with high computation cost
 * **SR-305**: Data subject access (GDPR Art. 15) and right to erasure (GDPR Art. 17) shall be supported by centralising all personal data in the `personal_data` table.
+* **SR-306**: Usernames of Nexmap's built-in authentication provider are considered as pseudonyms and thus excluded from application level encryption
 
 ## Functionality
 
