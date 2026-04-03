@@ -9,6 +9,7 @@
 * **AR-003**: Adhere to DRY: Don't repeat yourself
 * **AR-004**: Adhere to SOLID
 * **AR-005**: Wherever possible, code shall be covered by unit tests
+* **AR-006**: Error values returned by a function shall always be handled, or explicitly discarded.
 
 ### Deployment
 
