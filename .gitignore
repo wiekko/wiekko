@@ -35,6 +35,8 @@ go.work.sum
 web/dist/
 /nexmap
 /nexmap.db
+/nexmap.db-shm
+/nexmap.db-wal
 
 # Go templ output (generated *_templ.go files, not hand-written helpers)
 *_templ.go
