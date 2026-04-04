@@ -1,0 +1,74 @@
+package ui
+
+// ThemeToggle renders a three-state theme switcher (light / system / dark).
+templ ThemeToggle() {
+	<div id="theme-toggle" class="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800">
+		<button
+			type="button"
+			aria-label="Light mode"
+			data-theme="light"
+			onclick="setTheme('light')"
+			class="theme-btn rounded-md p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+		>
+			@Icon("sun", "sm")
+		</button>
+		<button
+			type="button"
+			aria-label="System preference"
+			data-theme="system"
+			onclick="setTheme('system')"
+			class="theme-btn rounded-md p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+		>
+			@Icon("monitor", "sm")
+		</button>
+		<button
+			type="button"
+			aria-label="Dark mode"
+			data-theme="dark"
+			onclick="setTheme('dark')"
+			class="theme-btn rounded-md p-1.5 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+		>
+			@Icon("moon", "sm")
+		</button>
+	</div>
+	<script>
+		(function() {
+			var mq = window.matchMedia('(prefers-color-scheme: dark)');
+
+			function applyTheme(theme) {
+				var dark = theme === 'dark' || (theme === 'system' && mq.matches);
+				document.documentElement.classList.toggle('dark', dark);
+			}
+
+			function highlightActive(theme) {
+				var btns = document.querySelectorAll('#theme-toggle .theme-btn');
+				btns.forEach(function(btn) {
+					var active = btn.getAttribute('data-theme') === theme;
+					btn.classList.toggle('bg-white', active && !document.documentElement.classList.contains('dark'));
+					btn.classList.toggle('dark:bg-gray-700', active);
+					btn.classList.toggle('text-gray-900', active);
+					btn.classList.toggle('dark:text-gray-100', active);
+					btn.classList.toggle('shadow-sm', active);
+				});
+			}
+
+			window.setTheme = function(theme) {
+				localStorage.setItem('theme', theme);
+				applyTheme(theme);
+				highlightActive(theme);
+			};
+
+			mq.addEventListener('change', function() {
+				var t = localStorage.getItem('theme') || 'system';
+				if (t === 'system') {
+					applyTheme('system');
+					highlightActive('system');
+				}
+			});
+
+			// Highlight the active button on load.
+			var current = localStorage.getItem('theme') || 'system';
+			highlightActive(current);
+		})();
+	</script>
+}

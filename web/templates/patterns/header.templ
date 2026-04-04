@@ -4,14 +4,15 @@ import "nexmap.net/web/templates/ui"
 
 // AppHeader renders the top header bar with user menu.
 templ AppHeader(displayName, csrfToken string, isAdmin bool) {
-	<header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
+	<header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6 dark:border-gray-700 dark:bg-gray-900">
 		<div>
 			<!-- Placeholder for breadcrumbs or page title injected by pages -->
 		</div>
 		<div class="flex items-center gap-4">
+			@ui.ThemeToggle()
 			@ui.DropdownMenu("user-menu") {
 				@ui.DropdownTrigger() {
-					<button type="button" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+					<button type="button" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-gray-300 dark:hover:bg-gray-800">
 						@ui.UserAvatar(displayName, "sm")
 						<span>{ displayName }</span>
 						@ui.Icon("chevron-down", "sm")

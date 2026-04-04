@@ -8,11 +8,11 @@ templ ProgressBar(percent int, color, label string) {
 	<div class="w-full">
 		if label != "" {
 			<div class="mb-1 flex items-center justify-between">
-				<span class="text-sm font-medium text-gray-700">{ label }</span>
-				<span class="text-sm text-gray-500">{ fmt.Sprintf("%d%%", percent) }</span>
+				<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{ label }</span>
+				<span class="text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d%%", percent) }</span>
 			</div>
 		}
-		<div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+		<div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
 			<div
 				class={ "h-full rounded-full transition-all", progressColor(color) }
 				style={ fmt.Sprintf("width: %d%%", clampPercent(percent)) }

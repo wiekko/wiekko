@@ -4,13 +4,13 @@ package ui
 templ EmptyState(icon, title, description, actionLabel, actionHref string) {
 	<div class="flex flex-col items-center justify-center py-12 text-center">
 		if icon != "" {
-			<div class="text-gray-400">
+			<div class="text-gray-400 dark:text-gray-500">
 				@Icon(icon, "lg")
 			</div>
 		}
-		<h3 class="mt-2 text-sm font-semibold text-gray-900">{ title }</h3>
+		<h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{ title }</h3>
 		if description != "" {
-			<p class="mt-1 text-sm text-gray-500">{ description }</p>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ description }</p>
 		}
 		if actionLabel != "" && actionHref != "" {
 			<div class="mt-6">

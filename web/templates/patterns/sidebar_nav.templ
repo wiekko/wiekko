@@ -4,17 +4,17 @@ import "nexmap.net/web/templates/ui"
 
 // SidebarNav renders the left navigation panel.
 templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
-	<aside class="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
+	<aside class="flex h-full w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
 		<!-- Logo -->
-		<div class="flex h-16 items-center gap-3 border-b border-gray-200 px-4">
+		<div class="flex h-16 items-center gap-3 border-b border-gray-200 px-4 dark:border-gray-700">
 			<img src="/static/img/logo.svg" alt="Nexmap" class="h-8 w-auto"/>
-			<span class="text-lg font-bold text-gray-900">Nexmap</span>
+			<span class="text-lg font-bold text-gray-900 dark:text-gray-100">Nexmap</span>
 		</div>
 		<!-- Product context -->
 		if productName != "" {
-			<div class="border-b border-gray-200 px-4 py-3">
-				<p class="text-xs font-medium uppercase tracking-wider text-gray-500">Product</p>
-				<p class="mt-1 truncate text-sm font-semibold text-gray-900">{ productName }</p>
+			<div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+				<p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Product</p>
+				<p class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{ productName }</p>
 			</div>
 		}
 		<!-- Navigation -->
@@ -50,7 +50,7 @@ templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
 // SidebarSection renders a group of nav links with a heading.
 templ SidebarSection(title string) {
 	<div class="pt-4">
-		<p class="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{ title }</p>
+		<p class="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{ title }</p>
 		<div class="mt-2 space-y-1">
 			{ children... }
 		</div>
@@ -69,7 +69,7 @@ templ SidebarLink(label, href, icon string, active bool, badge string) {
 		</span>
 		<span class="flex-1">{ label }</span>
 		if badge != "" {
-			<span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+			<span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
 				{ badge }
 			</span>
 		}
@@ -78,14 +78,14 @@ templ SidebarLink(label, href, icon string, active bool, badge string) {
 
 func sidebarLinkClass(active bool) string {
 	if active {
-		return "bg-indigo-50 text-indigo-700"
+		return "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
 	}
-	return "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+	return "text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
 }
 
 func sidebarIconClass(active bool) string {
 	if active {
-		return "text-indigo-500"
+		return "text-indigo-500 dark:text-indigo-400"
 	}
-	return "text-gray-400 group-hover:text-gray-500"
+	return "text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-400"
 }

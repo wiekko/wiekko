@@ -18,7 +18,7 @@ templ AttachmentList(attachments []AttachmentView, csrfToken string) {
 		if len(attachments) == 0 {
 			@ui.EmptyState("upload", "No attachments", "Upload files to attach them to this item.", "", "")
 		} else {
-			<ul id="attachments" class="divide-y divide-gray-200 rounded-lg border border-gray-200">
+			<ul id="attachments" class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
 				for _, a := range attachments {
 					@attachmentItem(a, csrfToken)
 				}
@@ -30,20 +30,20 @@ templ AttachmentList(attachments []AttachmentView, csrfToken string) {
 templ attachmentItem(a AttachmentView, csrfToken string) {
 	<li class="flex items-center justify-between px-4 py-3" id={ "attachment-" + a.ID }>
 		<div class="flex items-center gap-3">
-			<div class="text-gray-400">
+			<div class="text-gray-400 dark:text-gray-500">
 				@ui.Icon("download", "md")
 			</div>
 			<div>
-				<a href={ templ.SafeURL(a.DownloadURL) } class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+				<a href={ templ.SafeURL(a.DownloadURL) } class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
 					{ a.Filename }
 				</a>
-				<p class="text-xs text-gray-500">{ a.ContentType } · { a.Size }</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{ a.ContentType } · { a.Size }</p>
 			</div>
 		</div>
 		if a.DeleteURL != "" {
 			<button
 				type="button"
-				class="text-gray-400 hover:text-red-500"
+				class="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
 				hx-delete={ a.DeleteURL }
 				hx-target={ "#attachment-" + a.ID }
 				hx-swap="outerHTML"
@@ -69,7 +69,7 @@ templ UploadForm(hxPost, csrfToken string) {
 			type="file"
 			name="file"
 			required
-			class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
+			class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-400 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/50"
 		/>
 		@ui.Button(ui.ButtonProps{
 			Label:   "Upload",

@@ -3,7 +3,7 @@ package ui
 // LoadingSpinner renders an animated spinner. Sizes: "sm", "md", "lg".
 templ LoadingSpinner(size string) {
 	<svg
-		class={ spinnerSize(size), "animate-spin text-indigo-600" }
+		class={ spinnerSize(size), "animate-spin text-indigo-600 dark:text-indigo-400" }
 		xmlns="http://www.w3.org/2000/svg"
 		fill="none"
 		viewBox="0 0 24 24"
@@ -19,7 +19,7 @@ templ SkeletonRow(columns int) {
 	<tr class="animate-pulse">
 		for i := 0; i < columns; i++ {
 			<td class="px-6 py-4">
-				<div class={ "h-4 rounded bg-gray-200", skeletonWidth(i) }></div>
+				<div class={ "h-4 rounded bg-gray-200 dark:bg-gray-700", skeletonWidth(i) }></div>
 			</td>
 		}
 	</tr>
@@ -45,7 +45,7 @@ func skeletonWidth(index int) string {
 templ HtmxIndicator() {
 	<span class="htmx-indicator inline-flex items-center gap-2">
 		@LoadingSpinner("sm")
-		<span class="text-sm text-gray-500">Loading…</span>
+		<span class="text-sm text-gray-500 dark:text-gray-400">Loading…</span>
 	</span>
 }
 

@@ -16,18 +16,18 @@ templ AuditTimeline(entries []templates.AuditEntryView) {
 					<li>
 						<div class="relative pb-8">
 							if i < len(entries)-1 {
-								<span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"></span>
+								<span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700"></span>
 							}
 							<div class="relative flex items-start space-x-3">
-								<div class={ "flex h-8 w-8 items-center justify-center rounded-full ring-8 ring-white", auditActionBg(entry.Action) }>
+								<div class={ "flex h-8 w-8 items-center justify-center rounded-full ring-8 ring-white dark:ring-gray-950", auditActionBg(entry.Action) }>
 									@ui.Icon(auditActionIcon(entry.Action), "sm")
 								</div>
 								<div class="min-w-0 flex-1">
 									<div class="flex items-center gap-2">
-										<span class="text-sm font-medium text-gray-900">{ entry.UserName }</span>
-										<span class="text-xs text-gray-500">{ entry.CreatedAt }</span>
+										<span class="text-sm font-medium text-gray-900 dark:text-gray-100">{ entry.UserName }</span>
+										<span class="text-xs text-gray-500 dark:text-gray-400">{ entry.CreatedAt }</span>
 									</div>
-									<p class="mt-0.5 text-sm text-gray-500">
+									<p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
 										{ auditDescription(entry) }
 									</p>
 								</div>
@@ -54,11 +54,11 @@ func auditActionIcon(action string) string {
 func auditActionBg(action string) string {
 	switch action {
 	case "create":
-		return "bg-green-50 text-green-600"
+		return "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400"
 	case "delete":
-		return "bg-red-50 text-red-600"
+		return "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400"
 	default:
-		return "bg-blue-50 text-blue-600"
+		return "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
 	}
 }
 

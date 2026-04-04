@@ -5,7 +5,7 @@ import "fmt"
 // Pagination renders page navigation with prev/next and page numbers.
 templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 	if totalPages > 1 {
-		<nav aria-label="Pagination" class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
+		<nav aria-label="Pagination" class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700">
 			<div class="flex flex-1 justify-between sm:hidden">
 				if currentPage > 1 {
 					<a
@@ -14,7 +14,7 @@ templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 						hx-target={ hxTarget }
 						hx-swap="innerHTML"
 						hx-push-url="true"
-						class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+						class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
 					>
 						Previous
 					</a>
@@ -33,7 +33,7 @@ templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 				}
 			</div>
 			<div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-				<p class="text-sm text-gray-700">
+				<p class="text-sm text-gray-700 dark:text-gray-300">
 					Page <span class="font-medium">{ fmt.Sprintf("%d", currentPage) }</span> of <span class="font-medium">{ fmt.Sprintf("%d", totalPages) }</span>
 				</p>
 				<div class="flex gap-1">
@@ -44,7 +44,7 @@ templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 							hx-target={ hxTarget }
 							hx-swap="innerHTML"
 							hx-push-url="true"
-							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
+							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-500 dark:ring-gray-600 dark:hover:bg-gray-800"
 						>
 							@Icon("chevron-left", "sm")
 						</a>
@@ -61,7 +61,7 @@ templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 								hx-target={ hxTarget }
 								hx-swap="innerHTML"
 								hx-push-url="true"
-								class="relative inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
+								class="relative inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-800"
 							>
 								{ fmt.Sprintf("%d", page) }
 							</a>
@@ -74,7 +74,7 @@ templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 							hx-target={ hxTarget }
 							hx-swap="innerHTML"
 							hx-push-url="true"
-							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50"
+							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-500 dark:ring-gray-600 dark:hover:bg-gray-800"
 						>
 							@Icon("chevron-right", "sm")
 						</a>

@@ -18,7 +18,7 @@ type ButtonProps struct {
 templ Button(props ButtonProps) {
 	<button
 		type={ buttonType(props.Type) }
-		class={ "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+		class={ "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-gray-900",
 			buttonVariant(props.Variant),
 			buttonSize(props.Size) }
 		disabled?={ props.Disabled }
@@ -50,7 +50,7 @@ templ IconButton(icon, ariaLabel, variant, size string) {
 	<button
 		type="button"
 		aria-label={ ariaLabel }
-		class={ "inline-flex items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+		class={ "inline-flex items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-gray-900",
 			buttonVariant(variant),
 			iconButtonSize(size) }
 	>
@@ -62,7 +62,7 @@ templ IconButton(icon, ariaLabel, variant, size string) {
 templ LinkButton(href, label, variant, size string) {
 	<a
 		href={ templ.SafeURL(href) }
-		class={ "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2",
+		class={ "inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900",
 			buttonVariant(variant),
 			buttonSize(size) }
 	>
@@ -81,11 +81,11 @@ func buttonType(t string) string {
 func buttonVariant(variant string) string {
 	switch variant {
 	case "secondary":
-		return "bg-white text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:ring-indigo-500"
+		return "bg-white text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
 	case "danger":
 		return "bg-red-600 text-white hover:bg-red-500 focus:ring-red-500"
 	case "ghost":
-		return "text-gray-700 hover:bg-gray-100 focus:ring-indigo-500"
+		return "text-gray-700 hover:bg-gray-100 focus:ring-indigo-500 dark:text-gray-300 dark:hover:bg-gray-800"
 	default: // primary
 		return "bg-indigo-600 text-white hover:bg-indigo-500 focus:ring-indigo-500"
 	}

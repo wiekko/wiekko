@@ -10,44 +10,47 @@ import (
 templ CataloguePage() {
 	@layout.Base(templates.PageMeta{Title: "Component Catalogue"}) {
 		<div class="mx-auto max-w-7xl space-y-16 px-6 py-8">
-			<div>
-				<h1 class="text-3xl font-bold text-gray-900">Component Catalogue</h1>
-				<p class="mt-2 text-gray-500">Visual reference for all Nexmap UI components.</p>
+			<div class="flex items-start justify-between">
+				<div>
+					<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Component Catalogue</h1>
+					<p class="mt-2 text-gray-500 dark:text-gray-400">Visual reference for all Nexmap UI components.</p>
+				</div>
+				@ui.ThemeToggle()
 			</div>
 
 			<!-- Typography -->
 			@section("Typography") {
-				<h1 class="text-3xl font-bold text-gray-900">Heading 1</h1>
-				<h2 class="text-2xl font-bold text-gray-900">Heading 2</h2>
-				<h3 class="text-xl font-semibold text-gray-900">Heading 3</h3>
-				<h4 class="text-lg font-semibold text-gray-900">Heading 4</h4>
-				<p class="text-sm text-gray-700">Body text — The quick brown fox jumps over the lazy dog.</p>
-				<p class="text-xs text-gray-500">Caption text — secondary information.</p>
-				<code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-sm text-gray-800">inline code</code>
+				<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Heading 1</h1>
+				<h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Heading 2</h2>
+				<h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Heading 3</h3>
+				<h4 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Heading 4</h4>
+				<p class="text-sm text-gray-700 dark:text-gray-300">Body text — The quick brown fox jumps over the lazy dog.</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">Caption text — secondary information.</p>
+				<code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-sm text-gray-800 dark:bg-gray-800 dark:text-gray-200">inline code</code>
 			}
 
 			<!-- Icons -->
 			@section("Icons") {
 				<div class="flex flex-wrap gap-4">
 					for _, name := range iconNames() {
-						<div class="flex flex-col items-center gap-1 rounded-lg border border-gray-200 p-3">
+						<div class="flex flex-col items-center gap-1 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
 							@ui.Icon(name, "md")
-							<span class="text-xs text-gray-500">{ name }</span>
+							<span class="text-xs text-gray-500 dark:text-gray-400">{ name }</span>
 						</div>
 					}
 				</div>
 				<div class="mt-4 flex items-center gap-4">
 					<div class="flex items-center gap-2">
 						@ui.Icon("home", "sm")
-						<span class="text-xs text-gray-500">sm</span>
+						<span class="text-xs text-gray-500 dark:text-gray-400">sm</span>
 					</div>
 					<div class="flex items-center gap-2">
 						@ui.Icon("home", "md")
-						<span class="text-xs text-gray-500">md</span>
+						<span class="text-xs text-gray-500 dark:text-gray-400">md</span>
 					</div>
 					<div class="flex items-center gap-2">
 						@ui.Icon("home", "lg")
-						<span class="text-xs text-gray-500">lg</span>
+						<span class="text-xs text-gray-500 dark:text-gray-400">lg</span>
 					</div>
 				</div>
 			}
@@ -164,7 +167,7 @@ templ CataloguePage() {
 							@ui.Button(ui.ButtonProps{Label: "Action", Variant: "secondary", Size: "sm"})
 						}
 						@ui.CardBody() {
-							<p class="text-sm text-gray-500">Card body content goes here.</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Card body content goes here.</p>
 						}
 						@ui.CardFooter() {
 							@ui.Button(ui.ButtonProps{Label: "Cancel", Variant: "secondary", Size: "sm"})
@@ -173,7 +176,7 @@ templ CataloguePage() {
 					}
 					@ui.Card() {
 						@ui.CardBody() {
-							<p class="text-sm text-gray-500">A card with only a body — no header or footer.</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">A card with only a body — no header or footer.</p>
 						}
 					}
 				</div>
@@ -248,7 +251,7 @@ templ CataloguePage() {
 					{ID: "history", Label: "History"},
 				})
 				@ui.TabPanel("overview") {
-					<p class="text-sm text-gray-500">Overview tab content goes here.</p>
+					<p class="text-sm text-gray-500 dark:text-gray-400">Overview tab content goes here.</p>
 				}
 			}
 
@@ -312,10 +315,10 @@ templ CataloguePage() {
 			<!-- Empty State -->
 			@section("Empty States") {
 				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-					<div class="rounded-lg border border-dashed border-gray-300 p-4">
+					<div class="rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-600">
 						@ui.EmptyState("clipboard-list", "No requirements", "Get started by creating a new requirement.", "New Requirement", "#")
 					</div>
-					<div class="rounded-lg border border-dashed border-gray-300 p-4">
+					<div class="rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-600">
 						@ui.EmptyState("bug", "No defects found", "All clear! No defects match your filters.", "", "")
 					</div>
 				</div>
@@ -506,14 +509,14 @@ templ CataloguePage() {
 
 			<!-- Modal -->
 			@section("Modal (Confirm Dialog)") {
-				<p class="text-sm text-gray-500">Modals are rendered into the <code>#modal</code> container via htmx. Here's a static preview:</p>
-				<div class="mt-4 rounded-lg border border-gray-200 p-6">
-					<div class="mx-auto max-w-md rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
-						<div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-							<h3 class="text-lg font-semibold text-gray-900">Delete Requirement</h3>
+				<p class="text-sm text-gray-500 dark:text-gray-400">Modals are rendered into the <code>#modal</code> container via htmx. Here's a static preview:</p>
+				<div class="mt-4 rounded-lg border border-gray-200 p-6 dark:border-gray-700">
+					<div class="mx-auto max-w-md rounded-lg bg-white shadow-xl ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+						<div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Requirement</h3>
 						</div>
 						<div class="px-6 py-4">
-							<p class="text-sm text-gray-500">Are you sure you want to delete this requirement? This action cannot be undone.</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Are you sure you want to delete this requirement? This action cannot be undone.</p>
 							<div class="mt-4 flex justify-end gap-3">
 								@ui.Button(ui.ButtonProps{Label: "Cancel", Variant: "secondary", Size: "md"})
 								@ui.Button(ui.ButtonProps{Label: "Delete", Variant: "danger", Size: "md"})
@@ -529,7 +532,7 @@ templ CataloguePage() {
 
 templ section(title string) {
 	<div class="space-y-4">
-		<h2 class="border-b border-gray-200 pb-2 text-xl font-bold text-gray-900">{ title }</h2>
+		<h2 class="border-b border-gray-200 pb-2 text-xl font-bold text-gray-900 dark:border-gray-700 dark:text-gray-100">{ title }</h2>
 		{ children... }
 	</div>
 }
@@ -543,5 +546,6 @@ func iconNames() []string {
 		"flag", "users", "settings", "logout",
 		"home", "folder", "eye", "link",
 		"upload", "download", "clock",
+		"sun", "moon", "monitor",
 	}
 }

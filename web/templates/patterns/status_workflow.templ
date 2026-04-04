@@ -14,7 +14,7 @@ templ StatusBadge(name string, isClosed bool) {
 templ StatusTransition(currentStatusID string, statuses []templates.StatusView, hxPatch string) {
 	@ui.DropdownMenu("status-transition") {
 		@ui.DropdownTrigger() {
-			<button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none">
+			<button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none dark:text-gray-300 dark:hover:text-gray-100">
 				for _, s := range statuses {
 					if s.ID == currentStatusID {
 						@StatusBadge(s.Name, s.IsClosed)
