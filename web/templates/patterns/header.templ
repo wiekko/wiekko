@@ -4,8 +4,12 @@ import "nexmap.net/web/templates/ui"
 
 // AppHeader renders the top header bar with user menu.
 templ AppHeader(displayName, csrfToken string, isAdmin bool) {
-	<header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6 dark:border-gray-700 dark:bg-gray-900">
-		<div>
+	<header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 dark:border-gray-700 dark:bg-gray-900">
+		<div class="flex items-center gap-3">
+			<!-- Mobile menu toggle -->
+			<button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 md:hidden dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200" onclick="openSidebar()" aria-label="Open menu">
+				@ui.Icon("menu", "md")
+			</button>
 			<!-- Placeholder for breadcrumbs or page title injected by pages -->
 		</div>
 		<div class="flex items-center gap-4">
@@ -26,7 +30,7 @@ templ AppHeader(displayName, csrfToken string, isAdmin bool) {
 						@ui.DropdownItem("Admin", "/admin/users", "users", false)
 					}
 					@ui.DropdownDivider()
-					@ui.DropdownItem("Sign out", "", "logout", true) {
+					@ui.DropdownItem("Sign out", "", "log-out", true) {
 						<span
 							hx-post="/api/v1/auth/logout"
 							hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }

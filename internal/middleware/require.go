@@ -17,6 +17,18 @@ func RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
+// RequireAuthPage redirects unauthenticated requests to the login page.
+// Used for page routes (as opposed to RequireAuth which returns JSON 401).
+func RequireAuthPage(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if UserFromContext(r.Context()) == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RequireAdmin rejects non-admin requests with 403.
 // Must be used after RequireAuth.
 func RequireAdmin(next http.Handler) http.Handler {

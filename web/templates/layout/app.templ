@@ -17,16 +17,22 @@ type AppLayoutProps struct {
 }
 
 // AppLayout renders the authenticated app shell: sidebar + header + content + toast container.
+// On mobile (<md) the sidebar is hidden behind a hamburger toggle; on desktop (md+) it is always visible.
 templ AppLayout(props AppLayoutProps) {
 	@Base(props.Meta) {
 		<div
+			id="app-shell"
 			class="flex h-full"
 			if props.Meta.CSRFToken != "" {
 				hx-headers={ `{"X-CSRF-Token":"` + props.Meta.CSRFToken + `"}` }
 			}
 		>
-			<!-- Sidebar -->
-			@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.IsAdmin)
+			<!-- Mobile sidebar backdrop -->
+			<div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-gray-900/50" onclick="closeSidebar()"></div>
+			<!-- Sidebar: hidden on mobile, always visible on md+ -->
+			<div id="sidebar" class="fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200 ease-in-out md:static md:translate-x-0">
+				@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.IsAdmin)
+			</div>
 			<!-- Main area -->
 			<div class="flex flex-1 flex-col overflow-hidden">
 				<!-- Header -->
@@ -41,5 +47,19 @@ templ AppLayout(props AppLayoutProps) {
 		@ui.ToastContainer()
 		<!-- Modal container -->
 		@ui.ModalContainer()
+		@sidebarScript()
 	}
+}
+
+templ sidebarScript() {
+	<script>
+		function openSidebar() {
+			document.getElementById('sidebar').classList.remove('-translate-x-full');
+			document.getElementById('sidebar-backdrop').classList.remove('hidden');
+		}
+		function closeSidebar() {
+			document.getElementById('sidebar').classList.add('-translate-x-full');
+			document.getElementById('sidebar-backdrop').classList.add('hidden');
+		}
+	</script>
 }

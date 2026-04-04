@@ -20,6 +20,7 @@ type Services struct {
 	Testing    *TestingService
 	Comment    *CommentService
 	Audit      *AuditService
+	Dashboard  *DashboardService
 }
 
 // New creates the application service layer.
@@ -94,6 +95,14 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services 
 		Audit: &AuditService{
 			audit: st.Audit,
 			authz: authz,
+		},
+		Dashboard: &DashboardService{
+			products:     st.Product,
+			productRoles: st.ProductRole,
+			requirements: st.Requirement,
+			defects:      st.Defect,
+			statuses:     st.Status,
+			sprints:      st.Sprint,
 		},
 	}
 }

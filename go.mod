@@ -3,14 +3,15 @@ module nexmap.net
 go 1.24.4
 
 require (
+	github.com/a-h/templ v0.3.1001
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
+	github.com/kaugesaar/lucide-go v0.11.0
 	github.com/pressly/goose/v3 v3.26.0
 	modernc.org/sqlite v1.38.2
 )
 
 require (
-	github.com/a-h/templ v0.3.1001 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

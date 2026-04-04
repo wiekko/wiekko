@@ -13,6 +13,7 @@ func New(svc *service.Services, cookieSecure, devMode bool) http.Handler {
 	mux := http.NewServeMux()
 
 	mountStatic(mux)
+	mountPages(mux, svc)
 	mountAPIv1(mux, svc, cookieSecure)
 
 	if devMode {
