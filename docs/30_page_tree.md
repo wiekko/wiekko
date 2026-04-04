@@ -1,0 +1,251 @@
+# Page Tree & Navigation
+
+This document defines the UI page tree, navigation structure, and related design decisions.
+
+## Design Principles
+
+1. **Three-layer depth**: global > product-scoped > entity detail. No page is more than three clicks from the dashboard.
+2. **Product as context, not destination**: selecting a product sets the sidebar context; everything inside is product-relative.
+3. **Tabs over pages for related data**: detail pages use tabs for comments, attachments, linked items, and history rather than separate routes.
+4. **URL = state**: filters, sort order, and active tab are reflected in the URL so views are bookmarkable and shareable.
+5. **Consistent CRUD pattern**: every entity follows list > detail (tabbed) > create/edit.
+
+## Navigation Structure
+
+### Sidebar
+
+The sidebar is visible on all authenticated pages. Its contents adapt to context:
+
+- **Always visible**: Dashboard link, Admin section (admin-only)
+- **Product context active**: Backlog, Testing, and Structure sections appear
+- **Product switcher**: clicking the logo or product name navigates back to `/` (the dashboard), which doubles as the product selector
+
+### Header
+
+The header bar contains:
+
+- **Left**: breadcrumbs (injected per page)
+- **Right**: theme toggle (quick access), user dropdown (profile, API tokens, admin link, sign out)
+
+### Breadcrumbs
+
+Every page below the dashboard renders breadcrumbs for upward navigation. Pattern:
+
+```
+Dashboard > [Product Name] > [Section] > [Entity Title]
+```
+
+## Page Tree
+
+### Authentication (unauthenticated, uses AuthLayout)
+
+| Route                    | Page              | Purpose                           |
+|--------------------------|-------------------|-----------------------------------|
+| `/login`                 | Login             | Username/password + optional TOTP |
+| `/register`              | Register          | Self-registration (if enabled)    |
+| `/accept-invite/:token`  | Accept Invitation | Register via invitation link      |
+| `/forgot-password`       | Forgot Password   | Request password reset email      |
+| `/reset-password/:token` | Reset Password    | Set new password via reset link   |
+
+### Global (authenticated, uses AppLayout without product context)
+
+| Route           | Page           | Purpose                                                              |
+|-----------------|----------------|----------------------------------------------------------------------|
+| `/`             | Dashboard      | Product cards with key metrics; doubles as product switcher          |
+| `/products/new` | Create Product | New product form (if globally enabled or admin)                      |
+| `/user/profile` | User Profile   | Display name, email, password, TOTP setup, theme preference (UR-009) |
+| `/user/tokens`  | API Tokens     | List, create, revoke personal access tokens                          |
+
+The **Dashboard** shows all products the user has access to. Each product card displays:
+
+- Product name and description
+- Open requirements / active defects count
+- Current sprint (if scrum mode)
+- User's role in the product
+
+### Product-Scoped (authenticated, uses AppLayout with product context)
+
+#### Product Overview & Settings
+
+| Route                    | Page             | Purpose                                           |
+|--------------------------|------------------|---------------------------------------------------|
+| `/products/:id`          | Product Overview | Summary dashboard for the selected product        |
+| `/products/:id/settings` | Product Settings | Tabbed settings page (see below)                  |
+| `/products/:id/team`     | Team Management  | Product roles: list members, invite, change roles |
+
+**Product Settings tabs:**
+
+| Tab            | Content                                                          |
+|----------------|------------------------------------------------------------------|
+| General        | Name, description, estimation mode, workflow mode (kanban/scrum) |
+| Statuses       | Requirement and defect status columns (drag to reorder)          |
+| Environments   | Runtime environment labels for test matrix                       |
+| Pyramid Levels | Test pyramid configuration (hierarchical, max depth 2)           |
+
+#### Backlog
+
+| Route                                  | Page               | Purpose                                                   |
+|----------------------------------------|--------------------|-----------------------------------------------------------|
+| `/products/:id/requirements`           | Requirements List  | Table view with filters, sort, multi-select (UR-103..105) |
+| `/products/:id/requirements/board`     | Requirements Board | Kanban/sprint board view (UR-101..102)                    |
+| `/products/:id/requirements/new`       | Create Requirement | Form                                                      |
+| `/products/:id/requirements/:rid`      | Requirement Detail | Tabbed detail page (see below)                            |
+| `/products/:id/requirements/:rid/edit` | Edit Requirement   | Form                                                      |
+| `/products/:id/defects`                | Defects List       | Table view with filters, sort, multi-select               |
+| `/products/:id/defects/board`          | Defects Board      | Kanban board view                                         |
+| `/products/:id/defects/new`            | Create Defect      | Form                                                      |
+| `/products/:id/defects/:did`           | Defect Detail      | Tabbed detail page                                        |
+| `/products/:id/defects/:did/edit`      | Edit Defect        | Form                                                      |
+
+**Requirement Detail tabs:**
+
+| Tab         | Content                                                                |
+|-------------|------------------------------------------------------------------------|
+| Overview    | Fields, definition of done, status, assignments, child requirements    |
+| Test Cases  | Linked test cases (requirement coverage + definition of done coverage) |
+| Defects     | Linked defects                                                         |
+| Comments    | Comment thread                                                         |
+| Attachments | File list + upload                                                     |
+| History     | Audit trail                                                            |
+
+**Defect Detail tabs:**
+
+| Tab          | Content                                        |
+|--------------|------------------------------------------------|
+| Overview     | Fields, status, assignments, criticality       |
+| Linked Items | Linked components, functionalities, test cases |
+| Comments     | Comment thread                                 |
+| Attachments  | File list + upload                             |
+| History      | Audit trail                                    |
+
+#### Testing
+
+| Route                                | Page             | Purpose                                                                              |
+|--------------------------------------|------------------|--------------------------------------------------------------------------------------|
+| `/products/:id/test-cases`           | Test Cases List  | Table with filters (component, functionality, pyramid level, execution mode)         |
+| `/products/:id/test-cases/new`       | Create Test Case | Form                                                                                 |
+| `/products/:id/test-cases/:tid`      | Test Case Detail | Tabbed detail page                                                                   |
+| `/products/:id/test-cases/:tid/edit` | Edit Test Case   | Form                                                                                 |
+| `/products/:id/campaigns`            | Campaigns List   | Table of testing campaigns with progress summary                                     |
+| `/products/:id/campaigns/new`        | Create Campaign  | Form (scope selection, inheritance from previous campaign)                           |
+| `/products/:id/campaigns/:cid`       | Campaign Detail  | Execution matrix (test cases x environments), collapsible by component (UR-201..204) |
+
+**Test Case Detail tabs:**
+
+| Tab          | Content                                                |
+|--------------|--------------------------------------------------------|
+| Overview     | Fields, execution mode, test identifier, pyramid level |
+| Requirements | Linked requirements and definitions of done            |
+| Campaigns    | Campaign history (pass/fail across campaigns)          |
+| Comments     | Comment thread                                         |
+| Attachments  | File list + upload                                     |
+| History      | Audit trail                                            |
+
+#### Structure
+
+| Route                                     | Page                 | Purpose                                          |
+|-------------------------------------------|----------------------|--------------------------------------------------|
+| `/products/:id/components`                | Components List      | Table                                            |
+| `/products/:id/components/new`            | Create Component     | Form                                             |
+| `/products/:id/components/:cid`           | Component Detail     | Tabbed detail page                               |
+| `/products/:id/components/:cid/edit`      | Edit Component       | Form                                             |
+| `/products/:id/functionalities`           | Functionalities List | Table (grouped by component optionally)          |
+| `/products/:id/functionalities/new`       | Create Functionality | Form                                             |
+| `/products/:id/functionalities/:fid`      | Functionality Detail | Tabbed detail page                               |
+| `/products/:id/functionalities/:fid/edit` | Edit Functionality   | Form                                             |
+| `/products/:id/milestones`                | Milestones List      | Table or timeline view                           |
+| `/products/:id/milestones/new`            | Create Milestone     | Form                                             |
+| `/products/:id/milestones/:mid`           | Milestone Detail     | Tabbed detail page                               |
+| `/products/:id/milestones/:mid/edit`      | Edit Milestone       | Form                                             |
+| `/products/:id/sprints`                   | Sprints List         | Table (only in scrum mode)                       |
+| `/products/:id/sprints/new`               | Create Sprint        | Form                                             |
+| `/products/:id/sprints/:sid`              | Sprint Detail        | Board view (kanban columns = statuses) + summary |
+| `/products/:id/sprints/:sid/edit`         | Edit Sprint          | Form                                             |
+
+**Component Detail tabs:**
+
+| Tab             | Content                  |
+|-----------------|--------------------------|
+| Overview        | Fields, linked milestone |
+| Functionalities | Child functionalities    |
+| Test Cases      | Linked test cases        |
+| Comments        | Comment thread           |
+| Attachments     | File list + upload       |
+| History         | Audit trail              |
+
+**Functionality Detail tabs:**
+
+| Tab        | Content                                    |
+|------------|--------------------------------------------|
+| Overview   | Fields, parent component, linked milestone |
+| Test Cases | Linked test cases                          |
+| Defects    | Linked defects                             |
+| History    | Audit trail                                |
+
+**Milestone Detail tabs:**
+
+| Tab      | Content                                  |
+|----------|------------------------------------------|
+| Overview | Fields, type, due date                   |
+| Items    | Linked components, requirements, defects |
+| Sprints  | Sprints targeting this milestone         |
+| History  | Audit trail                              |
+
+**Sprint Detail tabs:**
+
+| Tab     | Content                                                          |
+|---------|------------------------------------------------------------------|
+| Board   | Kanban view (columns = statuses, cards = requirements + defects) |
+| Backlog | Items assigned to this sprint, not yet started                   |
+| Summary | Velocity, burndown, completion stats                             |
+| History | Audit trail                                                      |
+
+### Administration (admin-only)
+
+| Route                | Page              | Purpose                                                                |
+|----------------------|-------------------|------------------------------------------------------------------------|
+| `/admin/users`       | Users List        | All users with status, filter by status                                |
+| `/admin/users/:uid`  | User Detail       | Account status, roles, actions (lock, reset password, delete)          |
+| `/admin/settings`    | Instance Settings | Registration, moderation, product creation toggles (UR-006: auto-save) |
+| `/admin/invitations` | Invitations       | List + create new invitations                                          |
+
+### Development (dev mode only)
+
+| Route            | Page                | Purpose                                |
+|------------------|---------------------|----------------------------------------|
+| `/dev/catalogue` | Component Catalogue | Visual reference for all UI components |
+
+## Decisions
+
+### Product switcher via dashboard (not dropdown)
+
+Navigating back to `/` to switch products keeps the UI simple. A dropdown switcher would require loading the product list into every page and adds complexity for a low-frequency action. The logo/product name in the sidebar links back to the dashboard.
+
+### Tabs on detail pages (not separate routes)
+
+Entity detail pages use in-page tabs loaded via htmx (`hx-get` to tab content endpoint, `hx-target` to tab panel). This means:
+
+- Related data is one click away without full page navigation
+- The URL updates to reflect the active tab (e.g. `?tab=comments`) for bookmarking
+- Tab content loads lazily, keeping initial page load fast
+- The sidebar active state doesn't change when switching tabs
+
+### Board views as alternate routes (not tab)
+
+Requirements and defects have both a table view (`/requirements`) and a board view (`/requirements/board`). These are separate routes rather than tabs because:
+
+- They represent fundamentally different interaction patterns
+- The sidebar link can indicate which view is active
+- Users can bookmark their preferred view
+
+### Theme preference on user profile
+
+The theme toggle in the header provides quick access for in-session switching (persisted to `localStorage`). The user profile page is where the preference is formally configured and persisted to the database, so it follows the user across devices.
+
+### Sprint board as sprint detail
+
+The sprint detail page defaults to the board tab (kanban view of items in that sprint). This avoids a separate top-level "Board" nav entry and makes it clear which sprint's board the user is looking at.
+
+### Settings pages use auto-save (UR-006)
+
+Product settings (statuses, environments, pyramid levels) and admin instance settings use auto-save on change. Entity create/edit forms use explicit submit buttons. This distinction is reflected in the form patterns used on each page.
