@@ -97,6 +97,24 @@ func TestCSRF_PATAuth_Exempted(t *testing.T) {
 	}
 }
 
+func TestCSRF_SessionAuth_ValidFormToken(t *testing.T) {
+	called := false
+	handler := middleware.CSRF(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+
+	r := httptest.NewRequest(http.MethodPost, "/?_csrf=csrf-secret", nil)
+	ctx := middleware.WithUser(r.Context(), &model.User{ID: "u1"}, "session", "csrf-secret")
+	r = r.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	if !called {
+		t.Fatal("handler was not called with valid CSRF form token")
+	}
+}
+
 func TestCSRF_StateChangingMethods(t *testing.T) {
 	for _, method := range []string{http.MethodPut, http.MethodPatch, http.MethodDelete} {
 		t.Run(method, func(t *testing.T) {

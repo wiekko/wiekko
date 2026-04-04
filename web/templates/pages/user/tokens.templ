@@ -1,0 +1,254 @@
+package user
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+	"nexmap.net/internal/model"
+)
+
+// TokenView is a display-ready token with computed status.
+type TokenView struct {
+	Token     *model.PAT
+	IsExpired bool
+}
+
+// TokensProps holds the data for the API tokens page.
+type TokensProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Tokens      []TokenView
+}
+
+templ TokensPage(props TokensProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "",
+	}) {
+		<div class="mx-auto max-w-4xl space-y-6">
+			<!-- Breadcrumb -->
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: "API Tokens"},
+			})
+			<!-- Header -->
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">API Tokens</h1>
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Personal access tokens for CLI and API authentication.</p>
+				</div>
+				<button
+					type="button"
+					class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+					onclick="document.getElementById('create-token-modal').classList.remove('hidden')"
+				>
+					@ui.Icon("plus", "sm")
+					Create Token
+				</button>
+			</div>
+			@copyTokenScript()
+			<!-- Token list -->
+			if len(props.Tokens) == 0 {
+				@ui.EmptyState("link", "No tokens", "Create a personal access token to authenticate CLI and API requests.", "", "")
+			} else {
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								Name
+							}
+							@ui.TableHeader() {
+								Token
+							}
+							@ui.TableHeader() {
+								Created
+							}
+							@ui.TableHeader() {
+								Last Used
+							}
+							@ui.TableHeader() {
+								Expires
+							}
+							@ui.TableHeader() {
+								Status
+							}
+							@ui.TableHeader() {
+								<!-- Actions -->
+							}
+						}
+						@TokenTableBody(props.Tokens)
+					}
+				}
+			}
+		</div>
+		<!-- Create token modal -->
+		<div id="create-token-modal" class="hidden relative z-50">
+			<div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80" onclick="document.getElementById('create-token-modal').classList.add('hidden')"></div>
+			<div class="fixed inset-0 z-10 overflow-y-auto">
+				<div class="flex min-h-full items-center justify-center p-4">
+					<div id="create-token-content" class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+						@CreateTokenForm("")
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// TokenTableBody renders the token table rows. Returned as fragment after revoke.
+templ TokenTableBody(tokens []TokenView) {
+	<tbody id="token-table-body" class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900" hx-target="this" hx-swap="outerHTML">
+		for _, tv := range tokens {
+			@tokenRow(tv)
+		}
+	</tbody>
+}
+
+templ tokenRow(tv TokenView) {
+	<tr>
+		@ui.TableCell() {
+			<span class="font-medium">{ tv.Token.Name }</span>
+		}
+		@ui.TableCell() {
+			<code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-gray-800">{ tv.Token.TokenPrefix }...</code>
+		}
+		@ui.TableCellMuted() {
+			{ formatDate(tv.Token.CreatedAt) }
+		}
+		@ui.TableCellMuted() {
+			if tv.Token.LastUsedAt != "" {
+				{ formatDate(tv.Token.LastUsedAt) }
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">Never</span>
+			}
+		}
+		@ui.TableCellMuted() {
+			if tv.Token.ExpiresAt != "" {
+				{ formatDate(tv.Token.ExpiresAt) }
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">Never</span>
+			}
+		}
+		@ui.TableCell() {
+			@tokenStatusBadge(tv)
+		}
+		@ui.TableCell() {
+			if tv.Token.RevokedAt == "" && !tv.IsExpired {
+				<button
+					type="button"
+					class="text-sm font-medium text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
+					hx-delete={ "/user/tokens/" + tv.Token.ID }
+					hx-target="#token-table-body"
+					hx-swap="outerHTML"
+					hx-confirm={ "Revoke token \"" + tv.Token.Name + "\"? Applications using it will lose access." }
+				>
+					Revoke
+				</button>
+			}
+		}
+	</tr>
+}
+
+templ tokenStatusBadge(tv TokenView) {
+	if tv.Token.RevokedAt != "" {
+		@ui.Badge("Revoked", "red")
+	} else if tv.IsExpired {
+		@ui.Badge("Expired", "yellow")
+	} else {
+		@ui.Badge("Active", "green")
+	}
+}
+
+// CreateTokenForm renders the create token form inside the modal. Returned as fragment on error.
+templ CreateTokenForm(errorMessage string) {
+	<div id="create-form-section">
+		<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Create API Token</h3>
+		<form class="mt-4 space-y-4" hx-post="/user/tokens" hx-target="#create-token-content" hx-swap="innerHTML">
+			@ui.TextInput(ui.InputProps{
+				ID:          "token-name",
+				Name:        "name",
+				Label:       "Token Name",
+				Placeholder: "e.g. CI Pipeline",
+				Required:    true,
+			})
+			@ui.TextInput(ui.InputProps{
+				ID:       "token-expiry",
+				Name:     "expires_at",
+				Label:    "Expiry Date",
+				Type:     "date",
+				HelpText: "Leave empty for no expiry.",
+			})
+			if errorMessage != "" {
+				<p class="text-sm text-red-600 dark:text-red-400">{ errorMessage }</p>
+			}
+			<div class="flex justify-end gap-3">
+				<button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700" onclick="document.getElementById('create-token-modal').classList.add('hidden')">
+					Cancel
+				</button>
+				@ui.Button(ui.ButtonProps{
+					Label:   "Create",
+					Variant: "primary",
+					Size:    "md",
+					Type:    "submit",
+				})
+			</div>
+		</form>
+	</div>
+}
+
+// TokenCreated renders the raw token display after creation.
+templ TokenCreated(rawToken string) {
+	<div id="token-created-section">
+		<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Token Created</h3>
+		<div class="mt-4 rounded-md bg-amber-50 p-4 dark:bg-amber-900/30">
+			<div class="flex items-center gap-2">
+				<div class="shrink-0 text-amber-500">
+					@ui.Icon("alert-triangle", "md")
+				</div>
+				<p class="text-sm font-medium text-amber-800 dark:text-amber-300">Copy this token now. You won't be able to see it again.</p>
+			</div>
+		</div>
+		<div class="mt-4">
+			<div class="flex items-center gap-2">
+				<code id="raw-token-value" class="block flex-1 overflow-x-auto rounded-md bg-gray-100 px-3 py-2 font-mono text-sm dark:bg-gray-800 dark:text-gray-100">{ rawToken }</code>
+				<button
+					type="button"
+					class="shrink-0 rounded-md bg-white p-2 text-gray-500 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-600 dark:hover:bg-gray-700"
+					onclick="copyToken()"
+					aria-label="Copy token"
+				>
+					@ui.Icon("copy", "sm")
+				</button>
+			</div>
+			<p id="copy-feedback" class="mt-1 text-sm text-gray-500 dark:text-gray-400"></p>
+		</div>
+		<div class="mt-4 flex justify-end">
+			<button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500" onclick="window.location.reload()">
+				Done
+			</button>
+		</div>
+	</div>
+}
+
+templ copyTokenScript() {
+	<script>
+		function copyToken() {
+			var token = document.getElementById('raw-token-value').textContent;
+			navigator.clipboard.writeText(token).then(function() {
+				document.getElementById('copy-feedback').textContent = 'Copied to clipboard!';
+			}, function() {
+				document.getElementById('copy-feedback').textContent = 'Copy failed. Please select and copy manually.';
+			});
+		}
+	</script>
+}
+
+func formatDate(rfc3339 string) string {
+	if len(rfc3339) >= 10 {
+		return rfc3339[:10]
+	}
+	return rfc3339
+}

@@ -31,7 +31,58 @@ func (c *PageLoginController) Show(w http.ResponseWriter, r *http.Request) {
 	selfReg, _ := c.settings.Get(r.Context(), "self_registration_enabled")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = login.LoginPage(selfReg == "true").Render(r.Context(), w)
+	_ = login.LoginPage(selfReg == "true", "").Render(r.Context(), w)
+}
+
+// Login handles POST /login. Authenticates the user and redirects to /.
+func (c *PageLoginController) Login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	if username == "" || password == "" {
+		c.renderLoginError(w, r, "Username and password are required")
+		return
+	}
+
+	ip := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		ip = fwd
+	}
+
+	result, err := c.auth.Login(r.Context(), username, password, ip, r.UserAgent())
+	if err != nil {
+		c.renderLoginError(w, r, "Invalid username or password")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "nexmap_session",
+		Value:    result.SessionID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   c.cookieSecure,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (c *PageLoginController) renderLoginError(w http.ResponseWriter, r *http.Request, message string) {
+	selfReg, _ := c.settings.Get(r.Context(), "self_registration_enabled")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	if r.Header.Get("HX-Request") == "true" {
+		// Return just the form fragment for htmx swap.
+		_ = login.LoginForm(selfReg == "true", message).Render(r.Context(), w)
+		return
+	}
+	_ = login.LoginPage(selfReg == "true", message).Render(r.Context(), w)
 }
 
 // Logout handles POST /logout. Validates the CSRF token from the form,

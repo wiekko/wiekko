@@ -1,0 +1,209 @@
+package user
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+	"nexmap.net/internal/model"
+)
+
+// ProfileProps holds the data for the user profile page.
+type ProfileProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	User        *model.User
+}
+
+templ ProfilePage(props ProfileProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "",
+	}) {
+		<div class="mx-auto max-w-3xl space-y-6">
+			<!-- Breadcrumb -->
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: "Profile"},
+			})
+			<!-- Profile header -->
+			<div class="flex items-center gap-4">
+				@ui.UserAvatar(props.User.DisplayName, "lg")
+				<div>
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{ props.User.DisplayName }</h1>
+					<p class="text-sm text-gray-500 dark:text-gray-400">{ "@" + props.User.Username }</p>
+				</div>
+			</div>
+			<!-- Edit profile -->
+			@ProfileCard(props.User, "")
+			<!-- Change password -->
+			@PasswordCard("")
+			<!-- Two-factor authentication -->
+			@ui.Card() {
+				@ui.CardHeader("Two-Factor Authentication") {
+				}
+				@ui.CardBody() {
+					if props.User.TOTPEnabled {
+						<div class="flex items-center gap-3">
+							<div class="text-emerald-500">
+								@ui.Icon("shield-check", "md")
+							</div>
+							<div>
+								<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Enabled</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">Your account is protected with two-factor authentication.</p>
+							</div>
+						</div>
+					} else {
+						<div class="flex items-center gap-3">
+							<div class="text-gray-400 dark:text-gray-500">
+								@ui.Icon("shield", "md")
+							</div>
+							<div>
+								<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Not configured</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">TOTP setup will be available in a future update.</p>
+							</div>
+						</div>
+					}
+				}
+			}
+			<!-- Theme preference -->
+			@ui.Card() {
+				@ui.CardHeader("Theme") {
+				}
+				@ui.CardBody() {
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Appearance</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Choose between light, dark, or system theme.</p>
+						</div>
+						@ui.ThemeToggle()
+					</div>
+				}
+			}
+			<!-- Danger zone -->
+			@ui.Card() {
+				<div class="border-b border-red-200 px-6 py-4 dark:border-red-800">
+					<h3 class="text-base font-semibold text-red-700 dark:text-red-400">Danger Zone</h3>
+				</div>
+				@ui.CardBody() {
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Delete Account</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Permanently delete your account and all associated data.</p>
+						</div>
+						<button
+							type="button"
+							class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+							hx-post="/user/profile/delete"
+							hx-confirm="Are you sure you want to delete your account? This action cannot be undone."
+						>
+							@ui.Icon("trash", "sm")
+							Request Deletion
+						</button>
+					</div>
+				}
+			}
+		</div>
+	}
+}
+
+// ProfileCard renders the profile edit form. Returned as fragment on htmx update.
+templ ProfileCard(user *model.User, feedback string) {
+	<div id="profile-card">
+		@ui.Card() {
+			@ui.CardHeader("Profile") {
+			}
+			@ui.CardBody() {
+				<form class="space-y-4" hx-post="/user/profile" hx-target="#profile-card" hx-swap="outerHTML">
+					@ui.TextInput(ui.InputProps{
+						ID:    "profile-display-name",
+						Name:  "display_name",
+						Label: "Display Name",
+						Value: user.DisplayName,
+					})
+					@ui.TextInput(ui.InputProps{
+						ID:    "profile-email",
+						Name:  "email",
+						Label: "Email",
+						Type:  "email",
+						Value: user.Email,
+					})
+					@Feedback(feedback, false)
+					<div class="flex justify-end">
+						@ui.Button(ui.ButtonProps{
+							Label:   "Save Changes",
+							Variant: "primary",
+							Size:    "md",
+							Type:    "submit",
+						})
+					</div>
+				</form>
+			}
+		}
+	</div>
+}
+
+// PasswordCard renders the password change form. Returned as fragment on htmx update.
+templ PasswordCard(feedback string) {
+	<div id="password-card">
+		@ui.Card() {
+			@ui.CardHeader("Change Password") {
+			}
+			@ui.CardBody() {
+				<form class="space-y-4" hx-post="/user/profile/password" hx-target="#password-card" hx-swap="outerHTML">
+					@ui.TextInput(ui.InputProps{
+						ID:       "current-password",
+						Name:     "old_password",
+						Label:    "Current Password",
+						Type:     "password",
+						Required: true,
+					})
+					@ui.TextInput(ui.InputProps{
+						ID:       "new-password",
+						Name:     "new_password",
+						Label:    "New Password",
+						Type:     "password",
+						Required: true,
+					})
+					@ui.TextInput(ui.InputProps{
+						ID:       "confirm-password",
+						Name:     "confirm_password",
+						Label:    "Confirm New Password",
+						Type:     "password",
+						Required: true,
+					})
+					@Feedback(feedback, feedback != "")
+					<div class="flex justify-end">
+						@ui.Button(ui.ButtonProps{
+							Label:   "Change Password",
+							Variant: "primary",
+							Size:    "md",
+							Type:    "submit",
+						})
+					</div>
+				</form>
+			}
+		}
+	</div>
+}
+
+// Feedback renders an inline success or error message.
+templ Feedback(message string, isError bool) {
+	if message != "" {
+		if isError {
+			<p class="text-sm text-red-600 dark:text-red-400">{ message }</p>
+		} else {
+			<p class="text-sm text-emerald-700 dark:text-emerald-400">{ message }</p>
+		}
+	}
+}
+
+// HeaderUserInfoOOB renders an out-of-band swap to update the header display name.
+templ HeaderUserInfoOOB(displayName string) {
+	<span id="header-user-info" class="flex items-center gap-2" hx-swap-oob="true">
+		@ui.UserAvatar(displayName, "sm")
+		<span>{ displayName }</span>
+	</span>
+}

@@ -26,6 +26,9 @@ func CSRF(next http.Handler) http.Handler {
 
 		expected := CSRFTokenFromContext(r.Context())
 		provided := r.Header.Get(csrfHeader)
+		if provided == "" {
+			provided = r.FormValue("_csrf")
+		}
 		if expected == "" || provided == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) != 1 {
 			httputil.Error(w, http.StatusForbidden, "CSRF_INVALID", "Invalid or missing CSRF token")
 			return

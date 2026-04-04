@@ -60,47 +60,127 @@ templ UserDetailPage(props UserDetailProps) {
 				}
 			}
 			<!-- Actions -->
-			@ui.Card() {
-				@ui.CardHeader("Actions") {
-				}
-				@ui.CardBody() {
-					<div class="flex flex-wrap gap-3">
-						if props.Target.Status == "pending_approval" {
-							@actionButton("Approve", props.Target.ID, "/api/v1/admin/users/"+props.Target.ID+"/approve", "primary", props.Meta.CSRFToken)
-						}
-						if props.Target.Status == "active" && !props.IsSelf {
-							@actionButton("Lock", props.Target.ID, "/api/v1/admin/users/"+props.Target.ID+"/lock", "secondary", props.Meta.CSRFToken)
-						}
-						if props.Target.Status == "locked" {
-							@actionButton("Unlock", props.Target.ID, "/api/v1/admin/users/"+props.Target.ID+"/unlock", "secondary", props.Meta.CSRFToken)
-						}
-						<button
-							type="button"
-							class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
-							onclick="document.getElementById('password-modal').classList.remove('hidden')"
-						>
-							@ui.Icon("lock", "sm")
-							Reset Password
-						</button>
-						if !props.IsSelf {
-							<button
-								type="button"
-								class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500"
-								onclick="document.getElementById('delete-modal').classList.remove('hidden')"
-							>
-								@ui.Icon("trash", "sm")
-								Delete User
-							</button>
-						}
-					</div>
-				}
-			}
+			@ActionsCard(props.Target, props.IsSelf, "")
 		</div>
 		<!-- Password reset modal -->
-		@passwordModal(props.Target.ID, props.Meta.CSRFToken)
-		<!-- Delete confirmation modal -->
-		@deleteUserModal(props.Target.ID, props.Target.Username, props.Meta.CSRFToken)
+		<div id="password-modal" class="hidden relative z-50">
+			<div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80" onclick="document.getElementById('password-modal').classList.add('hidden')"></div>
+			<div class="fixed inset-0 z-10 overflow-y-auto">
+				<div class="flex min-h-full items-center justify-center p-4">
+					<div id="password-modal-content" class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+						@PasswordResetForm(props.Target.ID, "")
+					</div>
+				</div>
+			</div>
+		</div>
 	}
+}
+
+// ActionsCard renders the admin action buttons. Returned as fragment after state changes.
+templ ActionsCard(target *model.User, isSelf bool, feedback string) {
+	<div id="actions-card">
+		@ui.Card() {
+			@ui.CardHeader("Actions") {
+			}
+			@ui.CardBody() {
+				if feedback != "" {
+					<p class="mb-3 text-sm text-emerald-700 dark:text-emerald-400">{ feedback }</p>
+				}
+				<div class="flex flex-wrap gap-3">
+					if target.Status == "pending_approval" {
+						@ui.Button(ui.ButtonProps{
+							Label:   "Approve",
+							Variant: "primary",
+							Size:    "md",
+							HxPost:  "/admin/users/" + target.ID + "/approve",
+							HxTarget: "#actions-card",
+							HxSwap: "outerHTML",
+						})
+					}
+					if target.Status == "active" && !isSelf {
+						@ui.Button(ui.ButtonProps{
+							Label:   "Lock",
+							Variant: "secondary",
+							Size:    "md",
+							HxPost:  "/admin/users/" + target.ID + "/lock",
+							HxTarget: "#actions-card",
+							HxSwap: "outerHTML",
+						})
+					}
+					if target.Status == "locked" {
+						@ui.Button(ui.ButtonProps{
+							Label:   "Unlock",
+							Variant: "secondary",
+							Size:    "md",
+							HxPost:  "/admin/users/" + target.ID + "/unlock",
+							HxTarget: "#actions-card",
+							HxSwap: "outerHTML",
+						})
+					}
+					<button
+						type="button"
+						class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700 dark:focus:ring-offset-gray-900"
+						onclick="document.getElementById('password-modal').classList.remove('hidden')"
+					>
+						@ui.Icon("lock", "sm")
+						Reset Password
+					</button>
+					if !isSelf {
+						<button
+							type="button"
+							class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+							hx-delete={ "/admin/users/" + target.ID }
+							hx-target="#actions-card"
+							hx-swap="outerHTML"
+							hx-confirm={ "Delete user " + target.Username + "? This cannot be undone." }
+						>
+							@ui.Icon("trash", "sm")
+							Delete User
+						</button>
+					}
+				</div>
+			}
+		}
+	</div>
+}
+
+// PasswordResetForm renders the password reset form inside the modal.
+templ PasswordResetForm(userID, feedback string) {
+	<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Reset Password</h3>
+	<form class="mt-4" hx-post={ "/admin/users/" + userID + "/password" } hx-target="#password-modal-content" hx-swap="innerHTML">
+		@ui.TextInput(ui.InputProps{
+			ID:       "new-password",
+			Name:     "password",
+			Label:    "New Password",
+			Type:     "password",
+			Required: true,
+		})
+		if feedback != "" {
+			<p class="mt-2 text-sm text-red-600 dark:text-red-400">{ feedback }</p>
+		}
+		<div class="mt-4 flex justify-end gap-3">
+			<button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700" onclick="document.getElementById('password-modal').classList.add('hidden')">
+				Cancel
+			</button>
+			@ui.Button(ui.ButtonProps{
+				Label:   "Set Password",
+				Variant: "primary",
+				Size:    "md",
+				Type:    "submit",
+			})
+		</div>
+	</form>
+}
+
+// PasswordResetSuccess renders the success state in the password modal.
+templ PasswordResetSuccess() {
+	<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Reset Password</h3>
+	<p class="mt-2 text-sm text-emerald-700 dark:text-emerald-400">Password updated successfully.</p>
+	<div class="mt-4 flex justify-end">
+		<button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500" onclick="document.getElementById('password-modal').classList.add('hidden')">
+			Done
+		</button>
+	</div>
 }
 
 templ detailField(label, value string) {
@@ -114,110 +194,6 @@ templ detailField(label, value string) {
 			}
 		</dd>
 	</div>
-}
-
-templ actionButton(label, userID, apiURL, variant, csrfToken string) {
-	<button
-		type="button"
-		class={ "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold", actionButtonClass(variant) }
-		onclick={ postAction(apiURL, csrfToken) }
-	>
-		{ label }
-	</button>
-}
-
-templ passwordModal(userID, csrfToken string) {
-	<div id="password-modal" class="hidden relative z-50">
-		<div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80" onclick="document.getElementById('password-modal').classList.add('hidden')"></div>
-		<div class="fixed inset-0 z-10 overflow-y-auto">
-			<div class="flex min-h-full items-center justify-center p-4">
-				<div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
-					<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Reset Password</h3>
-					<div class="mt-4">
-						<label for="new-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Password</label>
-						<input type="password" id="new-password" class="mt-1 block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"/>
-					</div>
-					<div id="password-error" class="mt-2"></div>
-					<div class="mt-4 flex justify-end gap-3">
-						<button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700" onclick="document.getElementById('password-modal').classList.add('hidden')">
-							Cancel
-						</button>
-						<button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500" onclick={ submitPassword(userID, csrfToken) }>
-							Set Password
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
-templ deleteUserModal(userID, username, csrfToken string) {
-	<div id="delete-modal" class="hidden relative z-50">
-		<div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80" onclick="document.getElementById('delete-modal').classList.add('hidden')"></div>
-		<div class="fixed inset-0 z-10 overflow-y-auto">
-			<div class="flex min-h-full items-center justify-center p-4">
-				<div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
-					<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete User</h3>
-					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-						Are you sure you want to delete <strong class="text-gray-900 dark:text-gray-100">{ username }</strong>? This action cannot be undone.
-					</p>
-					<div id="delete-error" class="mt-2"></div>
-					<div class="mt-4 flex justify-end gap-3">
-						<button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700" onclick="document.getElementById('delete-modal').classList.add('hidden')">
-							Cancel
-						</button>
-						<button type="button" class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500" onclick={ deleteUser(userID, csrfToken) }>
-							Delete
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
-script postAction(apiURL, csrfToken string) {
-	fetch(apiURL, {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken}
-	}).then(function() { window.location.reload(); });
-}
-
-script submitPassword(userID, csrfToken string) {
-	var pw = document.getElementById('new-password').value;
-	if (!pw) return;
-	fetch('/api/v1/admin/users/' + userID + '/password', {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
-		body: JSON.stringify({password: pw})
-	}).then(function(resp) {
-		if (resp.ok) {
-			document.getElementById('password-modal').classList.add('hidden');
-			document.getElementById('new-password').value = '';
-		} else {
-			resp.json().then(function(data) {
-				document.getElementById('password-error').innerHTML =
-					'<p class="text-sm text-red-600 dark:text-red-400">' + (data.error ? data.error.message : 'Failed') + '</p>';
-			});
-		}
-	});
-}
-
-script deleteUser(userID, csrfToken string) {
-	fetch('/api/v1/admin/users/' + userID, {
-		method: 'DELETE',
-		headers: {'X-CSRF-Token': csrfToken}
-	}).then(function(resp) {
-		if (resp.ok) {
-			window.location.href = '/admin/users';
-		} else {
-			resp.json().then(function(data) {
-				document.getElementById('delete-error').innerHTML =
-					'<p class="text-sm text-red-600 dark:text-red-400">' + (data.error ? data.error.message : 'Failed') + '</p>';
-			});
-		}
-	});
 }
 
 func actionButtonClass(variant string) string {
