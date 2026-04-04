@@ -23,9 +23,14 @@ templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
 			</div>
 		}
 		<!-- Navigation -->
-		<nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+		<nav class="flex-1 space-y-1 overflow-y-auto scrollbar-thin px-3 py-4">
 			@SidebarLink("Dashboard", "/", "home", activeSection == "dashboard", "")
 			if productID != "" {
+				@SidebarSection("Product") {
+					@SidebarLink("Overview", "/products/"+productID, "layout-dashboard", activeSection == "overview", "")
+					@SidebarLink("Settings", "/products/"+productID+"/settings", "settings", activeSection == "settings", "")
+					@SidebarLink("Team", "/products/"+productID+"/team", "users", activeSection == "team", "")
+				}
 				@SidebarSection("Backlog") {
 					@SidebarLink("Requirements", "/products/"+productID+"/requirements", "clipboard-list", activeSection == "requirements", "")
 					@SidebarLink("Defects", "/products/"+productID+"/defects", "bug", activeSection == "defects", "")

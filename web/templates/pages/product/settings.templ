@@ -1,0 +1,178 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+)
+
+// SettingsProps holds data for the product settings page.
+type SettingsProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+}
+
+templ SettingsPage(props SettingsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "settings",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Settings"},
+			})
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Changes are saved automatically.</p>
+			</div>
+			@ui.TabGroup([]templates.TabDef{
+				{ID: "general", Label: "General", HxGet: "/products/" + props.Product.ID + "/settings/general", Active: true},
+				{ID: "statuses", Label: "Statuses", HxGet: "/products/" + props.Product.ID + "/settings/statuses"},
+				{ID: "environments", Label: "Environments", HxGet: "/products/" + props.Product.ID + "/settings/environments"},
+				{ID: "pyramid", Label: "Pyramid Levels", HxGet: "/products/" + props.Product.ID + "/settings/pyramid"},
+			})
+			@ui.TabPanel("general") {
+				@GeneralTabContent(props.Product)
+			}
+			@ui.TabPanel("statuses") {
+			}
+			@ui.TabPanel("environments") {
+			}
+			@ui.TabPanel("pyramid") {
+			}
+			<!-- Danger Zone -->
+			<div class="mt-8 border-t border-red-200 pt-6 dark:border-red-800">
+				<h2 class="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h2>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Permanently delete this product and all its data.</p>
+				<div class="mt-4">
+					<button
+						type="button"
+						class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-get={ "/products/" + props.Product.ID + "/delete/confirm" }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						@ui.Icon("trash", "sm")
+						Delete Product
+					</button>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// GeneralTabContent renders the auto-save fields for the General settings tab.
+templ GeneralTabContent(p *model.Product) {
+	<div class="space-y-6">
+		@ui.Card() {
+			@ui.CardBody() {
+				<div class="space-y-6">
+					@settingTextField(p.ID, "name", "Name", p.Name)
+					@settingTextArea(p.ID, "description", "Description", p.Description)
+					@settingSelect(p.ID, "estimation_mode", "Estimation Mode", estimationModeOptions(p.EstimationMode))
+					@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
+				</div>
+			}
+		}
+	</div>
+}
+
+// StubTabContent renders a placeholder for unimplemented settings tabs.
+templ StubTabContent(name string) {
+	<div class="py-12 text-center">
+		<div class="text-gray-400 dark:text-gray-500">
+			@ui.Icon("construction", "lg")
+		</div>
+		<p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">{ name } configuration coming soon.</p>
+	</div>
+}
+
+// SettingField renders a single auto-save field fragment (used after PATCH update).
+templ SettingField(p *model.Product, field string) {
+	switch field {
+		case "name":
+			@settingTextField(p.ID, "name", "Name", p.Name)
+		case "description":
+			@settingTextArea(p.ID, "description", "Description", p.Description)
+		case "estimation_mode":
+			@settingSelect(p.ID, "estimation_mode", "Estimation Mode", estimationModeOptions(p.EstimationMode))
+		case "workflow_mode":
+			@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
+	}
+}
+
+templ settingTextField(productID, field, label, value string) {
+	<div
+		id={ "setting-" + field }
+		class="space-y-1"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<label for={ field } class="block text-sm font-medium text-gray-700 dark:text-gray-300">{ label }</label>
+		<input
+			type="text"
+			id={ field }
+			name="value"
+			value={ value }
+			class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings" }
+			hx-include="this"
+			hx-vals={ `{"field":"` + field + `"}` }
+			hx-trigger="change"
+		/>
+	</div>
+}
+
+templ settingTextArea(productID, field, label, value string) {
+	<div
+		id={ "setting-" + field }
+		class="space-y-1"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<label for={ field } class="block text-sm font-medium text-gray-700 dark:text-gray-300">{ label }</label>
+		<textarea
+			id={ field }
+			name="value"
+			rows="3"
+			class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings" }
+			hx-include="this"
+			hx-vals={ `{"field":"` + field + `"}` }
+			hx-trigger="change"
+		>{ value }</textarea>
+	</div>
+}
+
+templ settingSelect(productID, field, label string, options []templates.SelectOption) {
+	<div
+		id={ "setting-" + field }
+		class="space-y-1"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<label for={ field } class="block text-sm font-medium text-gray-700 dark:text-gray-300">{ label }</label>
+		<select
+			id={ field }
+			name="value"
+			class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings" }
+			hx-include="this"
+			hx-vals={ `{"field":"` + field + `"}` }
+			hx-trigger="change"
+		>
+			for _, opt := range options {
+				<option value={ opt.Value } selected?={ opt.Selected }>{ opt.Label }</option>
+			}
+		</select>
+	</div>
+}

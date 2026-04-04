@@ -7,6 +7,7 @@ type ButtonProps struct {
 	Size     string // "sm", "md", "lg"
 	Disabled bool
 	Type     string // "button", "submit"
+	HxGet    string
 	HxPost   string
 	HxPatch  string
 	HxDelete string
@@ -22,6 +23,9 @@ templ Button(props ButtonProps) {
 			buttonVariant(props.Variant),
 			buttonSize(props.Size) }
 		disabled?={ props.Disabled }
+		if props.HxGet != "" {
+			hx-get={ props.HxGet }
+		}
 		if props.HxPost != "" {
 			hx-post={ props.HxPost }
 		}

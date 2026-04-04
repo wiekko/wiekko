@@ -1,0 +1,98 @@
+package product
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// CreateProps holds data for the create product page.
+type CreateProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Name           string
+	Description    string
+	EstimationMode string
+	WorkflowMode   string
+	Error          string
+}
+
+templ CreatePage(props CreateProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "dashboard",
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: "Create Product"},
+			})
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Product</h1>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Set up a new product to manage requirements, testing, and defects.</p>
+			</div>
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="POST" action="/products/new" class="space-y-6">
+						@patterns.FormError(props.Error)
+						@ui.TextInput(ui.InputProps{
+							ID:          "name",
+							Name:        "name",
+							Label:       "Name",
+							Value:       props.Name,
+							Placeholder: "My Product",
+							Required:    true,
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "A brief description of the product...",
+							Rows:        3,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:    "estimation_mode",
+							Name:  "estimation_mode",
+							Label: "Estimation Mode",
+							Options: estimationModeOptions(props.EstimationMode),
+						})
+						@ui.Select(ui.SelectProps{
+							ID:    "workflow_mode",
+							Name:  "workflow_mode",
+							Label: "Workflow Mode",
+							Options: workflowModeOptions(props.WorkflowMode),
+						})
+						@patterns.FormActions("Create Product", "/")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func estimationModeOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = "disabled"
+	}
+	return []templates.SelectOption{
+		{Value: "disabled", Label: "Disabled", Selected: current == "disabled"},
+		{Value: "story_points", Label: "Story Points", Selected: current == "story_points"},
+		{Value: "tshirt_sizes", Label: "T-Shirt Sizes", Selected: current == "tshirt_sizes"},
+		{Value: "hours", Label: "Hours", Selected: current == "hours"},
+	}
+}
+
+func workflowModeOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = "kanban"
+	}
+	return []templates.SelectOption{
+		{Value: "kanban", Label: "Kanban", Selected: current == "kanban"},
+		{Value: "scrum", Label: "Scrum", Selected: current == "scrum"},
+	}
+}

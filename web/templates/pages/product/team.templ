@@ -1,0 +1,479 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TeamMemberView is a display-ready product member.
+type TeamMemberView struct {
+	UserID      string
+	DisplayName string
+	Username    string
+	Role        string
+	IsOwner     bool
+}
+
+// UserSearchResult is a user returned by the typeahead search.
+type UserSearchResult struct {
+	UserID      string
+	DisplayName string
+	Username    string
+}
+
+// TeamProps holds data for the team management page.
+type TeamProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Members        []TeamMemberView
+	IsOwnerOrAdmin bool
+}
+
+templ TeamPage(props TeamProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "team",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Team"},
+			})
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Team</h1>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d members", len(props.Members)) }</p>
+			</div>
+			if props.IsOwnerOrAdmin {
+				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+					@AddMemberForm(props.Product.ID, "")
+					@InviteForm(props.Product.ID, "")
+				</div>
+			}
+			@ui.Card() {
+				@ui.CardBody() {
+					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+						<thead>
+							<tr>
+								<th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">User</th>
+								<th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Role</th>
+								if props.IsOwnerOrAdmin {
+									<th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
+								}
+							</tr>
+						</thead>
+						<tbody id="member-table-body" class="divide-y divide-gray-200 dark:divide-gray-700">
+							@MemberTableBody(props.Members, props.Product.ID, props.IsOwnerOrAdmin)
+						</tbody>
+					</table>
+				}
+			}
+		</div>
+	}
+}
+
+// AddMemberForm renders the add-existing-user form card with typeahead search.
+templ AddMemberForm(productID string, errMsg string) {
+	<div id="add-member-form">
+		@ui.Card() {
+			@ui.CardHeader("Add Existing User") {
+			}
+			@ui.CardBody() {
+				if errMsg != "" {
+					@patterns.FormError(errMsg)
+				}
+				<form
+					id="add-member-submit-form"
+					class="space-y-4"
+					hx-post={ "/products/" + productID + "/team/members" }
+					hx-target="#member-table-body"
+					hx-swap="innerHTML"
+				>
+					<input type="hidden" id="selected-user-id" name="user_id" value=""/>
+					<!-- Search input -->
+					<div>
+						<label for="user-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+							Search User
+							<span class="text-red-500">*</span>
+						</label>
+						<div class="relative mt-1">
+							<input
+								type="text"
+								id="user-search"
+								autocomplete="off"
+								placeholder="Type to search by name or username..."
+								class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+								hx-get={ "/products/" + productID + "/team/search-users" }
+								hx-trigger="input changed delay:300ms"
+								hx-target="#user-search-results"
+								hx-swap="innerHTML"
+								name="q"
+							/>
+							<div id="user-search-results" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md bg-white shadow-lg ring-1 ring-gray-200 empty:hidden dark:bg-gray-800 dark:ring-gray-700"></div>
+						</div>
+						<div id="selected-user-display" class="mt-2 hidden items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm dark:bg-indigo-900/30">
+							<span id="selected-user-name" class="font-medium text-indigo-700 dark:text-indigo-300"></span>
+							<button type="button" class="ml-auto text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-200" onclick="clearUserSelection()">
+								@ui.Icon("x", "sm")
+							</button>
+						</div>
+					</div>
+					<div>
+						@ui.Select(ui.SelectProps{
+							ID:    "add-member-role",
+							Name:  "role",
+							Label: "Role",
+							Options: roleOptions(),
+							Required: true,
+						})
+					</div>
+					@ui.Button(ui.ButtonProps{
+						Label:   "Add Member",
+						Variant: "primary",
+						Size:    "md",
+						Type:    "submit",
+					}) {
+						@ui.Icon("plus", "sm")
+					}
+				</form>
+				@userSearchScript()
+			}
+		}
+	</div>
+}
+
+// AddMemberFormOOB renders the add-member form as an htmx out-of-band swap.
+templ AddMemberFormOOB(productID string, errMsg string) {
+	<div id="add-member-form" hx-swap-oob="true">
+		@ui.Card() {
+			@ui.CardHeader("Add Existing User") {
+			}
+			@ui.CardBody() {
+				if errMsg != "" {
+					@patterns.FormError(errMsg)
+				}
+				<form
+					id="add-member-submit-form"
+					class="space-y-4"
+					hx-post={ "/products/" + productID + "/team/members" }
+					hx-target="#member-table-body"
+					hx-swap="innerHTML"
+				>
+					<input type="hidden" id="selected-user-id" name="user_id" value=""/>
+					<div>
+						<label for="user-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+							Search User
+							<span class="text-red-500">*</span>
+						</label>
+						<div class="relative mt-1">
+							<input
+								type="text"
+								id="user-search"
+								autocomplete="off"
+								placeholder="Type to search by name or username..."
+								class="block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+								hx-get={ "/products/" + productID + "/team/search-users" }
+								hx-trigger="input changed delay:300ms"
+								hx-target="#user-search-results"
+								hx-swap="innerHTML"
+								name="q"
+							/>
+							<div id="user-search-results" class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md bg-white shadow-lg ring-1 ring-gray-200 empty:hidden dark:bg-gray-800 dark:ring-gray-700"></div>
+						</div>
+						<div id="selected-user-display" class="mt-2 hidden items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm dark:bg-indigo-900/30">
+							<span id="selected-user-name" class="font-medium text-indigo-700 dark:text-indigo-300"></span>
+							<button type="button" class="ml-auto text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-200" onclick="clearUserSelection()">
+								@ui.Icon("x", "sm")
+							</button>
+						</div>
+					</div>
+					<div>
+						@ui.Select(ui.SelectProps{
+							ID:    "add-member-role",
+							Name:  "role",
+							Label: "Role",
+							Options: roleOptions(),
+							Required: true,
+						})
+					</div>
+					@ui.Button(ui.ButtonProps{
+						Label:   "Add Member",
+						Variant: "primary",
+						Size:    "md",
+						Type:    "submit",
+					}) {
+						@ui.Icon("plus", "sm")
+					}
+				</form>
+				@userSearchScript()
+			}
+		}
+	</div>
+}
+
+// UserSearchResults renders the typeahead dropdown items.
+templ UserSearchResults(results []UserSearchResult) {
+	for _, r := range results {
+		<button
+			type="button"
+			class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+			onclick={ selectUser(r.UserID, r.DisplayName, r.Username) }
+		>
+			<div>
+				<p class="font-medium text-gray-900 dark:text-gray-100">{ r.DisplayName }</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{ "@" + r.Username }</p>
+			</div>
+		</button>
+	}
+	if len(results) == 0 {
+		<div class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No users found.</div>
+	}
+}
+
+// InviteForm renders the invite-by-email form card.
+templ InviteForm(productID string, errMsg string) {
+	<div id="invite-form">
+		@ui.Card() {
+			@ui.CardHeader("Invite New User") {
+			}
+			@ui.CardBody() {
+				if errMsg != "" {
+					@patterns.FormError(errMsg)
+				}
+				<form
+					class="space-y-4"
+					hx-post={ "/products/" + productID + "/team/invite" }
+					hx-target="#invite-form"
+					hx-swap="outerHTML"
+				>
+					@ui.TextInput(ui.InputProps{
+						ID:          "invite-email",
+						Name:        "email",
+						Label:       "Email Address",
+						Type:        "email",
+						Placeholder: "user@example.com",
+						Required:    true,
+					})
+					@ui.Select(ui.SelectProps{
+						ID:    "invite-role",
+						Name:  "role",
+						Label: "Role",
+						Options: roleOptions(),
+						Required: true,
+					})
+					@ui.Button(ui.ButtonProps{
+						Label:   "Send Invitation",
+						Variant: "secondary",
+						Size:    "md",
+						Type:    "submit",
+					}) {
+						@ui.Icon("mail", "sm")
+					}
+				</form>
+			}
+		}
+	</div>
+}
+
+// InviteFormOOB renders the invite form with error as OOB swap.
+templ InviteFormOOB(productID string, errMsg string) {
+	<div id="invite-form" hx-swap-oob="true">
+		@ui.Card() {
+			@ui.CardHeader("Invite New User") {
+			}
+			@ui.CardBody() {
+				if errMsg != "" {
+					@patterns.FormError(errMsg)
+				}
+				<form
+					class="space-y-4"
+					hx-post={ "/products/" + productID + "/team/invite" }
+					hx-target="#invite-form"
+					hx-swap="outerHTML"
+				>
+					@ui.TextInput(ui.InputProps{
+						ID:          "invite-email",
+						Name:        "email",
+						Type:        "email",
+						Label:       "Email Address",
+						Placeholder: "user@example.com",
+						Required:    true,
+					})
+					@ui.Select(ui.SelectProps{
+						ID:    "invite-role",
+						Name:  "role",
+						Label: "Role",
+						Options: roleOptions(),
+						Required: true,
+					})
+					@ui.Button(ui.ButtonProps{
+						Label:   "Send Invitation",
+						Variant: "secondary",
+						Size:    "md",
+						Type:    "submit",
+					}) {
+						@ui.Icon("mail", "sm")
+					}
+				</form>
+			}
+		}
+	</div>
+}
+
+// InviteSuccessOOB renders a success message after sending an invitation.
+templ InviteSuccessOOB(productID string, inviteURL string) {
+	<div id="invite-form" hx-swap-oob="true">
+		@ui.Card() {
+			@ui.CardHeader("Invite New User") {
+			}
+			@ui.CardBody() {
+				<div class="space-y-4">
+					<div class="rounded-md bg-emerald-50 p-4 dark:bg-emerald-900/30">
+						<div class="flex items-start gap-3">
+							<span class="text-emerald-500">
+								@ui.Icon("check-circle", "md")
+							</span>
+							<div>
+								<p class="text-sm font-medium text-emerald-700 dark:text-emerald-400">Invitation created!</p>
+								<p class="mt-1 text-sm text-emerald-600 dark:text-emerald-400">Share this link with the user:</p>
+								<code class="mt-2 block break-all rounded bg-emerald-100 px-2 py-1 text-xs font-mono text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">{ inviteURL }</code>
+							</div>
+						</div>
+					</div>
+					@ui.Button(ui.ButtonProps{
+						Label:   "Invite Another",
+						Variant: "secondary",
+						Size:    "md",
+						HxGet:   "/products/" + productID + "/team/invite-form",
+						HxTarget: "#invite-form",
+						HxSwap:   "outerHTML",
+					})
+				</div>
+			}
+		}
+	</div>
+}
+
+// MemberTableBody renders all member rows.
+templ MemberTableBody(members []TeamMemberView, productID string, isOwnerOrAdmin bool) {
+	for _, m := range members {
+		@MemberRow(m, productID, isOwnerOrAdmin)
+	}
+}
+
+// MemberRow renders a single member table row.
+templ MemberRow(m TeamMemberView, productID string, isOwnerOrAdmin bool) {
+	<tr id={ "member-" + m.UserID }>
+		<td class="whitespace-nowrap px-4 py-3">
+			<div>
+				<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ m.DisplayName }</p>
+				if m.Username != "" {
+					<p class="text-xs text-gray-500 dark:text-gray-400">{ "@" + m.Username }</p>
+				}
+			</div>
+		</td>
+		<td class="whitespace-nowrap px-4 py-3">
+			if isOwnerOrAdmin && !m.IsOwner {
+				<select
+					name="role"
+					class="rounded-md border-0 px-2 py-1 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+					hx-patch={ "/products/" + productID + "/team/members/" + m.UserID }
+					hx-target={ "#member-" + m.UserID }
+					hx-swap="outerHTML"
+					hx-trigger="change"
+				>
+					<option value="developer" selected?={ m.Role == "developer" }>Developer</option>
+					<option value="tester" selected?={ m.Role == "tester" }>Tester</option>
+					<option value="viewer" selected?={ m.Role == "viewer" }>Viewer</option>
+				</select>
+			} else {
+				@roleBadge(m.Role)
+			}
+		</td>
+		if isOwnerOrAdmin {
+			<td class="whitespace-nowrap px-4 py-3 text-right">
+				if m.IsOwner {
+					<span class="text-xs text-gray-400 dark:text-gray-500">Product Owner</span>
+				} else {
+					<div class="flex items-center justify-end gap-2">
+						<button
+							type="button"
+							class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+							hx-post={ "/products/" + productID + "/team/transfer" }
+							hx-vals={ `{"new_owner_id":"` + m.UserID + `"}` }
+							hx-confirm={ "Transfer ownership to " + m.DisplayName + "? You will be demoted to Developer." }
+						>
+							Transfer Ownership
+						</button>
+						<button
+							type="button"
+							class="text-sm font-medium text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
+							hx-delete={ "/products/" + productID + "/team/members/" + m.UserID }
+							hx-target={ "#member-" + m.UserID }
+							hx-swap="delete"
+							hx-confirm={ "Remove " + m.DisplayName + " from this product?" }
+						>
+							Remove
+						</button>
+					</div>
+				}
+			</td>
+		}
+	</tr>
+}
+
+// DeleteProductConfirmation renders the delete product confirmation modal content.
+templ DeleteProductConfirmation(productName, productID string) {
+	@ui.ConfirmDialog(
+		"delete-confirm",
+		"Delete Product",
+		"Are you sure you want to delete \""+productName+"\"? This will permanently remove all associated data. This action cannot be undone.",
+		"Delete Product",
+		"danger",
+		"delete",
+		"/products/"+productID,
+	)
+}
+
+func roleOptions() []templates.SelectOption {
+	return []templates.SelectOption{
+		{Value: "developer", Label: "Developer"},
+		{Value: "tester", Label: "Tester"},
+		{Value: "viewer", Label: "Viewer"},
+	}
+}
+
+// userSearchScript provides the selection logic for the typeahead search.
+templ userSearchScript() {
+	<script>
+		function selectUserResult(userId, displayName, username) {
+			document.getElementById('selected-user-id').value = userId;
+			document.getElementById('selected-user-name').textContent = displayName + ' (@' + username + ')';
+			document.getElementById('selected-user-display').classList.remove('hidden');
+			document.getElementById('selected-user-display').classList.add('flex');
+			document.getElementById('user-search').value = '';
+			document.getElementById('user-search-results').innerHTML = '';
+		}
+		function clearUserSelection() {
+			document.getElementById('selected-user-id').value = '';
+			document.getElementById('selected-user-name').textContent = '';
+			document.getElementById('selected-user-display').classList.add('hidden');
+			document.getElementById('selected-user-display').classList.remove('flex');
+		}
+	</script>
+}
+
+script selectUser(userId, displayName, username string) {
+	selectUserResult(userId, displayName, username)
+}

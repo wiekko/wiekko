@@ -13,6 +13,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
@@ -30,6 +31,27 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /user/tokens", pageAuthed(http.HandlerFunc(userCtrl.Tokens)))
 	mux.Handle("POST /user/tokens", pageAuthed(http.HandlerFunc(userCtrl.CreateToken)))
 	mux.Handle("DELETE /user/tokens/{id}", pageAuthed(http.HandlerFunc(userCtrl.RevokeToken)))
+
+	// Product pages.
+	mux.Handle("GET /products/new", pageAuthed(http.HandlerFunc(productCtrl.CreateForm)))
+	mux.Handle("POST /products/new", pageAuthed(http.HandlerFunc(productCtrl.Create)))
+	mux.Handle("GET /products/{id}", pageAuthed(http.HandlerFunc(productCtrl.Overview)))
+	mux.Handle("GET /products/{id}/settings", pageAuthed(http.HandlerFunc(productCtrl.Settings)))
+	mux.Handle("GET /products/{id}/settings/general", pageAuthed(http.HandlerFunc(productCtrl.SettingsGeneral)))
+	mux.Handle("GET /products/{id}/settings/statuses", pageAuthed(http.HandlerFunc(productCtrl.SettingsStatuses)))
+	mux.Handle("GET /products/{id}/settings/environments", pageAuthed(http.HandlerFunc(productCtrl.SettingsEnvironments)))
+	mux.Handle("GET /products/{id}/settings/pyramid", pageAuthed(http.HandlerFunc(productCtrl.SettingsPyramid)))
+	mux.Handle("PATCH /products/{id}/settings", pageAuthed(http.HandlerFunc(productCtrl.UpdateProduct)))
+	mux.Handle("GET /products/{id}/team", pageAuthed(http.HandlerFunc(productCtrl.Team)))
+	mux.Handle("POST /products/{id}/team/members", pageAuthed(http.HandlerFunc(productCtrl.AddMember)))
+	mux.Handle("PATCH /products/{id}/team/members/{userId}", pageAuthed(http.HandlerFunc(productCtrl.UpdateMemberRole)))
+	mux.Handle("DELETE /products/{id}/team/members/{userId}", pageAuthed(http.HandlerFunc(productCtrl.RemoveMember)))
+	mux.Handle("POST /products/{id}/team/transfer", pageAuthed(http.HandlerFunc(productCtrl.TransferOwnership)))
+	mux.Handle("GET /products/{id}/team/search-users", pageAuthed(http.HandlerFunc(productCtrl.SearchUsers)))
+	mux.Handle("POST /products/{id}/team/invite", pageAuthed(http.HandlerFunc(productCtrl.InviteMember)))
+	mux.Handle("GET /products/{id}/team/invite-form", pageAuthed(http.HandlerFunc(productCtrl.InviteFormReset)))
+	mux.Handle("DELETE /products/{id}", pageAuthed(http.HandlerFunc(productCtrl.DeleteProduct)))
+	mux.Handle("GET /products/{id}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.DeleteProductConfirm)))
 
 	// Admin pages.
 	mux.Handle("GET /admin/users", pageAdmin(http.HandlerFunc(adminCtrl.ListUsers)))
