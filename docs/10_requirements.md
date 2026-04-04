@@ -33,7 +33,8 @@
 * **AR-221**: Nexmap shall provide a web interface for human interaction
 * **AR-222**: Nexmap shall provide a CLI for command line interaction from the project repository, e.g. for scripting, integration into build systems, or AI agents.
 * **AR-223**: Nexmap shall provide a REST API for third-party systems (e.g. web hooks for GitHub / GitLab / Forgejo)
-* **AR-224**: The CLI, web UI and third-party integrations shall all use the same REST API
+* **AR-224**: The CLI and third-party integrations shall all use the same REST API
+* **AR-225**: The Web UI shall use dedicated endpoints, rendering HTMX snippets.
 
 ### Technologies
 
