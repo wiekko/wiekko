@@ -27,4 +27,6 @@ type Config struct {
 	CookieSecure     bool
 	EncryptionKey    string
 	DevMode          bool
+	InitialAdminUser string
+	InitialAdminPass string
 }

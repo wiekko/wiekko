@@ -85,7 +85,7 @@ func main() {
 	svc := service.New(st, provider, cfg)
 
 	// Bootstrap admin account if no users exist.
-	if err := bootstrapAdmin(st, provider); err != nil {
+	if err := bootstrapAdmin(st, provider, cfg.InitialAdminUser, cfg.InitialAdminPass); err != nil {
 		slog.Error("failed to bootstrap admin", "err", err)
 		os.Exit(1)
 	}
@@ -107,7 +107,7 @@ func main() {
 	slog.Info("server stopped")
 }
 
-func bootstrapAdmin(st *store.Store, provider *builtin.Provider) error {
+func bootstrapAdmin(st *store.Store, provider *builtin.Provider, user string, password string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -119,10 +119,22 @@ func bootstrapAdmin(st *store.Store, provider *builtin.Provider) error {
 		return nil
 	}
 
-	password, err := generateBootstrapPassword()
-	if err != nil {
-		return err
+	logUser := false
+	logPassword := false
+
+	if user == "" {
+		user = "admin"
+		logUser = true
 	}
+
+	if password == "" {
+		password, err = generateBootstrapPassword()
+		if err != nil {
+			return err
+		}
+		logPassword = true
+	}
+
 	hash, err := provider.HashPassword(password)
 	if err != nil {
 		return err
@@ -131,7 +143,7 @@ func bootstrapAdmin(st *store.Store, provider *builtin.Provider) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	admin := &model.User{
 		ID:           uuid.New().String(),
-		Username:     "admin",
+		Username:     user,
 		Email:        "admin@localhost",
 		DisplayName:  "Administrator",
 		PasswordHash: hash,
@@ -144,7 +156,13 @@ func bootstrapAdmin(st *store.Store, provider *builtin.Provider) error {
 		return err
 	}
 
-	slog.Info("default admin account created", "username", "admin", "password", password)
+	if !logUser {
+		user = "as provided by ENV"
+	}
+	if !logPassword {
+		password = "as provided by ENV"
+	}
+	slog.Info("default admin account created", "username", user, "password", password)
 	return nil
 }
 

@@ -73,6 +73,12 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_DEV_MODE"); v != "" {
 		cfg.DevMode = v == "true" || v == "1"
 	}
+	if v := os.Getenv("NEXMAP_ADMIN_USER"); v != "" {
+		cfg.InitialAdminUser = v
+	}
+	if v := os.Getenv("NEXMAP_ADMIN_PASSWORD"); v != "" {
+		cfg.InitialAdminPass = v
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {
