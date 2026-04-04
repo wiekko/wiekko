@@ -29,6 +29,23 @@ func RequireAuthPage(next http.Handler) http.Handler {
 	})
 }
 
+// RequireAdminPage redirects non-admin page requests.
+// Unauthenticated users go to /login; authenticated non-admins go to /.
+func RequireAdminPage(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := UserFromContext(r.Context())
+		if user == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if !user.IsAdmin {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RequireAdmin rejects non-admin requests with 403.
 // Must be used after RequireAuth.
 func RequireAdmin(next http.Handler) http.Handler {

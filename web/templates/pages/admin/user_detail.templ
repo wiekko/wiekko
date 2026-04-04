@@ -1,0 +1,230 @@
+package admin
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+	"nexmap.net/internal/model"
+)
+
+// UserDetailProps holds the data for the user detail page.
+type UserDetailProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	IsSelf      bool
+	Target      *model.User
+}
+
+templ UserDetailPage(props UserDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "admin-users",
+	}) {
+		<div class="space-y-6">
+			<!-- Breadcrumb -->
+			<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+				<a href="/admin/users" class="hover:text-gray-700 dark:hover:text-gray-300">Users</a>
+				<span>/</span>
+				<span class="text-gray-900 dark:text-gray-100">{ props.Target.Username }</span>
+			</div>
+			<!-- Header -->
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-4">
+					@ui.UserAvatar(props.Target.DisplayName, "lg")
+					<div>
+						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{ props.Target.Username }</h1>
+						<div class="mt-1 flex items-center gap-2">
+							@userStatusBadge(props.Target.Status)
+							if props.Target.IsAdmin {
+								@ui.Badge("Admin", "amber")
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Info card -->
+			@ui.Card() {
+				@ui.CardHeader("Account Details") {
+				}
+				@ui.CardBody() {
+					<dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+						@detailField("Username", props.Target.Username)
+						@detailField("Email", props.Target.Email)
+						@detailField("Display Name", props.Target.DisplayName)
+						@detailField("Created", formatDate(props.Target.CreatedAt))
+						@detailField("Updated", formatDate(props.Target.UpdatedAt))
+					</dl>
+				}
+			}
+			<!-- Actions -->
+			@ui.Card() {
+				@ui.CardHeader("Actions") {
+				}
+				@ui.CardBody() {
+					<div class="flex flex-wrap gap-3">
+						if props.Target.Status == "pending_approval" {
+							@actionButton("Approve", props.Target.ID, "/api/v1/admin/users/"+props.Target.ID+"/approve", "primary", props.Meta.CSRFToken)
+						}
+						if props.Target.Status == "active" && !props.IsSelf {
+							@actionButton("Lock", props.Target.ID, "/api/v1/admin/users/"+props.Target.ID+"/lock", "secondary", props.Meta.CSRFToken)
+						}
+						if props.Target.Status == "locked" {
+							@actionButton("Unlock", props.Target.ID, "/api/v1/admin/users/"+props.Target.ID+"/unlock", "secondary", props.Meta.CSRFToken)
+						}
+						<button
+							type="button"
+							class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
+							onclick="document.getElementById('password-modal').classList.remove('hidden')"
+						>
+							@ui.Icon("lock", "sm")
+							Reset Password
+						</button>
+						if !props.IsSelf {
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500"
+								onclick="document.getElementById('delete-modal').classList.remove('hidden')"
+							>
+								@ui.Icon("trash", "sm")
+								Delete User
+							</button>
+						}
+					</div>
+				}
+			}
+		</div>
+		<!-- Password reset modal -->
+		@passwordModal(props.Target.ID, props.Meta.CSRFToken)
+		<!-- Delete confirmation modal -->
+		@deleteUserModal(props.Target.ID, props.Target.Username, props.Meta.CSRFToken)
+	}
+}
+
+templ detailField(label, value string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			if value != "" {
+				{ value }
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">—</span>
+			}
+		</dd>
+	</div>
+}
+
+templ actionButton(label, userID, apiURL, variant, csrfToken string) {
+	<button
+		type="button"
+		class={ "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold", actionButtonClass(variant) }
+		onclick={ postAction(apiURL, csrfToken) }
+	>
+		{ label }
+	</button>
+}
+
+templ passwordModal(userID, csrfToken string) {
+	<div id="password-modal" class="hidden relative z-50">
+		<div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80" onclick="document.getElementById('password-modal').classList.add('hidden')"></div>
+		<div class="fixed inset-0 z-10 overflow-y-auto">
+			<div class="flex min-h-full items-center justify-center p-4">
+				<div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Reset Password</h3>
+					<div class="mt-4">
+						<label for="new-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Password</label>
+						<input type="password" id="new-password" class="mt-1 block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"/>
+					</div>
+					<div id="password-error" class="mt-2"></div>
+					<div class="mt-4 flex justify-end gap-3">
+						<button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700" onclick="document.getElementById('password-modal').classList.add('hidden')">
+							Cancel
+						</button>
+						<button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500" onclick={ submitPassword(userID, csrfToken) }>
+							Set Password
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ deleteUserModal(userID, username, csrfToken string) {
+	<div id="delete-modal" class="hidden relative z-50">
+		<div class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80" onclick="document.getElementById('delete-modal').classList.add('hidden')"></div>
+		<div class="fixed inset-0 z-10 overflow-y-auto">
+			<div class="flex min-h-full items-center justify-center p-4">
+				<div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete User</h3>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+						Are you sure you want to delete <strong class="text-gray-900 dark:text-gray-100">{ username }</strong>? This action cannot be undone.
+					</p>
+					<div id="delete-error" class="mt-2"></div>
+					<div class="mt-4 flex justify-end gap-3">
+						<button type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700" onclick="document.getElementById('delete-modal').classList.add('hidden')">
+							Cancel
+						</button>
+						<button type="button" class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500" onclick={ deleteUser(userID, csrfToken) }>
+							Delete
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+script postAction(apiURL, csrfToken string) {
+	fetch(apiURL, {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken}
+	}).then(function() { window.location.reload(); });
+}
+
+script submitPassword(userID, csrfToken string) {
+	var pw = document.getElementById('new-password').value;
+	if (!pw) return;
+	fetch('/api/v1/admin/users/' + userID + '/password', {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+		body: JSON.stringify({password: pw})
+	}).then(function(resp) {
+		if (resp.ok) {
+			document.getElementById('password-modal').classList.add('hidden');
+			document.getElementById('new-password').value = '';
+		} else {
+			resp.json().then(function(data) {
+				document.getElementById('password-error').innerHTML =
+					'<p class="text-sm text-red-600 dark:text-red-400">' + (data.error ? data.error.message : 'Failed') + '</p>';
+			});
+		}
+	});
+}
+
+script deleteUser(userID, csrfToken string) {
+	fetch('/api/v1/admin/users/' + userID, {
+		method: 'DELETE',
+		headers: {'X-CSRF-Token': csrfToken}
+	}).then(function(resp) {
+		if (resp.ok) {
+			window.location.href = '/admin/users';
+		} else {
+			resp.json().then(function(data) {
+				document.getElementById('delete-error').innerHTML =
+					'<p class="text-sm text-red-600 dark:text-red-400">' + (data.error ? data.error.message : 'Failed') + '</p>';
+			});
+		}
+	});
+}
+
+func actionButtonClass(variant string) string {
+	switch variant {
+	case "primary":
+		return "bg-indigo-600 text-white hover:bg-indigo-500"
+	default:
+		return "bg-white text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
+	}
+}

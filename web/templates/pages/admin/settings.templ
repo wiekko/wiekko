@@ -1,0 +1,159 @@
+package admin
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+)
+
+// SettingsProps holds the data for the instance settings page.
+type SettingsProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Settings    map[string]string
+}
+
+templ SettingsPage(props SettingsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "admin-settings",
+	}) {
+		<div class="space-y-6">
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Instance Settings</h1>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Changes are saved automatically.</p>
+			</div>
+			<!-- Registration & Access -->
+			@ui.Card() {
+				@ui.CardHeader("Registration & Access") {
+				}
+				@ui.CardBody() {
+					<div class="space-y-4">
+						@settingToggle("self_registration_enabled", "Self-Registration", "Allow users to register without an invitation link.", props.Settings["self_registration_enabled"] == "true", props.Meta.CSRFToken)
+						@settingToggle("moderation_enabled", "Moderation", "Require admin approval for self-registered accounts.", props.Settings["moderation_enabled"] == "true", props.Meta.CSRFToken)
+						@settingToggle("product_creation_enabled", "Product Creation", "Allow non-admin users to create new products.", props.Settings["product_creation_enabled"] == "true", props.Meta.CSRFToken)
+						@settingToggle("2fa_enforced", "Enforce 2FA", "Require two-factor authentication for all users.", props.Settings["2fa_enforced"] == "true", props.Meta.CSRFToken)
+					</div>
+				}
+			}
+			<!-- Password Policy -->
+			@ui.Card() {
+				@ui.CardHeader("Password Policy") {
+				}
+				@ui.CardBody() {
+					<div class="space-y-4">
+						@settingNumber("password_min_length", "Minimum Length", props.Settings["password_min_length"], props.Meta.CSRFToken)
+						@settingToggle("password_require_uppercase", "Require Uppercase", "At least one uppercase letter.", props.Settings["password_require_uppercase"] == "true", props.Meta.CSRFToken)
+						@settingToggle("password_require_lowercase", "Require Lowercase", "At least one lowercase letter.", props.Settings["password_require_lowercase"] == "true", props.Meta.CSRFToken)
+						@settingToggle("password_require_digit", "Require Digit", "At least one numeric digit.", props.Settings["password_require_digit"] == "true", props.Meta.CSRFToken)
+						@settingToggle("password_require_special", "Require Special Character", "At least one special character.", props.Settings["password_require_special"] == "true", props.Meta.CSRFToken)
+					</div>
+				}
+			}
+		</div>
+	}
+}
+
+templ settingToggle(key, label, description string, checked bool, csrfToken string) {
+	<div class="flex items-center justify-between">
+		<div>
+			<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ label }</p>
+			<p class="text-sm text-gray-500 dark:text-gray-400">{ description }</p>
+		</div>
+		<button
+			type="button"
+			role="switch"
+			aria-checked={ boolStr(checked) }
+			class={ "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900", toggleBg(checked) }
+			onclick={ toggleSetting(key, csrfToken) }
+			data-key={ key }
+		>
+			<span class={ "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform dark:bg-gray-200", toggleKnob(checked) }></span>
+		</button>
+	</div>
+}
+
+templ settingNumber(key, label, value, csrfToken string) {
+	<div class="flex items-center justify-between">
+		<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ label }</p>
+		<input
+			type="number"
+			min="1"
+			max="128"
+			value={ settingValue(value, "8") }
+			class="w-20 rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			onchange={ updateNumberSetting(key, csrfToken) }
+			data-key={ key }
+		/>
+	</div>
+}
+
+script toggleSetting(key, csrfToken string) {
+	var btn = event.currentTarget;
+	var isOn = btn.getAttribute('aria-checked') === 'true';
+	var newVal = isOn ? 'false' : 'true';
+	var body = {};
+	body[key] = newVal;
+	fetch('/api/v1/admin/settings', {
+		method: 'PATCH',
+		headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+		body: JSON.stringify(body)
+	}).then(function(resp) {
+		if (resp.ok) {
+			btn.setAttribute('aria-checked', newVal);
+			if (newVal === 'true') {
+				btn.classList.remove('bg-gray-200', 'dark:bg-gray-700');
+				btn.classList.add('bg-indigo-600');
+				btn.firstElementChild.classList.remove('translate-x-0');
+				btn.firstElementChild.classList.add('translate-x-5');
+			} else {
+				btn.classList.remove('bg-indigo-600');
+				btn.classList.add('bg-gray-200', 'dark:bg-gray-700');
+				btn.firstElementChild.classList.remove('translate-x-5');
+				btn.firstElementChild.classList.add('translate-x-0');
+			}
+		}
+	});
+}
+
+script updateNumberSetting(key, csrfToken string) {
+	var input = event.currentTarget;
+	var body = {};
+	body[key] = input.value;
+	fetch('/api/v1/admin/settings', {
+		method: 'PATCH',
+		headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+		body: JSON.stringify(body)
+	});
+}
+
+func toggleBg(on bool) string {
+	if on {
+		return "bg-indigo-600"
+	}
+	return "bg-gray-200 dark:bg-gray-700"
+}
+
+func toggleKnob(on bool) string {
+	if on {
+		return "translate-x-5"
+	}
+	return "translate-x-0"
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+func settingValue(val, fallback string) string {
+	if val != "" {
+		return val
+	}
+	return fallback
+}

@@ -1,0 +1,144 @@
+package admin
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+	"nexmap.net/internal/model"
+)
+
+// UsersProps holds the data for the users list page.
+type UsersProps struct {
+	Meta         templates.PageMeta
+	DisplayName  string
+	IsAdmin      bool
+	Users        []*model.User
+	StatusFilter string
+}
+
+templ UsersPage(props UsersProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "admin-users",
+	}) {
+		<div class="space-y-6">
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Users</h1>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage user accounts.</p>
+			</div>
+			<!-- Status filter tabs -->
+			<div class="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+				@statusTab("All", "", props.StatusFilter)
+				@statusTab("Active", "active", props.StatusFilter)
+				@statusTab("Pending", "pending_approval", props.StatusFilter)
+				@statusTab("Locked", "locked", props.StatusFilter)
+			</div>
+			<!-- Users table -->
+			if len(props.Users) == 0 {
+				@ui.EmptyState("users", "No users found", "No users match the selected filter.", "", "")
+			} else {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Username
+						}
+						@ui.TableHeader() {
+							Email
+						}
+						@ui.TableHeader() {
+							Display Name
+						}
+						@ui.TableHeader() {
+							Status
+						}
+						@ui.TableHeader() {
+							Created
+						}
+					}
+					@ui.TableBody("") {
+						for _, u := range props.Users {
+							@userRow(u)
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+templ userRow(u *model.User) {
+	<tr class="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800" onclick={ navigateTo("/admin/users/" + u.ID) }>
+		@ui.TableCell() {
+			<span class="font-medium">{ u.Username }</span>
+			if u.IsAdmin {
+				<span class="ml-2">
+					@ui.Badge("Admin", "amber")
+				</span>
+			}
+		}
+		@ui.TableCell() {
+			{ u.Email }
+		}
+		@ui.TableCell() {
+			{ u.DisplayName }
+		}
+		@ui.TableCell() {
+			@userStatusBadge(u.Status)
+		}
+		@ui.TableCellMuted() {
+			{ formatDate(u.CreatedAt) }
+		}
+	</tr>
+}
+
+templ statusTab(label, value, current string) {
+	<a
+		href={ templ.SafeURL(statusTabHref(value)) }
+		class={ "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+			statusTabClass(value, current) }
+	>
+		{ label }
+	</a>
+}
+
+templ userStatusBadge(status string) {
+	switch status {
+		case "active":
+			@ui.Badge("Active", "green")
+		case "pending_approval":
+			@ui.Badge("Pending", "yellow")
+		case "locked":
+			@ui.Badge("Locked", "red")
+		case "deletion_requested":
+			@ui.Badge("Deletion Requested", "red")
+		default:
+			@ui.Badge(status, "gray")
+	}
+}
+
+script navigateTo(url string) {
+	window.location.href = url;
+}
+
+func statusTabHref(value string) string {
+	if value == "" {
+		return "/admin/users"
+	}
+	return "/admin/users?status=" + value
+}
+
+func statusTabClass(value, current string) string {
+	if value == current {
+		return "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
+	}
+	return "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
+}
+
+func formatDate(rfc3339 string) string {
+	if len(rfc3339) >= 10 {
+		return rfc3339[:10]
+	}
+	return rfc3339
+}
