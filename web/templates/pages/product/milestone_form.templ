@@ -1,0 +1,128 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// MilestoneFormProps holds data for the milestone create/edit form.
+type MilestoneFormProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Milestone      *model.Milestone // nil for create
+	IsEdit         bool
+	Error          string
+	// Form values (preserved on validation error).
+	Name        string
+	Description string
+	Type        string
+	DueDate     string
+}
+
+templ MilestoneFormPage(props MilestoneFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "milestones",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(milestoneFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Milestone
+				} else {
+					New Milestone
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(milestoneFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						@ui.TextInput(ui.InputProps{
+							ID:          "name",
+							Name:        "name",
+							Label:       "Name",
+							Value:       props.Name,
+							Placeholder: "e.g. v1.0 Release",
+							Required:    true,
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe the goals and scope of this milestone...",
+							Rows:        4,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:    "type",
+							Name:  "type",
+							Label: "Type",
+							Value: milestoneFormType(props),
+							Options: []templates.SelectOption{
+								{Value: "planning", Label: "Planning"},
+								{Value: "release", Label: "Release"},
+								{Value: "internal", Label: "Internal"},
+							},
+						})
+						@ui.DateInput(ui.InputProps{
+							ID:       "due_date",
+							Name:     "due_date",
+							Label:    "Due Date",
+							Value:    props.DueDate,
+							HelpText: "Optional. Leave empty if no target date is set.",
+						})
+						@patterns.FormActions(milestoneSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/milestones")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func milestoneFormBreadcrumbs(props MilestoneFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Milestones", Href: "/products/" + props.Product.ID + "/milestones"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Milestone.Name, Href: "/products/" + props.Product.ID + "/milestones/" + props.Milestone.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func milestoneFormAction(props MilestoneFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/milestones/" + props.Milestone.ID
+	}
+	return "/products/" + props.Product.ID + "/milestones"
+}
+
+func milestoneFormType(props MilestoneFormProps) string {
+	if props.Type != "" {
+		return props.Type
+	}
+	return "planning"
+}
+
+func milestoneSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Milestone"
+}

@@ -21,11 +21,12 @@ type PageProductController struct {
 	user       *service.UserService
 	invitation *service.InvitationService
 	milestone  *service.MilestoneService
+	audit      *service.AuditService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, audit *service.AuditService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, audit: audit}
 }
 
 // CreateForm renders GET /products/new.
@@ -843,4 +844,365 @@ func (c *PageProductController) buildTeamMembers(r *http.Request, user *model.Us
 	}
 
 	return views
+}
+
+// --- Milestones ---
+
+// Milestones renders GET /products/{id}/milestones.
+func (c *PageProductController) Milestones(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	milestones, err := c.milestone.ListMilestones(r.Context(), user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
+		return
+	}
+
+	view := r.URL.Query().Get("view")
+	if view != "timeline" {
+		view = "table"
+	}
+
+	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestonesPage(productpage.MilestonesProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Milestones",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		Milestones:     milestones,
+		IsOwnerOrAdmin: isOwnerOrAdmin,
+		View:           view,
+	}).Render(r.Context(), w)
+}
+
+// MilestoneDetail renders GET /products/{id}/milestones/{milestoneId}.
+func (c *PageProductController) MilestoneDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	m, err := c.milestone.GetMilestone(r.Context(), user, productID, milestoneID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/milestones", http.StatusSeeOther)
+		return
+	}
+
+	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneDetailPage(productpage.MilestoneDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + m.Name,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		Milestone:      m,
+		IsOwnerOrAdmin: isOwnerOrAdmin,
+	}).Render(r.Context(), w)
+}
+
+// MilestoneCreateForm renders GET /products/{id}/milestones/new.
+func (c *PageProductController) MilestoneCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Redirect(w, r, "/products/"+productID+"/milestones", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneFormPage(productpage.MilestoneFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Milestone",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+	}).Render(r.Context(), w)
+}
+
+// MilestoneCreate handles POST /products/{id}/milestones.
+func (c *PageProductController) MilestoneCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	milestoneType := r.FormValue("type")
+	dueDate := r.FormValue("due_date")
+
+	_, err = c.milestone.CreateMilestone(r.Context(), user, service.CreateMilestoneInput{
+		ProductID:   productID,
+		Name:        name,
+		Description: description,
+		Type:        milestoneType,
+		DueDate:     dueDate,
+	})
+	if err != nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.MilestoneFormPage(productpage.MilestoneFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Milestone",
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Name:        name,
+			Description: description,
+			Type:        milestoneType,
+			DueDate:     dueDate,
+			Error:       err.Error(),
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/milestones", http.StatusSeeOther)
+}
+
+// MilestoneEditForm renders GET /products/{id}/milestones/{milestoneId}/edit.
+func (c *PageProductController) MilestoneEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Redirect(w, r, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID), http.StatusSeeOther)
+		return
+	}
+
+	m, err := c.milestone.GetMilestone(r.Context(), user, productID, milestoneID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/milestones", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneFormPage(productpage.MilestoneFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + m.Name,
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Milestone:   m,
+		IsEdit:      true,
+		Name:        m.Name,
+		Description: m.Description,
+		Type:        m.Type,
+		DueDate:     milestoneEditDate(m.DueDate),
+	}).Render(r.Context(), w)
+}
+
+// MilestoneUpdate handles POST /products/{id}/milestones/{milestoneId}.
+func (c *PageProductController) MilestoneUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	m, err := c.milestone.GetMilestone(r.Context(), user, productID, milestoneID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/milestones", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	milestoneType := r.FormValue("type")
+	dueDate := r.FormValue("due_date")
+
+	input := service.UpdateMilestoneInput{
+		Name:        &name,
+		Description: &description,
+		Type:        &milestoneType,
+		DueDate:     &dueDate,
+	}
+
+	_, err = c.milestone.UpdateMilestone(r.Context(), user, productID, milestoneID, input)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.MilestoneFormPage(productpage.MilestoneFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + m.Name,
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Milestone:   m,
+			IsEdit:      true,
+			Name:        name,
+			Description: description,
+			Type:        milestoneType,
+			DueDate:     dueDate,
+			Error:       err.Error(),
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID), http.StatusSeeOther)
+}
+
+// MilestoneDelete handles DELETE /products/{id}/milestones/{milestoneId}.
+func (c *PageProductController) MilestoneDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if err := c.milestone.DeleteMilestone(r.Context(), user, productID, milestoneID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/milestones")
+	w.WriteHeader(http.StatusOK)
+}
+
+// MilestoneDeleteConfirm renders GET /products/{id}/milestones/{milestoneId}/delete/confirm.
+func (c *PageProductController) MilestoneDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	m, err := c.milestone.GetMilestone(r.Context(), user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneDeleteConfirmation(m.Name, productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneOverviewTab renders GET /products/{id}/milestones/{milestoneId}/tabs/overview.
+func (c *PageProductController) MilestoneOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	m, err := c.milestone.GetMilestone(r.Context(), user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneOverviewTabContent(m).Render(r.Context(), w)
+}
+
+// MilestoneItemsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/items.
+func (c *PageProductController) MilestoneItemsTab(w http.ResponseWriter, r *http.Request) {
+	productID := r.PathValue("id")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneItemsTabContent(productID).Render(r.Context(), w)
+}
+
+// MilestoneSprintsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/sprints.
+func (c *PageProductController) MilestoneSprintsTab(w http.ResponseWriter, r *http.Request) {
+	productID := r.PathValue("id")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneSprintsTabContent(productID).Render(r.Context(), w)
+}
+
+// MilestoneHistoryTab renders GET /products/{id}/milestones/{milestoneId}/tabs/history.
+func (c *PageProductController) MilestoneHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	entries, err := c.audit.ListByEntity(r.Context(), user, productID, "milestone", milestoneID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Resolve user display names.
+	allUsers, _ := c.user.List(r.Context(), store.UserFilter{})
+	userMap := make(map[string]string, len(allUsers))
+	for _, u := range allUsers {
+		userMap[u.ID] = u.DisplayName
+	}
+
+	views := make([]templates.AuditEntryView, 0, len(entries))
+	for _, e := range entries {
+		name := e.UserID
+		if dn, ok := userMap[e.UserID]; ok {
+			name = dn
+		}
+		views = append(views, templates.AuditEntryView{
+			ID:        e.ID,
+			UserName:  name,
+			Action:    e.Action,
+			FieldName: e.FieldName,
+			OldValue:  e.OldValue,
+			NewValue:  e.NewValue,
+			CreatedAt: e.CreatedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneHistoryTabContent(views).Render(r.Context(), w)
+}
+
+// milestoneEditDate extracts the date part from an RFC 3339 string for the date input.
+func milestoneEditDate(rfc3339 string) string {
+	if len(rfc3339) >= 10 {
+		return rfc3339[:10]
+	}
+	return rfc3339
 }

@@ -1,0 +1,287 @@
+package product
+
+import (
+	"fmt"
+	"strings"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// MilestonesProps holds data for the milestones list page.
+type MilestonesProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Milestones     []*model.Milestone
+	IsOwnerOrAdmin bool
+	View           string // "table" or "timeline"
+}
+
+templ MilestonesPage(props MilestonesProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "milestones",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Milestones"},
+			})
+			if len(props.Milestones) == 0 {
+				@patterns.ListPageHeader("Milestones", "", "", -1)
+				@ui.Card() {
+					if props.IsOwnerOrAdmin {
+						@ui.EmptyState("calendar", "No milestones yet", "Create your first milestone to start building your roadmap.", "New Milestone", "/products/"+props.Product.ID+"/milestones/new")
+					} else {
+						@ui.EmptyState("calendar", "No milestones yet", "No milestones have been created for this product.", "", "")
+					}
+				}
+			} else {
+				<div class="flex items-center justify-between">
+					<div>
+						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Milestones</h1>
+						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d items", len(props.Milestones)) }</p>
+					</div>
+					<div class="flex items-center gap-3">
+						<!-- View toggle -->
+						<div class="flex items-center gap-1 rounded-md border border-gray-200 p-1 dark:border-gray-700">
+							<a
+								href={ templ.SafeURL("/products/" + props.Product.ID + "/milestones?view=table") }
+								class={ "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+									viewToggleClass(props.View != "timeline") }
+							>
+								Table
+							</a>
+							<a
+								href={ templ.SafeURL("/products/" + props.Product.ID + "/milestones?view=timeline") }
+								class={ "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+									viewToggleClass(props.View == "timeline") }
+							>
+								Roadmap
+							</a>
+						</div>
+						if props.IsOwnerOrAdmin {
+							@ui.LinkButton("/products/"+props.Product.ID+"/milestones/new", "New Milestone", "primary", "md") {
+								@ui.Icon("plus", "sm")
+							}
+						}
+					</div>
+				</div>
+				if props.View == "timeline" {
+					@milestonesTimeline(props.Product.ID, props.Milestones)
+				} else {
+					@milestonesTable(props.Product.ID, props.Milestones)
+				}
+			}
+		</div>
+	}
+}
+
+templ milestonesTable(productID string, milestones []*model.Milestone) {
+	@ui.Card() {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.TableHeader() {
+					Name
+				}
+				@ui.TableHeader() {
+					Type
+				}
+				@ui.TableHeader() {
+					Due Date
+				}
+				@ui.TableHeader() {
+					Created
+				}
+			}
+			@ui.TableBody("") {
+				for _, m := range milestones {
+					@ui.TableRow("") {
+						@ui.TableCell() {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/products/%s/milestones/%s", productID, m.ID)) }
+								class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+							>
+								{ m.Name }
+							</a>
+						}
+						@ui.TableCell() {
+							@milestoneTypeBadge(m.Type)
+						}
+						@ui.TableCellMuted() {
+							if m.DueDate != "" {
+								{ formatDate(m.DueDate) }
+							} else {
+								<span class="text-gray-400 dark:text-gray-500">No date set</span>
+							}
+						}
+						@ui.TableCellMuted() {
+							{ formatDate(m.CreatedAt) }
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ milestonesTimeline(productID string, milestones []*model.Milestone) {
+	<div class="space-y-6">
+		<!-- Scheduled milestones -->
+		if hasScheduled(milestones) {
+			<div class="relative">
+				<!-- Timeline line -->
+				<div class="absolute left-4 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+				<div class="space-y-6">
+					for _, m := range milestones {
+						if m.DueDate != "" {
+							@timelineItem(productID, m)
+						}
+					}
+				</div>
+			</div>
+		}
+		<!-- Unscheduled milestones -->
+		if hasUnscheduled(milestones) {
+			<div class="pt-2">
+				<h3 class="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Unscheduled</h3>
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					for _, m := range milestones {
+						if m.DueDate == "" {
+							@timelineCard(productID, m)
+						}
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ timelineItem(productID string, m *model.Milestone) {
+	<div class="relative flex items-start gap-4 pl-10">
+		<!-- Timeline dot -->
+		<div class={ "absolute left-2.5 top-1.5 h-3 w-3 rounded-full ring-4 ring-white dark:ring-gray-900", timelineDotColor(m.Type) }></div>
+		<!-- Card -->
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/products/%s/milestones/%s", productID, m.ID)) }
+			class="group flex-1"
+		>
+			@ui.Card() {
+				<div class="px-4 py-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<span class="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 dark:text-gray-100 dark:group-hover:text-indigo-400">{ m.Name }</span>
+							@milestoneTypeBadge(m.Type)
+						</div>
+						<span class="text-xs text-gray-500 dark:text-gray-400">{ formatDate(m.DueDate) }</span>
+					</div>
+					if m.Description != "" {
+						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ truncate(m.Description, 120) }</p>
+					}
+				</div>
+			}
+		</a>
+	</div>
+}
+
+templ timelineCard(productID string, m *model.Milestone) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/products/%s/milestones/%s", productID, m.ID)) }
+		class="group"
+	>
+		@ui.Card() {
+			<div class="px-4 py-3">
+				<div class="flex items-center gap-2">
+					<span class="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 dark:text-gray-100 dark:group-hover:text-indigo-400">{ m.Name }</span>
+					@milestoneTypeBadge(m.Type)
+				</div>
+				if m.Description != "" {
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ truncate(m.Description, 120) }</p>
+				}
+			</div>
+		}
+	</a>
+}
+
+templ milestoneTypeBadge(milestoneType string) {
+	switch milestoneType {
+		case "release":
+			@ui.Badge("Release", "indigo")
+		case "internal":
+			@ui.Badge("Internal", "amber")
+		default:
+			@ui.Badge("Planning", "gray")
+	}
+}
+
+func viewToggleClass(active bool) string {
+	if active {
+		return "bg-indigo-600 text-white dark:bg-indigo-500"
+	}
+	return "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+}
+
+func timelineDotColor(milestoneType string) string {
+	switch milestoneType {
+	case "release":
+		return "bg-indigo-500"
+	case "internal":
+		return "bg-amber-500"
+	default:
+		return "bg-slate-400"
+	}
+}
+
+func milestonesCreateHref(props MilestonesProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/milestones/new"
+	}
+	return ""
+}
+
+func hasScheduled(milestones []*model.Milestone) bool {
+	for _, m := range milestones {
+		if m.DueDate != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUnscheduled(milestones []*model.Milestone) bool {
+	for _, m := range milestones {
+		if m.DueDate == "" {
+			return true
+		}
+	}
+	return false
+}
+
+func formatDate(rfc3339 string) string {
+	if rfc3339 == "" {
+		return ""
+	}
+	// Show just the date part (YYYY-MM-DD).
+	if len(rfc3339) >= 10 {
+		return rfc3339[:10]
+	}
+	return rfc3339
+}
+
+func truncate(s string, maxLen int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}

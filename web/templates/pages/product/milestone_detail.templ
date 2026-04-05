@@ -1,0 +1,160 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// MilestoneDetailProps holds data for the milestone detail page.
+type MilestoneDetailProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Milestone      *model.Milestone
+	IsOwnerOrAdmin bool
+}
+
+templ MilestoneDetailPage(props MilestoneDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "milestones",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Milestones", Href: "/products/" + props.Product.ID + "/milestones"},
+					{Label: props.Milestone.Name},
+				},
+				props.Milestone.Name,
+				milestoneDetailSubtitle(props.Milestone),
+				milestoneEditHref(props),
+				milestoneDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@milestoneTypeBadge(props.Milestone.Type)
+			}
+			<!-- Tabs -->
+			@ui.TabGroup(milestoneDetailTabs(props.Product.ID, props.Milestone.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@MilestoneOverviewTabContent(props.Milestone)
+			}
+			@ui.TabPanelHidden("items") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("sprints") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ MilestoneOverviewTabContent(m *model.Milestone) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Type", milestoneTypeLabel(m.Type))
+				@patterns.DetailField("Due Date", milestoneDate(m.DueDate))
+				@patterns.DetailField("Created", formatDate(m.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(m.UpdatedAt))
+			}
+			if m.Description != "" {
+				<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+					<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
+					<p class="mt-2 text-sm text-gray-900 whitespace-pre-wrap dark:text-gray-100">{ m.Description }</p>
+				</div>
+			}
+		}
+	}
+}
+
+templ MilestoneItemsTabContent(productID string) {
+	@ui.Card() {
+		@ui.EmptyState("link", "No linked items", "Components, requirements, and defects linked to this milestone will appear here.", "", "")
+	}
+}
+
+templ MilestoneSprintsTabContent(productID string) {
+	@ui.Card() {
+		@ui.EmptyState("clock", "No sprints", "Sprints targeting this milestone will appear here.", "", "")
+	}
+}
+
+templ MilestoneHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this milestone will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// MilestoneDeleteConfirmation renders the delete confirmation for a milestone.
+templ MilestoneDeleteConfirmation(name, productID, milestoneID string) {
+	@patterns.DeleteConfirmation("milestone", fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID))
+}
+
+func milestoneDetailTabs(productID, milestoneID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/milestones/%s/tabs", productID, milestoneID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "items", Label: "Items", HxGet: base + "/items"},
+		{ID: "sprints", Label: "Sprints", HxGet: base + "/sprints"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func milestoneDetailSubtitle(m *model.Milestone) string {
+	if m.DueDate != "" {
+		return "Due " + formatDate(m.DueDate)
+	}
+	return ""
+}
+
+func milestoneEditHref(props MilestoneDetailProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/milestones/" + props.Milestone.ID + "/edit"
+	}
+	return ""
+}
+
+func milestoneDeleteURL(props MilestoneDetailProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/milestones/" + props.Milestone.ID
+	}
+	return ""
+}
+
+func milestoneTypeLabel(t string) string {
+	switch t {
+	case "release":
+		return "Release"
+	case "internal":
+		return "Internal"
+	default:
+		return "Planning"
+	}
+}
+
+func milestoneDate(d string) string {
+	if d == "" {
+		return "Not set"
+	}
+	return formatDate(d)
+}
