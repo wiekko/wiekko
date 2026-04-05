@@ -1,0 +1,192 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// ComponentDetailProps holds data for the component detail page.
+type ComponentDetailProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Component      *model.Component
+	MilestoneName  string
+	IsOwnerOrAdmin bool
+}
+
+templ ComponentDetailPage(props ComponentDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "components",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Components", Href: "/products/" + props.Product.ID + "/components"},
+					{Label: props.Component.Name},
+				},
+				props.Component.Name,
+				"",
+				componentEditHref(props),
+				componentDeleteURL(props),
+				props.Meta.CSRFToken,
+			)
+			<!-- Tabs -->
+			@ui.TabGroup(componentDetailTabs(props.Product.ID, props.Component.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@ComponentOverviewTabContent(props.Component, props.MilestoneName)
+			}
+			@ui.TabPanelHidden("functionalities") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("test-cases") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ ComponentOverviewTabContent(c *model.Component, milestoneName string) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Milestone", componentMilestoneDisplay(milestoneName))
+				@patterns.DetailField("Created", formatDate(c.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(c.UpdatedAt))
+			}
+			if c.Description != "" {
+				<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+					<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
+					<p class="mt-2 text-sm text-gray-900 whitespace-pre-wrap dark:text-gray-100">{ c.Description }</p>
+				</div>
+			}
+		}
+	}
+}
+
+templ ComponentFunctionalitiesTabContent(productID string, functionalities []*model.Functionality) {
+	if len(functionalities) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("layers", "No functionalities", "Functionalities linked to this component will appear here.", "", "")
+		}
+	} else {
+		@ui.Card() {
+			@ui.Table() {
+				@ui.TableHead() {
+					@ui.TableHeader() {
+						Name
+					}
+					@ui.TableHeader() {
+						Created
+					}
+				}
+				@ui.TableBody("") {
+					for _, f := range functionalities {
+						@ui.TableRow("") {
+							@ui.TableCell() {
+								<a
+									href={ templ.SafeURL(fmt.Sprintf("/products/%s/functionalities/%s", productID, f.ID)) }
+									class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+								>
+									{ f.Name }
+								</a>
+							}
+							@ui.TableCellMuted() {
+								{ formatDate(f.CreatedAt) }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ ComponentTestCasesTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("beaker", "No test cases", "Test cases linked to this component will appear here.", "", "")
+	}
+}
+
+templ ComponentCommentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("message-circle", "No comments", "Comments on this component will appear here.", "", "")
+	}
+}
+
+templ ComponentAttachmentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("paperclip", "No attachments", "Attachments for this component will appear here.", "", "")
+	}
+}
+
+templ ComponentHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this component will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// ComponentDeleteConfirmation renders the delete confirmation for a component.
+templ ComponentDeleteConfirmation(name, productID, componentID string) {
+	@patterns.DeleteConfirmation("component", fmt.Sprintf("/products/%s/components/%s", productID, componentID))
+}
+
+func componentDetailTabs(productID, componentID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/components/%s/tabs", productID, componentID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "functionalities", Label: "Functionalities", HxGet: base + "/functionalities"},
+		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func componentEditHref(props ComponentDetailProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/components/" + props.Component.ID + "/edit"
+	}
+	return ""
+}
+
+func componentDeleteURL(props ComponentDetailProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/components/" + props.Component.ID
+	}
+	return ""
+}
+
+func componentMilestoneDisplay(name string) string {
+	if name == "" {
+		return "Not set"
+	}
+	return name
+}

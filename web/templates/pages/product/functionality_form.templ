@@ -1,0 +1,131 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// FunctionalityFormProps holds data for the functionality create/edit form.
+type FunctionalityFormProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Functionality *model.Functionality // nil for create
+	Components  []*model.Component
+	Milestones  []*model.Milestone
+	IsEdit      bool
+	Error       string
+	// Form values (preserved on validation error).
+	Name        string
+	Description string
+	ComponentID string
+	MilestoneID string
+}
+
+templ FunctionalityFormPage(props FunctionalityFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "functionalities",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(functionalityFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Functionality
+				} else {
+					New Functionality
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(functionalityFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						@ui.TextInput(ui.InputProps{
+							ID:          "name",
+							Name:        "name",
+							Label:       "Name",
+							Value:       props.Name,
+							Placeholder: "e.g. User Login",
+							Required:    true,
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe this functionality...",
+							Rows:        4,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "component_id",
+							Name:     "component_id",
+							Label:    "Component",
+							Value:    props.ComponentID,
+							Options:  componentSelectOptions(props.Components),
+							HelpText: "Optional. Assign to a component or leave as top-level.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "milestone_id",
+							Name:     "milestone_id",
+							Label:    "Milestone",
+							Value:    props.MilestoneID,
+							Options:  milestoneSelectOptions(props.Milestones),
+							HelpText: "Optional. Link this functionality to a milestone.",
+						})
+						@patterns.FormActions(functionalitySubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/functionalities")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func functionalityFormBreadcrumbs(props FunctionalityFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Functionalities", Href: "/products/" + props.Product.ID + "/functionalities"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Functionality.Name, Href: "/products/" + props.Product.ID + "/functionalities/" + props.Functionality.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func functionalityFormAction(props FunctionalityFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/functionalities/" + props.Functionality.ID
+	}
+	return "/products/" + props.Product.ID + "/functionalities"
+}
+
+func functionalitySubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Functionality"
+}
+
+// componentSelectOptions builds select options from components with an empty "None" option.
+func componentSelectOptions(components []*model.Component) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(components)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None (top-level)"})
+	for _, c := range components {
+		opts = append(opts, templates.SelectOption{Value: c.ID, Label: c.Name})
+	}
+	return opts
+}

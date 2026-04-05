@@ -29,8 +29,8 @@ templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
 					@SidebarLink("Campaigns", "/products/"+productID+"/campaigns", "flag", activeSection == "campaigns", "")
 				}
 				@SidebarSection("Structure", activeSection == "components" || activeSection == "functionalities" || activeSection == "milestones" || activeSection == "sprints") {
-					@SidebarLink("Components", "/products/"+productID+"/components", "folder", activeSection == "components", "")
-					@SidebarLink("Functionalities", "/products/"+productID+"/functionalities", "folder", activeSection == "functionalities", "")
+					@SidebarLink("Components", "/products/"+productID+"/components", "component", activeSection == "components", "")
+					@SidebarLink("Functionalities", "/products/"+productID+"/functionalities", "layers", activeSection == "functionalities", "")
 					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
 					@SidebarLink("Sprints", "/products/"+productID+"/sprints", "clock", activeSection == "sprints", "")
 				}

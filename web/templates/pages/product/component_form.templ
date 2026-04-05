@@ -1,0 +1,121 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// ComponentFormProps holds data for the component create/edit form.
+type ComponentFormProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Component   *model.Component // nil for create
+	Milestones  []*model.Milestone
+	IsEdit      bool
+	Error       string
+	// Form values (preserved on validation error).
+	Name        string
+	Description string
+	MilestoneID string
+}
+
+templ ComponentFormPage(props ComponentFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "components",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(componentFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Component
+				} else {
+					New Component
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(componentFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						@ui.TextInput(ui.InputProps{
+							ID:          "name",
+							Name:        "name",
+							Label:       "Name",
+							Value:       props.Name,
+							Placeholder: "e.g. Authentication Module",
+							Required:    true,
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe this component...",
+							Rows:        4,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "milestone_id",
+							Name:     "milestone_id",
+							Label:    "Milestone",
+							Value:    props.MilestoneID,
+							Options:  milestoneSelectOptions(props.Milestones),
+							HelpText: "Optional. Link this component to a milestone.",
+						})
+						@patterns.FormActions(componentSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/components")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func componentFormBreadcrumbs(props ComponentFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Components", Href: "/products/" + props.Product.ID + "/components"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Component.Name, Href: "/products/" + props.Product.ID + "/components/" + props.Component.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func componentFormAction(props ComponentFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/components/" + props.Component.ID
+	}
+	return "/products/" + props.Product.ID + "/components"
+}
+
+func componentSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Component"
+}
+
+// milestoneSelectOptions builds select options from milestones with an empty "None" option.
+func milestoneSelectOptions(milestones []*model.Milestone) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(milestones)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, m := range milestones {
+		opts = append(opts, templates.SelectOption{Value: m.ID, Label: m.Name})
+	}
+	return opts
+}

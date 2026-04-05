@@ -21,12 +21,13 @@ type PageProductController struct {
 	user       *service.UserService
 	invitation *service.InvitationService
 	milestone  *service.MilestoneService
+	component  *service.ComponentService
 	audit      *service.AuditService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, audit *service.AuditService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, audit: audit}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, audit *service.AuditService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, audit: audit}
 }
 
 // CreateForm renders GET /products/new.
@@ -1165,13 +1166,763 @@ func (c *PageProductController) MilestoneHistoryTab(w http.ResponseWriter, r *ht
 	productID := r.PathValue("id")
 	milestoneID := r.PathValue("milestoneId")
 
-	entries, err := c.audit.ListByEntity(r.Context(), user, productID, "milestone", milestoneID)
+	views := c.buildAuditViews(r, user, productID, "milestone", milestoneID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneHistoryTabContent(views).Render(r.Context(), w)
+}
+
+// milestoneEditDate extracts the date part from an RFC 3339 string for the date input.
+func milestoneEditDate(rfc3339 string) string {
+	if len(rfc3339) >= 10 {
+		return rfc3339[:10]
+	}
+	return rfc3339
+}
+
+// --- Components ---
+
+// Components renders GET /products/{id}/components.
+func (c *PageProductController) Components(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	components, err := c.component.ListComponents(r.Context(), user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
+		return
+	}
+
+	milestoneMap := c.buildMilestoneMap(r, user, productID)
+	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentsPage(productpage.ComponentsProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Components",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		Components:     components,
+		Milestones:     milestoneMap,
+		IsOwnerOrAdmin: isOwnerOrAdmin,
+	}).Render(r.Context(), w)
+}
+
+// ComponentDetail renders GET /products/{id}/components/{componentId}.
+func (c *PageProductController) ComponentDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	comp, err := c.component.GetComponent(r.Context(), user, productID, componentID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/components", http.StatusSeeOther)
+		return
+	}
+
+	milestoneName := c.resolveMilestoneName(r, user, productID, comp.MilestoneID)
+	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentDetailPage(productpage.ComponentDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + comp.Name,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		Component:      comp,
+		MilestoneName:  milestoneName,
+		IsOwnerOrAdmin: isOwnerOrAdmin,
+	}).Render(r.Context(), w)
+}
+
+// ComponentCreateForm renders GET /products/{id}/components/new.
+func (c *PageProductController) ComponentCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Redirect(w, r, "/products/"+productID+"/components", http.StatusSeeOther)
+		return
+	}
+
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentFormPage(productpage.ComponentFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Component",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Milestones:  milestones,
+	}).Render(r.Context(), w)
+}
+
+// ComponentCreate handles POST /products/{id}/components.
+func (c *PageProductController) ComponentCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	milestoneID := r.FormValue("milestone_id")
+
+	_, err = c.component.CreateComponent(r.Context(), user, service.CreateComponentInput{
+		ProductID:   productID,
+		Name:        name,
+		Description: description,
+		MilestoneID: milestoneID,
+	})
+	if err != nil {
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.ComponentFormPage(productpage.ComponentFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Component",
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Milestones:  milestones,
+			Name:        name,
+			Description: description,
+			MilestoneID: milestoneID,
+			Error:       err.Error(),
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/components", http.StatusSeeOther)
+}
+
+// ComponentEditForm renders GET /products/{id}/components/{componentId}/edit.
+func (c *PageProductController) ComponentEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Redirect(w, r, fmt.Sprintf("/products/%s/components/%s", productID, componentID), http.StatusSeeOther)
+		return
+	}
+
+	comp, err := c.component.GetComponent(r.Context(), user, productID, componentID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/components", http.StatusSeeOther)
+		return
+	}
+
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentFormPage(productpage.ComponentFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + comp.Name,
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Component:   comp,
+		Milestones:  milestones,
+		IsEdit:      true,
+		Name:        comp.Name,
+		Description: comp.Description,
+		MilestoneID: comp.MilestoneID,
+	}).Render(r.Context(), w)
+}
+
+// ComponentUpdate handles POST /products/{id}/components/{componentId}.
+func (c *PageProductController) ComponentUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	comp, err := c.component.GetComponent(r.Context(), user, productID, componentID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/components", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	milestoneID := r.FormValue("milestone_id")
+
+	input := service.UpdateComponentInput{
+		Name:        &name,
+		Description: &description,
+		MilestoneID: &milestoneID,
+	}
+
+	_, err = c.component.UpdateComponent(r.Context(), user, productID, componentID, input)
+	if err != nil {
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.ComponentFormPage(productpage.ComponentFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + comp.Name,
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Component:   comp,
+			Milestones:  milestones,
+			IsEdit:      true,
+			Name:        name,
+			Description: description,
+			MilestoneID: milestoneID,
+			Error:       err.Error(),
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/products/%s/components/%s", productID, componentID), http.StatusSeeOther)
+}
+
+// ComponentDelete handles DELETE /products/{id}/components/{componentId}.
+func (c *PageProductController) ComponentDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	if err := c.component.DeleteComponent(r.Context(), user, productID, componentID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/components")
+	w.WriteHeader(http.StatusOK)
+}
+
+// ComponentDeleteConfirm renders GET /products/{id}/components/{componentId}/delete/confirm.
+func (c *PageProductController) ComponentDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	comp, err := c.component.GetComponent(r.Context(), user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentDeleteConfirmation(comp.Name, productID, componentID).Render(r.Context(), w)
+}
+
+// ComponentOverviewTab renders GET /products/{id}/components/{componentId}/tabs/overview.
+func (c *PageProductController) ComponentOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	comp, err := c.component.GetComponent(r.Context(), user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	milestoneName := c.resolveMilestoneName(r, user, productID, comp.MilestoneID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentOverviewTabContent(comp, milestoneName).Render(r.Context(), w)
+}
+
+// ComponentFunctionalitiesTab renders GET /products/{id}/components/{componentId}/tabs/functionalities.
+func (c *PageProductController) ComponentFunctionalitiesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	funcs, err := c.component.ListFunctionalitiesByComponent(r.Context(), user, productID, componentID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Resolve user display names.
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentFunctionalitiesTabContent(productID, funcs).Render(r.Context(), w)
+}
+
+// ComponentTestCasesTab renders GET /products/{id}/components/{componentId}/tabs/test-cases.
+func (c *PageProductController) ComponentTestCasesTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentTestCasesTabContent().Render(r.Context(), w)
+}
+
+// ComponentCommentsTab renders GET /products/{id}/components/{componentId}/tabs/comments.
+func (c *PageProductController) ComponentCommentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentCommentsTabContent().Render(r.Context(), w)
+}
+
+// ComponentAttachmentsTab renders GET /products/{id}/components/{componentId}/tabs/attachments.
+func (c *PageProductController) ComponentAttachmentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentAttachmentsTabContent().Render(r.Context(), w)
+}
+
+// ComponentHistoryTab renders GET /products/{id}/components/{componentId}/tabs/history.
+func (c *PageProductController) ComponentHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	views := c.buildAuditViews(r, user, productID, "component", componentID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentHistoryTabContent(views).Render(r.Context(), w)
+}
+
+// --- Functionalities ---
+
+// Functionalities renders GET /products/{id}/functionalities.
+func (c *PageProductController) Functionalities(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	funcs, err := c.component.ListFunctionalities(r.Context(), user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
+		return
+	}
+
+	componentMap := c.buildComponentMap(r, user, productID)
+	milestoneMap := c.buildMilestoneMap(r, user, productID)
+	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalitiesPage(productpage.FunctionalitiesProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Functionalities",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:     user.DisplayName,
+		IsAdmin:         user.IsAdmin,
+		Product:         p,
+		Functionalities: funcs,
+		Components:      componentMap,
+		Milestones:      milestoneMap,
+		IsOwnerOrAdmin:  isOwnerOrAdmin,
+	}).Render(r.Context(), w)
+}
+
+// FunctionalityDetail renders GET /products/{id}/functionalities/{functionalityId}.
+func (c *PageProductController) FunctionalityDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		return
+	}
+
+	componentName := c.resolveComponentName(r, user, productID, f.ComponentID)
+	milestoneName := c.resolveMilestoneName(r, user, productID, f.MilestoneID)
+	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityDetailPage(productpage.FunctionalityDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + f.Name,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		Functionality:  f,
+		ComponentName:  componentName,
+		MilestoneName:  milestoneName,
+		IsOwnerOrAdmin: isOwnerOrAdmin,
+	}).Render(r.Context(), w)
+}
+
+// FunctionalityCreateForm renders GET /products/{id}/functionalities/new.
+func (c *PageProductController) FunctionalityCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Functionality",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Components:  components,
+		Milestones:  milestones,
+	}).Render(r.Context(), w)
+}
+
+// FunctionalityCreate handles POST /products/{id}/functionalities.
+func (c *PageProductController) FunctionalityCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	componentID := r.FormValue("component_id")
+	milestoneID := r.FormValue("milestone_id")
+
+	_, err = c.component.CreateFunctionality(r.Context(), user, service.CreateFunctionalityInput{
+		ProductID:   productID,
+		ComponentID: componentID,
+		Name:        name,
+		Description: description,
+		MilestoneID: milestoneID,
+	})
+	if err != nil {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Functionality",
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Components:  components,
+			Milestones:  milestones,
+			Name:        name,
+			Description: description,
+			ComponentID: componentID,
+			MilestoneID: milestoneID,
+			Error:       err.Error(),
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+}
+
+// FunctionalityEditForm renders GET /products/{id}/functionalities/{functionalityId}/edit.
+func (c *PageProductController) FunctionalityEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Redirect(w, r, fmt.Sprintf("/products/%s/functionalities/%s", productID, functionalityID), http.StatusSeeOther)
+		return
+	}
+
+	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + f.Name,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Functionality: f,
+		Components:    components,
+		Milestones:    milestones,
+		IsEdit:        true,
+		Name:          f.Name,
+		Description:   f.Description,
+		ComponentID:   f.ComponentID,
+		MilestoneID:   f.MilestoneID,
+	}).Render(r.Context(), w)
+}
+
+// FunctionalityUpdate handles POST /products/{id}/functionalities/{functionalityId}.
+func (c *PageProductController) FunctionalityUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	componentID := r.FormValue("component_id")
+	milestoneID := r.FormValue("milestone_id")
+
+	input := service.UpdateFunctionalityInput{
+		Name:        &name,
+		Description: &description,
+		ComponentID: &componentID,
+		MilestoneID: &milestoneID,
+	}
+
+	_, err = c.component.UpdateFunctionality(r.Context(), user, productID, functionalityID, input)
+	if err != nil {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + f.Name,
+				CSRFToken: csrfToken,
+			},
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Functionality: f,
+			Components:    components,
+			Milestones:    milestones,
+			IsEdit:        true,
+			Name:          name,
+			Description:   description,
+			ComponentID:   componentID,
+			MilestoneID:   milestoneID,
+			Error:         err.Error(),
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/products/%s/functionalities/%s", productID, functionalityID), http.StatusSeeOther)
+}
+
+// FunctionalityDelete handles DELETE /products/{id}/functionalities/{functionalityId}.
+func (c *PageProductController) FunctionalityDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	if err := c.component.DeleteFunctionality(r.Context(), user, productID, functionalityID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/functionalities")
+	w.WriteHeader(http.StatusOK)
+}
+
+// FunctionalityDeleteConfirm renders GET /products/{id}/functionalities/{functionalityId}/delete/confirm.
+func (c *PageProductController) FunctionalityDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityDeleteConfirmation(f.Name, productID, functionalityID).Render(r.Context(), w)
+}
+
+// FunctionalityOverviewTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/overview.
+func (c *PageProductController) FunctionalityOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	componentName := c.resolveComponentName(r, user, productID, f.ComponentID)
+	milestoneName := c.resolveMilestoneName(r, user, productID, f.MilestoneID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityOverviewTabContent(productID, f, componentName, milestoneName).Render(r.Context(), w)
+}
+
+// FunctionalityTestCasesTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/test-cases.
+func (c *PageProductController) FunctionalityTestCasesTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityTestCasesTabContent().Render(r.Context(), w)
+}
+
+// FunctionalityDefectsTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/defects.
+func (c *PageProductController) FunctionalityDefectsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityDefectsTabContent().Render(r.Context(), w)
+}
+
+// FunctionalityHistoryTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/history.
+func (c *PageProductController) FunctionalityHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	functionalityID := r.PathValue("functionalityId")
+
+	views := c.buildAuditViews(r, user, productID, "functionality", functionalityID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.FunctionalityHistoryTabContent(views).Render(r.Context(), w)
+}
+
+// --- shared helpers for components/functionalities ---
+
+// buildMilestoneMap returns a map of milestone ID → name for the product.
+func (c *PageProductController) buildMilestoneMap(r *http.Request, user *model.User, productID string) map[string]string {
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	m := make(map[string]string, len(milestones))
+	for _, ms := range milestones {
+		m[ms.ID] = ms.Name
+	}
+	return m
+}
+
+// buildComponentMap returns a map of component ID → name for the product.
+func (c *PageProductController) buildComponentMap(r *http.Request, user *model.User, productID string) map[string]string {
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	m := make(map[string]string, len(components))
+	for _, comp := range components {
+		m[comp.ID] = comp.Name
+	}
+	return m
+}
+
+// resolveMilestoneName returns the milestone name for the given ID, or empty string.
+func (c *PageProductController) resolveMilestoneName(r *http.Request, user *model.User, productID, milestoneID string) string {
+	if milestoneID == "" {
+		return ""
+	}
+	ms, err := c.milestone.GetMilestone(r.Context(), user, productID, milestoneID)
+	if err != nil {
+		return ""
+	}
+	return ms.Name
+}
+
+// resolveComponentName returns the component name for the given ID, or empty string.
+func (c *PageProductController) resolveComponentName(r *http.Request, user *model.User, productID, componentID string) string {
+	if componentID == "" {
+		return ""
+	}
+	comp, err := c.component.GetComponent(r.Context(), user, productID, componentID)
+	if err != nil {
+		return ""
+	}
+	return comp.Name
+}
+
+// buildAuditViews fetches audit entries and resolves user display names.
+func (c *PageProductController) buildAuditViews(r *http.Request, user *model.User, productID, entityType, entityID string) []templates.AuditEntryView {
+	entries, err := c.audit.ListByEntity(r.Context(), user, productID, entityType, entityID)
+	if err != nil {
+		return nil
+	}
+
 	allUsers, _ := c.user.List(r.Context(), store.UserFilter{})
 	userMap := make(map[string]string, len(allUsers))
 	for _, u := range allUsers {
@@ -1194,15 +1945,5 @@ func (c *PageProductController) MilestoneHistoryTab(w http.ResponseWriter, r *ht
 			CreatedAt: e.CreatedAt,
 		})
 	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneHistoryTabContent(views).Render(r.Context(), w)
-}
-
-// milestoneEditDate extracts the date part from an RFC 3339 string for the date input.
-func milestoneEditDate(rfc3339 string) string {
-	if len(rfc3339) >= 10 {
-		return rfc3339[:10]
-	}
-	return rfc3339
+	return views
 }
