@@ -32,7 +32,7 @@ templ DashboardPage(props DashboardProps) {
 					<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your products at a glance.</p>
 				</div>
-				if props.CanCreate {
+				if props.CanCreate && len(props.Products) > 0 {
 					@ui.LinkButton("/products/new", "Create Product", "primary", "md") {
 						@ui.Icon("plus", "sm")
 					}

@@ -108,3 +108,10 @@ All static assets are embedded into the Go binary via `//go:embed` (see `web/emb
 | JetBrains Mono | 2.304   | `web/static/fonts/JetBrainsMono-Variable.woff2`                      |
 
 No CDN or runtime third-party dependencies. Tailwind CSS is compiled at build time using the standalone CLI.
+
+## Components
+
+### Collections
+
+1. empty entity collections shall have a distinct visualisation (cf. /dev/catalogue)
+2. collections containing elements shall display a create button above the collection (cf. /dev/catalogue)

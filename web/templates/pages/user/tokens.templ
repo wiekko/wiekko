@@ -40,19 +40,37 @@ templ TokensPage(props TokensProps) {
 					<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">API Tokens</h1>
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Personal access tokens for CLI and API authentication.</p>
 				</div>
-				<button
-					type="button"
-					class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-					onclick="document.getElementById('create-token-modal').classList.remove('hidden')"
-				>
-					@ui.Icon("plus", "sm")
-					Create Token
-				</button>
+				if len(props.Tokens) > 0 {
+					<button
+						type="button"
+						class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						onclick="document.getElementById('create-token-modal').classList.remove('hidden')"
+					>
+						@ui.Icon("plus", "sm")
+						Create Token
+					</button>
+				}
 			</div>
 			@copyTokenScript()
 			<!-- Token list -->
 			if len(props.Tokens) == 0 {
-				@ui.EmptyState("link", "No tokens", "Create a personal access token to authenticate CLI and API requests.", "", "")
+				<div class="flex flex-col items-center justify-center py-12 text-center">
+					<div class="text-gray-400 dark:text-gray-500">
+						@ui.Icon("link", "lg")
+					</div>
+					<h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">No tokens</h3>
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Create a personal access token to authenticate CLI and API requests.</p>
+					<div class="mt-6">
+						<button
+							type="button"
+							class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+							onclick="document.getElementById('create-token-modal').classList.remove('hidden')"
+						>
+							@ui.Icon("plus", "sm")
+							Create Token
+						</button>
+					</div>
+				</div>
 			} else {
 				@ui.Card() {
 					@ui.Table() {
