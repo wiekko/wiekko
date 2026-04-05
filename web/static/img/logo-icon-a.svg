@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Option A: Rounded square shield with compass/arrow motif -->
+  <!-- Background shape -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/>
+  <!-- Inner path network -->
+  <circle cx="22" cy="40" r="4" fill="#c7d2fe"/>
+  <circle cx="22" cy="22" r="4" fill="#c7d2fe"/>
+  <circle cx="40" cy="22" r="4" fill="#c7d2fe"/>
+  <!-- Connecting lines -->
+  <path d="M22 36 L22 26" stroke="#c7d2fe" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M26 22 L36 22" stroke="#c7d2fe" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M25 37 L37 25" stroke="#c7d2fe" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+  <!-- Forward arrow (amber accent) — the "nex" direction -->
+  <path d="M36 40 L52 40" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+  <path d="M47 35 L53 40 L47 45" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Bright node at arrow origin -->
+  <circle cx="36" cy="40" r="4" fill="#fbbf24"/>
+</svg>
