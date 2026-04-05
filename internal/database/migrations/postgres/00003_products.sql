@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS products (
     description     TEXT NOT NULL DEFAULT '',
     estimation_mode TEXT NOT NULL DEFAULT 'disabled',
     workflow_mode   TEXT NOT NULL DEFAULT 'kanban',
+    status_sync    BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL,
     updated_at      TIMESTAMPTZ NOT NULL
 );

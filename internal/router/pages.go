@@ -45,6 +45,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("POST /products/{id}/settings/statuses", pageAuthed(http.HandlerFunc(productCtrl.CreateStatus)))
 	mux.Handle("PATCH /products/{id}/settings/statuses/{statusId}", pageAuthed(http.HandlerFunc(productCtrl.UpdateStatus)))
 	mux.Handle("DELETE /products/{id}/settings/statuses/{statusId}", pageAuthed(http.HandlerFunc(productCtrl.DeleteStatus)))
+	mux.Handle("POST /products/{id}/settings/statuses/split", pageAuthed(http.HandlerFunc(productCtrl.SplitStatuses)))
 	mux.Handle("POST /products/{id}/settings/environments", pageAuthed(http.HandlerFunc(productCtrl.CreateEnvironment)))
 	mux.Handle("DELETE /products/{id}/settings/environments/{envId}", pageAuthed(http.HandlerFunc(productCtrl.DeleteEnvironment)))
 	mux.Handle("POST /products/{id}/settings/pyramid", pageAuthed(http.HandlerFunc(productCtrl.CreatePyramidLevel)))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ type MilestoneService struct {
 	milestones    store.MilestoneStore
 	sprints       store.SprintStore
 	statuses      store.StatusStore
+	products      store.ProductStore
 	pyramidLevels store.PyramidLevelStore
 	runtimeEnvs   store.RuntimeEnvironmentStore
 	audit         store.AuditStore
@@ -278,6 +280,14 @@ func (s *MilestoneService) ListSprints(ctx context.Context, user *model.User, pr
 
 // --- Status ---
 
+// otherEntityType returns the counterpart entity type for status sync.
+func otherEntityType(entityType string) string {
+	if entityType == "requirement" {
+		return "defect"
+	}
+	return "requirement"
+}
+
 // CreateStatusInput contains the fields required to create a status.
 type CreateStatusInput struct {
 	ProductID  string
@@ -329,6 +339,29 @@ func (s *MilestoneService) CreateStatus(ctx context.Context, user *model.User, i
 		UserID: user.ID, Action: "create", CreatedAt: now,
 	})
 
+	// Sync: mirror to the other entity type if product has status_sync enabled.
+	product, err := s.products.GetByID(ctx, input.ProductID)
+	if err == nil && product.StatusSync {
+		sibling := &model.Status{
+			ID:         uuid.New().String(),
+			ProductID:  input.ProductID,
+			EntityType: otherEntityType(input.EntityType),
+			Name:       input.Name,
+			Position:   input.Position,
+			IsDefault:  input.IsDefault,
+			IsClosed:   input.IsClosed,
+			CreatedAt:  now,
+		}
+		if err := s.statuses.Create(ctx, sibling); err != nil {
+			slog.Warn("status sync: failed to create sibling", "error", err)
+		} else {
+			_ = s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+				UserID: user.ID, Action: "create", CreatedAt: now,
+			})
+		}
+	}
+
 	return status, nil
 }
 
@@ -350,6 +383,9 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 	if err != nil {
 		return nil, err
 	}
+
+	// Capture old name before mutation for sibling lookup.
+	oldName := status.Name
 
 	if input.Name != nil {
 		status.Name = *input.Name
@@ -374,6 +410,29 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 		UserID: user.ID, Action: "update", CreatedAt: now,
 	})
 
+	// Sync: mirror changes to sibling if product has status_sync enabled.
+	product, err := s.products.GetByID(ctx, productID)
+	if err == nil && product.StatusSync {
+		otherType := otherEntityType(status.EntityType)
+		sibling, err := s.statuses.GetByProductAndName(ctx, productID, otherType, oldName)
+		if err != nil {
+			slog.Warn("status sync: sibling not found for update", "name", oldName, "entityType", otherType, "error", err)
+		} else {
+			sibling.Name = status.Name
+			sibling.Position = status.Position
+			sibling.IsDefault = status.IsDefault
+			sibling.IsClosed = status.IsClosed
+			if err := s.statuses.Update(ctx, sibling); err != nil {
+				slog.Warn("status sync: failed to update sibling", "error", err)
+			} else {
+				_ = s.audit.Create(ctx, &model.AuditEntry{
+					ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+					UserID: user.ID, Action: "update", CreatedAt: now,
+				})
+			}
+		}
+	}
+
 	return status, nil
 }
 
@@ -381,6 +440,12 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
+	}
+
+	// Get the status before deletion for sync lookup.
+	status, err := s.statuses.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("delete status: %w", err)
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -392,6 +457,25 @@ func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, p
 		ID: uuid.New().String(), EntityType: "status", EntityID: id,
 		UserID: user.ID, Action: "delete", CreatedAt: now,
 	})
+
+	// Sync: delete sibling if product has status_sync enabled.
+	product, err := s.products.GetByID(ctx, productID)
+	if err == nil && product.StatusSync {
+		otherType := otherEntityType(status.EntityType)
+		sibling, err := s.statuses.GetByProductAndName(ctx, productID, otherType, status.Name)
+		if err != nil {
+			slog.Warn("status sync: sibling not found for delete", "name", status.Name, "entityType", otherType, "error", err)
+		} else {
+			if err := s.statuses.Delete(ctx, sibling.ID); err != nil {
+				slog.Warn("status sync: failed to delete sibling", "error", err)
+			} else {
+				_ = s.audit.Create(ctx, &model.AuditEntry{
+					ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+					UserID: user.ID, Action: "delete", CreatedAt: now,
+				})
+			}
+		}
+	}
 
 	return nil
 }

@@ -24,10 +24,11 @@ type productStore struct {
 
 func (s *productStore) Create(ctx context.Context, product *model.Product) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO products (id, name, description, estimation_mode, workflow_mode, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO products (id, name, description, estimation_mode, workflow_mode, status_sync, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		product.ID, product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
+		boolToInt(product.StatusSync),
 		product.CreatedAt, product.UpdatedAt,
 	)
 	return err
@@ -35,7 +36,7 @@ func (s *productStore) Create(ctx context.Context, product *model.Product) error
 
 func (s *productStore) GetByID(ctx context.Context, id string) (*model.Product, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, estimation_mode, workflow_mode, created_at, updated_at
+		`SELECT id, name, description, estimation_mode, workflow_mode, status_sync, created_at, updated_at
 		 FROM products WHERE id = ?`, id)
 	p, err := scanProduct(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -46,10 +47,11 @@ func (s *productStore) GetByID(ctx context.Context, id string) (*model.Product, 
 
 func (s *productStore) Update(ctx context.Context, product *model.Product) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE products SET name = ?, description = ?, estimation_mode = ?, workflow_mode = ?, updated_at = ?
+		`UPDATE products SET name = ?, description = ?, estimation_mode = ?, workflow_mode = ?, status_sync = ?, updated_at = ?
 		 WHERE id = ?`,
 		product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
+		boolToInt(product.StatusSync),
 		product.UpdatedAt, product.ID,
 	)
 	return err
@@ -62,7 +64,7 @@ func (s *productStore) Delete(ctx context.Context, id string) error {
 
 func (s *productStore) List(ctx context.Context) ([]*model.Product, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, description, estimation_mode, workflow_mode, created_at, updated_at
+		`SELECT id, name, description, estimation_mode, workflow_mode, status_sync, created_at, updated_at
 		 FROM products ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -82,11 +84,14 @@ func (s *productStore) List(ctx context.Context) ([]*model.Product, error) {
 
 func scanProduct(sc scanner) (*model.Product, error) {
 	var p model.Product
+	var statusSync int
 	err := sc.Scan(&p.ID, &p.Name, &p.Description,
 		&p.EstimationMode, &p.WorkflowMode,
+		&statusSync,
 		&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	p.StatusSync = statusSync != 0
 	return &p, nil
 }

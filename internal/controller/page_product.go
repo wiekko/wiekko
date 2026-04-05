@@ -183,19 +183,29 @@ func (c *PageProductController) SettingsStatuses(w http.ResponseWriter, r *http.
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 
-	reqStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	product, err := c.product.GetByID(r.Context(), user, productID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	reqStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var defStatuses []*model.Status
+	if !product.StatusSync {
+		defStatuses, err = c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.StatusesTabContent(productID, reqStatuses, defStatuses).Render(r.Context(), w)
+	_ = productpage.StatusesTabContent(productID, product.StatusSync, reqStatuses, defStatuses).Render(r.Context(), w)
 }
 
 // SettingsEnvironments renders the Environments tab content fragment.
@@ -260,7 +270,12 @@ func (c *PageProductController) CreateStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	c.renderStatusList(w, r, user, productID, entityType)
+	product, err := c.product.GetByID(r.Context(), user, productID)
+	if err == nil && product.StatusSync {
+		c.renderSyncedStatusList(w, r, user, productID)
+	} else {
+		c.renderStatusList(w, r, user, productID, entityType)
+	}
 }
 
 // UpdateStatus handles PATCH /products/{id}/settings/statuses/{statusId}.
@@ -297,7 +312,12 @@ func (c *PageProductController) UpdateStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	c.renderStatusList(w, r, user, productID, status.EntityType)
+	product, pErr := c.product.GetByID(r.Context(), user, productID)
+	if pErr == nil && product.StatusSync {
+		c.renderSyncedStatusList(w, r, user, productID)
+	} else {
+		c.renderStatusList(w, r, user, productID, status.EntityType)
+	}
 }
 
 // DeleteStatus handles DELETE /products/{id}/settings/statuses/{statusId}.
@@ -318,7 +338,12 @@ func (c *PageProductController) DeleteStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	c.renderStatusList(w, r, user, productID, status.EntityType)
+	product, pErr := c.product.GetByID(r.Context(), user, productID)
+	if pErr == nil && product.StatusSync {
+		c.renderSyncedStatusList(w, r, user, productID)
+	} else {
+		c.renderStatusList(w, r, user, productID, status.EntityType)
+	}
 }
 
 // renderStatusList re-renders the status list fragment for a given entity type.
@@ -330,6 +355,43 @@ func (c *PageProductController) renderStatusList(w http.ResponseWriter, r *http.
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.StatusListFragment(productID, entityType, statuses).Render(r.Context(), w)
+}
+
+// renderSyncedStatusList re-renders the synced status list fragment.
+func (c *PageProductController) renderSyncedStatusList(w http.ResponseWriter, r *http.Request, user *model.User, productID string) {
+	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.SyncedStatusListFragment(productID, statuses).Render(r.Context(), w)
+}
+
+// SplitStatuses handles POST /products/{id}/settings/statuses/split.
+func (c *PageProductController) SplitStatuses(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	if err := c.product.SplitStatuses(r.Context(), user, productID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	// Re-render the full statuses tab content in split mode.
+	reqStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.StatusesTabContent(productID, false, reqStatuses, defStatuses).Render(r.Context(), w)
 }
 
 // CreateEnvironment handles POST /products/{id}/settings/environments.

@@ -17,6 +17,7 @@ type StatusStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID, entityType string) ([]*model.Status, error)
 	GetDefault(ctx context.Context, productID, entityType string) (*model.Status, error)
+	GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Status, error)
 }
 
 type statusStore struct {
@@ -90,6 +91,18 @@ func (s *statusStore) GetDefault(ctx context.Context, productID, entityType stri
 	st, err := scanStatus(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("default status not found: %w", err)
+	}
+	return st, err
+}
+
+func (s *statusStore) GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Status, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, created_at
+		 FROM statuses WHERE product_id = ? AND entity_type = ? AND name = ?
+		 LIMIT 1`, productID, entityType, name)
+	st, err := scanStatus(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("status not found: %w", err)
 	}
 	return st, err
 }

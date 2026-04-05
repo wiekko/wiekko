@@ -7,6 +7,7 @@ type Product struct {
 	Description    string
 	EstimationMode string // "disabled", "story_points", "tshirt_sizes", "hours"
 	WorkflowMode   string // "kanban", "scrum"
+	StatusSync     bool   // true = statuses synced between requirements and defects
 	CreatedAt      string // RFC 3339
 	UpdatedAt      string // RFC 3339
 }

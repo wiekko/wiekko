@@ -13,6 +13,7 @@ func newMilestoneService(
 	milestones *testutil.MockMilestoneStore,
 	sprints *testutil.MockSprintStore,
 	statuses *testutil.MockStatusStore,
+	products *testutil.MockProductStore,
 	pyramidLevels *testutil.MockPyramidLevelStore,
 	runtimeEnvs *testutil.MockRuntimeEnvironmentStore,
 	audit *testutil.MockAuditStore,
@@ -22,6 +23,7 @@ func newMilestoneService(
 		milestones:    milestones,
 		sprints:       sprints,
 		statuses:      statuses,
+		products:      products,
 		pyramidLevels: pyramidLevels,
 		runtimeEnvs:   runtimeEnvs,
 		audit:         audit,
@@ -38,7 +40,7 @@ func TestCreateMilestone(t *testing.T) {
 			&testutil.MockMilestoneStore{
 				CreateFunc: func(_ context.Context, m *model.Milestone) error { created = m; return nil },
 			},
-			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		result, err := svc.CreateMilestone(context.Background(), testutil.MakeUser(), CreateMilestoneInput{
@@ -59,7 +61,7 @@ func TestCreateMilestone(t *testing.T) {
 	})
 
 	t.Run("missing name", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, ownerRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
 		_, err := svc.CreateMilestone(context.Background(), testutil.MakeUser(), CreateMilestoneInput{ProductID: "product-001"})
 		if err == nil {
 			t.Fatal("expected error")
@@ -67,7 +69,7 @@ func TestCreateMilestone(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreateMilestone(context.Background(), testutil.MakeUser(), CreateMilestoneInput{ProductID: "product-001", Name: "X"})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -83,7 +85,7 @@ func TestGetMilestone(t *testing.T) {
 			&testutil.MockMilestoneStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Milestone, error) { return milestone, nil },
 			},
-			nil, nil, nil, nil, nil, viewerRoles(),
+			nil, nil, nil, nil, nil, nil, viewerRoles(),
 		)
 
 		result, err := svc.GetMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
@@ -96,7 +98,7 @@ func TestGetMilestone(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.GetMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -113,7 +115,7 @@ func TestUpdateMilestone(t *testing.T) {
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Milestone, error) { return milestone, nil },
 				UpdateFunc:  func(_ context.Context, m *model.Milestone) error { updated = m; return nil },
 			},
-			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		newName := "v2.0"
@@ -130,7 +132,7 @@ func TestUpdateMilestone(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.UpdateMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001", UpdateMilestoneInput{})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -145,7 +147,7 @@ func TestDeleteMilestone(t *testing.T) {
 			&testutil.MockMilestoneStore{
 				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
-			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		err := svc.DeleteMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
@@ -158,7 +160,7 @@ func TestDeleteMilestone(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		err := svc.DeleteMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -174,7 +176,7 @@ func TestListMilestones(t *testing.T) {
 					return []*model.Milestone{testutil.MakeMilestone()}, nil
 				},
 			},
-			nil, nil, nil, nil, nil, viewerRoles(),
+			nil, nil, nil, nil, nil, nil, viewerRoles(),
 		)
 
 		result, err := svc.ListMilestones(context.Background(), testutil.MakeUser(), "product-001")
@@ -187,7 +189,7 @@ func TestListMilestones(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListMilestones(context.Background(), testutil.MakeUser(), "product-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -204,7 +206,7 @@ func TestCreateSprint(t *testing.T) {
 			&testutil.MockSprintStore{
 				CreateFunc: func(_ context.Context, s *model.Sprint) error { created = s; return nil },
 			},
-			nil, nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		result, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), CreateSprintInput{
@@ -222,7 +224,7 @@ func TestCreateSprint(t *testing.T) {
 	})
 
 	t.Run("missing name", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, ownerRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
 		_, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), CreateSprintInput{ProductID: "product-001"})
 		if err == nil {
 			t.Fatal("expected error")
@@ -230,7 +232,7 @@ func TestCreateSprint(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), CreateSprintInput{ProductID: "product-001", Name: "X"})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -246,7 +248,7 @@ func TestGetSprint(t *testing.T) {
 			&testutil.MockSprintStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
 			},
-			nil, nil, nil, nil, viewerRoles(),
+			nil, nil, nil, nil, nil, viewerRoles(),
 		)
 
 		result, err := svc.GetSprint(context.Background(), testutil.MakeUser(), "product-001", "sprint-001")
@@ -259,7 +261,7 @@ func TestGetSprint(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.GetSprint(context.Background(), testutil.MakeUser(), "product-001", "sprint-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -276,7 +278,7 @@ func TestUpdateSprint(t *testing.T) {
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
 				UpdateFunc:  func(_ context.Context, s *model.Sprint) error { updated = s; return nil },
 			},
-			nil, nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		newName := "Sprint 2"
@@ -293,7 +295,7 @@ func TestUpdateSprint(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.UpdateSprint(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", UpdateSprintInput{})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -308,7 +310,7 @@ func TestDeleteSprint(t *testing.T) {
 			&testutil.MockSprintStore{
 				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
-			nil, nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		err := svc.DeleteSprint(context.Background(), testutil.MakeUser(), "product-001", "sprint-001")
@@ -321,7 +323,7 @@ func TestDeleteSprint(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		err := svc.DeleteSprint(context.Background(), testutil.MakeUser(), "product-001", "sprint-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -337,7 +339,7 @@ func TestListSprints(t *testing.T) {
 					return []*model.Sprint{testutil.MakeSprint()}, nil
 				},
 			},
-			nil, nil, nil, nil, viewerRoles(),
+			nil, nil, nil, nil, nil, viewerRoles(),
 		)
 
 		result, err := svc.ListSprints(context.Background(), testutil.MakeUser(), "product-001")
@@ -350,7 +352,7 @@ func TestListSprints(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListSprints(context.Background(), testutil.MakeUser(), "product-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -367,7 +369,7 @@ func TestCreateStatus(t *testing.T) {
 			&testutil.MockStatusStore{
 				CreateFunc: func(_ context.Context, s *model.Status) error { created = s; return nil },
 			},
-			nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		result, err := svc.CreateStatus(context.Background(), testutil.MakeUser(), CreateStatusInput{
@@ -385,7 +387,7 @@ func TestCreateStatus(t *testing.T) {
 	})
 
 	t.Run("missing name", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, ownerRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
 		_, err := svc.CreateStatus(context.Background(), testutil.MakeUser(), CreateStatusInput{ProductID: "product-001", EntityType: "requirement"})
 		if err == nil {
 			t.Fatal("expected error")
@@ -393,7 +395,7 @@ func TestCreateStatus(t *testing.T) {
 	})
 
 	t.Run("missing entity type", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, ownerRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
 		_, err := svc.CreateStatus(context.Background(), testutil.MakeUser(), CreateStatusInput{ProductID: "product-001", Name: "Open"})
 		if err == nil {
 			t.Fatal("expected error")
@@ -401,7 +403,7 @@ func TestCreateStatus(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreateStatus(context.Background(), testutil.MakeUser(), CreateStatusInput{ProductID: "product-001", EntityType: "requirement", Name: "X"})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -417,7 +419,7 @@ func TestGetStatus(t *testing.T) {
 			&testutil.MockStatusStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Status, error) { return status, nil },
 			},
-			nil, nil, nil, viewerRoles(),
+			nil, nil, nil, nil, viewerRoles(),
 		)
 
 		result, err := svc.GetStatus(context.Background(), testutil.MakeUser(), "product-001", "status-001")
@@ -430,7 +432,7 @@ func TestGetStatus(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.GetStatus(context.Background(), testutil.MakeUser(), "product-001", "status-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -447,7 +449,7 @@ func TestUpdateStatus(t *testing.T) {
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Status, error) { return status, nil },
 				UpdateFunc:  func(_ context.Context, s *model.Status) error { updated = s; return nil },
 			},
-			nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		newName := "Closed"
@@ -464,7 +466,7 @@ func TestUpdateStatus(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.UpdateStatus(context.Background(), testutil.MakeUser(), "product-001", "status-001", UpdateStatusInput{})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -477,9 +479,12 @@ func TestDeleteStatus(t *testing.T) {
 		deleted := false
 		svc := newMilestoneService(nil, nil,
 			&testutil.MockStatusStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Status, error) {
+					return testutil.MakeStatus(), nil
+				},
 				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
-			nil, nil, noopAudit(), ownerRoles(),
+			nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
 		err := svc.DeleteStatus(context.Background(), testutil.MakeUser(), "product-001", "status-001")
@@ -492,7 +497,7 @@ func TestDeleteStatus(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		err := svc.DeleteStatus(context.Background(), testutil.MakeUser(), "product-001", "status-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -508,7 +513,7 @@ func TestListStatuses(t *testing.T) {
 					return []*model.Status{testutil.MakeStatus()}, nil
 				},
 			},
-			nil, nil, nil, viewerRoles(),
+			nil, nil, nil, nil, viewerRoles(),
 		)
 
 		result, err := svc.ListStatuses(context.Background(), testutil.MakeUser(), "product-001", "requirement")
@@ -521,7 +526,7 @@ func TestListStatuses(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListStatuses(context.Background(), testutil.MakeUser(), "product-001", "requirement")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -534,7 +539,7 @@ func TestListStatuses(t *testing.T) {
 func TestCreatePyramidLevel(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var created *model.PyramidLevel
-		svc := newMilestoneService(nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil,
 			&testutil.MockPyramidLevelStore{
 				CreateFunc: func(_ context.Context, pl *model.PyramidLevel) error { created = pl; return nil },
 			},
@@ -556,7 +561,7 @@ func TestCreatePyramidLevel(t *testing.T) {
 	})
 
 	t.Run("missing name", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, ownerRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
 		_, err := svc.CreatePyramidLevel(context.Background(), testutil.MakeUser(), CreatePyramidLevelInput{ProductID: "product-001"})
 		if err == nil {
 			t.Fatal("expected error")
@@ -564,7 +569,7 @@ func TestCreatePyramidLevel(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreatePyramidLevel(context.Background(), testutil.MakeUser(), CreatePyramidLevelInput{ProductID: "product-001", Name: "X"})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -575,7 +580,7 @@ func TestCreatePyramidLevel(t *testing.T) {
 func TestGetPyramidLevel(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		pl := &model.PyramidLevel{ID: "pl-001", ProductID: "product-001", Name: "Unit"}
-		svc := newMilestoneService(nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil,
 			&testutil.MockPyramidLevelStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.PyramidLevel, error) { return pl, nil },
 			},
@@ -592,7 +597,7 @@ func TestGetPyramidLevel(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.GetPyramidLevel(context.Background(), testutil.MakeUser(), "product-001", "pl-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -604,7 +609,7 @@ func TestUpdatePyramidLevel(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		pl := &model.PyramidLevel{ID: "pl-001", ProductID: "product-001", Name: "Unit"}
 		var updated *model.PyramidLevel
-		svc := newMilestoneService(nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil,
 			&testutil.MockPyramidLevelStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.PyramidLevel, error) { return pl, nil },
 				UpdateFunc:  func(_ context.Context, p *model.PyramidLevel) error { updated = p; return nil },
@@ -626,7 +631,7 @@ func TestUpdatePyramidLevel(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.UpdatePyramidLevel(context.Background(), testutil.MakeUser(), "product-001", "pl-001", UpdatePyramidLevelInput{})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -637,7 +642,7 @@ func TestUpdatePyramidLevel(t *testing.T) {
 func TestDeletePyramidLevel(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		deleted := false
-		svc := newMilestoneService(nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil,
 			&testutil.MockPyramidLevelStore{
 				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
@@ -654,7 +659,7 @@ func TestDeletePyramidLevel(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		err := svc.DeletePyramidLevel(context.Background(), testutil.MakeUser(), "product-001", "pl-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -664,7 +669,7 @@ func TestDeletePyramidLevel(t *testing.T) {
 
 func TestListPyramidLevels(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil,
 			&testutil.MockPyramidLevelStore{
 				ListByProductIDFunc: func(_ context.Context, _ string) ([]*model.PyramidLevel, error) {
 					return []*model.PyramidLevel{{ID: "pl-001"}}, nil
@@ -683,7 +688,7 @@ func TestListPyramidLevels(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListPyramidLevels(context.Background(), testutil.MakeUser(), "product-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -696,7 +701,7 @@ func TestListPyramidLevels(t *testing.T) {
 func TestCreateRuntimeEnvironment(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var created *model.RuntimeEnvironment
-		svc := newMilestoneService(nil, nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil, nil,
 			&testutil.MockRuntimeEnvironmentStore{
 				CreateFunc: func(_ context.Context, env *model.RuntimeEnvironment) error { created = env; return nil },
 			},
@@ -716,7 +721,7 @@ func TestCreateRuntimeEnvironment(t *testing.T) {
 	})
 
 	t.Run("missing name", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, ownerRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
 		_, err := svc.CreateRuntimeEnvironment(context.Background(), testutil.MakeUser(), "product-001", "")
 		if err == nil {
 			t.Fatal("expected error")
@@ -724,7 +729,7 @@ func TestCreateRuntimeEnvironment(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreateRuntimeEnvironment(context.Background(), testutil.MakeUser(), "product-001", "staging")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -735,7 +740,7 @@ func TestCreateRuntimeEnvironment(t *testing.T) {
 func TestDeleteRuntimeEnvironment(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		deleted := false
-		svc := newMilestoneService(nil, nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil, nil,
 			&testutil.MockRuntimeEnvironmentStore{
 				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
@@ -752,7 +757,7 @@ func TestDeleteRuntimeEnvironment(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		err := svc.DeleteRuntimeEnvironment(context.Background(), testutil.MakeUser(), "product-001", "env-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -762,7 +767,7 @@ func TestDeleteRuntimeEnvironment(t *testing.T) {
 
 func TestListRuntimeEnvironments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil,
+		svc := newMilestoneService(nil, nil, nil, nil, nil,
 			&testutil.MockRuntimeEnvironmentStore{
 				ListByProductIDFunc: func(_ context.Context, _ string) ([]*model.RuntimeEnvironment, error) {
 					return []*model.RuntimeEnvironment{{ID: "env-001", Name: "staging"}}, nil
@@ -781,7 +786,7 @@ func TestListRuntimeEnvironments(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListRuntimeEnvironments(context.Background(), testutil.MakeUser(), "product-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)

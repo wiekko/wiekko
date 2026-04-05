@@ -14,11 +14,13 @@ import (
 
 // ProductService handles product CRUD and member management.
 type ProductService struct {
-	products     store.ProductStore
-	productRoles store.ProductRoleStore
-	settings     store.SettingStore
-	audit        store.AuditStore
-	authz        *Authorizer
+	products      store.ProductStore
+	productRoles  store.ProductRoleStore
+	statuses      store.StatusStore
+	pyramidLevels store.PyramidLevelStore
+	settings      store.SettingStore
+	audit         store.AuditStore
+	authz         *Authorizer
 }
 
 // CreateProductInput contains the fields required to create a product.
@@ -64,6 +66,7 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 		Description:    input.Description,
 		EstimationMode: input.EstimationMode,
 		WorkflowMode:   input.WorkflowMode,
+		StatusSync:     true,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -88,7 +91,60 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 		UserID: user.ID, Action: "create", CreatedAt: now,
 	})
 
+	s.seedDefaults(ctx, product.ID, now)
+
 	return product, nil
+}
+
+// seedDefaults creates default statuses and pyramid levels for a new product.
+func (s *ProductService) seedDefaults(ctx context.Context, productID, now string) {
+	// Default statuses (synced: same for both entity types).
+	defaultStatuses := []struct {
+		Name      string
+		Position  int
+		IsDefault bool
+		IsClosed  bool
+	}{
+		{Name: "New", Position: 1, IsDefault: true},
+		{Name: "In Progress", Position: 2},
+		{Name: "In Review", Position: 3},
+		{Name: "Done", Position: 4, IsClosed: true},
+	}
+
+	for _, et := range []string{"requirement", "defect"} {
+		for _, ds := range defaultStatuses {
+			_ = s.statuses.Create(ctx, &model.Status{
+				ID:         uuid.New().String(),
+				ProductID:  productID,
+				EntityType: et,
+				Name:       ds.Name,
+				Position:   ds.Position,
+				IsDefault:  ds.IsDefault,
+				IsClosed:   ds.IsClosed,
+				CreatedAt:  now,
+			})
+		}
+	}
+
+	// Default pyramid levels.
+	defaultLevels := []struct {
+		Name     string
+		Position int
+	}{
+		{Name: "Unit", Position: 1},
+		{Name: "Integration", Position: 2},
+		{Name: "End-to-End", Position: 3},
+	}
+
+	for _, dl := range defaultLevels {
+		_ = s.pyramidLevels.Create(ctx, &model.PyramidLevel{
+			ID:        uuid.New().String(),
+			ProductID: productID,
+			Name:      dl.Name,
+			Position:  dl.Position,
+			CreatedAt: now,
+		})
+	}
 }
 
 // GetByID returns a product by ID. Requires viewer role.
@@ -225,6 +281,38 @@ func (s *ProductService) ListMembers(ctx context.Context, user *model.User, prod
 	}
 
 	return s.productRoles.ListByProductID(ctx, productID)
+}
+
+// SplitStatuses permanently separates requirement and defect statuses for a product.
+// This is a one-way operation and cannot be undone. Requires owner role.
+func (s *ProductService) SplitStatuses(ctx context.Context, user *model.User, productID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	product, err := s.products.GetByID(ctx, productID)
+	if err != nil {
+		return err
+	}
+
+	if !product.StatusSync {
+		return errors.New("statuses are already split")
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	product.StatusSync = false
+	product.UpdatedAt = now
+
+	if err := s.products.Update(ctx, product); err != nil {
+		return fmt.Errorf("split statuses: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+		UserID: user.ID, Action: "split_statuses", CreatedAt: now,
+	})
+
+	return nil
 }
 
 // TransferOwnership transfers product ownership to another user (FR-306).

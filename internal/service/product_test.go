@@ -11,11 +11,13 @@ import (
 
 func newProductService(products *testutil.MockProductStore, roles *testutil.MockProductRoleStore, settings *testutil.MockSettingStore, audit *testutil.MockAuditStore) *ProductService {
 	return &ProductService{
-		products:     products,
-		productRoles: roles,
-		settings:     settings,
-		audit:        audit,
-		authz:        &Authorizer{productRoles: roles},
+		products:      products,
+		productRoles:  roles,
+		statuses:      &testutil.MockStatusStore{CreateFunc: func(_ context.Context, _ *model.Status) error { return nil }},
+		pyramidLevels: &testutil.MockPyramidLevelStore{CreateFunc: func(_ context.Context, _ *model.PyramidLevel) error { return nil }},
+		settings:      settings,
+		audit:         audit,
+		authz:         &Authorizer{productRoles: roles},
 	}
 }
 

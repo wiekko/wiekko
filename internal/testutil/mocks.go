@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/model"
@@ -212,6 +213,9 @@ func (m *MockProductStore) Create(ctx context.Context, product *model.Product) e
 	return m.CreateFunc(ctx, product)
 }
 func (m *MockProductStore) GetByID(ctx context.Context, id string) (*model.Product, error) {
+	if m == nil || m.GetByIDFunc == nil {
+		return nil, fmt.Errorf("product not found")
+	}
 	return m.GetByIDFunc(ctx, id)
 }
 func (m *MockProductStore) Update(ctx context.Context, product *model.Product) error {
@@ -343,12 +347,13 @@ func (m *MockSprintStore) ListByProductID(ctx context.Context, productID string)
 
 // MockStatusStore implements store.StatusStore with configurable function fields.
 type MockStatusStore struct {
-	CreateFunc          func(ctx context.Context, status *model.Status) error
-	GetByIDFunc         func(ctx context.Context, id string) (*model.Status, error)
-	UpdateFunc          func(ctx context.Context, status *model.Status) error
-	DeleteFunc          func(ctx context.Context, id string) error
-	ListByProductIDFunc func(ctx context.Context, productID, entityType string) ([]*model.Status, error)
-	GetDefaultFunc      func(ctx context.Context, productID, entityType string) (*model.Status, error)
+	CreateFunc              func(ctx context.Context, status *model.Status) error
+	GetByIDFunc             func(ctx context.Context, id string) (*model.Status, error)
+	UpdateFunc              func(ctx context.Context, status *model.Status) error
+	DeleteFunc              func(ctx context.Context, id string) error
+	ListByProductIDFunc     func(ctx context.Context, productID, entityType string) ([]*model.Status, error)
+	GetDefaultFunc          func(ctx context.Context, productID, entityType string) (*model.Status, error)
+	GetByProductAndNameFunc func(ctx context.Context, productID, entityType, name string) (*model.Status, error)
 }
 
 func (m *MockStatusStore) Create(ctx context.Context, status *model.Status) error {
@@ -368,6 +373,12 @@ func (m *MockStatusStore) ListByProductID(ctx context.Context, productID, entity
 }
 func (m *MockStatusStore) GetDefault(ctx context.Context, productID, entityType string) (*model.Status, error) {
 	return m.GetDefaultFunc(ctx, productID, entityType)
+}
+func (m *MockStatusStore) GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Status, error) {
+	if m.GetByProductAndNameFunc != nil {
+		return m.GetByProductAndNameFunc(ctx, productID, entityType, name)
+	}
+	return nil, fmt.Errorf("status not found")
 }
 
 // MockPyramidLevelStore implements store.PyramidLevelStore with configurable function fields.
