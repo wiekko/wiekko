@@ -5,6 +5,7 @@ import (
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
 	"nexmap.net/web/templates/ui"
+	"strconv"
 )
 
 // SettingsProps holds data for the product settings page.
@@ -43,11 +44,11 @@ templ SettingsPage(props SettingsProps) {
 			@ui.TabPanel("general") {
 				@GeneralTabContent(props.Product)
 			}
-			@ui.TabPanel("statuses") {
+			@ui.TabPanelHidden("statuses") {
 			}
-			@ui.TabPanel("environments") {
+			@ui.TabPanelHidden("environments") {
 			}
-			@ui.TabPanel("pyramid") {
+			@ui.TabPanelHidden("pyramid") {
 			}
 			<!-- Danger Zone -->
 			<div class="mt-8 border-t border-red-200 pt-6 dark:border-red-800">
@@ -94,6 +95,286 @@ templ StubTabContent(name string) {
 		</div>
 		<p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">{ name } configuration coming soon.</p>
 	</div>
+}
+
+// --- Statuses Tab ---
+
+// StatusesTabContent renders the Statuses settings tab.
+templ StatusesTabContent(productID string, reqStatuses, defStatuses []*model.Status) {
+	<div class="space-y-8">
+		<div>
+			<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Requirement Statuses</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Define workflow columns for requirements.</p>
+			<div class="mt-4">
+				@StatusListFragment(productID, "requirement", reqStatuses)
+			</div>
+		</div>
+		<div>
+			<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Defect Statuses</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Define workflow columns for defects.</p>
+			<div class="mt-4">
+				@StatusListFragment(productID, "defect", defStatuses)
+			</div>
+		</div>
+	</div>
+}
+
+// StatusListFragment renders the status list for a single entity type (requirement or defect).
+templ StatusListFragment(productID, entityType string, statuses []*model.Status) {
+	<div id={ "status-list-" + entityType } hx-target="this" hx-swap="outerHTML">
+		@ui.Card() {
+			if len(statuses) > 0 {
+				<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+					for _, s := range statuses {
+						@statusRow(productID, s)
+					}
+				</ul>
+			} else {
+				<div class="px-6 py-8 text-center">
+					<div class="text-gray-400 dark:text-gray-500">
+						@ui.Icon("columns-3", "lg")
+					</div>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No { entityType } statuses defined yet.</p>
+				</div>
+			}
+			<div class="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+				<form class="flex items-center gap-3" hx-post={ "/products/" + productID + "/settings/statuses" } hx-target={ "#status-list-" + entityType } hx-swap="outerHTML">
+					<input type="hidden" name="entity_type" value={ entityType }/>
+					<input
+						type="text"
+						name="name"
+						placeholder="New status name"
+						required
+						class="block flex-1 rounded-md border-0 px-3 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+					/>
+					<label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+						<input type="checkbox" name="is_closed" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"/>
+						Closed
+					</label>
+					<button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+						@ui.Icon("plus", "sm")
+						Add
+					</button>
+				</form>
+			</div>
+		}
+	</div>
+}
+
+templ statusRow(productID string, s *model.Status) {
+	<li class="flex items-center gap-3 px-6 py-3">
+		<input
+			type="text"
+			name="name"
+			value={ s.Name }
+			class="block flex-1 rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings/statuses/" + s.ID }
+			hx-target={ "#status-list-" + s.EntityType }
+			hx-swap="outerHTML"
+			hx-trigger="change"
+		/>
+		<label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+			<input
+				type="checkbox"
+				name="is_default"
+				checked?={ s.IsDefault }
+				class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
+				hx-patch={ "/products/" + productID + "/settings/statuses/" + s.ID }
+				hx-target={ "#status-list-" + s.EntityType }
+				hx-swap="outerHTML"
+				hx-trigger="change"
+			/>
+			Default
+		</label>
+		<label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+			<input
+				type="checkbox"
+				name="is_closed"
+				checked?={ s.IsClosed }
+				class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
+				hx-patch={ "/products/" + productID + "/settings/statuses/" + s.ID }
+				hx-target={ "#status-list-" + s.EntityType }
+				hx-swap="outerHTML"
+				hx-trigger="change"
+			/>
+			Closed
+		</label>
+		<span class="text-xs text-gray-400 dark:text-gray-500">{ strconv.Itoa(s.Position) }</span>
+		<button
+			type="button"
+			class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+			hx-delete={ "/products/" + productID + "/settings/statuses/" + s.ID }
+			hx-target={ "#status-list-" + s.EntityType }
+			hx-swap="outerHTML"
+			hx-confirm={ "Delete status \"" + s.Name + "\"?" }
+		>
+			@ui.Icon("trash", "sm")
+		</button>
+	</li>
+}
+
+// --- Environments Tab ---
+
+// EnvironmentsTabContent renders the Environments settings tab.
+templ EnvironmentsTabContent(productID string, envs []*model.RuntimeEnvironment) {
+	<div>
+		<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Runtime Environments</h3>
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Labels for the test execution matrix (e.g. OS, browser, platform).</p>
+		<div class="mt-4">
+			@EnvironmentListFragment(productID, envs)
+		</div>
+	</div>
+}
+
+// EnvironmentListFragment renders the environment list.
+templ EnvironmentListFragment(productID string, envs []*model.RuntimeEnvironment) {
+	<div id="environment-list" hx-target="this" hx-swap="outerHTML">
+		@ui.Card() {
+			if len(envs) > 0 {
+				<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+					for _, e := range envs {
+						<li class="flex items-center justify-between px-6 py-3">
+							<span class="text-sm font-medium text-gray-900 dark:text-gray-100">{ e.Name }</span>
+							<button
+								type="button"
+								class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+								hx-delete={ "/products/" + productID + "/settings/environments/" + e.ID }
+								hx-target="#environment-list"
+								hx-swap="outerHTML"
+								hx-confirm={ "Delete environment \"" + e.Name + "\"?" }
+							>
+								@ui.Icon("trash", "sm")
+							</button>
+						</li>
+					}
+				</ul>
+			} else {
+				<div class="px-6 py-8 text-center">
+					<div class="text-gray-400 dark:text-gray-500">
+						@ui.Icon("monitor", "lg")
+					</div>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No runtime environments defined yet.</p>
+				</div>
+			}
+			<div class="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+				<form class="flex items-center gap-3" hx-post={ "/products/" + productID + "/settings/environments" } hx-target="#environment-list" hx-swap="outerHTML">
+					<input
+						type="text"
+						name="name"
+						placeholder="e.g. Chrome, Linux, iOS 17"
+						required
+						class="block flex-1 rounded-md border-0 px-3 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+					/>
+					<button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+						@ui.Icon("plus", "sm")
+						Add
+					</button>
+				</form>
+			</div>
+		}
+	</div>
+}
+
+// --- Pyramid Levels Tab ---
+
+// PyramidTabContent renders the Pyramid Levels settings tab.
+templ PyramidTabContent(productID string, levels []*model.PyramidLevel) {
+	<div>
+		<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Pyramid Levels</h3>
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Test pyramid categorization (e.g. unit, integration, system, acceptance). Max depth: 2.</p>
+		<div class="mt-4">
+			@PyramidListFragment(productID, levels)
+		</div>
+	</div>
+}
+
+// PyramidListFragment renders the pyramid level tree.
+templ PyramidListFragment(productID string, levels []*model.PyramidLevel) {
+	<div id="pyramid-list" hx-target="this" hx-swap="outerHTML">
+		@ui.Card() {
+			if len(levels) > 0 {
+				<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+					for _, l := range levels {
+						if l.ParentID == "" {
+							@pyramidRow(productID, l, false)
+							for _, child := range levels {
+								if child.ParentID == l.ID {
+									@pyramidRow(productID, child, true)
+								}
+							}
+						}
+					}
+				</ul>
+			} else {
+				<div class="px-6 py-8 text-center">
+					<div class="text-gray-400 dark:text-gray-500">
+						@ui.Icon("triangle", "lg")
+					</div>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No pyramid levels defined yet.</p>
+				</div>
+			}
+			<div class="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+				<form class="flex items-center gap-3" hx-post={ "/products/" + productID + "/settings/pyramid" } hx-target="#pyramid-list" hx-swap="outerHTML">
+					<input
+						type="text"
+						name="name"
+						placeholder="New top-level (e.g. Unit, Integration)"
+						required
+						class="block flex-1 rounded-md border-0 px-3 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+					/>
+					<button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+						@ui.Icon("plus", "sm")
+						Add
+					</button>
+				</form>
+			</div>
+		}
+	</div>
+}
+
+templ pyramidRow(productID string, l *model.PyramidLevel, isChild bool) {
+	<li class={ "flex items-center gap-3 px-6 py-3", templ.KV("pl-12", isChild) }>
+		if isChild {
+			<span class="text-gray-300 dark:text-gray-600">
+				@ui.Icon("corner-down-right", "sm")
+			</span>
+		}
+		<input
+			type="text"
+			name="name"
+			value={ l.Name }
+			class="block flex-1 rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings/pyramid/" + l.ID }
+			hx-target="#pyramid-list"
+			hx-swap="outerHTML"
+			hx-trigger="change"
+		/>
+		if l.ParentID == "" {
+			<form class="flex items-center gap-1.5" hx-post={ "/products/" + productID + "/settings/pyramid" } hx-target="#pyramid-list" hx-swap="outerHTML">
+				<input type="hidden" name="parent_id" value={ l.ID }/>
+				<input
+					type="text"
+					name="name"
+					placeholder="Add sub-level"
+					required
+					class="w-36 rounded-md border-0 px-2 py-1.5 text-xs text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+				/>
+				<button type="submit" class="rounded p-1 text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-400" title="Add sub-level">
+					@ui.Icon("plus", "sm")
+				</button>
+			</form>
+		}
+		<button
+			type="button"
+			class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+			hx-delete={ "/products/" + productID + "/settings/pyramid/" + l.ID }
+			hx-target="#pyramid-list"
+			hx-swap="outerHTML"
+			hx-confirm={ "Delete level \"" + l.Name + "\"?" }
+		>
+			@ui.Icon("trash", "sm")
+		</button>
+	</li>
 }
 
 // SettingField renders a single auto-save field fragment (used after PATCH update).

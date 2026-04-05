@@ -20,11 +20,12 @@ type PageProductController struct {
 	settings   *service.SettingService
 	user       *service.UserService
 	invitation *service.InvitationService
+	milestone  *service.MilestoneService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone}
 }
 
 // CreateForm renders GET /products/new.
@@ -177,22 +178,283 @@ func (c *PageProductController) SettingsGeneral(w http.ResponseWriter, r *http.R
 	_ = productpage.GeneralTabContent(p).Render(r.Context(), w)
 }
 
-// SettingsStatuses renders the stub Statuses tab content.
+// SettingsStatuses renders the Statuses tab content fragment.
 func (c *PageProductController) SettingsStatuses(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	reqStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.StubTabContent("Statuses").Render(r.Context(), w)
+	_ = productpage.StatusesTabContent(productID, reqStatuses, defStatuses).Render(r.Context(), w)
 }
 
-// SettingsEnvironments renders the stub Environments tab content.
+// SettingsEnvironments renders the Environments tab content fragment.
 func (c *PageProductController) SettingsEnvironments(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	envs, err := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.StubTabContent("Environments").Render(r.Context(), w)
+	_ = productpage.EnvironmentsTabContent(productID, envs).Render(r.Context(), w)
 }
 
-// SettingsPyramid renders the stub Pyramid Levels tab content.
+// SettingsPyramid renders the Pyramid Levels tab content fragment.
 func (c *PageProductController) SettingsPyramid(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	levels, err := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.StubTabContent("Pyramid Levels").Render(r.Context(), w)
+	_ = productpage.PyramidTabContent(productID, levels).Render(r.Context(), w)
+}
+
+// CreateStatus handles POST /products/{id}/settings/statuses.
+func (c *PageProductController) CreateStatus(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	entityType := r.FormValue("entity_type")
+	name := r.FormValue("name")
+
+	if name == "" || entityType == "" {
+		http.Error(w, "name and entity_type are required", http.StatusBadRequest)
+		return
+	}
+
+	// Determine position: append to end.
+	existing, _ := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
+	position := len(existing) + 1
+
+	isDefault := r.FormValue("is_default") == "on"
+	isClosed := r.FormValue("is_closed") == "on"
+
+	_, err := c.milestone.CreateStatus(r.Context(), user, service.CreateStatusInput{
+		ProductID:  productID,
+		EntityType: entityType,
+		Name:       name,
+		Position:   position,
+		IsDefault:  isDefault,
+		IsClosed:   isClosed,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderStatusList(w, r, user, productID, entityType)
+}
+
+// UpdateStatus handles PATCH /products/{id}/settings/statuses/{statusId}.
+func (c *PageProductController) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	statusID := r.PathValue("statusId")
+
+	input := service.UpdateStatusInput{}
+	if v := r.FormValue("name"); v != "" {
+		input.Name = &v
+	}
+	if r.Form != nil {
+		if _, ok := r.Form["is_default"]; ok {
+			val := r.FormValue("is_default") == "on"
+			input.IsDefault = &val
+		}
+		if _, ok := r.Form["is_closed"]; ok {
+			val := r.FormValue("is_closed") == "on"
+			input.IsClosed = &val
+		}
+	}
+
+	// Get the status to know its entity type for re-rendering.
+	status, err := c.milestone.GetStatus(r.Context(), user, productID, statusID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	_, err = c.milestone.UpdateStatus(r.Context(), user, productID, statusID, input)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderStatusList(w, r, user, productID, status.EntityType)
+}
+
+// DeleteStatus handles DELETE /products/{id}/settings/statuses/{statusId}.
+func (c *PageProductController) DeleteStatus(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	statusID := r.PathValue("statusId")
+
+	// Get the status to know its entity type for re-rendering.
+	status, err := c.milestone.GetStatus(r.Context(), user, productID, statusID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if err := c.milestone.DeleteStatus(r.Context(), user, productID, statusID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderStatusList(w, r, user, productID, status.EntityType)
+}
+
+// renderStatusList re-renders the status list fragment for a given entity type.
+func (c *PageProductController) renderStatusList(w http.ResponseWriter, r *http.Request, user *model.User, productID, entityType string) {
+	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.StatusListFragment(productID, entityType, statuses).Render(r.Context(), w)
+}
+
+// CreateEnvironment handles POST /products/{id}/settings/environments.
+func (c *PageProductController) CreateEnvironment(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	name := r.FormValue("name")
+
+	if name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+
+	_, err := c.milestone.CreateRuntimeEnvironment(r.Context(), user, productID, name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderEnvironmentList(w, r, user, productID)
+}
+
+// DeleteEnvironment handles DELETE /products/{id}/settings/environments/{envId}.
+func (c *PageProductController) DeleteEnvironment(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	envID := r.PathValue("envId")
+
+	if err := c.milestone.DeleteRuntimeEnvironment(r.Context(), user, productID, envID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderEnvironmentList(w, r, user, productID)
+}
+
+// renderEnvironmentList re-renders the environment list fragment.
+func (c *PageProductController) renderEnvironmentList(w http.ResponseWriter, r *http.Request, user *model.User, productID string) {
+	envs, err := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.EnvironmentListFragment(productID, envs).Render(r.Context(), w)
+}
+
+// CreatePyramidLevel handles POST /products/{id}/settings/pyramid.
+func (c *PageProductController) CreatePyramidLevel(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	name := r.FormValue("name")
+	parentID := r.FormValue("parent_id")
+
+	if name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Determine position: append to end.
+	existing, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+	position := 1
+	for _, l := range existing {
+		if l.ParentID == parentID && l.Position >= position {
+			position = l.Position + 1
+		}
+	}
+
+	_, err := c.milestone.CreatePyramidLevel(r.Context(), user, service.CreatePyramidLevelInput{
+		ProductID: productID,
+		ParentID:  parentID,
+		Name:      name,
+		Position:  position,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderPyramidList(w, r, user, productID)
+}
+
+// UpdatePyramidLevel handles PATCH /products/{id}/settings/pyramid/{levelId}.
+func (c *PageProductController) UpdatePyramidLevel(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	levelID := r.PathValue("levelId")
+
+	input := service.UpdatePyramidLevelInput{}
+	if v := r.FormValue("name"); v != "" {
+		input.Name = &v
+	}
+
+	_, err := c.milestone.UpdatePyramidLevel(r.Context(), user, productID, levelID, input)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderPyramidList(w, r, user, productID)
+}
+
+// DeletePyramidLevel handles DELETE /products/{id}/settings/pyramid/{levelId}.
+func (c *PageProductController) DeletePyramidLevel(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	levelID := r.PathValue("levelId")
+
+	if err := c.milestone.DeletePyramidLevel(r.Context(), user, productID, levelID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderPyramidList(w, r, user, productID)
+}
+
+// renderPyramidList re-renders the pyramid level list fragment.
+func (c *PageProductController) renderPyramidList(w http.ResponseWriter, r *http.Request, user *model.User, productID string) {
+	levels, err := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.PyramidListFragment(productID, levels).Render(r.Context(), w)
 }
 
 // UpdateProduct handles PATCH /products/{id}/settings (auto-save).

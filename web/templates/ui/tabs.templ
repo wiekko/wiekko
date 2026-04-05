@@ -3,16 +3,19 @@ package ui
 import "nexmap.net/web/templates"
 
 // TabGroup renders a horizontal tab bar. Each tab loads content via htmx.
+// Clicking a tab hides all sibling panels, shows the target panel, and updates active styling.
 templ TabGroup(tabs []templates.TabDef) {
 	<div class="border-b border-gray-200 dark:border-gray-700">
-		<nav class="-mb-px flex space-x-8" aria-label="Tabs">
+		<nav class="-mb-px flex space-x-8" aria-label="Tabs" id="tab-nav">
 			for _, tab := range tabs {
 				<button
 					type="button"
 					hx-get={ tab.HxGet }
 					hx-target={ "#tab-panel-" + tab.ID }
 					hx-swap="innerHTML"
-					class={ "whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors",
+					data-tab-id={ tab.ID }
+					onclick="switchTab(this)"
+					class={ "tab-button whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors",
 						tabClass(tab.Active) }
 					if tab.Active {
 						aria-current="page"
@@ -23,11 +26,19 @@ templ TabGroup(tabs []templates.TabDef) {
 			}
 		</nav>
 	</div>
+	@tabScript()
 }
 
-// TabPanel renders a content area for a tab. The id matches the tab definition.
+// TabPanel renders a visible content area for a tab (used for the initially active tab).
 templ TabPanel(id string) {
-	<div id={ "tab-panel-" + id } class="py-4">
+	<div id={ "tab-panel-" + id } class="tab-panel py-4">
+		{ children... }
+	</div>
+}
+
+// TabPanelHidden renders a hidden tab panel (for inactive tabs on initial load).
+templ TabPanelHidden(id string) {
+	<div id={ "tab-panel-" + id } class="tab-panel hidden py-4">
 		{ children... }
 	</div>
 }
@@ -37,4 +48,35 @@ func tabClass(active bool) string {
 		return "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
 	}
 	return "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200"
+}
+
+templ tabScript() {
+	<script>
+		function switchTab(btn) {
+			// Update button styles.
+			var nav = btn.closest('[id="tab-nav"]');
+			var buttons = nav.querySelectorAll('.tab-button');
+			var activeClass = 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400';
+			var inactiveClass = 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200';
+			buttons.forEach(function(b) {
+				activeClass.split(' ').forEach(function(c) { b.classList.remove(c); });
+				inactiveClass.split(' ').forEach(function(c) { b.classList.add(c); });
+				b.removeAttribute('aria-current');
+			});
+			inactiveClass.split(' ').forEach(function(c) { btn.classList.remove(c); });
+			activeClass.split(' ').forEach(function(c) { btn.classList.add(c); });
+			btn.setAttribute('aria-current', 'page');
+
+			// Show target panel, hide others.
+			var panels = nav.parentElement.parentElement.querySelectorAll('.tab-panel');
+			var targetId = 'tab-panel-' + btn.getAttribute('data-tab-id');
+			panels.forEach(function(p) {
+				if (p.id === targetId) {
+					p.classList.remove('hidden');
+				} else {
+					p.classList.add('hidden');
+				}
+			});
+		}
+	</script>
 }
