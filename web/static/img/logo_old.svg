@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 64" fill="none">
+  <!-- Icon -->
+  <!-- Route path (background arc connecting nodes) -->
+  <path d="M12 48 Q16 20 32 16 Q48 12 52 40" stroke="#c7d2fe" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Start node -->
+  <circle cx="12" cy="48" r="5" fill="#4f46e5"/>
+  <!-- Middle node (main hexagon) -->
+  <path d="M32 10 L40.5 14.5 L40.5 23.5 L32 28 L23.5 23.5 L23.5 14.5 Z" fill="#4f46e5"/>
+  <!-- Forward arrow from hexagon -->
+  <path d="M40 20 L52 20" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  <path d="M48 15 L54 20 L48 25" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- End node -->
+  <circle cx="52" cy="40" r="5" fill="#4f46e5"/>
+  <!-- Small waypoint dots along the path -->
+  <circle cx="22" cy="30" r="2.5" fill="#c7d2fe"/>
+  <circle cx="42" cy="32" r="2.5" fill="#c7d2fe"/>
+
+  <!-- Wordmark -->
+  <text x="72" y="42" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700" fill="#0f172a">
+    <tspan fill="#4f46e5">Nex</tspan><tspan fill="#0f172a">map</tspan>
+  </text>
+</svg>
