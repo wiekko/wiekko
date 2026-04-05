@@ -4,42 +4,31 @@ import "nexmap.net/web/templates/ui"
 
 // SidebarNav renders the left navigation panel.
 templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
-	<aside class="flex h-full w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-		<!-- Logo + mobile close -->
-		<div class="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-700">
-			<div class="flex items-center gap-3">
-				<img src="/static/img/logo.svg" alt="Nexmap" class="h-8 w-auto"/>
-				<span class="text-lg font-bold text-gray-900 dark:text-gray-100">Nexmap</span>
-			</div>
-			<button type="button" class="rounded-md p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 md:hidden dark:hover:text-gray-300" onclick="closeSidebar()" aria-label="Close menu">
+	<aside class="flex h-full w-64 flex-col overflow-y-auto border-r border-gray-200 bg-white scrollbar-thin dark:border-gray-700 dark:bg-gray-900">
+		<!-- Mobile close button -->
+		<div class="flex items-center justify-end border-b border-gray-200 px-3 py-2 md:hidden dark:border-gray-700">
+			<button type="button" class="rounded-md p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:hover:text-gray-300" onclick="closeSidebar()" aria-label="Close menu">
 				@ui.Icon("x", "md")
 			</button>
 		</div>
-		<!-- Product context -->
-		if productName != "" {
-			<div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-				<p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Product</p>
-				<p class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{ productName }</p>
-			</div>
-		}
 		<!-- Navigation -->
-		<nav class="flex-1 space-y-1 overflow-y-auto scrollbar-thin px-3 py-4">
+		<nav class="flex-1 space-y-1 px-3 py-4">
 			@SidebarLink("Dashboard", "/", "home", activeSection == "dashboard", "")
 			if productID != "" {
-				@SidebarSection("Product") {
+				@SidebarSection("Product", activeSection == "overview" || activeSection == "settings" || activeSection == "team") {
 					@SidebarLink("Overview", "/products/"+productID, "layout-dashboard", activeSection == "overview", "")
 					@SidebarLink("Settings", "/products/"+productID+"/settings", "settings", activeSection == "settings", "")
 					@SidebarLink("Team", "/products/"+productID+"/team", "users", activeSection == "team", "")
 				}
-				@SidebarSection("Backlog") {
+				@SidebarSection("Backlog", activeSection == "requirements" || activeSection == "defects") {
 					@SidebarLink("Requirements", "/products/"+productID+"/requirements", "clipboard-list", activeSection == "requirements", "")
 					@SidebarLink("Defects", "/products/"+productID+"/defects", "bug", activeSection == "defects", "")
 				}
-				@SidebarSection("Testing") {
+				@SidebarSection("Testing", activeSection == "test-cases" || activeSection == "campaigns") {
 					@SidebarLink("Test Cases", "/products/"+productID+"/test-cases", "beaker", activeSection == "test-cases", "")
 					@SidebarLink("Campaigns", "/products/"+productID+"/campaigns", "flag", activeSection == "campaigns", "")
 				}
-				@SidebarSection("Structure") {
+				@SidebarSection("Structure", activeSection == "components" || activeSection == "functionalities" || activeSection == "milestones" || activeSection == "sprints") {
 					@SidebarLink("Components", "/products/"+productID+"/components", "folder", activeSection == "components", "")
 					@SidebarLink("Functionalities", "/products/"+productID+"/functionalities", "folder", activeSection == "functionalities", "")
 					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
@@ -47,7 +36,7 @@ templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
 				}
 			}
 			if isAdmin {
-				@SidebarSection("Admin") {
+				@SidebarSection("Admin", activeSection == "admin-users" || activeSection == "admin-settings" || activeSection == "admin-invitations") {
 					@SidebarLink("Users", "/admin/users", "users", activeSection == "admin-users", "")
 					@SidebarLink("Settings", "/admin/settings", "settings", activeSection == "admin-settings", "")
 					@SidebarLink("Invitations", "/admin/invitations", "link", activeSection == "admin-invitations", "")
@@ -57,14 +46,24 @@ templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
 	</aside>
 }
 
-// SidebarSection renders a group of nav links with a heading.
-templ SidebarSection(title string) {
-	<div class="pt-4">
-		<p class="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{ title }</p>
+// SidebarSection renders a collapsible group of nav links with a heading.
+templ SidebarSection(title string, open bool) {
+	<details
+		class="pt-4 group/section"
+		if open {
+			open
+		}
+	>
+		<summary class="flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wider text-gray-500 select-none hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 [&::-webkit-details-marker]:hidden">
+			{ title }
+			<span class="transition-transform duration-200 group-open/section:rotate-90">
+				@ui.Icon("chevron-right", "sm")
+			</span>
+		</summary>
 		<div class="mt-2 space-y-1">
 			{ children... }
 		</div>
-	</div>
+	</details>
 }
 
 // SidebarLink renders a single navigation item.

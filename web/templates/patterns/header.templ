@@ -2,15 +2,29 @@ package patterns
 
 import "nexmap.net/web/templates/ui"
 
-// AppHeader renders the top header bar with user menu.
-templ AppHeader(displayName, csrfToken string, isAdmin bool) {
+// AppHeader renders the top header bar with logo, product context, and user menu.
+templ AppHeader(displayName, csrfToken, productName string, isAdmin bool) {
 	<header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 dark:border-gray-700 dark:bg-gray-900">
 		<div class="flex items-center gap-3">
 			<!-- Mobile menu toggle -->
 			<button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 md:hidden dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200" onclick="openSidebar()" aria-label="Open menu">
 				@ui.Icon("menu", "md")
 			</button>
-			<!-- Placeholder for breadcrumbs or page title injected by pages -->
+			<!-- Logo -->
+			<a href="/" class="flex items-center gap-3">
+				<img src="/static/img/logo.svg" alt="Nexmap" class="h-8 w-auto"/>
+				<span class="hidden text-lg font-bold text-gray-900 sm:inline dark:text-gray-100">Nexmap</span>
+			</a>
+			<!-- Product context -->
+			if productName != "" {
+				<span class="hidden text-gray-300 sm:inline dark:text-gray-600">/</span>
+				<div class="hidden items-center gap-1.5 sm:flex">
+					<span class="max-w-48 truncate text-sm font-semibold text-gray-700 dark:text-gray-300">{ productName }</span>
+					<span class="text-gray-400 dark:text-gray-500">
+						@ui.Icon("chevron-down", "sm")
+					</span>
+				</div>
+			}
 		</div>
 		<div class="flex items-center gap-4">
 			@ui.ThemeToggle()
@@ -19,7 +33,7 @@ templ AppHeader(displayName, csrfToken string, isAdmin bool) {
 					<button type="button" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-gray-300 dark:hover:bg-gray-800">
 						<span id="header-user-info" class="flex items-center gap-2">
 							@ui.UserAvatar(displayName, "sm")
-							<span>{ displayName }</span>
+							<span class="hidden sm:inline">{ displayName }</span>
 						</span>
 						@ui.Icon("chevron-down", "sm")
 					</button>
