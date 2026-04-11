@@ -23,12 +23,13 @@ type PageProductController struct {
 	invitation *service.InvitationService
 	milestone  *service.MilestoneService
 	component  *service.ComponentService
+	testing    *service.TestingService
 	audit      *service.AuditService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, audit *service.AuditService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, audit: audit}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, audit *service.AuditService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, audit: audit}
 }
 
 // CreateForm renders GET /products/new.
@@ -1952,4 +1953,416 @@ func (c *PageProductController) buildAuditViews(r *http.Request, user *model.Use
 		})
 	}
 	return views
+}
+
+// --- Test Case Pages ---
+
+// TestCases renders GET /products/{id}/test-cases.
+func (c *PageProductController) TestCases(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	testCases, _ := c.testing.ListTestCases(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCasesPage(productpage.TestCasesProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Test Cases",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		TestCases:     testCases,
+		Components:    c.buildComponentMap(r, user, productID),
+		PyramidLevels: c.buildPyramidLevelMap(r, user, productID),
+		CanEdit:       c.canEditTestCases(user, role),
+	}).Render(r.Context(), w)
+}
+
+// TestCaseDetail renders GET /products/{id}/test-cases/{testCaseId}.
+func (c *PageProductController) TestCaseDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	tc, err := c.testing.GetTestCase(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/test-cases", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseDetailPage(productpage.TestCaseDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + tc.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:       user.DisplayName,
+		IsAdmin:           user.IsAdmin,
+		Product:           p,
+		TestCase:          tc,
+		ComponentName:     c.resolveComponentName(r, user, productID, tc.ComponentID),
+		FunctionalityName: c.resolveFunctionalityName(r, user, productID, tc.FunctionalityID),
+		PyramidLevelName:  c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID),
+		CanEdit:           c.canEditTestCases(user, role),
+	}).Render(r.Context(), w)
+}
+
+// TestCaseCreateForm renders GET /products/{id}/test-cases/new.
+func (c *PageProductController) TestCaseCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Test Case",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:     user.DisplayName,
+		IsAdmin:         user.IsAdmin,
+		Product:         p,
+		Components:      components,
+		Functionalities: functionalities,
+		PyramidLevels:   pyramidLevels,
+		ExecutionMode:   "manual",
+	}).Render(r.Context(), w)
+}
+
+// TestCaseCreate handles POST /products/{id}/test-cases.
+func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	executionMode := r.FormValue("execution_mode")
+	testIdentifier := r.FormValue("test_identifier")
+	componentID := r.FormValue("component_id")
+	functionalityID := r.FormValue("functionality_id")
+	pyramidLevelID := r.FormValue("pyramid_level_id")
+
+	_, err = c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
+		ProductID:       productID,
+		ComponentID:     componentID,
+		FunctionalityID: functionalityID,
+		Title:           title,
+		Description:     description,
+		ExecutionMode:   executionMode,
+		TestIdentifier:  testIdentifier,
+		PyramidLevelID:  pyramidLevelID,
+	})
+	if err != nil {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Test Case",
+				CSRFToken: csrfToken,
+			},
+			DisplayName:     user.DisplayName,
+			IsAdmin:         user.IsAdmin,
+			Product:         p,
+			Components:      components,
+			Functionalities: functionalities,
+			PyramidLevels:   pyramidLevels,
+			Error:           err.Error(),
+			Title:           title,
+			Description:     description,
+			ExecutionMode:   executionMode,
+			TestIdentifier:  testIdentifier,
+			ComponentID:     componentID,
+			FunctionalityID: functionalityID,
+			PyramidLevelID:  pyramidLevelID,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/test-cases", http.StatusSeeOther)
+}
+
+// TestCaseEditForm renders GET /products/{id}/test-cases/{testCaseId}/edit.
+func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	tc, err := c.testing.GetTestCase(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/test-cases", http.StatusSeeOther)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + tc.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:     user.DisplayName,
+		IsAdmin:         user.IsAdmin,
+		Product:         p,
+		TestCase:        tc,
+		Components:      components,
+		Functionalities: functionalities,
+		PyramidLevels:   pyramidLevels,
+		IsEdit:          true,
+		Title:           tc.Title,
+		Description:     tc.Description,
+		ExecutionMode:   tc.ExecutionMode,
+		TestIdentifier:  tc.TestIdentifier,
+		ComponentID:     tc.ComponentID,
+		FunctionalityID: tc.FunctionalityID,
+		PyramidLevelID:  tc.PyramidLevelID,
+	}).Render(r.Context(), w)
+}
+
+// TestCaseUpdate handles POST /products/{id}/test-cases/{testCaseId}.
+func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	tc, err := c.testing.GetTestCase(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/test-cases", http.StatusSeeOther)
+		return
+	}
+
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	executionMode := r.FormValue("execution_mode")
+	testIdentifier := r.FormValue("test_identifier")
+	componentID := r.FormValue("component_id")
+	functionalityID := r.FormValue("functionality_id")
+	pyramidLevelID := r.FormValue("pyramid_level_id")
+
+	_, err = c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		Title:           &title,
+		Description:     &description,
+		ExecutionMode:   &executionMode,
+		TestIdentifier:  &testIdentifier,
+		ComponentID:     &componentID,
+		FunctionalityID: &functionalityID,
+		PyramidLevelID:  &pyramidLevelID,
+	})
+	if err != nil {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + tc.Title,
+				CSRFToken: csrfToken,
+			},
+			DisplayName:     user.DisplayName,
+			IsAdmin:         user.IsAdmin,
+			Product:         p,
+			TestCase:        tc,
+			Components:      components,
+			Functionalities: functionalities,
+			PyramidLevels:   pyramidLevels,
+			IsEdit:          true,
+			Error:           err.Error(),
+			Title:           title,
+			Description:     description,
+			ExecutionMode:   executionMode,
+			TestIdentifier:  testIdentifier,
+			ComponentID:     componentID,
+			FunctionalityID: functionalityID,
+			PyramidLevelID:  pyramidLevelID,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/test-cases/"+testCaseID, http.StatusSeeOther)
+}
+
+// TestCaseDelete handles DELETE /products/{id}/test-cases/{testCaseId}.
+func (c *PageProductController) TestCaseDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	_ = c.testing.DeleteTestCase(r.Context(), user, productID, testCaseID)
+
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/test-cases")
+	w.WriteHeader(http.StatusOK)
+}
+
+// TestCaseDeleteConfirm renders GET /products/{id}/test-cases/{testCaseId}/delete/confirm.
+func (c *PageProductController) TestCaseDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	tc, err := c.testing.GetTestCase(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		http.Error(w, "test case not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseDeleteConfirmation(tc.Title, productID, testCaseID).Render(r.Context(), w)
+}
+
+// TestCaseOverviewTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/overview.
+func (c *PageProductController) TestCaseOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	tc, err := c.testing.GetTestCase(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		http.Error(w, "test case not found", http.StatusNotFound)
+		return
+	}
+
+	componentName := c.resolveComponentName(r, user, productID, tc.ComponentID)
+	functionalityName := c.resolveFunctionalityName(r, user, productID, tc.FunctionalityID)
+	pyramidLevelName := c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, functionalityName, pyramidLevelName).Render(r.Context(), w)
+}
+
+// TestCaseRequirementsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/requirements.
+func (c *PageProductController) TestCaseRequirementsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseRequirementsTabContent().Render(r.Context(), w)
+}
+
+// TestCaseCampaignsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/campaigns.
+func (c *PageProductController) TestCaseCampaignsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseCampaignsTabContent().Render(r.Context(), w)
+}
+
+// TestCaseCommentsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/comments.
+func (c *PageProductController) TestCaseCommentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseCommentsTabContent().Render(r.Context(), w)
+}
+
+// TestCaseAttachmentsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/attachments.
+func (c *PageProductController) TestCaseAttachmentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseAttachmentsTabContent().Render(r.Context(), w)
+}
+
+// TestCaseHistoryTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/history.
+func (c *PageProductController) TestCaseHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	entries := c.buildAuditViews(r, user, productID, "test_case", testCaseID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseHistoryTabContent(entries).Render(r.Context(), w)
+}
+
+// canEditTestCases returns true if the user can create/edit/delete test cases (developer+).
+func (c *PageProductController) canEditTestCases(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner || role == model.RoleDeveloper
+}
+
+// buildPyramidLevelMap returns a map of pyramid level ID → name for the product.
+func (c *PageProductController) buildPyramidLevelMap(r *http.Request, user *model.User, productID string) map[string]string {
+	levels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+	m := make(map[string]string, len(levels))
+	for _, l := range levels {
+		m[l.ID] = l.Name
+	}
+	return m
+}
+
+// buildFunctionalityMap returns a map of functionality ID → name for the product.
+func (c *PageProductController) buildFunctionalityMap(r *http.Request, user *model.User, productID string) map[string]string {
+	funcs, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+	m := make(map[string]string, len(funcs))
+	for _, f := range funcs {
+		m[f.ID] = f.Name
+	}
+	return m
+}
+
+// resolveFunctionalityName returns the functionality name for the given ID, or empty string.
+func (c *PageProductController) resolveFunctionalityName(r *http.Request, user *model.User, productID, functionalityID string) string {
+	if functionalityID == "" {
+		return ""
+	}
+	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	if err != nil {
+		return ""
+	}
+	return f.Name
+}
+
+// resolvePyramidLevelName returns the pyramid level name for the given ID, or empty string.
+func (c *PageProductController) resolvePyramidLevelName(r *http.Request, user *model.User, productID, pyramidLevelID string) string {
+	if pyramidLevelID == "" {
+		return ""
+	}
+	pl, err := c.milestone.GetPyramidLevel(r.Context(), user, productID, pyramidLevelID)
+	if err != nil {
+		return ""
+	}
+	return pl.Name
 }

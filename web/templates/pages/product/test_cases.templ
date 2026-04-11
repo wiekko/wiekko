@@ -1,0 +1,135 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TestCasesProps holds data for the test cases list page.
+type TestCasesProps struct {
+	Meta            templates.PageMeta
+	DisplayName     string
+	IsAdmin         bool
+	Product         *model.Product
+	TestCases       []*model.TestCase
+	Components      map[string]string // component ID → name
+	PyramidLevels   map[string]string // pyramid level ID → name
+	CanEdit         bool              // developer, owner, or admin
+}
+
+templ TestCasesPage(props TestCasesProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "test-cases",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Test Cases"},
+			})
+			if len(props.TestCases) == 0 {
+				@patterns.ListPageHeader("Test Cases", "", "", -1)
+				@ui.Card() {
+					if props.CanEdit {
+						@ui.EmptyState("beaker", "No test cases yet", "Create your first test case to start testing.", "New Test Case", "/products/"+props.Product.ID+"/test-cases/new")
+					} else {
+						@ui.EmptyState("beaker", "No test cases yet", "No test cases have been created for this product.", "", "")
+					}
+				}
+			} else {
+				if props.CanEdit {
+					@patterns.ListPageHeader("Test Cases", "/products/"+props.Product.ID+"/test-cases/new", "New Test Case", len(props.TestCases))
+				} else {
+					@patterns.ListPageHeader("Test Cases", "", "", len(props.TestCases))
+				}
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Mode
+							}
+							@ui.TableHeader() {
+								Component
+							}
+							@ui.TableHeader() {
+								Pyramid Level
+							}
+							@ui.TableHeader() {
+								Created
+							}
+						}
+						@ui.TableBody("") {
+							for _, tc := range props.TestCases {
+								@ui.TableRow("") {
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ tc.Title }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										@executionModeBadge(tc.ExecutionMode)
+									}
+									@ui.TableCellMuted() {
+										if tc.ComponentID != "" {
+											if name, ok := props.Components[tc.ComponentID]; ok {
+												<a
+													href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", props.Product.ID, tc.ComponentID)) }
+													class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+												>
+													{ name }
+												</a>
+											} else {
+												{ tc.ComponentID }
+											}
+										} else {
+											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+									@ui.TableCellMuted() {
+										if tc.PyramidLevelID != "" {
+											if name, ok := props.PyramidLevels[tc.PyramidLevelID]; ok {
+												{ name }
+											} else {
+												{ tc.PyramidLevelID }
+											}
+										} else {
+											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+									@ui.TableCellMuted() {
+										{ formatDate(tc.CreatedAt) }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+templ executionModeBadge(mode string) {
+	if mode == "automatic" {
+		@ui.Badge("Automatic", "blue")
+	} else {
+		@ui.Badge("Manual", "gray")
+	}
+}

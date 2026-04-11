@@ -13,7 +13,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
-	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Audit)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Audit)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
@@ -105,6 +105,22 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /products/{id}/functionalities/{functionalityId}/tabs/test-cases", pageAuthed(http.HandlerFunc(productCtrl.FunctionalityTestCasesTab)))
 	mux.Handle("GET /products/{id}/functionalities/{functionalityId}/tabs/defects", pageAuthed(http.HandlerFunc(productCtrl.FunctionalityDefectsTab)))
 	mux.Handle("GET /products/{id}/functionalities/{functionalityId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.FunctionalityHistoryTab)))
+
+	// Test case pages.
+	mux.Handle("GET /products/{id}/test-cases", pageAuthed(http.HandlerFunc(productCtrl.TestCases)))
+	mux.Handle("GET /products/{id}/test-cases/new", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCreateForm)))
+	mux.Handle("POST /products/{id}/test-cases", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCreate)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}", pageAuthed(http.HandlerFunc(productCtrl.TestCaseDetail)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/edit", pageAuthed(http.HandlerFunc(productCtrl.TestCaseEditForm)))
+	mux.Handle("POST /products/{id}/test-cases/{testCaseId}", pageAuthed(http.HandlerFunc(productCtrl.TestCaseUpdate)))
+	mux.Handle("DELETE /products/{id}/test-cases/{testCaseId}", pageAuthed(http.HandlerFunc(productCtrl.TestCaseDelete)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.TestCaseDeleteConfirm)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.TestCaseOverviewTab)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/requirements", pageAuthed(http.HandlerFunc(productCtrl.TestCaseRequirementsTab)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/campaigns", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCampaignsTab)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCommentsTab)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.TestCaseAttachmentsTab)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.TestCaseHistoryTab)))
 
 	// Admin pages.
 	mux.Handle("GET /admin/users", pageAdmin(http.HandlerFunc(adminCtrl.ListUsers)))

@@ -1,0 +1,201 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TestCaseDetailProps holds data for the test case detail page.
+type TestCaseDetailProps struct {
+	Meta              templates.PageMeta
+	DisplayName       string
+	IsAdmin           bool
+	Product           *model.Product
+	TestCase          *model.TestCase
+	ComponentName     string
+	FunctionalityName string
+	PyramidLevelName  string
+	CanEdit           bool // developer, owner, or admin
+}
+
+templ TestCaseDetailPage(props TestCaseDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "test-cases",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Test Cases", Href: "/products/" + props.Product.ID + "/test-cases"},
+					{Label: props.TestCase.Title},
+				},
+				props.TestCase.Title,
+				"",
+				testCaseEditHref(props),
+				testCaseDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@executionModeBadge(props.TestCase.ExecutionMode)
+			}
+			<!-- Tabs -->
+			@ui.TabGroup(testCaseDetailTabs(props.Product.ID, props.TestCase.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.FunctionalityName, props.PyramidLevelName)
+			}
+			@ui.TabPanelHidden("requirements") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("campaigns") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, functionalityName, pyramidLevelName string) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Execution Mode", testCaseModeDisplay(tc.ExecutionMode))
+				@patterns.DetailField("Test Identifier", testCaseIdentifierDisplay(tc.TestIdentifier))
+				if tc.ComponentID != "" {
+					@testCaseLinkedField("Component", componentName, fmt.Sprintf("/products/%s/components/%s", productID, tc.ComponentID))
+				} else {
+					@patterns.DetailField("Component", "")
+				}
+				if tc.FunctionalityID != "" {
+					@testCaseLinkedField("Functionality", functionalityName, fmt.Sprintf("/products/%s/functionalities/%s", productID, tc.FunctionalityID))
+				} else {
+					@patterns.DetailField("Functionality", "")
+				}
+				@patterns.DetailField("Pyramid Level", pyramidLevelName)
+				@patterns.DetailField("Created", formatDate(tc.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(tc.UpdatedAt))
+			}
+			if tc.Description != "" {
+				@patterns.DetailSection("Description") {
+					<p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ tc.Description }</p>
+				}
+			}
+		}
+	}
+}
+
+templ testCaseLinkedField(label, name, href string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			if name != "" {
+				<a
+					href={ templ.SafeURL(href) }
+					class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+				>
+					{ name }
+				</a>
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+			}
+		</dd>
+	</div>
+}
+
+templ TestCaseRequirementsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("clipboard-list", "No linked requirements", "Requirements linked to this test case will appear here.", "", "")
+	}
+}
+
+templ TestCaseCampaignsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("flag", "No campaigns", "Campaign results for this test case will appear here.", "", "")
+	}
+}
+
+templ TestCaseCommentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("message-circle", "No comments", "Comments on this test case will appear here.", "", "")
+	}
+}
+
+templ TestCaseAttachmentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("paperclip", "No attachments", "Attachments for this test case will appear here.", "", "")
+	}
+}
+
+templ TestCaseHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this test case will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// TestCaseDeleteConfirmation renders the delete confirmation for a test case.
+templ TestCaseDeleteConfirmation(name, productID, testCaseID string) {
+	@patterns.DeleteConfirmation("test case", fmt.Sprintf("/products/%s/test-cases/%s", productID, testCaseID))
+}
+
+func testCaseDetailTabs(productID, testCaseID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/test-cases/%s/tabs", productID, testCaseID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
+		{ID: "campaigns", Label: "Campaigns", HxGet: base + "/campaigns"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func testCaseEditHref(props TestCaseDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/test-cases/" + props.TestCase.ID + "/edit"
+	}
+	return ""
+}
+
+func testCaseDeleteURL(props TestCaseDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/test-cases/" + props.TestCase.ID
+	}
+	return ""
+}
+
+func testCaseModeDisplay(mode string) string {
+	if mode == "automatic" {
+		return "Automatic"
+	}
+	return "Manual"
+}
+
+func testCaseIdentifierDisplay(identifier string) string {
+	if identifier == "" {
+		return ""
+	}
+	return identifier
+}

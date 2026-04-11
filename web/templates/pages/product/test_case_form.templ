@@ -1,0 +1,180 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TestCaseFormProps holds data for the test case create/edit form.
+type TestCaseFormProps struct {
+	Meta            templates.PageMeta
+	DisplayName     string
+	IsAdmin         bool
+	Product         *model.Product
+	TestCase        *model.TestCase // nil for create
+	Components      []*model.Component
+	Functionalities []*model.Functionality
+	PyramidLevels   []*model.PyramidLevel
+	IsEdit          bool
+	Error           string
+	// Form values (preserved on validation error).
+	Title           string
+	Description     string
+	ExecutionMode   string
+	TestIdentifier  string
+	ComponentID     string
+	FunctionalityID string
+	PyramidLevelID  string
+}
+
+templ TestCaseFormPage(props TestCaseFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "test-cases",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(testCaseFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Test Case
+				} else {
+					New Test Case
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(testCaseFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						@ui.TextInput(ui.InputProps{
+							ID:          "title",
+							Name:        "title",
+							Label:       "Title",
+							Value:       props.Title,
+							Placeholder: "e.g. Login with valid credentials",
+							Required:    true,
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe this test case...",
+							Rows:        4,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "execution_mode",
+							Name:     "execution_mode",
+							Label:    "Execution Mode",
+							Value:    props.ExecutionMode,
+							Options:  executionModeOptions(props.ExecutionMode),
+							HelpText: "Manual tests are executed by testers. Automatic tests are linked to code.",
+						})
+						@ui.TextInput(ui.InputProps{
+							ID:          "test_identifier",
+							Name:        "test_identifier",
+							Label:       "Test Identifier",
+							Value:       props.TestIdentifier,
+							Placeholder: "e.g. TestLoginWithValidCredentials",
+							HelpText:    "Code test function name. Required for automatic tests.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "component_id",
+							Name:     "component_id",
+							Label:    "Component",
+							Value:    props.ComponentID,
+							Options:  componentSelectOptions(props.Components),
+							HelpText: "Optional. Assign to a component.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "functionality_id",
+							Name:     "functionality_id",
+							Label:    "Functionality",
+							Value:    props.FunctionalityID,
+							Options:  functionalitySelectOptions(props.Functionalities),
+							HelpText: "Optional. Assign to a functionality.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "pyramid_level_id",
+							Name:     "pyramid_level_id",
+							Label:    "Pyramid Level",
+							Value:    props.PyramidLevelID,
+							Options:  pyramidLevelSelectOptions(props.PyramidLevels),
+							HelpText: "Optional. Categorize by test pyramid level.",
+						})
+						@patterns.FormActions(testCaseSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/test-cases")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func testCaseFormBreadcrumbs(props TestCaseFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Test Cases", Href: "/products/" + props.Product.ID + "/test-cases"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.TestCase.Title, Href: "/products/" + props.Product.ID + "/test-cases/" + props.TestCase.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func testCaseFormAction(props TestCaseFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/test-cases/" + props.TestCase.ID
+	}
+	return "/products/" + props.Product.ID + "/test-cases"
+}
+
+func testCaseSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Test Case"
+}
+
+func executionModeOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = "manual"
+	}
+	return []templates.SelectOption{
+		{Value: "manual", Label: "Manual", Selected: current == "manual"},
+		{Value: "automatic", Label: "Automatic", Selected: current == "automatic"},
+	}
+}
+
+// functionalitySelectOptions builds select options from functionalities with an empty "None" option.
+func functionalitySelectOptions(functionalities []*model.Functionality) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(functionalities)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, f := range functionalities {
+		opts = append(opts, templates.SelectOption{Value: f.ID, Label: f.Name})
+	}
+	return opts
+}
+
+// pyramidLevelSelectOptions builds select options from pyramid levels with an empty "None" option.
+func pyramidLevelSelectOptions(levels []*model.PyramidLevel) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(levels)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, l := range levels {
+		opts = append(opts, templates.SelectOption{Value: l.ID, Label: l.Name})
+	}
+	return opts
+}
