@@ -30,6 +30,7 @@ templ MilestonesPage(props MilestonesProps) {
 		ActiveSection: "milestones",
 		ProductID:     props.Product.ID,
 		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
 		<div class="space-y-6">
 			@ui.Breadcrumb([]templates.BreadcrumbItem{

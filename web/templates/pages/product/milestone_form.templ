@@ -32,6 +32,7 @@ templ MilestoneFormPage(props MilestoneFormProps) {
 		ActiveSection: "milestones",
 		ProductID:     props.Product.ID,
 		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
 		<div class="mx-auto max-w-2xl space-y-6">
 			@ui.Breadcrumb(milestoneFormBreadcrumbs(props))

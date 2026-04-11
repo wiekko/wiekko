@@ -3,7 +3,7 @@ package patterns
 import "nexmap.net/web/templates/ui"
 
 // SidebarNav renders the left navigation panel.
-templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
+templ SidebarNav(activeSection, productID, productName, workflowMode string, isAdmin bool) {
 	<aside class="flex h-full w-64 flex-col overflow-y-auto border-r border-gray-200 bg-white scrollbar-thin dark:border-gray-700 dark:bg-gray-900">
 		<!-- Mobile close button -->
 		<div class="flex items-center justify-end border-b border-gray-200 px-3 py-2 md:hidden dark:border-gray-700">
@@ -28,11 +28,11 @@ templ SidebarNav(activeSection, productID, productName string, isAdmin bool) {
 					@SidebarLink("Test Cases", "/products/"+productID+"/test-cases", "beaker", activeSection == "test-cases", "")
 					@SidebarLink("Campaigns", "/products/"+productID+"/campaigns", "flag", activeSection == "campaigns", "")
 				}
-				@SidebarSection("Structure", activeSection == "components" || activeSection == "functionalities" || activeSection == "milestones" || activeSection == "sprints") {
+				@SidebarSection("Structure", activeSection == "components" || activeSection == "functionalities" || activeSection == "milestones" || activeSection == "sprints" || activeSection == "board") {
 					@SidebarLink("Components", "/products/"+productID+"/components", "component", activeSection == "components", "")
 					@SidebarLink("Functionalities", "/products/"+productID+"/functionalities", "layers", activeSection == "functionalities", "")
 					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
-					@SidebarLink("Sprints", "/products/"+productID+"/sprints", "clock", activeSection == "sprints", "")
+					@SidebarWorkflowItem(productID, workflowMode, activeSection)
 				}
 			}
 			if isAdmin {
@@ -83,6 +83,31 @@ templ SidebarLink(label, href, icon string, active bool, badge string) {
 			</span>
 		}
 	</a>
+}
+
+// SidebarWorkflowItem renders the workflow-dependent nav item (Sprints or Board).
+// It is wrapped in a div with a stable ID so it can be swapped via htmx OOB
+// when the workflow mode changes in product settings.
+templ SidebarWorkflowItem(productID, workflowMode, activeSection string) {
+	<div id="sidebar-workflow-item">
+		if workflowMode == "scrum" {
+			@SidebarLink("Sprints", "/products/"+productID+"/sprints", "clock", activeSection == "sprints", "")
+		} else {
+			@SidebarLink("Board", "/products/"+productID+"/board", "kanban", activeSection == "board", "")
+		}
+	</div>
+}
+
+// SidebarWorkflowItemOOB renders the workflow nav item as an htmx out-of-band swap.
+// Append this to any response to update the sidebar without a full page reload.
+templ SidebarWorkflowItemOOB(productID, workflowMode string) {
+	<div id="sidebar-workflow-item" hx-swap-oob="true">
+		if workflowMode == "scrum" {
+			@SidebarLink("Sprints", "/products/"+productID+"/sprints", "clock", false, "")
+		} else {
+			@SidebarLink("Board", "/products/"+productID+"/board", "kanban", false, "")
+		}
+	</div>
 }
 
 func sidebarLinkClass(active bool) string {

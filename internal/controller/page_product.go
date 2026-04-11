@@ -11,6 +11,7 @@ import (
 	"nexmap.net/internal/store"
 	"nexmap.net/web/templates"
 	productpage "nexmap.net/web/templates/pages/product"
+	"nexmap.net/web/templates/patterns"
 )
 
 // PageProductController handles product pages.
@@ -552,6 +553,11 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.SettingField(updated, field).Render(r.Context(), w)
+
+	// When workflow mode changes, send an OOB swap to update the sidebar nav item.
+	if field == "workflow_mode" {
+		_ = patterns.SidebarWorkflowItemOOB(updated.ID, updated.WorkflowMode).Render(r.Context(), w)
+	}
 }
 
 // Team renders GET /products/{id}/team.

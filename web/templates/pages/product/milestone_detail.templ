@@ -28,6 +28,7 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 		ActiveSection: "milestones",
 		ProductID:     props.Product.ID,
 		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
 		<div class="space-y-6">
 			@patterns.DetailPageHeader(
