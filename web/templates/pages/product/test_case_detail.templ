@@ -94,11 +94,7 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 				@patterns.DetailField("Created", formatDate(tc.CreatedAt))
 				@patterns.DetailField("Last Updated", formatDate(tc.UpdatedAt))
 			}
-			if tc.Description != "" {
-				@patterns.DetailSection("Description") {
-					<p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{ tc.Description }</p>
-				}
-			}
+			@patterns.DetailDescription(tc.Description)
 		}
 	}
 }
