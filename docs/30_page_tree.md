@@ -87,7 +87,6 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Route                                  | Page               | Purpose                                                   |
 |----------------------------------------|--------------------|-----------------------------------------------------------|
 | `/products/:id/requirements`           | Requirements List  | Table view with filters, sort, multi-select (UR-103..105) |
-| `/products/:id/requirements/board`     | Requirements Board | Kanban/sprint board view (UR-101..102)                    |
 | `/products/:id/requirements/new`       | Create Requirement | Form                                                      |
 | `/products/:id/requirements/:rid`      | Requirement Detail | Tabbed detail page (see below)                            |
 | `/products/:id/requirements/:rid/edit` | Edit Requirement   | Form                                                      |
@@ -96,6 +95,11 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/defects/new`            | Create Defect      | Form                                                      |
 | `/products/:id/defects/:did`           | Defect Detail      | Tabbed detail page                                        |
 | `/products/:id/defects/:did/edit`      | Edit Defect        | Form                                                      |
+| `/products/:id/board`                  | Backlog Board      | Kanban/sprint board view (UR-101..102)                    |
+| `/products/:id/sprints`                | Sprints List       | Table (only in scrum mode)                                |
+| `/products/:id/sprints/new`            | Create Sprint      | Form                                                      |
+| `/products/:id/sprints/:sid`           | Sprint Detail      | Board view (kanban columns = statuses) + summary          |
+| `/products/:id/sprints/:sid/edit`      | Edit Sprint        | Form                                                      |
 
 **Requirement Detail tabs:**
 
@@ -157,10 +161,6 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/milestones/new`            | Create Milestone     | Form                                             |
 | `/products/:id/milestones/:mid`           | Milestone Detail     | Tabbed detail page                               |
 | `/products/:id/milestones/:mid/edit`      | Edit Milestone       | Form                                             |
-| `/products/:id/sprints`                   | Sprints List         | Table (only in scrum mode)                       |
-| `/products/:id/sprints/new`               | Create Sprint        | Form                                             |
-| `/products/:id/sprints/:sid`              | Sprint Detail        | Board view (kanban columns = statuses) + summary |
-| `/products/:id/sprints/:sid/edit`         | Edit Sprint          | Form                                             |
 
 **Component Detail tabs:**
 
