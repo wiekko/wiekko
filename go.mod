@@ -6,8 +6,9 @@ require (
 	github.com/a-h/templ v0.3.1001
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
-	github.com/kaugesaar/lucide-go v0.11.0
+	github.com/kaugesaar/lucide-go v0.12.0
 	github.com/pressly/goose/v3 v3.26.0
+	github.com/yuin/goldmark v1.8.2
 	modernc.org/sqlite v1.38.2
 )
 
@@ -21,7 +22,6 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/yuin/goldmark v1.8.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
