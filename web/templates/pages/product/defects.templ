@@ -1,0 +1,127 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// DefectsProps holds data for the defects list page.
+type DefectsProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Defects     []*model.Defect
+	Statuses    map[string]string // status ID → name
+	CanCreate   bool              // tester+ can create
+	CanEdit     bool              // owner or admin
+}
+
+templ DefectsPage(props DefectsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "defects",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Defects"},
+			})
+			if len(props.Defects) == 0 {
+				@patterns.ListPageHeader("Defects", "", "", -1)
+				@ui.Card() {
+					if props.CanCreate {
+						@ui.EmptyState("bug", "No defects yet", "Report your first defect to start tracking issues.", "New Defect", "/products/"+props.Product.ID+"/defects/new")
+					} else {
+						@ui.EmptyState("bug", "No defects yet", "No defects have been reported for this product.", "", "")
+					}
+				}
+			} else {
+				if props.CanCreate {
+					@patterns.ListPageHeader("Defects", "/products/"+props.Product.ID+"/defects/new", "New Defect", len(props.Defects))
+				} else {
+					@patterns.ListPageHeader("Defects", "", "", len(props.Defects))
+				}
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Criticality
+							}
+							@ui.TableHeader() {
+								Status
+							}
+							@ui.TableHeader() {
+								Priority
+							}
+							@ui.TableHeader() {
+								Created
+							}
+						}
+						@ui.TableBody("") {
+							for _, d := range props.Defects {
+								@ui.TableRow("") {
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ d.Title }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										@defectCriticalityBadge(d.Criticality)
+									}
+									@ui.TableCellMuted() {
+										if d.StatusID != "" {
+											if name, ok := props.Statuses[d.StatusID]; ok {
+												{ name }
+											} else {
+												{ d.StatusID }
+											}
+										} else {
+											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+									@ui.TableCellMuted() {
+										{ fmt.Sprintf("%d", d.Priority) }
+									}
+									@ui.TableCellMuted() {
+										{ formatDate(d.CreatedAt) }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+templ defectCriticalityBadge(criticality string) {
+	switch criticality {
+		case "critical":
+			@ui.Badge("Critical", "red")
+		case "high":
+			@ui.Badge("High", "amber")
+		case "medium":
+			@ui.Badge("Medium", "yellow")
+		default:
+			@ui.Badge("Low", "gray")
+	}
+}

@@ -1,0 +1,184 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// DefectDetailProps holds data for the defect detail page.
+type DefectDetailProps struct {
+	Meta          templates.PageMeta
+	DisplayName   string
+	IsAdmin       bool
+	Product       *model.Product
+	Defect        *model.Defect
+	StatusName    string
+	MilestoneName string
+	SprintName    string
+	CanEdit       bool
+}
+
+templ DefectDetailPage(props DefectDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "defects",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Defects", Href: "/products/" + props.Product.ID + "/defects"},
+					{Label: props.Defect.Title},
+				},
+				props.Defect.Title,
+				"",
+				defectEditHref(props),
+				defectDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@defectCriticalityBadge(props.Defect.Criticality)
+			}
+			<!-- Tabs -->
+			@ui.TabGroup(defectDetailTabs(props.Product.ID, props.Defect.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@DefectOverviewTabContent(props.Product.ID, props.Defect, props.StatusName, props.MilestoneName, props.SprintName)
+			}
+			@ui.TabPanelHidden("linked-items") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ DefectOverviewTabContent(productID string, d *model.Defect, statusName, milestoneName, sprintName string) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Criticality", defectCriticalityDisplay(d.Criticality))
+				@patterns.DetailField("Status", statusName)
+				if d.MilestoneID != "" && milestoneName != "" {
+					@defectLinkedField("Milestone", milestoneName, fmt.Sprintf("/products/%s/milestones/%s", productID, d.MilestoneID))
+				} else {
+					@patterns.DetailField("Milestone", "")
+				}
+				@patterns.DetailField("Sprint", sprintName)
+				@patterns.DetailField("Estimation", d.Estimation)
+				@patterns.DetailField("Priority", fmt.Sprintf("%d", d.Priority))
+				@patterns.DetailField("Active", boolDisplay(d.IsActive))
+				@patterns.DetailField("Created", formatDate(d.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(d.UpdatedAt))
+			}
+			@patterns.DetailDescription(d.Description)
+		}
+	}
+}
+
+templ defectLinkedField(label, name, href string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			if name != "" {
+				<a
+					href={ templ.SafeURL(href) }
+					class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+				>
+					{ name }
+				</a>
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+			}
+		</dd>
+	</div>
+}
+
+templ DefectLinkedItemsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("link", "No linked items", "Components, functionalities, and test cases linked to this defect will appear here.", "", "")
+	}
+}
+
+templ DefectCommentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("message-circle", "No comments", "Comments on this defect will appear here.", "", "")
+	}
+}
+
+templ DefectAttachmentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("paperclip", "No attachments", "Attachments for this defect will appear here.", "", "")
+	}
+}
+
+templ DefectHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this defect will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// DefectDeleteConfirmation renders the delete confirmation for a defect.
+templ DefectDeleteConfirmation(name, productID, defectID string) {
+	@patterns.DeleteConfirmation("defect", fmt.Sprintf("/products/%s/defects/%s", productID, defectID))
+}
+
+func defectDetailTabs(productID, defectID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/defects/%s/tabs", productID, defectID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "linked-items", Label: "Linked Items", HxGet: base + "/linked-items"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func defectEditHref(props DefectDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/defects/" + props.Defect.ID + "/edit"
+	}
+	return ""
+}
+
+func defectDeleteURL(props DefectDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/defects/" + props.Defect.ID
+	}
+	return ""
+}
+
+func defectCriticalityDisplay(criticality string) string {
+	switch criticality {
+	case "critical":
+		return "Critical"
+	case "high":
+		return "High"
+	case "medium":
+		return "Medium"
+	default:
+		return "Low"
+	}
+}

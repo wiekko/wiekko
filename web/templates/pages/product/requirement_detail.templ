@@ -1,0 +1,203 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// RequirementDetailProps holds data for the requirement detail page.
+type RequirementDetailProps struct {
+	Meta          templates.PageMeta
+	DisplayName   string
+	IsAdmin       bool
+	Product       *model.Product
+	Requirement   *model.Requirement
+	StatusName    string
+	MilestoneName string
+	SprintName    string
+	CanEdit       bool
+}
+
+templ RequirementDetailPage(props RequirementDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "requirements",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Requirements", Href: "/products/" + props.Product.ID + "/requirements"},
+					{Label: props.Requirement.Title},
+				},
+				props.Requirement.Title,
+				"",
+				requirementEditHref(props),
+				requirementDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@requirementCategoryBadge(props.Requirement.Category)
+			}
+			<!-- Tabs -->
+			@ui.TabGroup(requirementDetailTabs(props.Product.ID, props.Requirement.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@RequirementOverviewTabContent(props.Product.ID, props.Requirement, props.StatusName, props.MilestoneName, props.SprintName)
+			}
+			@ui.TabPanelHidden("test-cases") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("defects") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ RequirementOverviewTabContent(productID string, req *model.Requirement, statusName, milestoneName, sprintName string) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Category", requirementCategoryDisplay(req.Category))
+				@patterns.DetailField("Status", statusName)
+				if req.MilestoneID != "" && milestoneName != "" {
+					@requirementLinkedField("Milestone", milestoneName, fmt.Sprintf("/products/%s/milestones/%s", productID, req.MilestoneID))
+				} else {
+					@patterns.DetailField("Milestone", "")
+				}
+				@patterns.DetailField("Sprint", sprintName)
+				@patterns.DetailField("Estimation", req.Estimation)
+				@patterns.DetailField("Priority", fmt.Sprintf("%d", req.Priority))
+				@patterns.DetailField("Coarse", boolDisplay(req.IsCoarse))
+				@patterns.DetailField("Active", boolDisplay(req.IsActive))
+				@patterns.DetailField("Created", formatDate(req.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(req.UpdatedAt))
+			}
+			@patterns.DetailDescription(req.Description)
+			@patterns.DetailMarkdownSection("Definition of Done", req.DefinitionOfDone)
+		}
+	}
+}
+
+templ requirementLinkedField(label, name, href string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			if name != "" {
+				<a
+					href={ templ.SafeURL(href) }
+					class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+				>
+					{ name }
+				</a>
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+			}
+		</dd>
+	</div>
+}
+
+templ RequirementTestCasesTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("beaker", "No linked test cases", "Test cases linked to this requirement will appear here.", "", "")
+	}
+}
+
+templ RequirementDefectsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("bug", "No linked defects", "Defects linked to this requirement will appear here.", "", "")
+	}
+}
+
+templ RequirementCommentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("message-circle", "No comments", "Comments on this requirement will appear here.", "", "")
+	}
+}
+
+templ RequirementAttachmentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("paperclip", "No attachments", "Attachments for this requirement will appear here.", "", "")
+	}
+}
+
+templ RequirementHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this requirement will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// RequirementDeleteConfirmation renders the delete confirmation for a requirement.
+templ RequirementDeleteConfirmation(name, productID, requirementID string) {
+	@patterns.DeleteConfirmation("requirement", fmt.Sprintf("/products/%s/requirements/%s", productID, requirementID))
+}
+
+func requirementDetailTabs(productID, requirementID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/requirements/%s/tabs", productID, requirementID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
+		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func requirementEditHref(props RequirementDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID + "/edit"
+	}
+	return ""
+}
+
+func requirementDeleteURL(props RequirementDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID
+	}
+	return ""
+}
+
+func requirementCategoryDisplay(category string) string {
+	switch category {
+	case "architecture":
+		return "Architecture"
+	case "security":
+		return "Security"
+	case "ux":
+		return "UX"
+	default:
+		return "Functionality"
+	}
+}
+
+func boolDisplay(v bool) string {
+	if v {
+		return "Yes"
+	}
+	return "No"
+}

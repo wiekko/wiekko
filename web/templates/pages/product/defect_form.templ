@@ -1,0 +1,171 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// DefectFormProps holds data for the defect create/edit form.
+type DefectFormProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Defect      *model.Defect // nil for create
+	Statuses    []*model.Status
+	Milestones  []*model.Milestone
+	Sprints     []*model.Sprint
+	IsEdit      bool
+	Error       string
+	// Form values (preserved on validation error).
+	Title       string
+	Description string
+	Criticality string
+	StatusID    string
+	MilestoneID string
+	SprintID    string
+	Estimation  string
+	Priority    string
+}
+
+templ DefectFormPage(props DefectFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "defects",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(defectFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Defect
+				} else {
+					New Defect
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(defectFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						@ui.TextInput(ui.InputProps{
+							ID:          "title",
+							Name:        "title",
+							Label:       "Title",
+							Value:       props.Title,
+							Placeholder: "e.g. Login page crashes on empty password",
+							Required:    true,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:      "criticality",
+							Name:    "criticality",
+							Label:   "Criticality",
+							Value:   props.Criticality,
+							Options: criticalitySelectOptions(props.Criticality),
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe the defect, steps to reproduce... (Markdown supported)",
+							Rows:        6,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "status_id",
+							Name:     "status_id",
+							Label:    "Status",
+							Value:    props.StatusID,
+							Options:  statusSelectOptions(props.Statuses),
+							HelpText: "Optional. Assign to a workflow status.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "milestone_id",
+							Name:     "milestone_id",
+							Label:    "Milestone",
+							Value:    props.MilestoneID,
+							Options:  milestoneSelectOptions(props.Milestones),
+							HelpText: "Optional. Link to a milestone.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "sprint_id",
+							Name:     "sprint_id",
+							Label:    "Sprint",
+							Value:    props.SprintID,
+							Options:  sprintSelectOptions(props.Sprints),
+							HelpText: "Optional. Assign to a sprint.",
+						})
+						@ui.TextInput(ui.InputProps{
+							ID:          "estimation",
+							Name:        "estimation",
+							Label:       "Estimation",
+							Value:       props.Estimation,
+							Placeholder: "e.g. 5, M, XL",
+							HelpText:    "Optional. Story points, t-shirt size, or time estimate.",
+						})
+						@ui.TextInput(ui.InputProps{
+							ID:          "priority",
+							Name:        "priority",
+							Label:       "Priority",
+							Value:       props.Priority,
+							Type:        "number",
+							Placeholder: "0",
+							HelpText:    "Lower numbers indicate higher priority.",
+						})
+						@patterns.FormActions(defectSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/defects")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func defectFormBreadcrumbs(props DefectFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Defects", Href: "/products/" + props.Product.ID + "/defects"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Defect.Title, Href: "/products/" + props.Product.ID + "/defects/" + props.Defect.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func defectFormAction(props DefectFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/defects/" + props.Defect.ID
+	}
+	return "/products/" + props.Product.ID + "/defects"
+}
+
+func defectSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Report Defect"
+}
+
+func criticalitySelectOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = "medium"
+	}
+	return []templates.SelectOption{
+		{Value: "critical", Label: "Critical", Selected: current == "critical"},
+		{Value: "high", Label: "High", Selected: current == "high"},
+		{Value: "medium", Label: "Medium", Selected: current == "medium"},
+		{Value: "low", Label: "Low", Selected: current == "low"},
+	}
+}

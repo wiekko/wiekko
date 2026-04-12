@@ -5,17 +5,23 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// DetailDescription renders a Markdown description below a border separator.
-// Renders nothing if the description is empty.
-templ DetailDescription(description string) {
-	if description != "" {
+// DetailMarkdownSection renders a labeled Markdown block below a border separator.
+// Renders nothing if the content is empty.
+templ DetailMarkdownSection(label, content string) {
+	if content != "" {
 		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
-			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
+			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</h3>
 			<div class="prose prose-sm dark:prose-invert mt-2 max-w-none">
-				@templ.Raw(templates.RenderMarkdown(description))
+				@templ.Raw(templates.RenderMarkdown(content))
 			</div>
 		</div>
 	}
+}
+
+// DetailDescription renders a Markdown description below a border separator.
+// Renders nothing if the description is empty.
+templ DetailDescription(description string) {
+	@DetailMarkdownSection("Description", description)
 }
 
 // DetailPageHeader renders the header for an entity detail page.

@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"nexmap.net/internal/middleware"
@@ -24,12 +25,13 @@ type PageProductController struct {
 	milestone  *service.MilestoneService
 	component  *service.ComponentService
 	testing    *service.TestingService
+	backlog    *service.BacklogService
 	audit      *service.AuditService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, audit *service.AuditService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, audit: audit}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, audit *service.AuditService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, audit: audit}
 }
 
 // CreateForm renders GET /products/new.
@@ -2365,4 +2367,828 @@ func (c *PageProductController) resolvePyramidLevelName(r *http.Request, user *m
 		return ""
 	}
 	return pl.Name
+}
+
+// --- Shared helpers for requirements/defects ---
+
+// buildStatusMap returns a map of status ID → name for the given entity type.
+func (c *PageProductController) buildStatusMap(r *http.Request, user *model.User, productID, entityType string) map[string]string {
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
+	m := make(map[string]string, len(statuses))
+	for _, s := range statuses {
+		m[s.ID] = s.Name
+	}
+	return m
+}
+
+// resolveStatusName returns the status name for the given ID and entity type, or empty string.
+func (c *PageProductController) resolveStatusName(r *http.Request, user *model.User, productID, statusID, entityType string) string {
+	if statusID == "" {
+		return ""
+	}
+	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
+	if err != nil {
+		return ""
+	}
+	for _, s := range statuses {
+		if s.ID == statusID {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+// buildSprintMap returns a map of sprint ID → name for the product.
+func (c *PageProductController) buildSprintMap(r *http.Request, user *model.User, productID string) map[string]string {
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	m := make(map[string]string, len(sprints))
+	for _, s := range sprints {
+		m[s.ID] = s.Name
+	}
+	return m
+}
+
+// resolveSprintName returns the sprint name for the given ID, or empty string.
+func (c *PageProductController) resolveSprintName(r *http.Request, user *model.User, productID, sprintID string) string {
+	if sprintID == "" {
+		return ""
+	}
+	sprints, err := c.milestone.ListSprints(r.Context(), user, productID)
+	if err != nil {
+		return ""
+	}
+	for _, s := range sprints {
+		if s.ID == sprintID {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+// canEditRequirements returns true if the user can create/edit/delete requirements (owner or admin).
+func (c *PageProductController) canEditRequirements(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner
+}
+
+// canCreateDefects returns true if the user can create defects (tester+ or admin).
+func (c *PageProductController) canCreateDefects(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner || role == model.RoleDeveloper || role == model.RoleTester
+}
+
+// canEditDefects returns true if the user can edit/delete defects (owner or admin).
+func (c *PageProductController) canEditDefects(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner
+}
+
+// --- Requirement Pages ---
+
+// Requirements renders GET /products/{id}/requirements.
+func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementsPage(productpage.RequirementsProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Requirements",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Requirements: requirements,
+		Statuses:     c.buildStatusMap(r, user, productID, "requirement"),
+		CanEdit:      c.canEditRequirements(user, role),
+	}).Render(r.Context(), w)
+}
+
+// RequirementDetail renders GET /products/{id}/requirements/{requirementId}.
+func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	req, err := c.backlog.GetRequirement(r.Context(), user, productID, requirementID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/requirements", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementDetailPage(productpage.RequirementDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + req.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Requirement:   req,
+		StatusName:    c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
+		MilestoneName: c.resolveMilestoneName(r, user, productID, req.MilestoneID),
+		SprintName:    c.resolveSprintName(r, user, productID, req.SprintID),
+		CanEdit:       c.canEditRequirements(user, role),
+	}).Render(r.Context(), w)
+}
+
+// RequirementCreateForm renders GET /products/{id}/requirements/new.
+func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Requirement",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Statuses:    statuses,
+		Milestones:  milestones,
+		Sprints:     sprints,
+		Category:    "functionality",
+		Priority:    "0",
+	}).Render(r.Context(), w)
+}
+
+// RequirementCreate handles POST /products/{id}/requirements.
+func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	definitionOfDone := r.FormValue("definition_of_done")
+	category := r.FormValue("category")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := strings.TrimSpace(r.FormValue("estimation"))
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+	isCoarse := r.FormValue("is_coarse") == "on"
+
+	_, createErr := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
+		ProductID:        productID,
+		Title:            title,
+		Description:      description,
+		DefinitionOfDone: definitionOfDone,
+		Category:         category,
+		StatusID:         statusID,
+		MilestoneID:      milestoneID,
+		SprintID:         sprintID,
+		Estimation:       estimation,
+		Priority:         priority,
+		IsCoarse:         isCoarse,
+	})
+	if createErr != nil {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Requirement",
+				CSRFToken: csrfToken,
+			},
+			DisplayName:      user.DisplayName,
+			IsAdmin:          user.IsAdmin,
+			Product:          p,
+			Statuses:         statuses,
+			Milestones:       milestones,
+			Sprints:          sprints,
+			Error:            createErr.Error(),
+			Title:            title,
+			Description:      description,
+			DefinitionOfDone: definitionOfDone,
+			Category:         category,
+			StatusID:         statusID,
+			MilestoneID:      milestoneID,
+			SprintID:         sprintID,
+			Estimation:       estimation,
+			Priority:         priorityStr,
+			IsCoarse:         isCoarse,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/requirements", http.StatusSeeOther)
+}
+
+// RequirementEditForm renders GET /products/{id}/requirements/{requirementId}/edit.
+func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	req, err := c.backlog.GetRequirement(r.Context(), user, productID, requirementID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/requirements", http.StatusSeeOther)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + req.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Requirement:      req,
+		Statuses:         statuses,
+		Milestones:       milestones,
+		Sprints:          sprints,
+		IsEdit:           true,
+		Title:            req.Title,
+		Description:      req.Description,
+		DefinitionOfDone: req.DefinitionOfDone,
+		Category:         req.Category,
+		StatusID:         req.StatusID,
+		MilestoneID:      req.MilestoneID,
+		SprintID:         req.SprintID,
+		Estimation:       req.Estimation,
+		Priority:         fmt.Sprintf("%d", req.Priority),
+		IsCoarse:         req.IsCoarse,
+	}).Render(r.Context(), w)
+}
+
+// RequirementUpdate handles POST /products/{id}/requirements/{requirementId}.
+func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	req, err := c.backlog.GetRequirement(r.Context(), user, productID, requirementID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/requirements", http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	definitionOfDone := r.FormValue("definition_of_done")
+	category := r.FormValue("category")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := strings.TrimSpace(r.FormValue("estimation"))
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+	isCoarse := r.FormValue("is_coarse") == "on"
+
+	_, updateErr := c.backlog.UpdateRequirement(r.Context(), user, productID, requirementID, service.UpdateRequirementInput{
+		Title:            &title,
+		Description:      &description,
+		DefinitionOfDone: &definitionOfDone,
+		Category:         &category,
+		StatusID:         &statusID,
+		MilestoneID:      &milestoneID,
+		SprintID:         &sprintID,
+		Estimation:       &estimation,
+		Priority:         &priority,
+		IsCoarse:         &isCoarse,
+	})
+	if updateErr != nil {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + req.Title,
+				CSRFToken: csrfToken,
+			},
+			DisplayName:      user.DisplayName,
+			IsAdmin:          user.IsAdmin,
+			Product:          p,
+			Requirement:      req,
+			Statuses:         statuses,
+			Milestones:       milestones,
+			Sprints:          sprints,
+			IsEdit:           true,
+			Error:            updateErr.Error(),
+			Title:            title,
+			Description:      description,
+			DefinitionOfDone: definitionOfDone,
+			Category:         category,
+			StatusID:         statusID,
+			MilestoneID:      milestoneID,
+			SprintID:         sprintID,
+			Estimation:       estimation,
+			Priority:         priorityStr,
+			IsCoarse:         isCoarse,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/requirements/"+requirementID, http.StatusSeeOther)
+}
+
+// RequirementDelete handles DELETE /products/{id}/requirements/{requirementId}.
+func (c *PageProductController) RequirementDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	_ = c.backlog.DeleteRequirement(r.Context(), user, productID, requirementID)
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/requirements")
+	w.WriteHeader(http.StatusOK)
+}
+
+// RequirementDeleteConfirm renders GET /products/{id}/requirements/{requirementId}/delete/confirm.
+func (c *PageProductController) RequirementDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	req, err := c.backlog.GetRequirement(r.Context(), user, productID, requirementID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementDeleteConfirmation(req.Title, productID, requirementID).Render(r.Context(), w)
+}
+
+// RequirementOverviewTab renders GET /products/{id}/requirements/{requirementId}/tabs/overview.
+func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	req, err := c.backlog.GetRequirement(r.Context(), user, productID, requirementID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementOverviewTabContent(
+		productID,
+		req,
+		c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
+		c.resolveMilestoneName(r, user, productID, req.MilestoneID),
+		c.resolveSprintName(r, user, productID, req.SprintID),
+	).Render(r.Context(), w)
+}
+
+// RequirementTestCasesTab renders GET /products/{id}/requirements/{requirementId}/tabs/test-cases.
+func (c *PageProductController) RequirementTestCasesTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementTestCasesTabContent().Render(r.Context(), w)
+}
+
+// RequirementDefectsTab renders GET /products/{id}/requirements/{requirementId}/tabs/defects.
+func (c *PageProductController) RequirementDefectsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementDefectsTabContent().Render(r.Context(), w)
+}
+
+// RequirementCommentsTab renders GET /products/{id}/requirements/{requirementId}/tabs/comments.
+func (c *PageProductController) RequirementCommentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCommentsTabContent().Render(r.Context(), w)
+}
+
+// RequirementAttachmentsTab renders GET /products/{id}/requirements/{requirementId}/tabs/attachments.
+func (c *PageProductController) RequirementAttachmentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementAttachmentsTabContent().Render(r.Context(), w)
+}
+
+// RequirementHistoryTab renders GET /products/{id}/requirements/{requirementId}/tabs/history.
+func (c *PageProductController) RequirementHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	entries := c.buildAuditViews(r, user, productID, "requirement", requirementID)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementHistoryTabContent(entries).Render(r.Context(), w)
+}
+
+// --- Defect Pages ---
+
+// Defects renders GET /products/{id}/defects.
+func (c *PageProductController) Defects(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	defects, _ := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectsPage(productpage.DefectsProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Defects",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Defects:     defects,
+		Statuses:    c.buildStatusMap(r, user, productID, "defect"),
+		CanCreate:   c.canCreateDefects(user, role),
+		CanEdit:     c.canEditDefects(user, role),
+	}).Render(r.Context(), w)
+}
+
+// DefectDetail renders GET /products/{id}/defects/{defectId}.
+func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	d, err := c.backlog.GetDefect(r.Context(), user, productID, defectID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/defects", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectDetailPage(productpage.DefectDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + d.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Defect:        d,
+		StatusName:    c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
+		MilestoneName: c.resolveMilestoneName(r, user, productID, d.MilestoneID),
+		SprintName:    c.resolveSprintName(r, user, productID, d.SprintID),
+		CanEdit:       c.canEditDefects(user, role),
+	}).Render(r.Context(), w)
+}
+
+// DefectCreateForm renders GET /products/{id}/defects/new.
+func (c *PageProductController) DefectCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectFormPage(productpage.DefectFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Defect",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Statuses:    statuses,
+		Milestones:  milestones,
+		Sprints:     sprints,
+		Criticality: "medium",
+		Priority:    "0",
+	}).Render(r.Context(), w)
+}
+
+// DefectCreate handles POST /products/{id}/defects.
+func (c *PageProductController) DefectCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	criticality := r.FormValue("criticality")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := strings.TrimSpace(r.FormValue("estimation"))
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+
+	_, createErr := c.backlog.CreateDefect(r.Context(), user, service.CreateDefectInput{
+		ProductID:   productID,
+		Title:       title,
+		Description: description,
+		Criticality: criticality,
+		StatusID:    statusID,
+		MilestoneID: milestoneID,
+		SprintID:    sprintID,
+		Estimation:  estimation,
+		Priority:    priority,
+	})
+	if createErr != nil {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.DefectFormPage(productpage.DefectFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Defect",
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Statuses:    statuses,
+			Milestones:  milestones,
+			Sprints:     sprints,
+			Error:       createErr.Error(),
+			Title:       title,
+			Description: description,
+			Criticality: criticality,
+			StatusID:    statusID,
+			MilestoneID: milestoneID,
+			SprintID:    sprintID,
+			Estimation:  estimation,
+			Priority:    priorityStr,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/defects", http.StatusSeeOther)
+}
+
+// DefectEditForm renders GET /products/{id}/defects/{defectId}/edit.
+func (c *PageProductController) DefectEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	d, err := c.backlog.GetDefect(r.Context(), user, productID, defectID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/defects", http.StatusSeeOther)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectFormPage(productpage.DefectFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + d.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Defect:      d,
+		Statuses:    statuses,
+		Milestones:  milestones,
+		Sprints:     sprints,
+		IsEdit:      true,
+		Title:       d.Title,
+		Description: d.Description,
+		Criticality: d.Criticality,
+		StatusID:    d.StatusID,
+		MilestoneID: d.MilestoneID,
+		SprintID:    d.SprintID,
+		Estimation:  d.Estimation,
+		Priority:    fmt.Sprintf("%d", d.Priority),
+	}).Render(r.Context(), w)
+}
+
+// DefectUpdate handles POST /products/{id}/defects/{defectId}.
+func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	d, err := c.backlog.GetDefect(r.Context(), user, productID, defectID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/defects", http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	criticality := r.FormValue("criticality")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := strings.TrimSpace(r.FormValue("estimation"))
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+
+	_, updateErr := c.backlog.UpdateDefect(r.Context(), user, productID, defectID, service.UpdateDefectInput{
+		Title:       &title,
+		Description: &description,
+		Criticality: &criticality,
+		StatusID:    &statusID,
+		MilestoneID: &milestoneID,
+		SprintID:    &sprintID,
+		Estimation:  &estimation,
+		Priority:    &priority,
+	})
+	if updateErr != nil {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.DefectFormPage(productpage.DefectFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + d.Title,
+				CSRFToken: csrfToken,
+			},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Defect:      d,
+			Statuses:    statuses,
+			Milestones:  milestones,
+			Sprints:     sprints,
+			IsEdit:      true,
+			Error:       updateErr.Error(),
+			Title:       title,
+			Description: description,
+			Criticality: criticality,
+			StatusID:    statusID,
+			MilestoneID: milestoneID,
+			SprintID:    sprintID,
+			Estimation:  estimation,
+			Priority:    priorityStr,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/defects/"+defectID, http.StatusSeeOther)
+}
+
+// DefectDelete handles DELETE /products/{id}/defects/{defectId}.
+func (c *PageProductController) DefectDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	_ = c.backlog.DeleteDefect(r.Context(), user, productID, defectID)
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/defects")
+	w.WriteHeader(http.StatusOK)
+}
+
+// DefectDeleteConfirm renders GET /products/{id}/defects/{defectId}/delete/confirm.
+func (c *PageProductController) DefectDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	d, err := c.backlog.GetDefect(r.Context(), user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectDeleteConfirmation(d.Title, productID, defectID).Render(r.Context(), w)
+}
+
+// DefectOverviewTab renders GET /products/{id}/defects/{defectId}/tabs/overview.
+func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	d, err := c.backlog.GetDefect(r.Context(), user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectOverviewTabContent(
+		productID,
+		d,
+		c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
+		c.resolveMilestoneName(r, user, productID, d.MilestoneID),
+		c.resolveSprintName(r, user, productID, d.SprintID),
+	).Render(r.Context(), w)
+}
+
+// DefectLinkedItemsTab renders GET /products/{id}/defects/{defectId}/tabs/linked-items.
+func (c *PageProductController) DefectLinkedItemsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectLinkedItemsTabContent().Render(r.Context(), w)
+}
+
+// DefectCommentsTab renders GET /products/{id}/defects/{defectId}/tabs/comments.
+func (c *PageProductController) DefectCommentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectCommentsTabContent().Render(r.Context(), w)
+}
+
+// DefectAttachmentsTab renders GET /products/{id}/defects/{defectId}/tabs/attachments.
+func (c *PageProductController) DefectAttachmentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectAttachmentsTabContent().Render(r.Context(), w)
+}
+
+// DefectHistoryTab renders GET /products/{id}/defects/{defectId}/tabs/history.
+func (c *PageProductController) DefectHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	entries := c.buildAuditViews(r, user, productID, "defect", defectID)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectHistoryTabContent(entries).Render(r.Context(), w)
 }

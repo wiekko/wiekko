@@ -1,0 +1,126 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// RequirementsProps holds data for the requirements list page.
+type RequirementsProps struct {
+	Meta         templates.PageMeta
+	DisplayName  string
+	IsAdmin      bool
+	Product      *model.Product
+	Requirements []*model.Requirement
+	Statuses     map[string]string // status ID → name
+	CanEdit      bool              // owner or admin
+}
+
+templ RequirementsPage(props RequirementsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "requirements",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Requirements"},
+			})
+			if len(props.Requirements) == 0 {
+				@patterns.ListPageHeader("Requirements", "", "", -1)
+				@ui.Card() {
+					if props.CanEdit {
+						@ui.EmptyState("clipboard-list", "No requirements yet", "Create your first requirement to start building the backlog.", "New Requirement", "/products/"+props.Product.ID+"/requirements/new")
+					} else {
+						@ui.EmptyState("clipboard-list", "No requirements yet", "No requirements have been created for this product.", "", "")
+					}
+				}
+			} else {
+				if props.CanEdit {
+					@patterns.ListPageHeader("Requirements", "/products/"+props.Product.ID+"/requirements/new", "New Requirement", len(props.Requirements))
+				} else {
+					@patterns.ListPageHeader("Requirements", "", "", len(props.Requirements))
+				}
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Category
+							}
+							@ui.TableHeader() {
+								Status
+							}
+							@ui.TableHeader() {
+								Priority
+							}
+							@ui.TableHeader() {
+								Created
+							}
+						}
+						@ui.TableBody("") {
+							for _, req := range props.Requirements {
+								@ui.TableRow("") {
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, req.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ req.Title }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										@requirementCategoryBadge(req.Category)
+									}
+									@ui.TableCellMuted() {
+										if req.StatusID != "" {
+											if name, ok := props.Statuses[req.StatusID]; ok {
+												{ name }
+											} else {
+												{ req.StatusID }
+											}
+										} else {
+											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+									@ui.TableCellMuted() {
+										{ fmt.Sprintf("%d", req.Priority) }
+									}
+									@ui.TableCellMuted() {
+										{ formatDate(req.CreatedAt) }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+templ requirementCategoryBadge(category string) {
+	switch category {
+		case "architecture":
+			@ui.Badge("Architecture", "indigo")
+		case "security":
+			@ui.Badge("Security", "red")
+		case "ux":
+			@ui.Badge("UX", "amber")
+		default:
+			@ui.Badge("Functionality", "blue")
+	}
+}

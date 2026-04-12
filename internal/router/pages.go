@@ -13,7 +13,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
-	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Audit)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Audit)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
@@ -121,6 +121,37 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCommentsTab)))
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.TestCaseAttachmentsTab)))
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.TestCaseHistoryTab)))
+
+	// Requirement pages.
+	mux.Handle("GET /products/{id}/requirements", pageAuthed(http.HandlerFunc(productCtrl.Requirements)))
+	mux.Handle("GET /products/{id}/requirements/new", pageAuthed(http.HandlerFunc(productCtrl.RequirementCreateForm)))
+	mux.Handle("POST /products/{id}/requirements", pageAuthed(http.HandlerFunc(productCtrl.RequirementCreate)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementDetail)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/edit", pageAuthed(http.HandlerFunc(productCtrl.RequirementEditForm)))
+	mux.Handle("POST /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementUpdate)))
+	mux.Handle("DELETE /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementDelete)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.RequirementDeleteConfirm)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.RequirementOverviewTab)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/test-cases", pageAuthed(http.HandlerFunc(productCtrl.RequirementTestCasesTab)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/defects", pageAuthed(http.HandlerFunc(productCtrl.RequirementDefectsTab)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.RequirementCommentsTab)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.RequirementAttachmentsTab)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.RequirementHistoryTab)))
+
+	// Defect pages.
+	mux.Handle("GET /products/{id}/defects", pageAuthed(http.HandlerFunc(productCtrl.Defects)))
+	mux.Handle("GET /products/{id}/defects/new", pageAuthed(http.HandlerFunc(productCtrl.DefectCreateForm)))
+	mux.Handle("POST /products/{id}/defects", pageAuthed(http.HandlerFunc(productCtrl.DefectCreate)))
+	mux.Handle("GET /products/{id}/defects/{defectId}", pageAuthed(http.HandlerFunc(productCtrl.DefectDetail)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/edit", pageAuthed(http.HandlerFunc(productCtrl.DefectEditForm)))
+	mux.Handle("POST /products/{id}/defects/{defectId}", pageAuthed(http.HandlerFunc(productCtrl.DefectUpdate)))
+	mux.Handle("DELETE /products/{id}/defects/{defectId}", pageAuthed(http.HandlerFunc(productCtrl.DefectDelete)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.DefectDeleteConfirm)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.DefectOverviewTab)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/linked-items", pageAuthed(http.HandlerFunc(productCtrl.DefectLinkedItemsTab)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.DefectCommentsTab)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.DefectAttachmentsTab)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.DefectHistoryTab)))
 
 	// Admin pages.
 	mux.Handle("GET /admin/users", pageAdmin(http.HandlerFunc(adminCtrl.ListUsers)))

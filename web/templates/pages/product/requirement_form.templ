@@ -1,0 +1,204 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// RequirementFormProps holds data for the requirement create/edit form.
+type RequirementFormProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Requirement      *model.Requirement // nil for create
+	Statuses         []*model.Status
+	Milestones       []*model.Milestone
+	Sprints          []*model.Sprint
+	IsEdit           bool
+	Error            string
+	// Form values (preserved on validation error).
+	Title            string
+	Description      string
+	DefinitionOfDone string
+	Category         string
+	StatusID         string
+	MilestoneID      string
+	SprintID         string
+	Estimation       string
+	Priority         string
+	IsCoarse         bool
+}
+
+templ RequirementFormPage(props RequirementFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "requirements",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(requirementFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Requirement
+				} else {
+					New Requirement
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(requirementFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						@ui.TextInput(ui.InputProps{
+							ID:          "title",
+							Name:        "title",
+							Label:       "Title",
+							Value:       props.Title,
+							Placeholder: "e.g. User can reset password via email",
+							Required:    true,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:      "category",
+							Name:    "category",
+							Label:   "Category",
+							Value:   props.Category,
+							Options: categorySelectOptions(props.Category),
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe this requirement... (Markdown supported)",
+							Rows:        6,
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "definition_of_done",
+							Name:        "definition_of_done",
+							Label:       "Definition of Done",
+							Value:       props.DefinitionOfDone,
+							Placeholder: "Acceptance criteria... (Markdown supported)",
+							Rows:        4,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "status_id",
+							Name:     "status_id",
+							Label:    "Status",
+							Value:    props.StatusID,
+							Options:  statusSelectOptions(props.Statuses),
+							HelpText: "Optional. Assign to a workflow status.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "milestone_id",
+							Name:     "milestone_id",
+							Label:    "Milestone",
+							Value:    props.MilestoneID,
+							Options:  milestoneSelectOptions(props.Milestones),
+							HelpText: "Optional. Link to a milestone.",
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "sprint_id",
+							Name:     "sprint_id",
+							Label:    "Sprint",
+							Value:    props.SprintID,
+							Options:  sprintSelectOptions(props.Sprints),
+							HelpText: "Optional. Assign to a sprint.",
+						})
+						@ui.TextInput(ui.InputProps{
+							ID:          "estimation",
+							Name:        "estimation",
+							Label:       "Estimation",
+							Value:       props.Estimation,
+							Placeholder: "e.g. 5, M, XL",
+							HelpText:    "Optional. Story points, t-shirt size, or time estimate.",
+						})
+						@ui.TextInput(ui.InputProps{
+							ID:          "priority",
+							Name:        "priority",
+							Label:       "Priority",
+							Value:       props.Priority,
+							Type:        "number",
+							Placeholder: "0",
+							HelpText:    "Lower numbers indicate higher priority.",
+						})
+						@ui.Checkbox("is_coarse", "is_coarse", "Needs refinement (coarse requirement)", props.IsCoarse, false)
+						@patterns.FormActions(requirementSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/requirements")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func requirementFormBreadcrumbs(props RequirementFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Requirements", Href: "/products/" + props.Product.ID + "/requirements"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Requirement.Title, Href: "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func requirementFormAction(props RequirementFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID
+	}
+	return "/products/" + props.Product.ID + "/requirements"
+}
+
+func requirementSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Requirement"
+}
+
+func categorySelectOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = "functionality"
+	}
+	return []templates.SelectOption{
+		{Value: "functionality", Label: "Functionality", Selected: current == "functionality"},
+		{Value: "architecture", Label: "Architecture", Selected: current == "architecture"},
+		{Value: "security", Label: "Security", Selected: current == "security"},
+		{Value: "ux", Label: "UX", Selected: current == "ux"},
+	}
+}
+
+// statusSelectOptions builds select options from statuses with an empty "None" option.
+// Shared with defect_form.templ (same package).
+func statusSelectOptions(statuses []*model.Status) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(statuses)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, s := range statuses {
+		opts = append(opts, templates.SelectOption{Value: s.ID, Label: s.Name})
+	}
+	return opts
+}
+
+// sprintSelectOptions builds select options from sprints with an empty "None" option.
+// Shared with defect_form.templ (same package).
+func sprintSelectOptions(sprints []*model.Sprint) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(sprints)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, s := range sprints {
+		opts = append(opts, templates.SelectOption{Value: s.ID, Label: s.Name})
+	}
+	return opts
+}
