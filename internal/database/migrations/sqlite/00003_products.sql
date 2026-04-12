@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS requirements (
     sprint_id          TEXT REFERENCES sprints(id) ON DELETE SET NULL,
     estimation         TEXT,
     priority           INTEGER NOT NULL DEFAULT 0,
+    sequence_number    INTEGER NOT NULL DEFAULT 0,
     is_coarse          INTEGER NOT NULL DEFAULT 0,
     is_active          INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT NOT NULL,
@@ -115,6 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_requirements_parent_id ON requirements(parent_id)
 CREATE INDEX IF NOT EXISTS idx_requirements_status_id ON requirements(status_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_milestone_id ON requirements(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_sprint_id ON requirements(sprint_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_requirements_product_seq ON requirements(product_id, sequence_number);
 
 -- Defects: bugs and issues (FR-022..FR-025)
 CREATE TABLE IF NOT EXISTS defects (

@@ -12,15 +12,18 @@ import (
 
 // RequirementDetailProps holds data for the requirement detail page.
 type RequirementDetailProps struct {
-	Meta          templates.PageMeta
-	DisplayName   string
-	IsAdmin       bool
-	Product       *model.Product
-	Requirement   *model.Requirement
-	StatusName    string
-	MilestoneName string
-	SprintName    string
-	CanEdit       bool
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Requirement      *model.Requirement
+	StatusName       string
+	MilestoneName    string
+	SprintName       string
+	ParentName       string // display name of parent requirement
+	ParentIdentifier string // e.g. "FR-1"
+	Children         []*model.Requirement
+	CanEdit          bool
 }
 
 templ RequirementDetailPage(props RequirementDetailProps) {
@@ -39,10 +42,10 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 					{Label: "Dashboard", Href: "/"},
 					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 					{Label: "Requirements", Href: "/products/" + props.Product.ID + "/requirements"},
-					{Label: props.Requirement.Title},
+					{Label: model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber)},
 				},
 				props.Requirement.Title,
-				"",
+				model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber),
 				requirementEditHref(props),
 				requirementDeleteURL(props),
 				props.Meta.CSRFToken,
@@ -53,7 +56,7 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 			@ui.TabGroup(requirementDetailTabs(props.Product.ID, props.Requirement.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@RequirementOverviewTabContent(props.Product.ID, props.Requirement, props.StatusName, props.MilestoneName, props.SprintName)
+				@RequirementOverviewTabContent(props)
 			}
 			@ui.TabPanelHidden("test-cases") {
 				@ui.LoadingSpinner("md")
@@ -74,27 +77,77 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 	}
 }
 
-templ RequirementOverviewTabContent(productID string, req *model.Requirement, statusName, milestoneName, sprintName string) {
+templ RequirementOverviewTabContent(props RequirementDetailProps) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
-				@patterns.DetailField("Category", requirementCategoryDisplay(req.Category))
-				@patterns.DetailField("Status", statusName)
-				if req.MilestoneID != "" && milestoneName != "" {
-					@requirementLinkedField("Milestone", milestoneName, fmt.Sprintf("/products/%s/milestones/%s", productID, req.MilestoneID))
+				@patterns.DetailField("Identifier", model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber))
+				@patterns.DetailField("Category", requirementCategoryDisplay(props.Requirement.Category))
+				if props.Requirement.ParentID != "" && props.ParentName != "" {
+					@requirementLinkedField("Parent", props.ParentIdentifier+" \u2014 "+props.ParentName, fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, props.Requirement.ParentID))
+				} else {
+					@patterns.DetailField("Parent", "")
+				}
+				@patterns.DetailField("Status", props.StatusName)
+				if props.Requirement.MilestoneID != "" && props.MilestoneName != "" {
+					@requirementLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Requirement.MilestoneID))
 				} else {
 					@patterns.DetailField("Milestone", "")
 				}
-				@patterns.DetailField("Sprint", sprintName)
-				@patterns.DetailField("Estimation", req.Estimation)
-				@patterns.DetailField("Priority", fmt.Sprintf("%d", req.Priority))
-				@patterns.DetailField("Coarse", boolDisplay(req.IsCoarse))
-				@patterns.DetailField("Active", boolDisplay(req.IsActive))
-				@patterns.DetailField("Created", formatDate(req.CreatedAt))
-				@patterns.DetailField("Last Updated", formatDate(req.UpdatedAt))
+				if props.Product.WorkflowMode == model.WorkflowModeScrum {
+					@patterns.DetailField("Sprint", props.SprintName)
+				}
+				if props.Product.EstimationMode != model.EstimationModeDisabled {
+					@patterns.DetailField("Estimation", formatEstimation(props.Product.EstimationMode, props.Requirement.Estimation))
+				}
+				@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Requirement.Priority))
+				@patterns.DetailField("Coarse", boolDisplay(props.Requirement.IsCoarse))
+				@patterns.DetailField("Active", boolDisplay(props.Requirement.IsActive))
+				@patterns.DetailField("Created", formatDate(props.Requirement.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(props.Requirement.UpdatedAt))
 			}
-			@patterns.DetailDescription(req.Description)
-			@patterns.DetailMarkdownSection("Definition of Done", req.DefinitionOfDone)
+			@patterns.DetailDescription(props.Requirement.Description)
+			@patterns.DetailMarkdownSection("Definition of Done", props.Requirement.DefinitionOfDone)
+		}
+	}
+	if len(props.Children) > 0 {
+		@ui.Card() {
+			@ui.CardBody() {
+				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Child Requirements</h3>
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Category
+						}
+					}
+					@ui.TableBody("") {
+						for _, child := range props.Children {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									{ model.RequirementIdentifier(child.Category, child.SequenceNumber) }
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, child.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ child.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@requirementCategoryBadge(child.Category)
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }

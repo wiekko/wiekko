@@ -40,6 +40,7 @@ type CreateRequirementInput struct {
 
 // UpdateRequirementInput contains the fields that can be updated on a requirement.
 type UpdateRequirementInput struct {
+	ParentID         *string
 	Category         *string
 	Title            *string
 	Description      *string
@@ -66,12 +67,18 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		input.Category = model.RequirementCategoryFunctionality
 	}
 
+	seq, err := s.requirements.NextSequenceNumber(ctx, input.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("next sequence number: %w", err)
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 	r := &model.Requirement{
 		ID:               uuid.New().String(),
 		ProductID:        input.ProductID,
 		ParentID:         input.ParentID,
 		Category:         input.Category,
+		SequenceNumber:   seq,
 		Title:            input.Title,
 		Description:      input.Description,
 		DefinitionOfDone: input.DefinitionOfDone,
@@ -128,12 +135,15 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 	}
 
 	// Fields that require owner role.
-	if input.Category != nil || input.Title != nil || input.Description != nil ||
+	if input.ParentID != nil || input.Category != nil || input.Title != nil || input.Description != nil ||
 		input.DefinitionOfDone != nil || input.MilestoneID != nil ||
 		input.SprintID != nil || input.Estimation != nil ||
 		input.Priority != nil || input.IsCoarse != nil {
 		if isDeveloper {
 			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
+		}
+		if input.ParentID != nil {
+			r.ParentID = *input.ParentID
 		}
 		if input.Category != nil {
 			r.Category = *input.Category

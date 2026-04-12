@@ -43,7 +43,9 @@ templ OverviewPage(props OverviewProps) {
 				<div>
 					<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{ props.Product.Name }</h1>
 					if props.Product.Description != "" {
-						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ props.Product.Description }</p>
+						<div class="prose prose-sm dark:prose-invert mt-1 max-w-none text-gray-500 dark:text-gray-400">
+							@templ.Raw(templates.RenderMarkdown(props.Product.Description))
+						</div>
 					}
 				</div>
 				<div class="flex items-center gap-3">

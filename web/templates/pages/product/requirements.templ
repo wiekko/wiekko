@@ -56,6 +56,9 @@ templ RequirementsPage(props RequirementsProps) {
 					@ui.Table() {
 						@ui.TableHead() {
 							@ui.TableHeader() {
+								ID
+							}
+							@ui.TableHeader() {
 								Title
 							}
 							@ui.TableHeader() {
@@ -74,6 +77,9 @@ templ RequirementsPage(props RequirementsProps) {
 						@ui.TableBody("") {
 							for _, req := range props.Requirements {
 								@ui.TableRow("") {
+									@ui.TableCellMuted() {
+										{ model.RequirementIdentifier(req.Category, req.SequenceNumber) }
+									}
 									@ui.TableCell() {
 										<a
 											href={ templ.SafeURL(fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, req.ID)) }

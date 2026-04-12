@@ -1,0 +1,85 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// EstimationInputProps holds the props for the estimation input component.
+type EstimationInputProps struct {
+	EstimationMode string // from product
+	Value          string // current form value
+}
+
+templ EstimationInput(props EstimationInputProps) {
+	switch props.EstimationMode {
+		case model.EstimationModeStoryPoints:
+			@ui.Select(ui.SelectProps{
+				ID:       "estimation",
+				Name:     "estimation",
+				Label:    "Estimation (Story Points)",
+				Value:    props.Value,
+				Options:  storyPointOptions(props.Value),
+				HelpText: "Fibonacci scale story points.",
+			})
+		case model.EstimationModeTShirtSizes:
+			@ui.Select(ui.SelectProps{
+				ID:       "estimation",
+				Name:     "estimation",
+				Label:    "Estimation (T-Shirt Size)",
+				Value:    props.Value,
+				Options:  tshirtSizeOptions(props.Value),
+				HelpText: "T-shirt size estimate.",
+			})
+		case model.EstimationModeHours:
+			@ui.TextInput(ui.InputProps{
+				ID:          "estimation",
+				Name:        "estimation",
+				Label:       "Estimation (Hours)",
+				Value:       props.Value,
+				Placeholder: "e.g. 04:30",
+				Pattern:     `^\d{1,4}:\d{2}$`,
+				HelpText:    "Time estimate in hh:mm format.",
+			})
+		default:
+			// disabled — render nothing
+	}
+}
+
+func storyPointOptions(current string) []templates.SelectOption {
+	points := []string{"1", "2", "3", "5", "8", "13", "21"}
+	opts := make([]templates.SelectOption, 0, len(points)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, p := range points {
+		opts = append(opts, templates.SelectOption{Value: p, Label: p, Selected: current == p})
+	}
+	return opts
+}
+
+func tshirtSizeOptions(current string) []templates.SelectOption {
+	sizes := []string{"XS", "S", "M", "L", "XL", "XXL"}
+	opts := make([]templates.SelectOption, 0, len(sizes)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, s := range sizes {
+		opts = append(opts, templates.SelectOption{Value: s, Label: s, Selected: current == s})
+	}
+	return opts
+}
+
+// formatEstimation returns a human-friendly display string for an estimation value.
+func formatEstimation(mode, value string) string {
+	if value == "" {
+		return ""
+	}
+	switch mode {
+	case model.EstimationModeStoryPoints:
+		return value + " points"
+	case model.EstimationModeTShirtSizes:
+		return value
+	case model.EstimationModeHours:
+		return value
+	default:
+		return ""
+	}
+}

@@ -429,16 +429,17 @@ func (m *MockRuntimeEnvironmentStore) ListByProductID(ctx context.Context, produ
 
 // MockRequirementStore implements store.RequirementStore with configurable function fields.
 type MockRequirementStore struct {
-	CreateFunc          func(ctx context.Context, r *model.Requirement) error
-	GetByIDFunc         func(ctx context.Context, id string) (*model.Requirement, error)
-	UpdateFunc          func(ctx context.Context, r *model.Requirement) error
-	DeleteFunc          func(ctx context.Context, id string) error
-	ListByProductIDFunc func(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error)
-	ListByParentIDFunc  func(ctx context.Context, parentID string) ([]*model.Requirement, error)
-	ListBySprintIDFunc  func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
-	AssignFunc          func(ctx context.Context, a *model.Assignment) error
-	UnassignFunc        func(ctx context.Context, requirementID, userID string) error
-	ListAssigneesFunc   func(ctx context.Context, requirementID string) ([]*model.Assignment, error)
+	CreateFunc             func(ctx context.Context, r *model.Requirement) error
+	GetByIDFunc            func(ctx context.Context, id string) (*model.Requirement, error)
+	UpdateFunc             func(ctx context.Context, r *model.Requirement) error
+	DeleteFunc             func(ctx context.Context, id string) error
+	ListByProductIDFunc    func(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error)
+	ListByParentIDFunc     func(ctx context.Context, parentID string) ([]*model.Requirement, error)
+	ListBySprintIDFunc     func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
+	NextSequenceNumberFunc func(ctx context.Context, productID string) (int, error)
+	AssignFunc             func(ctx context.Context, a *model.Assignment) error
+	UnassignFunc           func(ctx context.Context, requirementID, userID string) error
+	ListAssigneesFunc      func(ctx context.Context, requirementID string) ([]*model.Assignment, error)
 }
 
 func (m *MockRequirementStore) Create(ctx context.Context, r *model.Requirement) error {
@@ -461,6 +462,12 @@ func (m *MockRequirementStore) ListByParentID(ctx context.Context, parentID stri
 }
 func (m *MockRequirementStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error) {
 	return m.ListBySprintIDFunc(ctx, sprintID)
+}
+func (m *MockRequirementStore) NextSequenceNumber(ctx context.Context, productID string) (int, error) {
+	if m.NextSequenceNumberFunc != nil {
+		return m.NextSequenceNumberFunc(ctx, productID)
+	}
+	return 1, nil
 }
 func (m *MockRequirementStore) Assign(ctx context.Context, a *model.Assignment) error {
 	return m.AssignFunc(ctx, a)

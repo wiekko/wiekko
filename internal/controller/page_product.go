@@ -2490,20 +2490,35 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Resolve parent requirement name if set.
+	var parentName, parentIdentifier string
+	if req.ParentID != "" {
+		if parent, pErr := c.backlog.GetRequirement(r.Context(), user, productID, req.ParentID); pErr == nil {
+			parentName = parent.Title
+			parentIdentifier = model.RequirementIdentifier(parent.Category, parent.SequenceNumber)
+		}
+	}
+
+	// Load child requirements.
+	children, _ := c.backlog.ListChildRequirements(r.Context(), user, productID, requirementID)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.RequirementDetailPage(productpage.RequirementDetailProps{
 		Meta: templates.PageMeta{
 			Title:     p.Name + " - " + req.Title,
 			CSRFToken: csrfToken,
 		},
-		DisplayName:   user.DisplayName,
-		IsAdmin:       user.IsAdmin,
-		Product:       p,
-		Requirement:   req,
-		StatusName:    c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
-		MilestoneName: c.resolveMilestoneName(r, user, productID, req.MilestoneID),
-		SprintName:    c.resolveSprintName(r, user, productID, req.SprintID),
-		CanEdit:       c.canEditRequirements(user, role),
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Requirement:      req,
+		StatusName:       c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
+		MilestoneName:    c.resolveMilestoneName(r, user, productID, req.MilestoneID),
+		SprintName:       c.resolveSprintName(r, user, productID, req.SprintID),
+		ParentName:       parentName,
+		ParentIdentifier: parentIdentifier,
+		Children:         children,
+		CanEdit:          c.canEditRequirements(user, role),
 	}).Render(r.Context(), w)
 }
 
@@ -2522,6 +2537,7 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2529,14 +2545,15 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 			Title:     p.Name + " - New Requirement",
 			CSRFToken: csrfToken,
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Statuses:    statuses,
-		Milestones:  milestones,
-		Sprints:     sprints,
-		Category:    "functionality",
-		Priority:    "0",
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Requirements: requirements,
+		Statuses:     statuses,
+		Milestones:   milestones,
+		Sprints:      sprints,
+		Category:     "functionality",
+		Priority:     "0",
 	}).Render(r.Context(), w)
 }
 
@@ -2556,6 +2573,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 	description := r.FormValue("description")
 	definitionOfDone := r.FormValue("definition_of_done")
 	category := r.FormValue("category")
+	parentID := r.FormValue("parent_id")
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
 	sprintID := r.FormValue("sprint_id")
@@ -2566,6 +2584,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 
 	_, createErr := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
 		ProductID:        productID,
+		ParentID:         parentID,
 		Title:            title,
 		Description:      description,
 		DefinitionOfDone: definitionOfDone,
@@ -2581,6 +2600,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2591,6 +2611,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 			DisplayName:      user.DisplayName,
 			IsAdmin:          user.IsAdmin,
 			Product:          p,
+			Requirements:     requirements,
 			Statuses:         statuses,
 			Milestones:       milestones,
 			Sprints:          sprints,
@@ -2599,6 +2620,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 			Description:      description,
 			DefinitionOfDone: definitionOfDone,
 			Category:         category,
+			ParentID:         parentID,
 			StatusID:         statusID,
 			MilestoneID:      milestoneID,
 			SprintID:         sprintID,
@@ -2634,6 +2656,7 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2645,6 +2668,7 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 		IsAdmin:          user.IsAdmin,
 		Product:          p,
 		Requirement:      req,
+		Requirements:     requirements,
 		Statuses:         statuses,
 		Milestones:       milestones,
 		Sprints:          sprints,
@@ -2653,6 +2677,7 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 		Description:      req.Description,
 		DefinitionOfDone: req.DefinitionOfDone,
 		Category:         req.Category,
+		ParentID:         req.ParentID,
 		StatusID:         req.StatusID,
 		MilestoneID:      req.MilestoneID,
 		SprintID:         req.SprintID,
@@ -2685,6 +2710,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 	description := r.FormValue("description")
 	definitionOfDone := r.FormValue("definition_of_done")
 	category := r.FormValue("category")
+	parentID := r.FormValue("parent_id")
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
 	sprintID := r.FormValue("sprint_id")
@@ -2694,6 +2720,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 	isCoarse := r.FormValue("is_coarse") == "on"
 
 	_, updateErr := c.backlog.UpdateRequirement(r.Context(), user, productID, requirementID, service.UpdateRequirementInput{
+		ParentID:         &parentID,
 		Title:            &title,
 		Description:      &description,
 		DefinitionOfDone: &definitionOfDone,
@@ -2709,6 +2736,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2720,6 +2748,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 			IsAdmin:          user.IsAdmin,
 			Product:          p,
 			Requirement:      req,
+			Requirements:     requirements,
 			Statuses:         statuses,
 			Milestones:       milestones,
 			Sprints:          sprints,
@@ -2729,6 +2758,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 			Description:      description,
 			DefinitionOfDone: definitionOfDone,
 			Category:         category,
+			ParentID:         parentID,
 			StatusID:         statusID,
 			MilestoneID:      milestoneID,
 			SprintID:         sprintID,
@@ -2775,20 +2805,39 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 	productID := r.PathValue("id")
 	requirementID := r.PathValue("requirementId")
 
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
 	req, err := c.backlog.GetRequirement(r.Context(), user, productID, requirementID)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
+	var parentName, parentIdentifier string
+	if req.ParentID != "" {
+		if parent, pErr := c.backlog.GetRequirement(r.Context(), user, productID, req.ParentID); pErr == nil {
+			parentName = parent.Title
+			parentIdentifier = model.RequirementIdentifier(parent.Category, parent.SequenceNumber)
+		}
+	}
+	children, _ := c.backlog.ListChildRequirements(r.Context(), user, productID, requirementID)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementOverviewTabContent(
-		productID,
-		req,
-		c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
-		c.resolveMilestoneName(r, user, productID, req.MilestoneID),
-		c.resolveSprintName(r, user, productID, req.SprintID),
-	).Render(r.Context(), w)
+	_ = productpage.RequirementOverviewTabContent(productpage.RequirementDetailProps{
+		Product:          p,
+		Requirement:      req,
+		StatusName:       c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
+		MilestoneName:    c.resolveMilestoneName(r, user, productID, req.MilestoneID),
+		SprintName:       c.resolveSprintName(r, user, productID, req.SprintID),
+		ParentName:       parentName,
+		ParentIdentifier: parentIdentifier,
+		Children:         children,
+		CanEdit:          c.canEditRequirements(user, role),
+	}).Render(r.Context(), w)
 }
 
 // RequirementTestCasesTab renders GET /products/{id}/requirements/{requirementId}/tabs/test-cases.
@@ -3148,6 +3197,12 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 	productID := r.PathValue("id")
 	defectID := r.PathValue("defectId")
 
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
 	d, err := c.backlog.GetDefect(r.Context(), user, productID, defectID)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -3157,6 +3212,8 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectOverviewTabContent(
 		productID,
+		p.EstimationMode,
+		p.WorkflowMode,
 		d,
 		c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
 		c.resolveMilestoneName(r, user, productID, d.MilestoneID),

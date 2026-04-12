@@ -53,7 +53,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 			@ui.TabGroup(defectDetailTabs(props.Product.ID, props.Defect.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@DefectOverviewTabContent(props.Product.ID, props.Defect, props.StatusName, props.MilestoneName, props.SprintName)
+				@DefectOverviewTabContent(props.Product.ID, props.Product.EstimationMode, props.Product.WorkflowMode, props.Defect, props.StatusName, props.MilestoneName, props.SprintName)
 			}
 			@ui.TabPanelHidden("linked-items") {
 				@ui.LoadingSpinner("md")
@@ -71,7 +71,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 	}
 }
 
-templ DefectOverviewTabContent(productID string, d *model.Defect, statusName, milestoneName, sprintName string) {
+templ DefectOverviewTabContent(productID string, estimationMode string, workflowMode string, d *model.Defect, statusName, milestoneName, sprintName string) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -82,8 +82,12 @@ templ DefectOverviewTabContent(productID string, d *model.Defect, statusName, mi
 				} else {
 					@patterns.DetailField("Milestone", "")
 				}
-				@patterns.DetailField("Sprint", sprintName)
-				@patterns.DetailField("Estimation", d.Estimation)
+				if workflowMode == model.WorkflowModeScrum {
+					@patterns.DetailField("Sprint", sprintName)
+				}
+				if estimationMode != model.EstimationModeDisabled {
+					@patterns.DetailField("Estimation", formatEstimation(estimationMode, d.Estimation))
+				}
 				@patterns.DetailField("Priority", fmt.Sprintf("%d", d.Priority))
 				@patterns.DetailField("Active", boolDisplay(d.IsActive))
 				@patterns.DetailField("Created", formatDate(d.CreatedAt))

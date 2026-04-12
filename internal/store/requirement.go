@@ -25,6 +25,7 @@ type RequirementStore interface {
 	ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error)
 	ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error)
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error)
+	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, requirementID, userID string) error
 	ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error)
@@ -36,11 +37,11 @@ type requirementStore struct {
 
 func (s *requirementStore) Create(ctx context.Context, r *model.Requirement) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO requirements (id, product_id, parent_id, category, title, description,
+		`INSERT INTO requirements (id, product_id, parent_id, category, sequence_number, title, description,
 		 definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 		 is_coarse, is_active, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ProductID, nullableText(r.ParentID), r.Category,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProductID, nullableText(r.ParentID), r.Category, r.SequenceNumber,
 		r.Title, r.Description, r.DefinitionOfDone,
 		nullableText(r.StatusID), nullableText(r.MilestoneID), nullableText(r.SprintID),
 		nullableText(r.Estimation), r.Priority,
@@ -166,7 +167,21 @@ func (s *requirementStore) listRequirements(ctx context.Context, query string, a
 	return reqs, rows.Err()
 }
 
-const requirementColumns = `id, product_id, parent_id, category, title, description,
+func (s *requirementStore) NextSequenceNumber(ctx context.Context, productID string) (int, error) {
+	var maxSeq sql.NullInt64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT MAX(sequence_number) FROM requirements WHERE product_id = ?`,
+		productID).Scan(&maxSeq)
+	if err != nil {
+		return 0, err
+	}
+	if maxSeq.Valid {
+		return int(maxSeq.Int64) + 1, nil
+	}
+	return 1, nil
+}
+
+const requirementColumns = `id, product_id, parent_id, category, sequence_number, title, description,
 	definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 	is_coarse, is_active, created_at, updated_at`
 
@@ -174,7 +189,7 @@ func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement
 	var parentID, statusID, milestoneID, sprintID, estimation sql.NullString
 	var isCoarse, isActive int
-	err := sc.Scan(&r.ID, &r.ProductID, &parentID, &r.Category,
+	err := sc.Scan(&r.ID, &r.ProductID, &parentID, &r.Category, &r.SequenceNumber,
 		&r.Title, &r.Description, &r.DefinitionOfDone,
 		&statusID, &milestoneID, &sprintID, &estimation, &r.Priority,
 		&isCoarse, &isActive, &r.CreatedAt, &r.UpdatedAt)

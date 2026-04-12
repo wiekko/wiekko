@@ -94,21 +94,19 @@ templ DefectFormPage(props DefectFormProps) {
 							Options:  milestoneSelectOptions(props.Milestones),
 							HelpText: "Optional. Link to a milestone.",
 						})
-						@ui.Select(ui.SelectProps{
-							ID:       "sprint_id",
-							Name:     "sprint_id",
-							Label:    "Sprint",
-							Value:    props.SprintID,
-							Options:  sprintSelectOptions(props.Sprints),
-							HelpText: "Optional. Assign to a sprint.",
-						})
-						@ui.TextInput(ui.InputProps{
-							ID:          "estimation",
-							Name:        "estimation",
-							Label:       "Estimation",
-							Value:       props.Estimation,
-							Placeholder: "e.g. 5, M, XL",
-							HelpText:    "Optional. Story points, t-shirt size, or time estimate.",
+						if props.Product.WorkflowMode == model.WorkflowModeScrum {
+							@ui.Select(ui.SelectProps{
+								ID:       "sprint_id",
+								Name:     "sprint_id",
+								Label:    "Sprint",
+								Value:    props.SprintID,
+								Options:  sprintSelectOptions(props.Sprints),
+								HelpText: "Optional. Assign to a sprint.",
+							})
+						}
+						@EstimationInput(EstimationInputProps{
+							EstimationMode: props.Product.EstimationMode,
+							Value:          props.Estimation,
 						})
 						@ui.TextInput(ui.InputProps{
 							ID:          "priority",
