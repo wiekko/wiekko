@@ -1489,20 +1489,20 @@ func (c *PageProductController) ComponentOverviewTab(w http.ResponseWriter, r *h
 	_ = productpage.ComponentOverviewTabContent(comp, milestoneName).Render(r.Context(), w)
 }
 
-// ComponentFunctionalitiesTab renders GET /products/{id}/components/{componentId}/tabs/functionalities.
-func (c *PageProductController) ComponentFunctionalitiesTab(w http.ResponseWriter, r *http.Request) {
+// ComponentCapabilitiesTab renders GET /products/{id}/components/{componentId}/tabs/capabilities.
+func (c *PageProductController) ComponentCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 	componentID := r.PathValue("componentId")
 
-	funcs, err := c.component.ListFunctionalitiesByComponent(r.Context(), user, productID, componentID)
+	funcs, err := c.component.ListCapabilitiesByComponent(r.Context(), user, productID, componentID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentFunctionalitiesTabContent(productID, funcs).Render(r.Context(), w)
+	_ = productpage.ComponentCapabilitiesTabContent(productID, funcs).Render(r.Context(), w)
 }
 
 // ComponentTestCasesTab renders GET /products/{id}/components/{componentId}/tabs/test-cases.
@@ -1535,10 +1535,10 @@ func (c *PageProductController) ComponentHistoryTab(w http.ResponseWriter, r *ht
 	_ = productpage.ComponentHistoryTabContent(views).Render(r.Context(), w)
 }
 
-// --- Functionalities ---
+// --- Capabilities ---
 
-// Functionalities renders GET /products/{id}/functionalities.
-func (c *PageProductController) Functionalities(w http.ResponseWriter, r *http.Request) {
+// Capabilities renders GET /products/{id}/capabilities.
+func (c *PageProductController) Capabilities(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
@@ -1549,7 +1549,7 @@ func (c *PageProductController) Functionalities(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	funcs, err := c.component.ListFunctionalities(r.Context(), user, productID)
+	funcs, err := c.component.ListCapabilities(r.Context(), user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
 		return
@@ -1560,27 +1560,27 @@ func (c *PageProductController) Functionalities(w http.ResponseWriter, r *http.R
 	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalitiesPage(productpage.FunctionalitiesProps{
+	_ = productpage.CapabilitiesPage(productpage.CapabilitiesProps{
 		Meta: templates.PageMeta{
-			Title:     p.Name + " - Functionalities",
+			Title:     p.Name + " - Capabilities",
 			CSRFToken: csrfToken,
 		},
-		DisplayName:     user.DisplayName,
-		IsAdmin:         user.IsAdmin,
-		Product:         p,
-		Functionalities: funcs,
-		Components:      componentMap,
-		Milestones:      milestoneMap,
-		IsOwnerOrAdmin:  isOwnerOrAdmin,
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		Capabilities:   funcs,
+		Components:     componentMap,
+		Milestones:     milestoneMap,
+		IsOwnerOrAdmin: isOwnerOrAdmin,
 	}).Render(r.Context(), w)
 }
 
-// FunctionalityDetail renders GET /products/{id}/functionalities/{functionalityId}.
-func (c *PageProductController) FunctionalityDetail(w http.ResponseWriter, r *http.Request) {
+// CapabilityDetail renders GET /products/{id}/capabilities/{capabilityId}.
+func (c *PageProductController) CapabilityDetail(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
 	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
@@ -1588,9 +1588,9 @@ func (c *PageProductController) FunctionalityDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	f, err := c.component.GetCapability(r.Context(), user, productID, capabilityID)
 	if err != nil {
-		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		http.Redirect(w, r, "/products/"+productID+"/capabilities", http.StatusSeeOther)
 		return
 	}
 
@@ -1599,7 +1599,7 @@ func (c *PageProductController) FunctionalityDetail(w http.ResponseWriter, r *ht
 	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityDetailPage(productpage.FunctionalityDetailProps{
+	_ = productpage.CapabilityDetailPage(productpage.CapabilityDetailProps{
 		Meta: templates.PageMeta{
 			Title:     p.Name + " - " + f.Name,
 			CSRFToken: csrfToken,
@@ -1607,15 +1607,15 @@ func (c *PageProductController) FunctionalityDetail(w http.ResponseWriter, r *ht
 		DisplayName:    user.DisplayName,
 		IsAdmin:        user.IsAdmin,
 		Product:        p,
-		Functionality:  f,
+		Capability:     f,
 		ComponentName:  componentName,
 		MilestoneName:  milestoneName,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
 	}).Render(r.Context(), w)
 }
 
-// FunctionalityCreateForm renders GET /products/{id}/functionalities/new.
-func (c *PageProductController) FunctionalityCreateForm(w http.ResponseWriter, r *http.Request) {
+// CapabilityCreateForm renders GET /products/{id}/capabilities/new.
+func (c *PageProductController) CapabilityCreateForm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
@@ -1627,7 +1627,7 @@ func (c *PageProductController) FunctionalityCreateForm(w http.ResponseWriter, r
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		http.Redirect(w, r, "/products/"+productID+"/capabilities", http.StatusSeeOther)
 		return
 	}
 
@@ -1635,9 +1635,9 @@ func (c *PageProductController) FunctionalityCreateForm(w http.ResponseWriter, r
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+	_ = productpage.CapabilityFormPage(productpage.CapabilityFormProps{
 		Meta: templates.PageMeta{
-			Title:     p.Name + " - New Functionality",
+			Title:     p.Name + " - New Capability",
 			CSRFToken: csrfToken,
 		},
 		DisplayName: user.DisplayName,
@@ -1648,8 +1648,8 @@ func (c *PageProductController) FunctionalityCreateForm(w http.ResponseWriter, r
 	}).Render(r.Context(), w)
 }
 
-// FunctionalityCreate handles POST /products/{id}/functionalities.
-func (c *PageProductController) FunctionalityCreate(w http.ResponseWriter, r *http.Request) {
+// CapabilityCreate handles POST /products/{id}/capabilities.
+func (c *PageProductController) CapabilityCreate(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
@@ -1665,7 +1665,7 @@ func (c *PageProductController) FunctionalityCreate(w http.ResponseWriter, r *ht
 	componentID := r.FormValue("component_id")
 	milestoneID := r.FormValue("milestone_id")
 
-	_, err = c.component.CreateFunctionality(r.Context(), user, service.CreateFunctionalityInput{
+	_, err = c.component.CreateCapability(r.Context(), user, service.CreateCapabilityInput{
 		ProductID:   productID,
 		ComponentID: componentID,
 		Name:        name,
@@ -1676,9 +1676,9 @@ func (c *PageProductController) FunctionalityCreate(w http.ResponseWriter, r *ht
 		components, _ := c.component.ListComponents(r.Context(), user, productID)
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+		_ = productpage.CapabilityFormPage(productpage.CapabilityFormProps{
 			Meta: templates.PageMeta{
-				Title:     p.Name + " - New Functionality",
+				Title:     p.Name + " - New Capability",
 				CSRFToken: csrfToken,
 			},
 			DisplayName: user.DisplayName,
@@ -1695,15 +1695,15 @@ func (c *PageProductController) FunctionalityCreate(w http.ResponseWriter, r *ht
 		return
 	}
 
-	http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+	http.Redirect(w, r, "/products/"+productID+"/capabilities", http.StatusSeeOther)
 }
 
-// FunctionalityEditForm renders GET /products/{id}/functionalities/{functionalityId}/edit.
-func (c *PageProductController) FunctionalityEditForm(w http.ResponseWriter, r *http.Request) {
+// CapabilityEditForm renders GET /products/{id}/capabilities/{capabilityId}/edit.
+func (c *PageProductController) CapabilityEditForm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
 	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
@@ -1712,13 +1712,13 @@ func (c *PageProductController) FunctionalityEditForm(w http.ResponseWriter, r *
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, fmt.Sprintf("/products/%s/functionalities/%s", productID, functionalityID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID), http.StatusSeeOther)
 		return
 	}
 
-	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	f, err := c.component.GetCapability(r.Context(), user, productID, capabilityID)
 	if err != nil {
-		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		http.Redirect(w, r, "/products/"+productID+"/capabilities", http.StatusSeeOther)
 		return
 	}
 
@@ -1726,31 +1726,31 @@ func (c *PageProductController) FunctionalityEditForm(w http.ResponseWriter, r *
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+	_ = productpage.CapabilityFormPage(productpage.CapabilityFormProps{
 		Meta: templates.PageMeta{
 			Title:     p.Name + " - Edit " + f.Name,
 			CSRFToken: csrfToken,
 		},
-		DisplayName:   user.DisplayName,
-		IsAdmin:       user.IsAdmin,
-		Product:       p,
-		Functionality: f,
-		Components:    components,
-		Milestones:    milestones,
-		IsEdit:        true,
-		Name:          f.Name,
-		Description:   f.Description,
-		ComponentID:   f.ComponentID,
-		MilestoneID:   f.MilestoneID,
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Capability:  f,
+		Components:  components,
+		Milestones:  milestones,
+		IsEdit:      true,
+		Name:        f.Name,
+		Description: f.Description,
+		ComponentID: f.ComponentID,
+		MilestoneID: f.MilestoneID,
 	}).Render(r.Context(), w)
 }
 
-// FunctionalityUpdate handles POST /products/{id}/functionalities/{functionalityId}.
-func (c *PageProductController) FunctionalityUpdate(w http.ResponseWriter, r *http.Request) {
+// CapabilityUpdate handles POST /products/{id}/capabilities/{capabilityId}.
+func (c *PageProductController) CapabilityUpdate(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
 	p, _, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
@@ -1758,9 +1758,9 @@ func (c *PageProductController) FunctionalityUpdate(w http.ResponseWriter, r *ht
 		return
 	}
 
-	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	f, err := c.component.GetCapability(r.Context(), user, productID, capabilityID)
 	if err != nil {
-		http.Redirect(w, r, "/products/"+productID+"/functionalities", http.StatusSeeOther)
+		http.Redirect(w, r, "/products/"+productID+"/capabilities", http.StatusSeeOther)
 		return
 	}
 
@@ -1769,80 +1769,80 @@ func (c *PageProductController) FunctionalityUpdate(w http.ResponseWriter, r *ht
 	componentID := r.FormValue("component_id")
 	milestoneID := r.FormValue("milestone_id")
 
-	input := service.UpdateFunctionalityInput{
+	input := service.UpdateCapabilityInput{
 		Name:        &name,
 		Description: &description,
 		ComponentID: &componentID,
 		MilestoneID: &milestoneID,
 	}
 
-	_, err = c.component.UpdateFunctionality(r.Context(), user, productID, functionalityID, input)
+	_, err = c.component.UpdateCapability(r.Context(), user, productID, capabilityID, input)
 	if err != nil {
 		components, _ := c.component.ListComponents(r.Context(), user, productID)
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = productpage.FunctionalityFormPage(productpage.FunctionalityFormProps{
+		_ = productpage.CapabilityFormPage(productpage.CapabilityFormProps{
 			Meta: templates.PageMeta{
 				Title:     p.Name + " - Edit " + f.Name,
 				CSRFToken: csrfToken,
 			},
-			DisplayName:   user.DisplayName,
-			IsAdmin:       user.IsAdmin,
-			Product:       p,
-			Functionality: f,
-			Components:    components,
-			Milestones:    milestones,
-			IsEdit:        true,
-			Name:          name,
-			Description:   description,
-			ComponentID:   componentID,
-			MilestoneID:   milestoneID,
-			Error:         err.Error(),
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Capability:  f,
+			Components:  components,
+			Milestones:  milestones,
+			IsEdit:      true,
+			Name:        name,
+			Description: description,
+			ComponentID: componentID,
+			MilestoneID: milestoneID,
+			Error:       err.Error(),
 		}).Render(r.Context(), w)
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/products/%s/functionalities/%s", productID, functionalityID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID), http.StatusSeeOther)
 }
 
-// FunctionalityDelete handles DELETE /products/{id}/functionalities/{functionalityId}.
-func (c *PageProductController) FunctionalityDelete(w http.ResponseWriter, r *http.Request) {
+// CapabilityDelete handles DELETE /products/{id}/capabilities/{capabilityId}.
+func (c *PageProductController) CapabilityDelete(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
-	if err := c.component.DeleteFunctionality(r.Context(), user, productID, functionalityID); err != nil {
+	if err := c.component.DeleteCapability(r.Context(), user, productID, capabilityID); err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
-	w.Header().Set("HX-Redirect", "/products/"+productID+"/functionalities")
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/capabilities")
 	w.WriteHeader(http.StatusOK)
 }
 
-// FunctionalityDeleteConfirm renders GET /products/{id}/functionalities/{functionalityId}/delete/confirm.
-func (c *PageProductController) FunctionalityDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+// CapabilityDeleteConfirm renders GET /products/{id}/capabilities/{capabilityId}/delete/confirm.
+func (c *PageProductController) CapabilityDeleteConfirm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
-	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	f, err := c.component.GetCapability(r.Context(), user, productID, capabilityID)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityDeleteConfirmation(f.Name, productID, functionalityID).Render(r.Context(), w)
+	_ = productpage.CapabilityDeleteConfirmation(f.Name, productID, capabilityID).Render(r.Context(), w)
 }
 
-// FunctionalityOverviewTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/overview.
-func (c *PageProductController) FunctionalityOverviewTab(w http.ResponseWriter, r *http.Request) {
+// CapabilityOverviewTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/overview.
+func (c *PageProductController) CapabilityOverviewTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
-	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	f, err := c.component.GetCapability(r.Context(), user, productID, capabilityID)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -1852,34 +1852,34 @@ func (c *PageProductController) FunctionalityOverviewTab(w http.ResponseWriter, 
 	milestoneName := c.resolveMilestoneName(r, user, productID, f.MilestoneID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityOverviewTabContent(productID, f, componentName, milestoneName).Render(r.Context(), w)
+	_ = productpage.CapabilityOverviewTabContent(productID, f, componentName, milestoneName).Render(r.Context(), w)
 }
 
-// FunctionalityTestCasesTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/test-cases.
-func (c *PageProductController) FunctionalityTestCasesTab(w http.ResponseWriter, r *http.Request) {
+// CapabilityTestCasesTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/test-cases.
+func (c *PageProductController) CapabilityTestCasesTab(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityTestCasesTabContent().Render(r.Context(), w)
+	_ = productpage.CapabilityTestCasesTabContent().Render(r.Context(), w)
 }
 
-// FunctionalityDefectsTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/defects.
-func (c *PageProductController) FunctionalityDefectsTab(w http.ResponseWriter, r *http.Request) {
+// CapabilityDefectsTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/defects.
+func (c *PageProductController) CapabilityDefectsTab(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityDefectsTabContent().Render(r.Context(), w)
+	_ = productpage.CapabilityDefectsTabContent().Render(r.Context(), w)
 }
 
-// FunctionalityHistoryTab renders GET /products/{id}/functionalities/{functionalityId}/tabs/history.
-func (c *PageProductController) FunctionalityHistoryTab(w http.ResponseWriter, r *http.Request) {
+// CapabilityHistoryTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/history.
+func (c *PageProductController) CapabilityHistoryTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
-	functionalityID := r.PathValue("functionalityId")
+	capabilityID := r.PathValue("capabilityId")
 
-	views := c.buildAuditViews(r, user, productID, "functionality", functionalityID)
+	views := c.buildAuditViews(r, user, productID, "capability", capabilityID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.FunctionalityHistoryTabContent(views).Render(r.Context(), w)
+	_ = productpage.CapabilityHistoryTabContent(views).Render(r.Context(), w)
 }
 
-// --- shared helpers for components/functionalities ---
+// --- shared helpers for components/capabilities ---
 
 // buildMilestoneMap returns a map of milestone ID → name for the product.
 func (c *PageProductController) buildMilestoneMap(r *http.Request, user *model.User, productID string) map[string]string {
@@ -2014,14 +2014,14 @@ func (c *PageProductController) TestCaseDetail(w http.ResponseWriter, r *http.Re
 			Title:     p.Name + " - " + tc.Title,
 			CSRFToken: csrfToken,
 		},
-		DisplayName:       user.DisplayName,
-		IsAdmin:           user.IsAdmin,
-		Product:           p,
-		TestCase:          tc,
-		ComponentName:     c.resolveComponentName(r, user, productID, tc.ComponentID),
-		FunctionalityName: c.resolveFunctionalityName(r, user, productID, tc.FunctionalityID),
-		PyramidLevelName:  c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID),
-		CanEdit:           c.canEditTestCases(user, role),
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		TestCase:         tc,
+		ComponentName:    c.resolveComponentName(r, user, productID, tc.ComponentID),
+		CapabilityName:   c.resolveCapabilityName(r, user, productID, tc.CapabilityID),
+		PyramidLevelName: c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID),
+		CanEdit:          c.canEditTestCases(user, role),
 	}).Render(r.Context(), w)
 }
 
@@ -2038,7 +2038,7 @@ func (c *PageProductController) TestCaseCreateForm(w http.ResponseWriter, r *htt
 	}
 
 	components, _ := c.component.ListComponents(r.Context(), user, productID)
-	functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2047,13 +2047,13 @@ func (c *PageProductController) TestCaseCreateForm(w http.ResponseWriter, r *htt
 			Title:     p.Name + " - New Test Case",
 			CSRFToken: csrfToken,
 		},
-		DisplayName:     user.DisplayName,
-		IsAdmin:         user.IsAdmin,
-		Product:         p,
-		Components:      components,
-		Functionalities: functionalities,
-		PyramidLevels:   pyramidLevels,
-		ExecutionMode:   "manual",
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Components:    components,
+		Capabilities:  capabilities,
+		PyramidLevels: pyramidLevels,
+		ExecutionMode: "manual",
 	}).Render(r.Context(), w)
 }
 
@@ -2074,22 +2074,22 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 	executionMode := r.FormValue("execution_mode")
 	testIdentifier := r.FormValue("test_identifier")
 	componentID := r.FormValue("component_id")
-	functionalityID := r.FormValue("functionality_id")
+	capabilityID := r.FormValue("capability_id")
 	pyramidLevelID := r.FormValue("pyramid_level_id")
 
 	_, err = c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
-		ProductID:       productID,
-		ComponentID:     componentID,
-		FunctionalityID: functionalityID,
-		Title:           title,
-		Description:     description,
-		ExecutionMode:   executionMode,
-		TestIdentifier:  testIdentifier,
-		PyramidLevelID:  pyramidLevelID,
+		ProductID:      productID,
+		ComponentID:    componentID,
+		CapabilityID:   capabilityID,
+		Title:          title,
+		Description:    description,
+		ExecutionMode:  executionMode,
+		TestIdentifier: testIdentifier,
+		PyramidLevelID: pyramidLevelID,
 	})
 	if err != nil {
 		components, _ := c.component.ListComponents(r.Context(), user, productID)
-		functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2098,20 +2098,20 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 				Title:     p.Name + " - New Test Case",
 				CSRFToken: csrfToken,
 			},
-			DisplayName:     user.DisplayName,
-			IsAdmin:         user.IsAdmin,
-			Product:         p,
-			Components:      components,
-			Functionalities: functionalities,
-			PyramidLevels:   pyramidLevels,
-			Error:           err.Error(),
-			Title:           title,
-			Description:     description,
-			ExecutionMode:   executionMode,
-			TestIdentifier:  testIdentifier,
-			ComponentID:     componentID,
-			FunctionalityID: functionalityID,
-			PyramidLevelID:  pyramidLevelID,
+			DisplayName:    user.DisplayName,
+			IsAdmin:        user.IsAdmin,
+			Product:        p,
+			Components:     components,
+			Capabilities:   capabilities,
+			PyramidLevels:  pyramidLevels,
+			Error:          err.Error(),
+			Title:          title,
+			Description:    description,
+			ExecutionMode:  executionMode,
+			TestIdentifier: testIdentifier,
+			ComponentID:    componentID,
+			CapabilityID:   capabilityID,
+			PyramidLevelID: pyramidLevelID,
 		}).Render(r.Context(), w)
 		return
 	}
@@ -2139,7 +2139,7 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 	}
 
 	components, _ := c.component.ListComponents(r.Context(), user, productID)
-	functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2148,21 +2148,21 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 			Title:     p.Name + " - Edit " + tc.Title,
 			CSRFToken: csrfToken,
 		},
-		DisplayName:     user.DisplayName,
-		IsAdmin:         user.IsAdmin,
-		Product:         p,
-		TestCase:        tc,
-		Components:      components,
-		Functionalities: functionalities,
-		PyramidLevels:   pyramidLevels,
-		IsEdit:          true,
-		Title:           tc.Title,
-		Description:     tc.Description,
-		ExecutionMode:   tc.ExecutionMode,
-		TestIdentifier:  tc.TestIdentifier,
-		ComponentID:     tc.ComponentID,
-		FunctionalityID: tc.FunctionalityID,
-		PyramidLevelID:  tc.PyramidLevelID,
+		DisplayName:    user.DisplayName,
+		IsAdmin:        user.IsAdmin,
+		Product:        p,
+		TestCase:       tc,
+		Components:     components,
+		Capabilities:   capabilities,
+		PyramidLevels:  pyramidLevels,
+		IsEdit:         true,
+		Title:          tc.Title,
+		Description:    tc.Description,
+		ExecutionMode:  tc.ExecutionMode,
+		TestIdentifier: tc.TestIdentifier,
+		ComponentID:    tc.ComponentID,
+		CapabilityID:   tc.CapabilityID,
+		PyramidLevelID: tc.PyramidLevelID,
 	}).Render(r.Context(), w)
 }
 
@@ -2190,21 +2190,21 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 	executionMode := r.FormValue("execution_mode")
 	testIdentifier := r.FormValue("test_identifier")
 	componentID := r.FormValue("component_id")
-	functionalityID := r.FormValue("functionality_id")
+	capabilityID := r.FormValue("capability_id")
 	pyramidLevelID := r.FormValue("pyramid_level_id")
 
 	_, err = c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
-		Title:           &title,
-		Description:     &description,
-		ExecutionMode:   &executionMode,
-		TestIdentifier:  &testIdentifier,
-		ComponentID:     &componentID,
-		FunctionalityID: &functionalityID,
-		PyramidLevelID:  &pyramidLevelID,
+		Title:          &title,
+		Description:    &description,
+		ExecutionMode:  &executionMode,
+		TestIdentifier: &testIdentifier,
+		ComponentID:    &componentID,
+		CapabilityID:   &capabilityID,
+		PyramidLevelID: &pyramidLevelID,
 	})
 	if err != nil {
 		components, _ := c.component.ListComponents(r.Context(), user, productID)
-		functionalities, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2213,22 +2213,22 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 				Title:     p.Name + " - Edit " + tc.Title,
 				CSRFToken: csrfToken,
 			},
-			DisplayName:     user.DisplayName,
-			IsAdmin:         user.IsAdmin,
-			Product:         p,
-			TestCase:        tc,
-			Components:      components,
-			Functionalities: functionalities,
-			PyramidLevels:   pyramidLevels,
-			IsEdit:          true,
-			Error:           err.Error(),
-			Title:           title,
-			Description:     description,
-			ExecutionMode:   executionMode,
-			TestIdentifier:  testIdentifier,
-			ComponentID:     componentID,
-			FunctionalityID: functionalityID,
-			PyramidLevelID:  pyramidLevelID,
+			DisplayName:    user.DisplayName,
+			IsAdmin:        user.IsAdmin,
+			Product:        p,
+			TestCase:       tc,
+			Components:     components,
+			Capabilities:   capabilities,
+			PyramidLevels:  pyramidLevels,
+			IsEdit:         true,
+			Error:          err.Error(),
+			Title:          title,
+			Description:    description,
+			ExecutionMode:  executionMode,
+			TestIdentifier: testIdentifier,
+			ComponentID:    componentID,
+			CapabilityID:   capabilityID,
+			PyramidLevelID: pyramidLevelID,
 		}).Render(r.Context(), w)
 		return
 	}
@@ -2277,11 +2277,11 @@ func (c *PageProductController) TestCaseOverviewTab(w http.ResponseWriter, r *ht
 	}
 
 	componentName := c.resolveComponentName(r, user, productID, tc.ComponentID)
-	functionalityName := c.resolveFunctionalityName(r, user, productID, tc.FunctionalityID)
+	capabilityName := c.resolveCapabilityName(r, user, productID, tc.CapabilityID)
 	pyramidLevelName := c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, functionalityName, pyramidLevelName).Render(r.Context(), w)
+	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, capabilityName, pyramidLevelName).Render(r.Context(), w)
 }
 
 // TestCaseRequirementsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/requirements.
@@ -2335,9 +2335,9 @@ func (c *PageProductController) buildPyramidLevelMap(r *http.Request, user *mode
 	return m
 }
 
-// buildFunctionalityMap returns a map of functionality ID → name for the product.
-func (c *PageProductController) buildFunctionalityMap(r *http.Request, user *model.User, productID string) map[string]string {
-	funcs, _ := c.component.ListFunctionalities(r.Context(), user, productID)
+// buildCapabilityMap returns a map of capability ID → name for the product.
+func (c *PageProductController) buildCapabilityMap(r *http.Request, user *model.User, productID string) map[string]string {
+	funcs, _ := c.component.ListCapabilities(r.Context(), user, productID)
 	m := make(map[string]string, len(funcs))
 	for _, f := range funcs {
 		m[f.ID] = f.Name
@@ -2345,12 +2345,12 @@ func (c *PageProductController) buildFunctionalityMap(r *http.Request, user *mod
 	return m
 }
 
-// resolveFunctionalityName returns the functionality name for the given ID, or empty string.
-func (c *PageProductController) resolveFunctionalityName(r *http.Request, user *model.User, productID, functionalityID string) string {
-	if functionalityID == "" {
+// resolveCapabilityName returns the capability name for the given ID, or empty string.
+func (c *PageProductController) resolveCapabilityName(r *http.Request, user *model.User, productID, capabilityID string) string {
+	if capabilityID == "" {
 		return ""
 	}
-	f, err := c.component.GetFunctionality(r.Context(), user, productID, functionalityID)
+	f, err := c.component.GetCapability(r.Context(), user, productID, capabilityID)
 	if err != nil {
 		return ""
 	}
@@ -2552,7 +2552,7 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 		Statuses:     statuses,
 		Milestones:   milestones,
 		Sprints:      sprints,
-		Category:     "functionality",
+		Category:     "capability",
 		Priority:     "0",
 	}).Render(r.Context(), w)
 }

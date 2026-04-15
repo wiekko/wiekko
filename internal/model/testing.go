@@ -2,17 +2,17 @@ package model
 
 // TestCase represents a test case within a product.
 type TestCase struct {
-	ID              string
-	ProductID       string
-	ComponentID     string // empty if not linked
-	FunctionalityID string // empty if not linked
-	Title           string
-	Description     string // Markdown
-	ExecutionMode   string // "manual", "automatic"
-	TestIdentifier  string // code test function name for automatic tests
-	PyramidLevelID  string // empty if not assigned
-	CreatedAt       string // RFC 3339
-	UpdatedAt       string // RFC 3339
+	ID             string
+	ProductID      string
+	ComponentID    string // empty if not linked
+	CapabilityID   string // empty if not linked
+	Title          string
+	Description    string // Markdown
+	ExecutionMode  string // "manual", "automatic"
+	TestIdentifier string // code test function name for automatic tests
+	PyramidLevelID string // empty if not assigned
+	CreatedAt      string // RFC 3339
+	UpdatedAt      string // RFC 3339
 }
 
 // Execution mode constants.

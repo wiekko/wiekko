@@ -8,13 +8,13 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// FunctionalityFormProps holds data for the functionality create/edit form.
-type FunctionalityFormProps struct {
+// CapabilityFormProps holds data for the capability create/edit form.
+type CapabilityFormProps struct {
 	Meta        templates.PageMeta
 	DisplayName string
 	IsAdmin     bool
 	Product     *model.Product
-	Functionality *model.Functionality // nil for create
+	Capability  *model.Capability // nil for create
 	Components  []*model.Component
 	Milestones  []*model.Milestone
 	IsEdit      bool
@@ -26,29 +26,29 @@ type FunctionalityFormProps struct {
 	MilestoneID string
 }
 
-templ FunctionalityFormPage(props FunctionalityFormProps) {
+templ CapabilityFormPage(props CapabilityFormProps) {
 	@layout.AppLayout(layout.AppLayoutProps{
 		Meta:          props.Meta,
 		DisplayName:   props.DisplayName,
 		IsAdmin:       props.IsAdmin,
-		ActiveSection: "functionalities",
+		ActiveSection: "capabilities",
 		ProductID:     props.Product.ID,
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
 		<div class="mx-auto max-w-2xl space-y-6">
-			@ui.Breadcrumb(functionalityFormBreadcrumbs(props))
+			@ui.Breadcrumb(capabilityFormBreadcrumbs(props))
 			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
 				if props.IsEdit {
-					Edit Functionality
+					Edit Capability
 				} else {
-					New Functionality
+					New Capability
 				}
 			</h1>
 			@patterns.FormError(props.Error)
 			@ui.Card() {
 				@ui.CardBody() {
-					<form method="post" action={ templ.SafeURL(functionalityFormAction(props)) } class="space-y-6">
+					<form method="post" action={ templ.SafeURL(capabilityFormAction(props)) } class="space-y-6">
 						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
 						@ui.TextInput(ui.InputProps{
 							ID:          "name",
@@ -63,7 +63,7 @@ templ FunctionalityFormPage(props FunctionalityFormProps) {
 							Name:        "description",
 							Label:       "Description",
 							Value:       props.Description,
-							Placeholder: "Describe this functionality...",
+							Placeholder: "Describe this capability...",
 							Rows:        4,
 						})
 						@ui.Select(ui.SelectProps{
@@ -80,9 +80,9 @@ templ FunctionalityFormPage(props FunctionalityFormProps) {
 							Label:    "Milestone",
 							Value:    props.MilestoneID,
 							Options:  milestoneSelectOptions(props.Milestones),
-							HelpText: "Optional. Link this functionality to a milestone.",
+							HelpText: "Optional. Link this capability to a milestone.",
 						})
-						@patterns.FormActions(functionalitySubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/functionalities")
+						@patterns.FormActions(capabilitySubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/capabilities")
 					</form>
 				}
 			}
@@ -90,15 +90,15 @@ templ FunctionalityFormPage(props FunctionalityFormProps) {
 	}
 }
 
-func functionalityFormBreadcrumbs(props FunctionalityFormProps) []templates.BreadcrumbItem {
+func capabilityFormBreadcrumbs(props CapabilityFormProps) []templates.BreadcrumbItem {
 	crumbs := []templates.BreadcrumbItem{
 		{Label: "Dashboard", Href: "/"},
 		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
-		{Label: "Functionalities", Href: "/products/" + props.Product.ID + "/functionalities"},
+		{Label: "Capabilities", Href: "/products/" + props.Product.ID + "/capabilities"},
 	}
 	if props.IsEdit {
 		crumbs = append(crumbs,
-			templates.BreadcrumbItem{Label: props.Functionality.Name, Href: "/products/" + props.Product.ID + "/functionalities/" + props.Functionality.ID},
+			templates.BreadcrumbItem{Label: props.Capability.Name, Href: "/products/" + props.Product.ID + "/capabilities/" + props.Capability.ID},
 			templates.BreadcrumbItem{Label: "Edit"},
 		)
 	} else {
@@ -107,18 +107,18 @@ func functionalityFormBreadcrumbs(props FunctionalityFormProps) []templates.Brea
 	return crumbs
 }
 
-func functionalityFormAction(props FunctionalityFormProps) string {
+func capabilityFormAction(props CapabilityFormProps) string {
 	if props.IsEdit {
-		return "/products/" + props.Product.ID + "/functionalities/" + props.Functionality.ID
+		return "/products/" + props.Product.ID + "/capabilities/" + props.Capability.ID
 	}
-	return "/products/" + props.Product.ID + "/functionalities"
+	return "/products/" + props.Product.ID + "/capabilities"
 }
 
-func functionalitySubmitLabel(isEdit bool) string {
+func capabilitySubmitLabel(isEdit bool) string {
 	if isEdit {
 		return "Save Changes"
 	}
-	return "Create Functionality"
+	return "Create Capability"
 }
 
 // componentSelectOptions builds select options from components with an empty "None" option.

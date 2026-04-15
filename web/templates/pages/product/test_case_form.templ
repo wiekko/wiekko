@@ -16,7 +16,7 @@ type TestCaseFormProps struct {
 	Product         *model.Product
 	TestCase        *model.TestCase // nil for create
 	Components      []*model.Component
-	Functionalities []*model.Functionality
+	Capabilities    []*model.Capability
 	PyramidLevels   []*model.PyramidLevel
 	IsEdit          bool
 	Error           string
@@ -26,7 +26,7 @@ type TestCaseFormProps struct {
 	ExecutionMode   string
 	TestIdentifier  string
 	ComponentID     string
-	FunctionalityID string
+	CapabilityID    string
 	PyramidLevelID  string
 }
 
@@ -95,12 +95,12 @@ templ TestCaseFormPage(props TestCaseFormProps) {
 							HelpText: "Optional. Assign to a component.",
 						})
 						@ui.Select(ui.SelectProps{
-							ID:       "functionality_id",
-							Name:     "functionality_id",
-							Label:    "Functionality",
-							Value:    props.FunctionalityID,
-							Options:  functionalitySelectOptions(props.Functionalities),
-							HelpText: "Optional. Assign to a functionality.",
+							ID:       "capability_id",
+							Name:     "capability_id",
+							Label:    "Capability",
+							Value:    props.CapabilityID,
+							Options:  capabilitySelectOptions(props.Capabilities),
+							HelpText: "Optional. Assign to a capability.",
 						})
 						@ui.Select(ui.SelectProps{
 							ID:       "pyramid_level_id",
@@ -159,11 +159,11 @@ func executionModeOptions(current string) []templates.SelectOption {
 	}
 }
 
-// functionalitySelectOptions builds select options from functionalities with an empty "None" option.
-func functionalitySelectOptions(functionalities []*model.Functionality) []templates.SelectOption {
-	opts := make([]templates.SelectOption, 0, len(functionalities)+1)
+// capabilitySelectOptions builds select options from capabilities with an empty "None" option.
+func capabilitySelectOptions(capabilities []*model.Capability) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(capabilities)+1)
 	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
-	for _, f := range functionalities {
+	for _, f := range capabilities {
 		opts = append(opts, templates.SelectOption{Value: f.ID, Label: f.Name})
 	}
 	return opts

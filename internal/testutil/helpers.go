@@ -139,15 +139,15 @@ func MakeComponent(overrides ...func(*model.Component)) *model.Component {
 	return c
 }
 
-// MakeFunctionality returns a functionality with sensible defaults.
-func MakeFunctionality(overrides ...func(*model.Functionality)) *model.Functionality {
+// MakeCapability returns a capability with sensible defaults.
+func MakeCapability(overrides ...func(*model.Capability)) *model.Capability {
 	now := time.Now().UTC().Format(time.RFC3339)
-	f := &model.Functionality{
-		ID:          "functionality-001",
+	f := &model.Capability{
+		ID:          "capability-001",
 		ProductID:   "product-001",
 		ComponentID: "component-001",
-		Name:        "Test Functionality",
-		Description: "A test functionality",
+		Name:        "Test Capability",
+		Description: "A test capability",
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -155,6 +155,21 @@ func MakeFunctionality(overrides ...func(*model.Functionality)) *model.Functiona
 		fn(f)
 	}
 	return f
+}
+
+// MakeRequirementCapability returns a requirement-capability link with sensible defaults.
+func MakeRequirementCapability(overrides ...func(*model.RequirementCapability)) *model.RequirementCapability {
+	now := time.Now().UTC().Format(time.RFC3339)
+	rc := &model.RequirementCapability{
+		ID:            "reqcap-001",
+		RequirementID: "req-001",
+		CapabilityID:  "capability-001",
+		CreatedAt:     now,
+	}
+	for _, fn := range overrides {
+		fn(rc)
+	}
+	return rc
 }
 
 // MakeMilestone returns a milestone with sensible defaults.

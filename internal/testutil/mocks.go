@@ -266,33 +266,49 @@ func (m *MockComponentStore) ListByProductID(ctx context.Context, productID stri
 	return m.ListByProductIDFunc(ctx, productID)
 }
 
-// MockFunctionalityStore implements store.FunctionalityStore with configurable function fields.
-type MockFunctionalityStore struct {
-	CreateFunc            func(ctx context.Context, f *model.Functionality) error
-	GetByIDFunc           func(ctx context.Context, id string) (*model.Functionality, error)
-	UpdateFunc            func(ctx context.Context, f *model.Functionality) error
-	DeleteFunc            func(ctx context.Context, id string) error
-	ListByProductIDFunc   func(ctx context.Context, productID string) ([]*model.Functionality, error)
-	ListByComponentIDFunc func(ctx context.Context, componentID string) ([]*model.Functionality, error)
+// MockCapabilityStore implements store.CapabilityStore with configurable function fields.
+type MockCapabilityStore struct {
+	CreateFunc                        func(ctx context.Context, c *model.Capability) error
+	GetByIDFunc                       func(ctx context.Context, id string) (*model.Capability, error)
+	UpdateFunc                        func(ctx context.Context, c *model.Capability) error
+	DeleteFunc                        func(ctx context.Context, id string) error
+	ListByProductIDFunc               func(ctx context.Context, productID string) ([]*model.Capability, error)
+	ListByComponentIDFunc             func(ctx context.Context, componentID string) ([]*model.Capability, error)
+	LinkRequirementFunc               func(ctx context.Context, link *model.RequirementCapability) error
+	UnlinkRequirementFunc             func(ctx context.Context, capabilityID, requirementID string) error
+	ListRequirementsByCapabilityFunc  func(ctx context.Context, capabilityID string) ([]*model.RequirementCapability, error)
+	ListCapabilitiesByRequirementFunc func(ctx context.Context, requirementID string) ([]*model.RequirementCapability, error)
 }
 
-func (m *MockFunctionalityStore) Create(ctx context.Context, f *model.Functionality) error {
-	return m.CreateFunc(ctx, f)
+func (m *MockCapabilityStore) Create(ctx context.Context, c *model.Capability) error {
+	return m.CreateFunc(ctx, c)
 }
-func (m *MockFunctionalityStore) GetByID(ctx context.Context, id string) (*model.Functionality, error) {
+func (m *MockCapabilityStore) GetByID(ctx context.Context, id string) (*model.Capability, error) {
 	return m.GetByIDFunc(ctx, id)
 }
-func (m *MockFunctionalityStore) Update(ctx context.Context, f *model.Functionality) error {
-	return m.UpdateFunc(ctx, f)
+func (m *MockCapabilityStore) Update(ctx context.Context, c *model.Capability) error {
+	return m.UpdateFunc(ctx, c)
 }
-func (m *MockFunctionalityStore) Delete(ctx context.Context, id string) error {
+func (m *MockCapabilityStore) Delete(ctx context.Context, id string) error {
 	return m.DeleteFunc(ctx, id)
 }
-func (m *MockFunctionalityStore) ListByProductID(ctx context.Context, productID string) ([]*model.Functionality, error) {
+func (m *MockCapabilityStore) ListByProductID(ctx context.Context, productID string) ([]*model.Capability, error) {
 	return m.ListByProductIDFunc(ctx, productID)
 }
-func (m *MockFunctionalityStore) ListByComponentID(ctx context.Context, componentID string) ([]*model.Functionality, error) {
+func (m *MockCapabilityStore) ListByComponentID(ctx context.Context, componentID string) ([]*model.Capability, error) {
 	return m.ListByComponentIDFunc(ctx, componentID)
+}
+func (m *MockCapabilityStore) LinkRequirement(ctx context.Context, link *model.RequirementCapability) error {
+	return m.LinkRequirementFunc(ctx, link)
+}
+func (m *MockCapabilityStore) UnlinkRequirement(ctx context.Context, capabilityID, requirementID string) error {
+	return m.UnlinkRequirementFunc(ctx, capabilityID, requirementID)
+}
+func (m *MockCapabilityStore) ListRequirementsByCapability(ctx context.Context, capabilityID string) ([]*model.RequirementCapability, error) {
+	return m.ListRequirementsByCapabilityFunc(ctx, capabilityID)
+}
+func (m *MockCapabilityStore) ListCapabilitiesByRequirement(ctx context.Context, requirementID string) ([]*model.RequirementCapability, error) {
+	return m.ListCapabilitiesByRequirementFunc(ctx, requirementID)
 }
 
 // MockMilestoneStore implements store.MilestoneStore with configurable function fields.

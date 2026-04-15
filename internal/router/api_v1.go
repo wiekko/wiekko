@@ -85,12 +85,22 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("PATCH /products/{productId}/components/{id}", authed(csrf(http.HandlerFunc(componentCtrl.UpdateComponent))))
 	apiV1.Handle("DELETE /products/{productId}/components/{id}", authed(csrf(http.HandlerFunc(componentCtrl.DeleteComponent))))
 
-	// Functionalities.
-	apiV1.Handle("GET /products/{productId}/functionalities", authed(http.HandlerFunc(componentCtrl.ListFunctionalities)))
-	apiV1.Handle("POST /products/{productId}/functionalities", authed(csrf(http.HandlerFunc(componentCtrl.CreateFunctionality))))
-	apiV1.Handle("GET /products/{productId}/functionalities/{id}", authed(http.HandlerFunc(componentCtrl.GetFunctionality)))
-	apiV1.Handle("PATCH /products/{productId}/functionalities/{id}", authed(csrf(http.HandlerFunc(componentCtrl.UpdateFunctionality))))
-	apiV1.Handle("DELETE /products/{productId}/functionalities/{id}", authed(csrf(http.HandlerFunc(componentCtrl.DeleteFunctionality))))
+	// Capabilities.
+	apiV1.Handle("GET /products/{productId}/capabilities", authed(http.HandlerFunc(componentCtrl.ListCapabilities)))
+	apiV1.Handle("POST /products/{productId}/capabilities", authed(csrf(http.HandlerFunc(componentCtrl.CreateCapability))))
+	apiV1.Handle("GET /products/{productId}/capabilities/{id}", authed(http.HandlerFunc(componentCtrl.GetCapability)))
+	apiV1.Handle("PATCH /products/{productId}/capabilities/{id}", authed(csrf(http.HandlerFunc(componentCtrl.UpdateCapability))))
+	apiV1.Handle("DELETE /products/{productId}/capabilities/{id}", authed(csrf(http.HandlerFunc(componentCtrl.DeleteCapability))))
+
+	// Capability-requirement links.
+	apiV1.Handle("GET /products/{productId}/capabilities/{id}/requirements", authed(http.HandlerFunc(componentCtrl.ListCapabilityRequirements)))
+	apiV1.Handle("POST /products/{productId}/capabilities/{id}/requirements", authed(csrf(http.HandlerFunc(componentCtrl.LinkCapabilityRequirement))))
+	apiV1.Handle("DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}", authed(csrf(http.HandlerFunc(componentCtrl.UnlinkCapabilityRequirement))))
+
+	// Requirement-capability links.
+	apiV1.Handle("GET /products/{productId}/requirements/{id}/capabilities", authed(http.HandlerFunc(componentCtrl.ListRequirementCapabilities)))
+	apiV1.Handle("POST /products/{productId}/requirements/{id}/capabilities", authed(csrf(http.HandlerFunc(componentCtrl.LinkRequirementCapability))))
+	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/capabilities/{capId}", authed(csrf(http.HandlerFunc(componentCtrl.UnlinkRequirementCapability))))
 
 	// Milestones.
 	apiV1.Handle("GET /products/{productId}/milestones", authed(http.HandlerFunc(planningCtrl.ListMilestones)))

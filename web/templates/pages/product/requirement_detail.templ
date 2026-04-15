@@ -58,6 +58,9 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 			@ui.TabPanel("overview") {
 				@RequirementOverviewTabContent(props)
 			}
+			@ui.TabPanelHidden("capabilities") {
+				@ui.LoadingSpinner("md")
+			}
 			@ui.TabPanelHidden("test-cases") {
 				@ui.LoadingSpinner("md")
 			}
@@ -170,6 +173,12 @@ templ requirementLinkedField(label, name, href string) {
 	</div>
 }
 
+templ RequirementCapabilitiesTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("layers", "No linked capabilities", "Capabilities linked to this requirement will appear here.", "", "")
+	}
+}
+
 templ RequirementTestCasesTabContent() {
 	@ui.Card() {
 		@ui.EmptyState("beaker", "No linked test cases", "Test cases linked to this requirement will appear here.", "", "")
@@ -213,6 +222,7 @@ func requirementDetailTabs(productID, requirementID string) []templates.TabDef {
 	base := fmt.Sprintf("/products/%s/requirements/%s/tabs", productID, requirementID)
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},

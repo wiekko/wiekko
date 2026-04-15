@@ -1,0 +1,155 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// CapabilityDetailProps holds data for the capability detail page.
+type CapabilityDetailProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Capability     *model.Capability
+	ComponentName  string
+	MilestoneName  string
+	IsOwnerOrAdmin bool
+}
+
+templ CapabilityDetailPage(props CapabilityDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "capabilities",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Capabilities", Href: "/products/" + props.Product.ID + "/capabilities"},
+					{Label: props.Capability.Name},
+				},
+				props.Capability.Name,
+				capabilitySubtitle(props.ComponentName),
+				capabilityEditHref(props),
+				capabilityDeleteURL(props),
+				props.Meta.CSRFToken,
+			)
+			<!-- Tabs -->
+			@ui.TabGroup(capabilityDetailTabs(props.Product.ID, props.Capability.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@CapabilityOverviewTabContent(props.Product.ID, props.Capability, props.ComponentName, props.MilestoneName)
+			}
+			@ui.TabPanelHidden("requirements") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("test-cases") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("defects") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ CapabilityOverviewTabContent(productID string, f *model.Capability, componentName, milestoneName string) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Component", capabilityComponentDisplay(componentName))
+				@patterns.DetailField("Milestone", componentMilestoneDisplay(milestoneName))
+				@patterns.DetailField("Created", formatDate(f.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(f.UpdatedAt))
+			}
+			@patterns.DetailDescription(f.Description)
+		}
+	}
+}
+
+templ CapabilityRequirementsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("clipboard-list", "No linked requirements", "Requirements linked to this capability will appear here.", "", "")
+	}
+}
+
+templ CapabilityTestCasesTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("beaker", "No test cases", "Test cases linked to this capability will appear here.", "", "")
+	}
+}
+
+templ CapabilityDefectsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("bug", "No defects", "Defects linked to this capability will appear here.", "", "")
+	}
+}
+
+templ CapabilityHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this capability will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// CapabilityDeleteConfirmation renders the delete confirmation for a capability.
+templ CapabilityDeleteConfirmation(name, productID, capabilityID string) {
+	@patterns.DeleteConfirmation("capability", fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID))
+}
+
+func capabilityDetailTabs(productID, capabilityID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/capabilities/%s/tabs", productID, capabilityID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
+		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
+		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func capabilitySubtitle(componentName string) string {
+	if componentName != "" {
+		return "Part of " + componentName
+	}
+	return "Top-level capability"
+}
+
+func capabilityEditHref(props CapabilityDetailProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/capabilities/" + props.Capability.ID + "/edit"
+	}
+	return ""
+}
+
+func capabilityDeleteURL(props CapabilityDetailProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/capabilities/" + props.Capability.ID
+	}
+	return ""
+}
+
+func capabilityComponentDisplay(name string) string {
+	if name == "" {
+		return "None (top-level)"
+	}
+	return name
+}

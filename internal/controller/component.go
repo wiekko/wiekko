@@ -9,7 +9,7 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// ComponentController handles component and functionality endpoints.
+// ComponentController handles component and capability endpoints.
 type ComponentController struct {
 	component *service.ComponentService
 }
@@ -124,14 +124,14 @@ func (c *ComponentController) DeleteComponent(w http.ResponseWriter, r *http.Req
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// --- Functionalities ---
+// --- Capabilities ---
 
-// ListFunctionalities handles GET /products/{productId}/functionalities.
-func (c *ComponentController) ListFunctionalities(w http.ResponseWriter, r *http.Request) {
+// ListCapabilities handles GET /products/{productId}/capabilities.
+func (c *ComponentController) ListCapabilities(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
-	items, err := c.component.ListFunctionalities(r.Context(), user, productID)
+	items, err := c.component.ListCapabilities(r.Context(), user, productID)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -139,13 +139,13 @@ func (c *ComponentController) ListFunctionalities(w http.ResponseWriter, r *http
 
 	result := make([]map[string]any, 0, len(items))
 	for _, item := range items {
-		result = append(result, functionalityToJSON(item))
+		result = append(result, capabilityToJSON(item))
 	}
 	httputil.JSON(w, http.StatusOK, result)
 }
 
-// CreateFunctionality handles POST /products/{productId}/functionalities.
-func (c *ComponentController) CreateFunctionality(w http.ResponseWriter, r *http.Request) {
+// CreateCapability handles POST /products/{productId}/capabilities.
+func (c *ComponentController) CreateCapability(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
@@ -159,7 +159,7 @@ func (c *ComponentController) CreateFunctionality(w http.ResponseWriter, r *http
 		return
 	}
 
-	item, err := c.component.CreateFunctionality(r.Context(), user, service.CreateFunctionalityInput{
+	item, err := c.component.CreateCapability(r.Context(), user, service.CreateCapabilityInput{
 		ProductID:   productID,
 		ComponentID: req.ComponentID,
 		Name:        req.Name,
@@ -171,26 +171,26 @@ func (c *ComponentController) CreateFunctionality(w http.ResponseWriter, r *http
 		return
 	}
 
-	httputil.JSON(w, http.StatusCreated, functionalityToJSON(item))
+	httputil.JSON(w, http.StatusCreated, capabilityToJSON(item))
 }
 
-// GetFunctionality handles GET /products/{productId}/functionalities/{id}.
-func (c *ComponentController) GetFunctionality(w http.ResponseWriter, r *http.Request) {
+// GetCapability handles GET /products/{productId}/capabilities/{id}.
+func (c *ComponentController) GetCapability(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	item, err := c.component.GetFunctionality(r.Context(), user, productID, id)
+	item, err := c.component.GetCapability(r.Context(), user, productID, id)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, functionalityToJSON(item))
+	httputil.JSON(w, http.StatusOK, capabilityToJSON(item))
 }
 
-// UpdateFunctionality handles PATCH /products/{productId}/functionalities/{id}.
-func (c *ComponentController) UpdateFunctionality(w http.ResponseWriter, r *http.Request) {
+// UpdateCapability handles PATCH /products/{productId}/capabilities/{id}.
+func (c *ComponentController) UpdateCapability(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
@@ -205,7 +205,7 @@ func (c *ComponentController) UpdateFunctionality(w http.ResponseWriter, r *http
 		return
 	}
 
-	item, err := c.component.UpdateFunctionality(r.Context(), user, productID, id, service.UpdateFunctionalityInput{
+	item, err := c.component.UpdateCapability(r.Context(), user, productID, id, service.UpdateCapabilityInput{
 		Name:        req.Name,
 		Description: req.Description,
 		ComponentID: req.ComponentID,
@@ -216,21 +216,133 @@ func (c *ComponentController) UpdateFunctionality(w http.ResponseWriter, r *http
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, functionalityToJSON(item))
+	httputil.JSON(w, http.StatusOK, capabilityToJSON(item))
 }
 
-// DeleteFunctionality handles DELETE /products/{productId}/functionalities/{id}.
-func (c *ComponentController) DeleteFunctionality(w http.ResponseWriter, r *http.Request) {
+// DeleteCapability handles DELETE /products/{productId}/capabilities/{id}.
+func (c *ComponentController) DeleteCapability(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	if err := c.component.DeleteFunctionality(r.Context(), user, productID, id); err != nil {
+	if err := c.component.DeleteCapability(r.Context(), user, productID, id); err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// --- Capability-Requirement Links ---
+
+// ListCapabilityRequirements handles GET /products/{productId}/capabilities/{id}/requirements.
+func (c *ComponentController) ListCapabilityRequirements(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	items, err := c.component.ListCapabilityRequirements(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		result = append(result, requirementCapabilityToJSON(item))
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+// LinkCapabilityRequirement handles POST /products/{productId}/capabilities/{id}/requirements.
+func (c *ComponentController) LinkCapabilityRequirement(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	var req struct {
+		RequirementID string `json:"requirement_id"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, id, req.RequirementID); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusCreated, map[string]string{"status": "linked"})
+}
+
+// UnlinkCapabilityRequirement handles DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}.
+func (c *ComponentController) UnlinkCapabilityRequirement(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+	reqID := r.PathValue("reqId")
+
+	if err := c.component.UnlinkRequirementFromCapability(r.Context(), user, productID, id, reqID); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, map[string]string{"status": "unlinked"})
+}
+
+// ListRequirementCapabilities handles GET /products/{productId}/requirements/{id}/capabilities.
+func (c *ComponentController) ListRequirementCapabilities(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	items, err := c.component.ListRequirementCapabilities(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		result = append(result, requirementCapabilityToJSON(item))
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+// LinkRequirementCapability handles POST /products/{productId}/requirements/{id}/capabilities.
+func (c *ComponentController) LinkRequirementCapability(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	reqID := r.PathValue("id")
+
+	var req struct {
+		CapabilityID string `json:"capability_id"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, req.CapabilityID, reqID); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusCreated, map[string]string{"status": "linked"})
+}
+
+// UnlinkRequirementCapability handles DELETE /products/{productId}/requirements/{id}/capabilities/{capId}.
+func (c *ComponentController) UnlinkRequirementCapability(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	reqID := r.PathValue("id")
+	capID := r.PathValue("capId")
+
+	if err := c.component.UnlinkRequirementFromCapability(r.Context(), user, productID, capID, reqID); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, map[string]string{"status": "unlinked"})
 }
 
 func componentToJSON(c *model.Component) map[string]any {
@@ -245,15 +357,24 @@ func componentToJSON(c *model.Component) map[string]any {
 	}
 }
 
-func functionalityToJSON(f *model.Functionality) map[string]any {
+func capabilityToJSON(cap *model.Capability) map[string]any {
 	return map[string]any{
-		"id":           f.ID,
-		"product_id":   f.ProductID,
-		"component_id": f.ComponentID,
-		"name":         f.Name,
-		"description":  f.Description,
-		"milestone_id": f.MilestoneID,
-		"created_at":   f.CreatedAt,
-		"updated_at":   f.UpdatedAt,
+		"id":           cap.ID,
+		"product_id":   cap.ProductID,
+		"component_id": cap.ComponentID,
+		"name":         cap.Name,
+		"description":  cap.Description,
+		"milestone_id": cap.MilestoneID,
+		"created_at":   cap.CreatedAt,
+		"updated_at":   cap.UpdatedAt,
+	}
+}
+
+func requirementCapabilityToJSON(rc *model.RequirementCapability) map[string]any {
+	return map[string]any{
+		"id":             rc.ID,
+		"requirement_id": rc.RequirementID,
+		"capability_id":  rc.CapabilityID,
+		"created_at":     rc.CreatedAt,
 	}
 }

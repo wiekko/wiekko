@@ -100,9 +100,10 @@
 
 * **FR-001**: The top level model entity shall be the `product`
 * **FR-002**: A `product` shall have `components`
-* **FR-003**: A `product` shall have `functionalities`
-* **FR-004**: `functionalities` can be linked to `components`, or exist directly under the `product` (top level)
+* **FR-003**: A `product` shall have `capabilities`
+* **FR-004**: `capabilities` can be linked to `components`, or exist directly under the `product` (top level)
 * **FR-005**: A `product` shall have `requirements`. All not yet fulfilled `requirements` are the `backlog`
+* **FR-005a**: `requirements` can optionally be linked to `capabilities` (many-to-many), establishing traceability from specification to testable feature areas
 * **FR-006**: `requirements` shall be grouped into *architecture*, *security*, *functionality* and *user experience* requirements
 * **FR-007**: `requirements` shall have a `definition of done`.
 * **FR-008**: `requirements` can have parent-child relations, allowing hierarchical decomposition without prescribing specific agile terminology (e.g. epic, story, task)
@@ -110,9 +111,9 @@
 * **FR-010**: `requirements` and `defects` can optionally have an estimation (e.g. story points or time-based); the estimation mechanism shall be configurable per product
 * **FR-011**: A `product` shall have a `roadmap` with `milestones`
 * **FR-012**: `milestones` shall have a `type` (e.g. planning, release, internal) to distinguish regular planning checkpoints from shippable releases
-* **FR-013**: `components`, `functionalities` and `requirements` can be linked to `milestones`
+* **FR-013**: `components`, `capabilities` and `requirements` can be linked to `milestones`
 * **FR-014**: A `product` shall have `test cases`
-* **FR-015**: `test cases` can be linked to `components`, `functionalities` or exist directly under the `product`
+* **FR-015**: `test cases` can be linked to `components`, `capabilities` or exist directly under the `product`
 * **FR-016**: `test cases` can be linked to `requirements` or their `definition of done`
 * **FR-017**: `test cases` can either be automatic or user-driven tests
 * **FR-018**: Automatic `test cases` shall be linked to a specific test identifier in code (e.g. a Go test function name), allowing results to be ingested from CI pipelines or the CLI
@@ -120,7 +121,7 @@
 * **FR-020**: `runtime environments` shall be freely definable labels (e.g. OS, browser, third-party software) configurable per product
 * **FR-021**: `test cases` have a status (pending, passed, failed) in conjunction with a `testing campaign`
 * **FR-022**: A `product` shall have `defects`
-* **FR-023**: A `defect` can be linked to `components`, `functionalities` or a `test case`
+* **FR-023**: A `defect` can be linked to `components`, `capabilities` or a `test case`
 * **FR-024**: A `defect` shall have a `criticality` and a `status`
 * **FR-025**: A `defect` can be linked to a `milestone`
 * **FR-026**: A `defect` can have `comments` and `attachments`
@@ -128,7 +129,7 @@
 * **FR-028**: A `sprint` has a start and end date, and can contain `requirements`, and `defects`.
 * **FR-029**: A `sprint` can be linked to a `milestone` ("leads towards" / "enables")
 * **FR-030**: All text fields (descriptions, comments, definitions of done) shall support Markdown formatting
-* **FR-031**: All changes to `products`, `components`, `functionalities`, `requirements`, `test cases`, `defects`, `milestones` and `sprints` shall be recorded in an audit trail (who changed what, when)
+* **FR-031**: All changes to `products`, `components`, `capabilities`, `requirements`, `test cases`, `defects`, `milestones` and `sprints` shall be recorded in an audit trail (who changed what, when)
 * **FR-032**: `test cases` can have one `pyramid level` (or none if feature isn't used).
 * **FR-033**: `pyramid levels` are defined per product (default: "unit", "integration", "system", "acceptance")
 * **FR-034**: `pyramid levels` can be hierarchical, i.e. have a parent level (optional, max depth: 2)
@@ -142,7 +143,7 @@
 * **FR-104**: Administrators shall be able to lock other user accounts
 * **FR-105**: Administrators shall be able to remove other user accounts and their data
 * **FR-106**: Administrators shall be able to assign a new password to any user account
-* **FR-107**: Administrators shall be able to create, view, edit or delete any `product`, `component`, `functionality`, `requirement`, `test case` or `defect`
+* **FR-107**: Administrators shall be able to create, view, edit or delete any `product`, `component`, `capability`, `requirement`, `test case` or `defect`
 
 ### User Accounts
 
@@ -162,7 +163,7 @@
 * **FR-304**: Product owners shall be able to add further users to the product, and assign a role for them
 * **FR-305**: Product owners shall be able to invite not-yet existing users (with a token link) to join their product, with the pre-assigned role
 * **FR-306**: Product owners shall be able to transfer ownership to another user account. If the account has not yet been created (pending invitation), the transfer shall be pending as well, and only be completed once the new account is fully established.
-* **FR-307**: Product owners shall be able to create, update and delete components and functionalities
+* **FR-307**: Product owners shall be able to create, update and delete components and capabilities
 * **FR-308**: Product owners shall be able to create, update and delete requirements (including definition of done).
 * **FR-309**: Product owners shall be able to update the product roadmap (create, update, delete milestones).
 * **FR-310**: Product owners shall be able to create, update and delete test cases
@@ -188,7 +189,7 @@
 
 ### Development
 
-* **FR-401**: Developers shall be able to add comments to components, functionalities and requirements
+* **FR-401**: Developers shall be able to add comments to components, capabilities and requirements
 * **FR-402**: Developers shall be able to create, update and delete test cases
 * **FR-403**: Developers shall be able to define which conditions re-set a test case (mainly for the webhook API)
 * **FR-404**: Developers shall be able to manually re-set a test case (slate for re-testing after a change)
@@ -200,7 +201,7 @@
 
 ### Testing
 
-* **FR-501**: Testers shall be able to create defects and link them to a test case, requirement, component or functionality
+* **FR-501**: Testers shall be able to create defects and link them to a test case, requirement, component or capability
 * **FR-502**: Testers shall be able to mark test cases as processed. If no defect is recorded, they count as passed. A recorded (or linked) defect marks them as failed.
 * **FR-503**: Testers shall be able to add comments and attachments to defects.
 

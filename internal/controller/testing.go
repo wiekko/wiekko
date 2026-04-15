@@ -45,27 +45,27 @@ func (c *TestingController) CreateTestCase(w http.ResponseWriter, r *http.Reques
 	productID := r.PathValue("productId")
 
 	var req struct {
-		ComponentID     string `json:"component_id"`
-		FunctionalityID string `json:"functionality_id"`
-		Title           string `json:"title"`
-		Description     string `json:"description"`
-		ExecutionMode   string `json:"execution_mode"`
-		TestIdentifier  string `json:"test_identifier"`
-		PyramidLevelID  string `json:"pyramid_level_id"`
+		ComponentID    string `json:"component_id"`
+		CapabilityID   string `json:"capability_id"`
+		Title          string `json:"title"`
+		Description    string `json:"description"`
+		ExecutionMode  string `json:"execution_mode"`
+		TestIdentifier string `json:"test_identifier"`
+		PyramidLevelID string `json:"pyramid_level_id"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	item, err := c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
-		ProductID:       productID,
-		ComponentID:     req.ComponentID,
-		FunctionalityID: req.FunctionalityID,
-		Title:           req.Title,
-		Description:     req.Description,
-		ExecutionMode:   req.ExecutionMode,
-		TestIdentifier:  req.TestIdentifier,
-		PyramidLevelID:  req.PyramidLevelID,
+		ProductID:      productID,
+		ComponentID:    req.ComponentID,
+		CapabilityID:   req.CapabilityID,
+		Title:          req.Title,
+		Description:    req.Description,
+		ExecutionMode:  req.ExecutionMode,
+		TestIdentifier: req.TestIdentifier,
+		PyramidLevelID: req.PyramidLevelID,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -97,26 +97,26 @@ func (c *TestingController) UpdateTestCase(w http.ResponseWriter, r *http.Reques
 	id := r.PathValue("id")
 
 	var req struct {
-		ComponentID     *string `json:"component_id"`
-		FunctionalityID *string `json:"functionality_id"`
-		Title           *string `json:"title"`
-		Description     *string `json:"description"`
-		ExecutionMode   *string `json:"execution_mode"`
-		TestIdentifier  *string `json:"test_identifier"`
-		PyramidLevelID  *string `json:"pyramid_level_id"`
+		ComponentID    *string `json:"component_id"`
+		CapabilityID   *string `json:"capability_id"`
+		Title          *string `json:"title"`
+		Description    *string `json:"description"`
+		ExecutionMode  *string `json:"execution_mode"`
+		TestIdentifier *string `json:"test_identifier"`
+		PyramidLevelID *string `json:"pyramid_level_id"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	item, err := c.testing.UpdateTestCase(r.Context(), user, productID, id, service.UpdateTestCaseInput{
-		ComponentID:     req.ComponentID,
-		FunctionalityID: req.FunctionalityID,
-		Title:           req.Title,
-		Description:     req.Description,
-		ExecutionMode:   req.ExecutionMode,
-		TestIdentifier:  req.TestIdentifier,
-		PyramidLevelID:  req.PyramidLevelID,
+		ComponentID:    req.ComponentID,
+		CapabilityID:   req.CapabilityID,
+		Title:          req.Title,
+		Description:    req.Description,
+		ExecutionMode:  req.ExecutionMode,
+		TestIdentifier: req.TestIdentifier,
+		PyramidLevelID: req.PyramidLevelID,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -391,7 +391,7 @@ func testCaseToJSON(tc *model.TestCase) map[string]any {
 		"id":               tc.ID,
 		"product_id":       tc.ProductID,
 		"component_id":     tc.ComponentID,
-		"functionality_id": tc.FunctionalityID,
+		"capability_id":    tc.CapabilityID,
 		"title":            tc.Title,
 		"description":      tc.Description,
 		"execution_mode":   tc.ExecutionMode,

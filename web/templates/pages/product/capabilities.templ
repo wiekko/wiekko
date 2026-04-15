@@ -10,24 +10,24 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// FunctionalitiesProps holds data for the functionalities list page.
-type FunctionalitiesProps struct {
+// CapabilitiesProps holds data for the capabilities list page.
+type CapabilitiesProps struct {
 	Meta           templates.PageMeta
 	DisplayName    string
 	IsAdmin        bool
 	Product        *model.Product
-	Functionalities []*model.Functionality
-	Components     map[string]string // component ID → name
-	Milestones     map[string]string // milestone ID → name
+	Capabilities   []*model.Capability
+	Components     map[string]string // component ID -> name
+	Milestones     map[string]string // milestone ID -> name
 	IsOwnerOrAdmin bool
 }
 
-templ FunctionalitiesPage(props FunctionalitiesProps) {
+templ CapabilitiesPage(props CapabilitiesProps) {
 	@layout.AppLayout(layout.AppLayoutProps{
 		Meta:          props.Meta,
 		DisplayName:   props.DisplayName,
 		IsAdmin:       props.IsAdmin,
-		ActiveSection: "functionalities",
+		ActiveSection: "capabilities",
 		ProductID:     props.Product.ID,
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
@@ -36,25 +36,25 @@ templ FunctionalitiesPage(props FunctionalitiesProps) {
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
-				{Label: "Functionalities"},
+				{Label: "Capabilities"},
 			})
-			if len(props.Functionalities) == 0 {
-				@patterns.ListPageHeader("Functionalities", "", "", -1)
+			if len(props.Capabilities) == 0 {
+				@patterns.ListPageHeader("Capabilities", "", "", -1)
 				@ui.Card() {
 					if props.IsOwnerOrAdmin {
-						@ui.EmptyState("layers", "No functionalities yet", "Create your first functionality to describe your product capabilities.", "New Functionality", "/products/"+props.Product.ID+"/functionalities/new")
-					} else {synced / split defect and requirement statuses
-						@ui.EmptyState("layers", "No functionalities yet", "No functionalities have been created for this product.", "", "")
+						@ui.EmptyState("layers", "No capabilities yet", "Create your first capability to describe your product capabilities.", "New Capability", "/products/"+props.Product.ID+"/capabilities/new")
+					} else {
+						@ui.EmptyState("layers", "No capabilities yet", "No capabilities have been created for this product.", "", "")
 					}
 				}
 			} else {
 				<div class="flex items-center justify-between">
 					<div>
-						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Functionalities</h1>
-						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d items", len(props.Functionalities)) }</p>
+						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Capabilities</h1>
+						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d items", len(props.Capabilities)) }</p>
 					</div>
 					if props.IsOwnerOrAdmin {
-						@ui.LinkButton("/products/"+props.Product.ID+"/functionalities/new", "New Functionality", "primary", "md") {
+						@ui.LinkButton("/products/"+props.Product.ID+"/capabilities/new", "New Capability", "primary", "md") {
 							@ui.Icon("plus", "sm")
 						}
 					}
@@ -76,11 +76,11 @@ templ FunctionalitiesPage(props FunctionalitiesProps) {
 							}
 						}
 						@ui.TableBody("") {
-							for _, f := range props.Functionalities {
+							for _, f := range props.Capabilities {
 								@ui.TableRow("") {
 									@ui.TableCell() {
 										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/functionalities/%s", props.Product.ID, f.ID)) }
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", props.Product.ID, f.ID)) }
 											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
 										>
 											{ f.Name }

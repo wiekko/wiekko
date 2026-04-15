@@ -61,10 +61,10 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services 
 			authz:         authz,
 		},
 		Component: &ComponentService{
-			components:      st.Component,
-			functionalities: st.Functionality,
-			audit:           st.Audit,
-			authz:           authz,
+			components:   st.Component,
+			capabilities: st.Capability,
+			audit:        st.Audit,
+			authz:        authz,
 		},
 		Milestone: &MilestoneService{
 			milestones:    st.Milestone,

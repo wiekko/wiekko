@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS components (
 );
 CREATE INDEX IF NOT EXISTS idx_components_product_id ON components(product_id);
 
--- Functionalities: linked to components or top-level (FR-003, FR-004)
-CREATE TABLE IF NOT EXISTS functionalities (
+-- Capabilities: linked to components or top-level (FR-003, FR-004)
+CREATE TABLE IF NOT EXISTS capabilities (
     id           UUID PRIMARY KEY,
     product_id   UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     component_id UUID REFERENCES components(id) ON DELETE SET NULL,
@@ -61,8 +61,8 @@ CREATE TABLE IF NOT EXISTS functionalities (
     created_at   TIMESTAMPTZ NOT NULL,
     updated_at   TIMESTAMPTZ NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_functionalities_product_id ON functionalities(product_id);
-CREATE INDEX IF NOT EXISTS idx_functionalities_component_id ON functionalities(component_id);
+CREATE INDEX IF NOT EXISTS idx_capabilities_product_id ON capabilities(product_id);
+CREATE INDEX IF NOT EXISTS idx_capabilities_component_id ON capabilities(component_id);
 
 -- Configurable statuses for requirements and defects (FR-323)
 CREATE TABLE IF NOT EXISTS statuses (
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS test_cases (
     id               UUID PRIMARY KEY,
     product_id       UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     component_id     UUID REFERENCES components(id) ON DELETE SET NULL,
-    functionality_id UUID REFERENCES functionalities(id) ON DELETE SET NULL,
+    capability_id    UUID REFERENCES capabilities(id) ON DELETE SET NULL,
     title            TEXT NOT NULL,
     description      TEXT NOT NULL DEFAULT '',
     execution_mode   TEXT NOT NULL DEFAULT 'manual',
@@ -240,7 +240,18 @@ CREATE TABLE IF NOT EXISTS test_case_requirements (
 CREATE INDEX IF NOT EXISTS idx_test_case_requirements_test_case_id ON test_case_requirements(test_case_id);
 CREATE INDEX IF NOT EXISTS idx_test_case_requirements_requirement_id ON test_case_requirements(requirement_id);
 
--- Defect links: polymorphic links to components, functionalities, test cases (FR-023)
+-- Requirement to capability links (FR-005a)
+CREATE TABLE IF NOT EXISTS requirement_capabilities (
+    id             UUID PRIMARY KEY,
+    requirement_id UUID NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
+    capability_id  UUID NOT NULL REFERENCES capabilities(id) ON DELETE CASCADE,
+    created_at     TIMESTAMPTZ NOT NULL,
+    UNIQUE(requirement_id, capability_id)
+);
+CREATE INDEX IF NOT EXISTS idx_requirement_capabilities_requirement_id ON requirement_capabilities(requirement_id);
+CREATE INDEX IF NOT EXISTS idx_requirement_capabilities_capability_id ON requirement_capabilities(capability_id);
+
+-- Defect links: polymorphic links to components, capabilities, test cases (FR-023)
 CREATE TABLE IF NOT EXISTS defect_links (
     id          UUID PRIMARY KEY,
     defect_id   UUID NOT NULL REFERENCES defects(id) ON DELETE CASCADE,
@@ -299,6 +310,7 @@ DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS defect_links;
 DROP TABLE IF EXISTS test_case_requirements;
+DROP TABLE IF EXISTS requirement_capabilities;
 DROP TABLE IF EXISTS defect_assignments;
 DROP TABLE IF EXISTS requirement_assignments;
 DROP TABLE IF EXISTS campaign_results;
@@ -311,7 +323,7 @@ DROP TABLE IF EXISTS defects;
 DROP TABLE IF EXISTS requirements;
 DROP TABLE IF EXISTS sprints;
 DROP TABLE IF EXISTS statuses;
-DROP TABLE IF EXISTS functionalities;
+DROP TABLE IF EXISTS capabilities;
 DROP TABLE IF EXISTS components;
 DROP TABLE IF EXISTS milestones;
 DROP TABLE IF EXISTS product_roles;

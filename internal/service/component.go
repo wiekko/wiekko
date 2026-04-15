@@ -12,12 +12,12 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// ComponentService handles component and functionality CRUD.
+// ComponentService handles component and capability CRUD.
 type ComponentService struct {
-	components      store.ComponentStore
-	functionalities store.FunctionalityStore
-	audit           store.AuditStore
-	authz           *Authorizer
+	components   store.ComponentStore
+	capabilities store.CapabilityStore
+	audit        store.AuditStore
+	authz        *Authorizer
 }
 
 // CreateComponentInput contains the fields required to create a component.
@@ -35,8 +35,8 @@ type UpdateComponentInput struct {
 	MilestoneID *string
 }
 
-// CreateFunctionalityInput contains the fields required to create a functionality.
-type CreateFunctionalityInput struct {
+// CreateCapabilityInput contains the fields required to create a capability.
+type CreateCapabilityInput struct {
 	ProductID   string
 	ComponentID string
 	Name        string
@@ -44,8 +44,8 @@ type CreateFunctionalityInput struct {
 	MilestoneID string
 }
 
-// UpdateFunctionalityInput contains the fields that can be updated on a functionality.
-type UpdateFunctionalityInput struct {
+// UpdateCapabilityInput contains the fields that can be updated on a capability.
+type UpdateCapabilityInput struct {
 	Name        *string
 	Description *string
 	ComponentID *string
@@ -154,18 +154,18 @@ func (s *ComponentService) ListComponents(ctx context.Context, user *model.User,
 	return s.components.ListByProductID(ctx, productID)
 }
 
-// CreateFunctionality creates a new functionality. Requires owner role.
-func (s *ComponentService) CreateFunctionality(ctx context.Context, user *model.User, input CreateFunctionalityInput) (*model.Functionality, error) {
+// CreateCapability creates a new capability. Requires owner role.
+func (s *ComponentService) CreateCapability(ctx context.Context, user *model.User, input CreateCapabilityInput) (*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
 		return nil, err
 	}
 
 	if input.Name == "" {
-		return nil, errors.New("functionality name is required")
+		return nil, errors.New("capability name is required")
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	f := &model.Functionality{
+	c := &model.Capability{
 		ID:          uuid.New().String(),
 		ProductID:   input.ProductID,
 		ComponentID: input.ComponentID,
@@ -175,95 +175,134 @@ func (s *ComponentService) CreateFunctionality(ctx context.Context, user *model.
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.functionalities.Create(ctx, f); err != nil {
-		return nil, fmt.Errorf("create functionality: %w", err)
+	if err := s.capabilities.Create(ctx, c); err != nil {
+		return nil, fmt.Errorf("create capability: %w", err)
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "functionality", EntityID: f.ID,
+		ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
 		UserID: user.ID, Action: "create", CreatedAt: now,
 	})
 
-	return f, nil
+	return c, nil
 }
 
-// GetFunctionality returns a functionality by ID. Requires viewer role.
-func (s *ComponentService) GetFunctionality(ctx context.Context, user *model.User, productID, id string) (*model.Functionality, error) {
+// GetCapability returns a capability by ID. Requires viewer role.
+func (s *ComponentService) GetCapability(ctx context.Context, user *model.User, productID, id string) (*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
-	return s.functionalities.GetByID(ctx, id)
+	return s.capabilities.GetByID(ctx, id)
 }
 
-// UpdateFunctionality modifies a functionality. Requires owner role.
-func (s *ComponentService) UpdateFunctionality(ctx context.Context, user *model.User, productID, id string, input UpdateFunctionalityInput) (*model.Functionality, error) {
+// UpdateCapability modifies a capability. Requires owner role.
+func (s *ComponentService) UpdateCapability(ctx context.Context, user *model.User, productID, id string, input UpdateCapabilityInput) (*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return nil, err
 	}
 
-	f, err := s.functionalities.GetByID(ctx, id)
+	c, err := s.capabilities.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if input.Name != nil {
-		f.Name = *input.Name
+		c.Name = *input.Name
 	}
 	if input.Description != nil {
-		f.Description = *input.Description
+		c.Description = *input.Description
 	}
 	if input.ComponentID != nil {
-		f.ComponentID = *input.ComponentID
+		c.ComponentID = *input.ComponentID
 	}
 	if input.MilestoneID != nil {
-		f.MilestoneID = *input.MilestoneID
+		c.MilestoneID = *input.MilestoneID
 	}
-	f.UpdatedAt = now
+	c.UpdatedAt = now
 
-	if err := s.functionalities.Update(ctx, f); err != nil {
-		return nil, fmt.Errorf("update functionality: %w", err)
+	if err := s.capabilities.Update(ctx, c); err != nil {
+		return nil, fmt.Errorf("update capability: %w", err)
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "functionality", EntityID: f.ID,
+		ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
 		UserID: user.ID, Action: "update", CreatedAt: now,
 	})
 
-	return f, nil
+	return c, nil
 }
 
-// DeleteFunctionality removes a functionality. Requires owner role.
-func (s *ComponentService) DeleteFunctionality(ctx context.Context, user *model.User, productID, id string) error {
+// DeleteCapability removes a capability. Requires owner role.
+func (s *ComponentService) DeleteCapability(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.functionalities.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete functionality: %w", err)
+	if err := s.capabilities.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete capability: %w", err)
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "functionality", EntityID: id,
+		ID: uuid.New().String(), EntityType: "capability", EntityID: id,
 		UserID: user.ID, Action: "delete", CreatedAt: now,
 	})
 
 	return nil
 }
 
-// ListFunctionalities returns all functionalities for a product. Requires viewer role.
-func (s *ComponentService) ListFunctionalities(ctx context.Context, user *model.User, productID string) ([]*model.Functionality, error) {
+// ListCapabilities returns all capabilities for a product. Requires viewer role.
+func (s *ComponentService) ListCapabilities(ctx context.Context, user *model.User, productID string) ([]*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
-	return s.functionalities.ListByProductID(ctx, productID)
+	return s.capabilities.ListByProductID(ctx, productID)
 }
 
-// ListFunctionalitiesByComponent returns functionalities for a component. Requires viewer role.
-func (s *ComponentService) ListFunctionalitiesByComponent(ctx context.Context, user *model.User, productID, componentID string) ([]*model.Functionality, error) {
+// ListCapabilitiesByComponent returns capabilities for a component. Requires viewer role.
+func (s *ComponentService) ListCapabilitiesByComponent(ctx context.Context, user *model.User, productID, componentID string) ([]*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
-	return s.functionalities.ListByComponentID(ctx, componentID)
+	return s.capabilities.ListByComponentID(ctx, componentID)
+}
+
+// LinkRequirementToCapability creates a link between a requirement and a capability. Requires owner role.
+func (s *ComponentService) LinkRequirementToCapability(ctx context.Context, user *model.User, productID, capabilityID, requirementID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	return s.capabilities.LinkRequirement(ctx, &model.RequirementCapability{
+		ID:            uuid.New().String(),
+		RequirementID: requirementID,
+		CapabilityID:  capabilityID,
+		CreatedAt:     now,
+	})
+}
+
+// UnlinkRequirementFromCapability removes a link between a requirement and a capability. Requires owner role.
+func (s *ComponentService) UnlinkRequirementFromCapability(ctx context.Context, user *model.User, productID, capabilityID, requirementID string) error {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	return s.capabilities.UnlinkRequirement(ctx, capabilityID, requirementID)
+}
+
+// ListCapabilityRequirements returns requirement links for a capability. Requires viewer role.
+func (s *ComponentService) ListCapabilityRequirements(ctx context.Context, user *model.User, productID, capabilityID string) ([]*model.RequirementCapability, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.capabilities.ListRequirementsByCapability(ctx, capabilityID)
+}
+
+// ListRequirementCapabilities returns capability links for a requirement. Requires viewer role.
+func (s *ComponentService) ListRequirementCapabilities(ctx context.Context, user *model.User, productID, requirementID string) ([]*model.RequirementCapability, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.capabilities.ListCapabilitiesByRequirement(ctx, requirementID)
 }

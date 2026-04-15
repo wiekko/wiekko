@@ -30,10 +30,10 @@ type testCaseStore struct {
 
 func (s *testCaseStore) Create(ctx context.Context, tc *model.TestCase) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO test_cases (id, product_id, component_id, functionality_id, title, description,
+		`INSERT INTO test_cases (id, product_id, component_id, capability_id, title, description,
 		 execution_mode, test_identifier, pyramid_level_id, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		tc.ID, tc.ProductID, nullableText(tc.ComponentID), nullableText(tc.FunctionalityID),
+		tc.ID, tc.ProductID, nullableText(tc.ComponentID), nullableText(tc.CapabilityID),
 		tc.Title, tc.Description, tc.ExecutionMode,
 		nullableText(tc.TestIdentifier), nullableText(tc.PyramidLevelID),
 		tc.CreatedAt, tc.UpdatedAt,
@@ -52,10 +52,10 @@ func (s *testCaseStore) GetByID(ctx context.Context, id string) (*model.TestCase
 
 func (s *testCaseStore) Update(ctx context.Context, tc *model.TestCase) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE test_cases SET component_id = ?, functionality_id = ?, title = ?, description = ?,
+		`UPDATE test_cases SET component_id = ?, capability_id = ?, title = ?, description = ?,
 		 execution_mode = ?, test_identifier = ?, pyramid_level_id = ?, updated_at = ?
 		 WHERE id = ?`,
-		nullableText(tc.ComponentID), nullableText(tc.FunctionalityID),
+		nullableText(tc.ComponentID), nullableText(tc.CapabilityID),
 		tc.Title, tc.Description, tc.ExecutionMode,
 		nullableText(tc.TestIdentifier), nullableText(tc.PyramidLevelID),
 		tc.UpdatedAt, tc.ID,
@@ -160,20 +160,20 @@ func (s *testCaseStore) ListEnvironments(ctx context.Context, testCaseID string)
 	return envIDs, rows.Err()
 }
 
-const testCaseColumns = `id, product_id, component_id, functionality_id, title, description,
+const testCaseColumns = `id, product_id, component_id, capability_id, title, description,
 	execution_mode, test_identifier, pyramid_level_id, created_at, updated_at`
 
 func scanTestCase(sc scanner) (*model.TestCase, error) {
 	var tc model.TestCase
-	var componentID, functionalityID, testIdentifier, pyramidLevelID sql.NullString
-	err := sc.Scan(&tc.ID, &tc.ProductID, &componentID, &functionalityID,
+	var componentID, capabilityID, testIdentifier, pyramidLevelID sql.NullString
+	err := sc.Scan(&tc.ID, &tc.ProductID, &componentID, &capabilityID,
 		&tc.Title, &tc.Description, &tc.ExecutionMode,
 		&testIdentifier, &pyramidLevelID, &tc.CreatedAt, &tc.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	tc.ComponentID = componentID.String
-	tc.FunctionalityID = functionalityID.String
+	tc.CapabilityID = capabilityID.String
 	tc.TestIdentifier = testIdentifier.String
 	tc.PyramidLevelID = pyramidLevelID.String
 	return &tc, nil

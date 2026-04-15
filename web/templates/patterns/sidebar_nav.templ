@@ -29,9 +29,9 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string, isA
 					@SidebarLink("Test Cases", "/products/"+productID+"/test-cases", "beaker", activeSection == "test-cases", "")
 					@SidebarLink("Campaigns", "/products/"+productID+"/campaigns", "flag", activeSection == "campaigns", "")
 				}
-				@SidebarSection("Structure", activeSection == "components" || activeSection == "functionalities" || activeSection == "milestones") {
+				@SidebarSection("Structure", activeSection == "components" || activeSection == "capabilities" || activeSection == "milestones") {
 					@SidebarLink("Components", "/products/"+productID+"/components", "component", activeSection == "components", "")
-					@SidebarLink("Functionalities", "/products/"+productID+"/functionalities", "layers", activeSection == "functionalities", "")
+					@SidebarLink("Capabilities", "/products/"+productID+"/capabilities", "layers", activeSection == "capabilities", "")
 					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
 				}
 			}

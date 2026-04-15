@@ -18,7 +18,7 @@ type TestCaseDetailProps struct {
 	Product           *model.Product
 	TestCase          *model.TestCase
 	ComponentName     string
-	FunctionalityName string
+	CapabilityName    string
 	PyramidLevelName  string
 	CanEdit           bool // developer, owner, or admin
 }
@@ -53,7 +53,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 			@ui.TabGroup(testCaseDetailTabs(props.Product.ID, props.TestCase.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.FunctionalityName, props.PyramidLevelName)
+				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName)
 			}
 			@ui.TabPanelHidden("requirements") {
 				@ui.LoadingSpinner("md")
@@ -74,7 +74,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 	}
 }
 
-templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, functionalityName, pyramidLevelName string) {
+templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -85,10 +85,10 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 				} else {
 					@patterns.DetailField("Component", "")
 				}
-				if tc.FunctionalityID != "" {
-					@testCaseLinkedField("Functionality", functionalityName, fmt.Sprintf("/products/%s/functionalities/%s", productID, tc.FunctionalityID))
+				if tc.CapabilityID != "" {
+					@testCaseLinkedField("Capability", capabilityName, fmt.Sprintf("/products/%s/capabilities/%s", productID, tc.CapabilityID))
 				} else {
-					@patterns.DetailField("Functionality", "")
+					@patterns.DetailField("Capability", "")
 				}
 				@patterns.DetailField("Pyramid Level", pyramidLevelName)
 				@patterns.DetailField("Created", formatDate(tc.CreatedAt))

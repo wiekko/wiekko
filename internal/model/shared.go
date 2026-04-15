@@ -38,11 +38,11 @@ type AuditEntry struct {
 }
 
 // DefectLink represents a polymorphic link from a defect
-// to a component, functionality, or test case.
+// to a component, capability, or test case.
 type DefectLink struct {
 	ID         string
 	DefectID   string
-	TargetType string // "component", "functionality", "test_case"
+	TargetType string // "component", "capability", "test_case"
 	TargetID   string
 	CreatedAt  string // RFC 3339
 }

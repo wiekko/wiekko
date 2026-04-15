@@ -51,7 +51,7 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 			@ui.TabPanel("overview") {
 				@ComponentOverviewTabContent(props.Component, props.MilestoneName)
 			}
-			@ui.TabPanelHidden("functionalities") {
+			@ui.TabPanelHidden("capabilities") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("test-cases") {
@@ -83,10 +83,10 @@ templ ComponentOverviewTabContent(c *model.Component, milestoneName string) {
 	}
 }
 
-templ ComponentFunctionalitiesTabContent(productID string, functionalities []*model.Functionality) {
-	if len(functionalities) == 0 {
+templ ComponentCapabilitiesTabContent(productID string, capabilities []*model.Capability) {
+	if len(capabilities) == 0 {
 		@ui.Card() {
-			@ui.EmptyState("layers", "No functionalities", "Functionalities linked to this component will appear here.", "", "")
+			@ui.EmptyState("layers", "No capabilities", "Capabilities linked to this component will appear here.", "", "")
 		}
 	} else {
 		@ui.Card() {
@@ -100,11 +100,11 @@ templ ComponentFunctionalitiesTabContent(productID string, functionalities []*mo
 					}
 				}
 				@ui.TableBody("") {
-					for _, f := range functionalities {
+					for _, f := range capabilities {
 						@ui.TableRow("") {
 							@ui.TableCell() {
 								<a
-									href={ templ.SafeURL(fmt.Sprintf("/products/%s/functionalities/%s", productID, f.ID)) }
+									href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", productID, f.ID)) }
 									class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
 								>
 									{ f.Name }
@@ -158,7 +158,7 @@ func componentDetailTabs(productID, componentID string) []templates.TabDef {
 	base := fmt.Sprintf("/products/%s/components/%s/tabs", productID, componentID)
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
-		{ID: "functionalities", Label: "Functionalities", HxGet: base + "/functionalities"},
+		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},

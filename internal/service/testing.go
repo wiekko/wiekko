@@ -25,25 +25,25 @@ type TestingService struct {
 
 // CreateTestCaseInput contains the fields required to create a test case.
 type CreateTestCaseInput struct {
-	ProductID       string
-	ComponentID     string
-	FunctionalityID string
-	Title           string
-	Description     string
-	ExecutionMode   string
-	TestIdentifier  string
-	PyramidLevelID  string
+	ProductID      string
+	ComponentID    string
+	CapabilityID   string
+	Title          string
+	Description    string
+	ExecutionMode  string
+	TestIdentifier string
+	PyramidLevelID string
 }
 
 // UpdateTestCaseInput contains the fields that can be updated on a test case.
 type UpdateTestCaseInput struct {
-	ComponentID     *string
-	FunctionalityID *string
-	Title           *string
-	Description     *string
-	ExecutionMode   *string
-	TestIdentifier  *string
-	PyramidLevelID  *string
+	ComponentID    *string
+	CapabilityID   *string
+	Title          *string
+	Description    *string
+	ExecutionMode  *string
+	TestIdentifier *string
+	PyramidLevelID *string
 }
 
 // CreateTestCase creates a new test case. Requires developer role.
@@ -61,17 +61,17 @@ func (s *TestingService) CreateTestCase(ctx context.Context, user *model.User, i
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	tc := &model.TestCase{
-		ID:              uuid.New().String(),
-		ProductID:       input.ProductID,
-		ComponentID:     input.ComponentID,
-		FunctionalityID: input.FunctionalityID,
-		Title:           input.Title,
-		Description:     input.Description,
-		ExecutionMode:   input.ExecutionMode,
-		TestIdentifier:  input.TestIdentifier,
-		PyramidLevelID:  input.PyramidLevelID,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:             uuid.New().String(),
+		ProductID:      input.ProductID,
+		ComponentID:    input.ComponentID,
+		CapabilityID:   input.CapabilityID,
+		Title:          input.Title,
+		Description:    input.Description,
+		ExecutionMode:  input.ExecutionMode,
+		TestIdentifier: input.TestIdentifier,
+		PyramidLevelID: input.PyramidLevelID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	if err := s.testCases.Create(ctx, tc); err != nil {
 		return nil, fmt.Errorf("create test case: %w", err)
@@ -108,8 +108,8 @@ func (s *TestingService) UpdateTestCase(ctx context.Context, user *model.User, p
 	if input.ComponentID != nil {
 		tc.ComponentID = *input.ComponentID
 	}
-	if input.FunctionalityID != nil {
-		tc.FunctionalityID = *input.FunctionalityID
+	if input.CapabilityID != nil {
+		tc.CapabilityID = *input.CapabilityID
 	}
 	if input.Title != nil {
 		tc.Title = *input.Title

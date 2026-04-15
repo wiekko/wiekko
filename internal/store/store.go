@@ -16,7 +16,7 @@ type Store struct {
 	ProductRole        ProductRoleStore
 	Product            ProductStore
 	Component          ComponentStore
-	Functionality      FunctionalityStore
+	Capability         CapabilityStore
 	Milestone          MilestoneStore
 	Status             StatusStore
 	Sprint             SprintStore
@@ -43,7 +43,7 @@ func New(db *sql.DB, keys *crypto.KeyRing) *Store {
 		ProductRole:        &productRoleStore{db: db},
 		Product:            &productStore{db: db},
 		Component:          &componentStore{db: db},
-		Functionality:      &functionalityStore{db: db},
+		Capability:         &capabilityStore{db: db},
 		Milestone:          &milestoneStore{db: db},
 		Status:             &statusStore{db: db},
 		Sprint:             &sprintStore{db: db},

@@ -103,11 +103,12 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 **Requirement Detail tabs:**
 
-| Tab         | Content                                                                |
-|-------------|------------------------------------------------------------------------|
-| Overview    | Fields, definition of done, status, assignments, child requirements    |
-| Test Cases  | Linked test cases (requirement coverage + definition of done coverage) |
-| Defects     | Linked defects                                                         |
+| Tab          | Content                                                                |
+|--------------|------------------------------------------------------------------------|
+| Overview     | Fields, definition of done, status, assignments, child requirements    |
+| Capabilities | Linked capabilities                                                    |
+| Test Cases   | Linked test cases (requirement coverage + definition of done coverage) |
+| Defects      | Linked defects                                                         |
 | Comments    | Comment thread                                                         |
 | Attachments | File list + upload                                                     |
 | History     | Audit trail                                                            |
@@ -117,7 +118,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Tab          | Content                                        |
 |--------------|------------------------------------------------|
 | Overview     | Fields, status, assignments, criticality       |
-| Linked Items | Linked components, functionalities, test cases |
+| Linked Items | Linked components, capabilities, test cases |
 | Comments     | Comment thread                                 |
 | Attachments  | File list + upload                             |
 | History      | Audit trail                                    |
@@ -126,7 +127,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 | Route                                | Page             | Purpose                                                                              |
 |--------------------------------------|------------------|--------------------------------------------------------------------------------------|
-| `/products/:id/test-cases`           | Test Cases List  | Table with filters (component, functionality, pyramid level, execution mode)         |
+| `/products/:id/test-cases`           | Test Cases List  | Table with filters (component, capability, pyramid level, execution mode)            |
 | `/products/:id/test-cases/new`       | Create Test Case | Form                                                                                 |
 | `/products/:id/test-cases/:tid`      | Test Case Detail | Tabbed detail page                                                                   |
 | `/products/:id/test-cases/:tid/edit` | Edit Test Case   | Form                                                                                 |
@@ -153,10 +154,10 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/components/new`            | Create Component     | Form                                             |
 | `/products/:id/components/:cid`           | Component Detail     | Tabbed detail page                               |
 | `/products/:id/components/:cid/edit`      | Edit Component       | Form                                             |
-| `/products/:id/functionalities`           | Functionalities List | Table (grouped by component optionally)          |
-| `/products/:id/functionalities/new`       | Create Functionality | Form                                             |
-| `/products/:id/functionalities/:fid`      | Functionality Detail | Tabbed detail page                               |
-| `/products/:id/functionalities/:fid/edit` | Edit Functionality   | Form                                             |
+| `/products/:id/capabilities`              | Capabilities List    | Table (grouped by component optionally)          |
+| `/products/:id/capabilities/new`          | Create Capability    | Form                                             |
+| `/products/:id/capabilities/:fid`         | Capability Detail    | Tabbed detail page                               |
+| `/products/:id/capabilities/:fid/edit`    | Edit Capability      | Form                                             |
 | `/products/:id/milestones`                | Milestones List      | Table or timeline view                           |
 | `/products/:id/milestones/new`            | Create Milestone     | Form                                             |
 | `/products/:id/milestones/:mid`           | Milestone Detail     | Tabbed detail page                               |
@@ -164,23 +165,24 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 **Component Detail tabs:**
 
-| Tab             | Content                  |
-|-----------------|--------------------------|
-| Overview        | Fields, linked milestone |
-| Functionalities | Child functionalities    |
-| Test Cases      | Linked test cases        |
+| Tab          | Content                  |
+|--------------|--------------------------|
+| Overview     | Fields, linked milestone |
+| Capabilities | Child capabilities       |
+| Test Cases   | Linked test cases        |
 | Comments        | Comment thread           |
 | Attachments     | File list + upload       |
 | History         | Audit trail              |
 
-**Functionality Detail tabs:**
+**Capability Detail tabs:**
 
-| Tab        | Content                                    |
-|------------|--------------------------------------------|
-| Overview   | Fields, parent component, linked milestone |
-| Test Cases | Linked test cases                          |
-| Defects    | Linked defects                             |
-| History    | Audit trail                                |
+| Tab          | Content                                    |
+|--------------|--------------------------------------------|
+| Overview     | Fields, parent component, linked milestone |
+| Requirements | Linked requirements                        |
+| Test Cases   | Linked test cases                          |
+| Defects      | Linked defects                             |
+| History      | Audit trail                                |
 
 **Milestone Detail tabs:**
 
