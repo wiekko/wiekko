@@ -11,9 +11,9 @@ import (
 
 // RequirementFilter controls which requirements are returned by ListByProductID.
 type RequirementFilter struct {
-	Category string // empty = all categories
-	StatusID string // empty = all statuses
-	SprintID string // empty = all sprints
+	CategoryID string // empty = all categories
+	StatusID   string // empty = all statuses
+	SprintID   string // empty = all sprints
 }
 
 // RequirementStore defines data access operations for requirements.
@@ -37,11 +37,11 @@ type requirementStore struct {
 
 func (s *requirementStore) Create(ctx context.Context, r *model.Requirement) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO requirements (id, product_id, parent_id, category, sequence_number, title, description,
+		`INSERT INTO requirements (id, product_id, parent_id, category_id, sequence_number, title, description,
 		 definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 		 is_coarse, is_active, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ProductID, nullableText(r.ParentID), r.Category, r.SequenceNumber,
+		r.ID, r.ProductID, nullableText(r.ParentID), r.CategoryID, r.SequenceNumber,
 		r.Title, r.Description, r.DefinitionOfDone,
 		nullableText(r.StatusID), nullableText(r.MilestoneID), nullableText(r.SprintID),
 		nullableText(r.Estimation), r.Priority,
@@ -62,11 +62,11 @@ func (s *requirementStore) GetByID(ctx context.Context, id string) (*model.Requi
 
 func (s *requirementStore) Update(ctx context.Context, r *model.Requirement) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE requirements SET parent_id = ?, category = ?, title = ?, description = ?,
+		`UPDATE requirements SET parent_id = ?, category_id = ?, title = ?, description = ?,
 		 definition_of_done = ?, status_id = ?, milestone_id = ?, sprint_id = ?,
 		 estimation = ?, priority = ?, is_coarse = ?, is_active = ?, updated_at = ?
 		 WHERE id = ?`,
-		nullableText(r.ParentID), r.Category, r.Title, r.Description,
+		nullableText(r.ParentID), r.CategoryID, r.Title, r.Description,
 		r.DefinitionOfDone, nullableText(r.StatusID),
 		nullableText(r.MilestoneID), nullableText(r.SprintID),
 		nullableText(r.Estimation), r.Priority,
@@ -84,9 +84,9 @@ func (s *requirementStore) Delete(ctx context.Context, id string) error {
 func (s *requirementStore) ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error) {
 	query := `SELECT ` + requirementColumns + ` FROM requirements WHERE product_id = ?`
 	args := []any{productID}
-	if filter.Category != "" {
-		query += ` AND category = ?`
-		args = append(args, filter.Category)
+	if filter.CategoryID != "" {
+		query += ` AND category_id = ?`
+		args = append(args, filter.CategoryID)
 	}
 	if filter.StatusID != "" {
 		query += ` AND status_id = ?`
@@ -181,7 +181,7 @@ func (s *requirementStore) NextSequenceNumber(ctx context.Context, productID str
 	return 1, nil
 }
 
-const requirementColumns = `id, product_id, parent_id, category, sequence_number, title, description,
+const requirementColumns = `id, product_id, parent_id, category_id, sequence_number, title, description,
 	definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 	is_coarse, is_active, created_at, updated_at`
 
@@ -189,7 +189,7 @@ func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement
 	var parentID, statusID, milestoneID, sprintID, estimation sql.NullString
 	var isCoarse, isActive int
-	err := sc.Scan(&r.ID, &r.ProductID, &parentID, &r.Category, &r.SequenceNumber,
+	err := sc.Scan(&r.ID, &r.ProductID, &parentID, &r.CategoryID, &r.SequenceNumber,
 		&r.Title, &r.Description, &r.DefinitionOfDone,
 		&statusID, &milestoneID, &sprintID, &estimation, &r.Priority,
 		&isCoarse, &isActive, &r.CreatedAt, &r.UpdatedAt)

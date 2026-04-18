@@ -26,12 +26,14 @@ type PageProductController struct {
 	component  *service.ComponentService
 	testing    *service.TestingService
 	backlog    *service.BacklogService
+	category   *service.CategoryService
+	constraint *service.ConstraintService
 	audit      *service.AuditService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, audit *service.AuditService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, audit: audit}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, audit *service.AuditService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, audit: audit}
 }
 
 // CreateForm renders GET /products/new.
@@ -2440,6 +2442,40 @@ func (c *PageProductController) canEditDefects(user *model.User, role string) bo
 	return user.IsAdmin || role == model.RoleOwner
 }
 
+// buildCategoryPrefixMap returns a map of category ID to prefix for the given entity type.
+func (c *PageProductController) buildCategoryPrefixMap(r *http.Request, user *model.User, productID, entityType string) map[string]string {
+	cats, err := c.category.ListCategories(r.Context(), user, productID, entityType)
+	if err != nil {
+		return nil
+	}
+	m := make(map[string]string, len(cats))
+	for _, cat := range cats {
+		m[cat.ID] = cat.Prefix
+	}
+	return m
+}
+
+// buildCategoryNameMap returns a map of category ID to name for the given entity type.
+func (c *PageProductController) buildCategoryNameMap(r *http.Request, user *model.User, productID, entityType string) map[string]string {
+	cats, err := c.category.ListCategories(r.Context(), user, productID, entityType)
+	if err != nil {
+		return nil
+	}
+	m := make(map[string]string, len(cats))
+	for _, cat := range cats {
+		m[cat.ID] = cat.Name
+	}
+	return m
+}
+
+// categoryPrefix looks up the prefix for a category ID from a prefix map, falling back to "??".
+func categoryPrefix(prefixes map[string]string, categoryID string) string {
+	if p, ok := prefixes[categoryID]; ok {
+		return p
+	}
+	return "??"
+}
+
 // --- Requirement Pages ---
 
 // Requirements renders GET /products/{id}/requirements.
@@ -2455,6 +2491,7 @@ func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Requ
 	}
 
 	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.RequirementsPage(productpage.RequirementsProps{
@@ -2462,12 +2499,13 @@ func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Requ
 			Title:     p.Name + " - Requirements",
 			CSRFToken: csrfToken,
 		},
-		DisplayName:  user.DisplayName,
-		IsAdmin:      user.IsAdmin,
-		Product:      p,
-		Requirements: requirements,
-		Statuses:     c.buildStatusMap(r, user, productID, "requirement"),
-		CanEdit:      c.canEditRequirements(user, role),
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Requirements:     requirements,
+		CategoryPrefixes: prefixes,
+		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
+		CanEdit:          c.canEditRequirements(user, role),
 	}).Render(r.Context(), w)
 }
 
@@ -2490,12 +2528,16 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Load categories for prefix and name mapping.
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	catNames := c.buildCategoryNameMap(r, user, productID, "requirement")
+
 	// Resolve parent requirement name if set.
 	var parentName, parentIdentifier string
 	if req.ParentID != "" {
 		if parent, pErr := c.backlog.GetRequirement(r.Context(), user, productID, req.ParentID); pErr == nil {
 			parentName = parent.Title
-			parentIdentifier = model.RequirementIdentifier(parent.Category, parent.SequenceNumber)
+			parentIdentifier = model.EntityIdentifier(categoryPrefix(prefixes, parent.CategoryID), parent.SequenceNumber)
 		}
 	}
 
@@ -2512,6 +2554,8 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		IsAdmin:          user.IsAdmin,
 		Product:          p,
 		Requirement:      req,
+		CategoryPrefixes: prefixes,
+		CategoryNames:    catNames,
 		StatusName:       c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, req.MilestoneID),
 		SprintName:       c.resolveSprintName(r, user, productID, req.SprintID),
@@ -2538,6 +2582,8 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
 	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2545,15 +2591,17 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 			Title:     p.Name + " - New Requirement",
 			CSRFToken: csrfToken,
 		},
-		DisplayName:  user.DisplayName,
-		IsAdmin:      user.IsAdmin,
-		Product:      p,
-		Requirements: requirements,
-		Statuses:     statuses,
-		Milestones:   milestones,
-		Sprints:      sprints,
-		Category:     "capability",
-		Priority:     "0",
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Requirements:     requirements,
+		Categories:       categories,
+		CategoryPrefixes: prefixes,
+		Statuses:         statuses,
+		Milestones:       milestones,
+		Sprints:          sprints,
+		CategoryID:       "",
+		Priority:         "0",
 	}).Render(r.Context(), w)
 }
 
@@ -2572,7 +2620,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 	title := strings.TrimSpace(r.FormValue("title"))
 	description := r.FormValue("description")
 	definitionOfDone := r.FormValue("definition_of_done")
-	category := r.FormValue("category")
+	categoryID := r.FormValue("category_id")
 	parentID := r.FormValue("parent_id")
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
@@ -2588,7 +2636,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 		Title:            title,
 		Description:      description,
 		DefinitionOfDone: definitionOfDone,
-		Category:         category,
+		CategoryID:       categoryID,
 		StatusID:         statusID,
 		MilestoneID:      milestoneID,
 		SprintID:         sprintID,
@@ -2601,6 +2649,8 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
 		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2612,6 +2662,8 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 			IsAdmin:          user.IsAdmin,
 			Product:          p,
 			Requirements:     requirements,
+			Categories:       categories,
+			CategoryPrefixes: prefixes,
 			Statuses:         statuses,
 			Milestones:       milestones,
 			Sprints:          sprints,
@@ -2619,7 +2671,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 			Title:            title,
 			Description:      description,
 			DefinitionOfDone: definitionOfDone,
-			Category:         category,
+			CategoryID:       categoryID,
 			ParentID:         parentID,
 			StatusID:         statusID,
 			MilestoneID:      milestoneID,
@@ -2657,6 +2709,8 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
 	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2669,6 +2723,8 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 		Product:          p,
 		Requirement:      req,
 		Requirements:     requirements,
+		Categories:       categories,
+		CategoryPrefixes: prefixes,
 		Statuses:         statuses,
 		Milestones:       milestones,
 		Sprints:          sprints,
@@ -2676,7 +2732,7 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 		Title:            req.Title,
 		Description:      req.Description,
 		DefinitionOfDone: req.DefinitionOfDone,
-		Category:         req.Category,
+		CategoryID:       req.CategoryID,
 		ParentID:         req.ParentID,
 		StatusID:         req.StatusID,
 		MilestoneID:      req.MilestoneID,
@@ -2709,7 +2765,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 	title := strings.TrimSpace(r.FormValue("title"))
 	description := r.FormValue("description")
 	definitionOfDone := r.FormValue("definition_of_done")
-	category := r.FormValue("category")
+	categoryID := r.FormValue("category_id")
 	parentID := r.FormValue("parent_id")
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
@@ -2724,7 +2780,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 		Title:            &title,
 		Description:      &description,
 		DefinitionOfDone: &definitionOfDone,
-		Category:         &category,
+		CategoryID:       &categoryID,
 		StatusID:         &statusID,
 		MilestoneID:      &milestoneID,
 		SprintID:         &sprintID,
@@ -2737,6 +2793,8 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
 		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -2749,6 +2807,8 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 			Product:          p,
 			Requirement:      req,
 			Requirements:     requirements,
+			Categories:       categories,
+			CategoryPrefixes: prefixes,
 			Statuses:         statuses,
 			Milestones:       milestones,
 			Sprints:          sprints,
@@ -2757,7 +2817,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 			Title:            title,
 			Description:      description,
 			DefinitionOfDone: definitionOfDone,
-			Category:         category,
+			CategoryID:       categoryID,
 			ParentID:         parentID,
 			StatusID:         statusID,
 			MilestoneID:      milestoneID,
@@ -2817,11 +2877,14 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 		return
 	}
 
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	catNames := c.buildCategoryNameMap(r, user, productID, "requirement")
+
 	var parentName, parentIdentifier string
 	if req.ParentID != "" {
 		if parent, pErr := c.backlog.GetRequirement(r.Context(), user, productID, req.ParentID); pErr == nil {
 			parentName = parent.Title
-			parentIdentifier = model.RequirementIdentifier(parent.Category, parent.SequenceNumber)
+			parentIdentifier = model.EntityIdentifier(categoryPrefix(prefixes, parent.CategoryID), parent.SequenceNumber)
 		}
 	}
 	children, _ := c.backlog.ListChildRequirements(r.Context(), user, productID, requirementID)
@@ -2830,6 +2893,8 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 	_ = productpage.RequirementOverviewTabContent(productpage.RequirementDetailProps{
 		Product:          p,
 		Requirement:      req,
+		CategoryPrefixes: prefixes,
+		CategoryNames:    catNames,
 		StatusName:       c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, req.MilestoneID),
 		SprintName:       c.resolveSprintName(r, user, productID, req.SprintID),
@@ -3248,4 +3313,364 @@ func (c *PageProductController) DefectHistoryTab(w http.ResponseWriter, r *http.
 	entries := c.buildAuditViews(r, user, productID, "defect", defectID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectHistoryTabContent(entries).Render(r.Context(), w)
+}
+
+// --- Constraint Pages ---
+
+// canEditConstraints returns true if the user can create/edit/delete constraints (owner or admin).
+func (c *PageProductController) canEditConstraints(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner
+}
+
+// Constraints renders GET /products/{id}/constraints.
+func (c *PageProductController) Constraints(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	constraints, _ := c.constraint.ListConstraints(r.Context(), user, productID, store.ConstraintFilter{})
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintsPage(productpage.ConstraintsProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Constraints",
+			CSRFToken: csrfToken,
+		},
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Constraints:      constraints,
+		CategoryPrefixes: prefixes,
+		CanEdit:          c.canEditConstraints(user, role),
+	}).Render(r.Context(), w)
+}
+
+// ConstraintDetail renders GET /products/{id}/constraints/{constraintId}.
+func (c *PageProductController) ConstraintDetail(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	con, err := c.constraint.GetConstraint(r.Context(), user, productID, constraintID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/constraints", http.StatusSeeOther)
+		return
+	}
+
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
+	catNames := c.buildCategoryNameMap(r, user, productID, "constraint")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintDetailPage(productpage.ConstraintDetailProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - " + con.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Constraint:       con,
+		CategoryPrefixes: prefixes,
+		CategoryNames:    catNames,
+		MilestoneName:    c.resolveMilestoneName(r, user, productID, con.MilestoneID),
+		CanEdit:          c.canEditConstraints(user, role),
+	}).Render(r.Context(), w)
+}
+
+// ConstraintCreateForm renders GET /products/{id}/constraints/new.
+func (c *PageProductController) ConstraintCreateForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	categories, _ := c.category.ListCategories(r.Context(), user, productID, "constraint")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintFormPage(productpage.ConstraintFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - New Constraint",
+			CSRFToken: csrfToken,
+		},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Categories:  categories,
+		Milestones:  milestones,
+		CategoryID:  "",
+		Priority:    "0",
+	}).Render(r.Context(), w)
+}
+
+// ConstraintCreate handles POST /products/{id}/constraints.
+func (c *PageProductController) ConstraintCreate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	categoryID := r.FormValue("category_id")
+	complianceState := r.FormValue("compliance_state")
+	milestoneID := r.FormValue("milestone_id")
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+
+	_, createErr := c.constraint.CreateConstraint(r.Context(), user, service.CreateConstraintInput{
+		ProductID:       productID,
+		CategoryID:      categoryID,
+		Title:           title,
+		Description:     description,
+		ComplianceState: complianceState,
+		MilestoneID:     milestoneID,
+		Priority:        priority,
+	})
+	if createErr != nil {
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		categories, _ := c.category.ListCategories(r.Context(), user, productID, "constraint")
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.ConstraintFormPage(productpage.ConstraintFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - New Constraint",
+				CSRFToken: csrfToken,
+			},
+			DisplayName:     user.DisplayName,
+			IsAdmin:         user.IsAdmin,
+			Product:         p,
+			Categories:      categories,
+			Milestones:      milestones,
+			Error:           createErr.Error(),
+			Title:           title,
+			Description:     description,
+			CategoryID:      categoryID,
+			ComplianceState: complianceState,
+			MilestoneID:     milestoneID,
+			Priority:        priorityStr,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/constraints", http.StatusSeeOther)
+}
+
+// ConstraintEditForm renders GET /products/{id}/constraints/{constraintId}/edit.
+func (c *PageProductController) ConstraintEditForm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	con, err := c.constraint.GetConstraint(r.Context(), user, productID, constraintID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/constraints", http.StatusSeeOther)
+		return
+	}
+
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	categories, _ := c.category.ListCategories(r.Context(), user, productID, "constraint")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintFormPage(productpage.ConstraintFormProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Edit " + con.Title,
+			CSRFToken: csrfToken,
+		},
+		DisplayName:     user.DisplayName,
+		IsAdmin:         user.IsAdmin,
+		Product:         p,
+		Constraint:      con,
+		Categories:      categories,
+		Milestones:      milestones,
+		IsEdit:          true,
+		Title:           con.Title,
+		Description:     con.Description,
+		CategoryID:      con.CategoryID,
+		ComplianceState: con.ComplianceState,
+		MilestoneID:     con.MilestoneID,
+		Priority:        fmt.Sprintf("%d", con.Priority),
+	}).Render(r.Context(), w)
+}
+
+// ConstraintUpdate handles POST /products/{id}/constraints/{constraintId}.
+func (c *PageProductController) ConstraintUpdate(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	con, err := c.constraint.GetConstraint(r.Context(), user, productID, constraintID)
+	if err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/constraints", http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	categoryID := r.FormValue("category_id")
+	complianceState := r.FormValue("compliance_state")
+	milestoneID := r.FormValue("milestone_id")
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+
+	_, updateErr := c.constraint.UpdateConstraint(r.Context(), user, productID, constraintID, service.UpdateConstraintInput{
+		CategoryID:      &categoryID,
+		Title:           &title,
+		Description:     &description,
+		ComplianceState: &complianceState,
+		MilestoneID:     &milestoneID,
+		Priority:        &priority,
+	})
+	if updateErr != nil {
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		categories, _ := c.category.ListCategories(r.Context(), user, productID, "constraint")
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.ConstraintFormPage(productpage.ConstraintFormProps{
+			Meta: templates.PageMeta{
+				Title:     p.Name + " - Edit " + con.Title,
+				CSRFToken: csrfToken,
+			},
+			DisplayName:     user.DisplayName,
+			IsAdmin:         user.IsAdmin,
+			Product:         p,
+			Constraint:      con,
+			Categories:      categories,
+			Milestones:      milestones,
+			IsEdit:          true,
+			Error:           updateErr.Error(),
+			Title:           title,
+			Description:     description,
+			CategoryID:      categoryID,
+			ComplianceState: complianceState,
+			MilestoneID:     milestoneID,
+			Priority:        priorityStr,
+		}).Render(r.Context(), w)
+		return
+	}
+
+	http.Redirect(w, r, "/products/"+productID+"/constraints/"+constraintID, http.StatusSeeOther)
+}
+
+// ConstraintDelete handles DELETE /products/{id}/constraints/{constraintId}.
+func (c *PageProductController) ConstraintDelete(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	if err := c.constraint.DeleteConstraint(r.Context(), user, productID, constraintID); err != nil {
+		http.Redirect(w, r, "/products/"+productID+"/constraints", http.StatusSeeOther)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/products/"+productID+"/constraints")
+	w.WriteHeader(http.StatusOK)
+}
+
+// ConstraintDeleteConfirm renders GET /products/{id}/constraints/{constraintId}/delete/confirm.
+func (c *PageProductController) ConstraintDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintDeleteConfirmation("constraint", productID, constraintID).Render(r.Context(), w)
+}
+
+// ConstraintOverviewTab renders GET /products/{id}/constraints/{constraintId}/tabs/overview.
+func (c *PageProductController) ConstraintOverviewTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	con, err := c.constraint.GetConstraint(r.Context(), user, productID, constraintID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
+	catNames := c.buildCategoryNameMap(r, user, productID, "constraint")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintOverviewTabContent(productpage.ConstraintDetailProps{
+		Product:          p,
+		Constraint:       con,
+		CategoryPrefixes: prefixes,
+		CategoryNames:    catNames,
+		MilestoneName:    c.resolveMilestoneName(r, user, productID, con.MilestoneID),
+		CanEdit:          c.canEditConstraints(user, role),
+	}).Render(r.Context(), w)
+}
+
+// ConstraintCapabilitiesTab renders GET /products/{id}/constraints/{constraintId}/tabs/capabilities.
+func (c *PageProductController) ConstraintCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintCapabilitiesTabContent().Render(r.Context(), w)
+}
+
+// ConstraintCommentsTab renders GET /products/{id}/constraints/{constraintId}/tabs/comments.
+func (c *PageProductController) ConstraintCommentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintCommentsTabContent().Render(r.Context(), w)
+}
+
+// ConstraintAttachmentsTab renders GET /products/{id}/constraints/{constraintId}/tabs/attachments.
+func (c *PageProductController) ConstraintAttachmentsTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintAttachmentsTabContent().Render(r.Context(), w)
+}
+
+// ConstraintHistoryTab renders GET /products/{id}/constraints/{constraintId}/tabs/history.
+func (c *PageProductController) ConstraintHistoryTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	entries := c.buildAuditViews(r, user, productID, "constraint", constraintID)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintHistoryTabContent(entries).Render(r.Context(), w)
 }

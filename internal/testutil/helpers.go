@@ -230,12 +230,12 @@ func MakeStatus(overrides ...func(*model.Status)) *model.Status {
 func MakeRequirement(overrides ...func(*model.Requirement)) *model.Requirement {
 	now := time.Now().UTC().Format(time.RFC3339)
 	r := &model.Requirement{
-		ID:        "req-001",
-		ProductID: "product-001",
-		Category:  model.RequirementCategoryFunctionality,
-		Title:     "Test Requirement",
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         "req-001",
+		ProductID:  "product-001",
+		CategoryID: "cat-001",
+		Title:      "Test Requirement",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 	for _, fn := range overrides {
 		fn(r)

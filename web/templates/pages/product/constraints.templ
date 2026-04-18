@@ -1,0 +1,131 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// ConstraintsProps holds data for the constraints list page.
+type ConstraintsProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Constraints      []*model.Constraint
+	CategoryPrefixes map[string]string // category ID → prefix
+	CanEdit          bool              // owner or admin
+}
+
+templ ConstraintsPage(props ConstraintsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "constraints",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Constraints"},
+			})
+			if len(props.Constraints) == 0 {
+				@patterns.ListPageHeader("Constraints", "", "", -1)
+				@ui.Card() {
+					if props.CanEdit {
+						@ui.EmptyState("shield-check", "No constraints yet", "Create your first constraint to define rules and boundaries.", "New Constraint", "/products/"+props.Product.ID+"/constraints/new")
+					} else {
+						@ui.EmptyState("shield-check", "No constraints yet", "No constraints have been defined for this product.", "", "")
+					}
+				}
+			} else {
+				if props.CanEdit {
+					@patterns.ListPageHeader("Constraints", "/products/"+props.Product.ID+"/constraints/new", "New Constraint", len(props.Constraints))
+				} else {
+					@patterns.ListPageHeader("Constraints", "", "", len(props.Constraints))
+				}
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								ID
+							}
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Category
+							}
+							@ui.TableHeader() {
+								Compliance
+							}
+							@ui.TableHeader() {
+								Priority
+							}
+							@ui.TableHeader() {
+								Created
+							}
+						}
+						@ui.TableBody("") {
+							for _, c := range props.Constraints {
+								@ui.TableRow("") {
+									@ui.TableCellMuted() {
+										{ model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, c.CategoryID), c.SequenceNumber) }
+									}
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/constraints/%s", props.Product.ID, c.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ c.Title }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										@ui.Badge(constraintPrefix(props.CategoryPrefixes, c.CategoryID), "indigo")
+									}
+									@ui.TableCellMuted() {
+										@complianceBadge(c.ComplianceState)
+									}
+									@ui.TableCellMuted() {
+										{ fmt.Sprintf("%d", c.Priority) }
+									}
+									@ui.TableCellMuted() {
+										{ formatDate(c.CreatedAt) }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+func constraintPrefix(prefixes map[string]string, categoryID string) string {
+	if prefixes != nil {
+		if p, ok := prefixes[categoryID]; ok {
+			return p
+		}
+	}
+	return "??"
+}
+
+templ complianceBadge(state string) {
+	switch state {
+		case "met":
+			@ui.Badge("Met", "green")
+		case "violated":
+			@ui.Badge("Violated", "red")
+		default:
+			@ui.Badge("Not Assessed", "gray")
+	}
+}

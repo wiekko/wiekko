@@ -3,7 +3,7 @@ package model
 // Comment represents a user comment on any entity.
 type Comment struct {
 	ID        string
-	OwnerType string // "requirement", "test_case", "component", "defect"
+	OwnerType string // "requirement", "constraint", "test_case", "component", "defect"
 	OwnerID   string
 	UserID    string
 	Body      string // Markdown
@@ -14,7 +14,7 @@ type Comment struct {
 // Attachment represents a file attached to any entity.
 type Attachment struct {
 	ID          string
-	OwnerType   string // "requirement", "test_case", "component", "defect"
+	OwnerType   string // "requirement", "constraint", "test_case", "component", "defect"
 	OwnerID     string
 	UserID      string
 	Filename    string
@@ -27,7 +27,7 @@ type Attachment struct {
 // AuditEntry represents a single field-level change in the audit trail.
 type AuditEntry struct {
 	ID         string
-	EntityType string // "product", "component", "requirement", etc.
+	EntityType string // "product", "component", "requirement", "constraint", etc.
 	EntityID   string
 	UserID     string
 	Action     string // "create", "update", "delete"

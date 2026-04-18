@@ -15,6 +15,7 @@ func newProductService(products *testutil.MockProductStore, roles *testutil.Mock
 		productRoles:  roles,
 		statuses:      &testutil.MockStatusStore{CreateFunc: func(_ context.Context, _ *model.Status) error { return nil }},
 		pyramidLevels: &testutil.MockPyramidLevelStore{CreateFunc: func(_ context.Context, _ *model.PyramidLevel) error { return nil }},
+		categories:    &testutil.MockCategoryStore{CreateFunc: func(_ context.Context, _ *model.Category) error { return nil }},
 		settings:      settings,
 		audit:         audit,
 		authz:         &Authorizer{productRoles: roles},

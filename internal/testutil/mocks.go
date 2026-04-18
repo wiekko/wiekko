@@ -688,3 +688,39 @@ func (m *MockCampaignResultStore) GetByCampaignAndTestCase(ctx context.Context, 
 func (m *MockCampaignResultStore) ListByCampaignID(ctx context.Context, campaignID string) ([]*model.CampaignResult, error) {
 	return m.ListByCampaignIDFunc(ctx, campaignID)
 }
+
+// MockCategoryStore implements store.CategoryStore with configurable function fields.
+type MockCategoryStore struct {
+	CreateFunc                func(ctx context.Context, cat *model.Category) error
+	GetByIDFunc               func(ctx context.Context, id string) (*model.Category, error)
+	UpdateFunc                func(ctx context.Context, cat *model.Category) error
+	DeleteFunc                func(ctx context.Context, id string) error
+	ListByProductIDFunc       func(ctx context.Context, productID, entityType string) ([]*model.Category, error)
+	GetByProductAndNameFunc   func(ctx context.Context, productID, entityType, name string) (*model.Category, error)
+	GetByProductAndPrefixFunc func(ctx context.Context, productID, entityType, prefix string) (*model.Category, error)
+}
+
+func (m *MockCategoryStore) Create(ctx context.Context, cat *model.Category) error {
+	return m.CreateFunc(ctx, cat)
+}
+func (m *MockCategoryStore) GetByID(ctx context.Context, id string) (*model.Category, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockCategoryStore) Update(ctx context.Context, cat *model.Category) error {
+	return m.UpdateFunc(ctx, cat)
+}
+func (m *MockCategoryStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockCategoryStore) ListByProductID(ctx context.Context, productID, entityType string) ([]*model.Category, error) {
+	if m.ListByProductIDFunc != nil {
+		return m.ListByProductIDFunc(ctx, productID, entityType)
+	}
+	return nil, nil
+}
+func (m *MockCategoryStore) GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Category, error) {
+	return m.GetByProductAndNameFunc(ctx, productID, entityType, name)
+}
+func (m *MockCategoryStore) GetByProductAndPrefix(ctx context.Context, productID, entityType, prefix string) (*model.Category, error) {
+	return m.GetByProductAndPrefixFunc(ctx, productID, entityType, prefix)
+}

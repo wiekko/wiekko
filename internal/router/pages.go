@@ -13,7 +13,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
-	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Audit)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Audit)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
@@ -152,6 +152,21 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.DefectCommentsTab)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.DefectAttachmentsTab)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.DefectHistoryTab)))
+
+	// Constraint pages.
+	mux.Handle("GET /products/{id}/constraints", pageAuthed(http.HandlerFunc(productCtrl.Constraints)))
+	mux.Handle("GET /products/{id}/constraints/new", pageAuthed(http.HandlerFunc(productCtrl.ConstraintCreateForm)))
+	mux.Handle("POST /products/{id}/constraints", pageAuthed(http.HandlerFunc(productCtrl.ConstraintCreate)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintDetail)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/edit", pageAuthed(http.HandlerFunc(productCtrl.ConstraintEditForm)))
+	mux.Handle("POST /products/{id}/constraints/{constraintId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintUpdate)))
+	mux.Handle("DELETE /products/{id}/constraints/{constraintId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintDelete)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.ConstraintDeleteConfirm)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.ConstraintOverviewTab)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/capabilities", pageAuthed(http.HandlerFunc(productCtrl.ConstraintCapabilitiesTab)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.ConstraintCommentsTab)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.ConstraintAttachmentsTab)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.ConstraintHistoryTab)))
 
 	// Admin pages.
 	mux.Handle("GET /admin/users", pageAdmin(http.HandlerFunc(adminCtrl.ListUsers)))

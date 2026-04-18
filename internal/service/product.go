@@ -17,6 +17,7 @@ type ProductService struct {
 	products      store.ProductStore
 	productRoles  store.ProductRoleStore
 	statuses      store.StatusStore
+	categories    store.CategoryStore
 	pyramidLevels store.PyramidLevelStore
 	settings      store.SettingStore
 	audit         store.AuditStore
@@ -124,6 +125,53 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 				CreatedAt:  now,
 			})
 		}
+	}
+
+	// Default requirement categories.
+	defaultReqCategories := []struct {
+		Name     string
+		Prefix   string
+		Position int
+	}{
+		{Name: "Functionality", Prefix: "FR", Position: 1},
+		{Name: "Architecture", Prefix: "AR", Position: 2},
+		{Name: "Security", Prefix: "SR", Position: 3},
+		{Name: "UX", Prefix: "UR", Position: 4},
+	}
+
+	for _, dc := range defaultReqCategories {
+		_ = s.categories.Create(ctx, &model.Category{
+			ID:         uuid.New().String(),
+			ProductID:  productID,
+			EntityType: "requirement",
+			Name:       dc.Name,
+			Prefix:     dc.Prefix,
+			Position:   dc.Position,
+			CreatedAt:  now,
+		})
+	}
+
+	// Default constraint categories.
+	defaultConCategories := []struct {
+		Name     string
+		Prefix   string
+		Position int
+	}{
+		{Name: "Architecture", Prefix: "AC", Position: 1},
+		{Name: "Security", Prefix: "SC", Position: 2},
+		{Name: "UX", Prefix: "UC", Position: 3},
+	}
+
+	for _, dc := range defaultConCategories {
+		_ = s.categories.Create(ctx, &model.Category{
+			ID:         uuid.New().String(),
+			ProductID:  productID,
+			EntityType: "constraint",
+			Name:       dc.Name,
+			Prefix:     dc.Prefix,
+			Position:   dc.Position,
+			CreatedAt:  now,
+		})
 	}
 
 	// Default pyramid levels.

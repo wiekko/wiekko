@@ -16,7 +16,9 @@ type Services struct {
 	Product    *ProductService
 	Component  *ComponentService
 	Milestone  *MilestoneService
+	Category   *CategoryService
 	Backlog    *BacklogService
+	Constraint *ConstraintService
 	Testing    *TestingService
 	Comment    *CommentService
 	Audit      *AuditService
@@ -55,6 +57,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services 
 			products:      st.Product,
 			productRoles:  st.ProductRole,
 			statuses:      st.Status,
+			categories:    st.Category,
 			pyramidLevels: st.PyramidLevel,
 			settings:      st.Setting,
 			audit:         st.Audit,
@@ -76,11 +79,23 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services 
 			audit:         st.Audit,
 			authz:         authz,
 		},
+		Category: &CategoryService{
+			categories: st.Category,
+			audit:      st.Audit,
+			authz:      authz,
+		},
 		Backlog: &BacklogService{
 			requirements: st.Requirement,
 			defects:      st.Defect,
+			categories:   st.Category,
 			audit:        st.Audit,
 			authz:        authz,
+		},
+		Constraint: &ConstraintService{
+			constraints: st.Constraint,
+			categories:  st.Category,
+			audit:       st.Audit,
+			authz:       authz,
 		},
 		Testing: &TestingService{
 			testCases:       st.TestCase,

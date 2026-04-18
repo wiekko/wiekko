@@ -19,9 +19,11 @@ type Store struct {
 	Capability         CapabilityStore
 	Milestone          MilestoneStore
 	Status             StatusStore
+	Category           CategoryStore
 	Sprint             SprintStore
 	Requirement        RequirementStore
 	Defect             DefectStore
+	Constraint         ConstraintStore
 	PyramidLevel       PyramidLevelStore
 	TestCase           TestCaseStore
 	RuntimeEnvironment RuntimeEnvironmentStore
@@ -46,9 +48,11 @@ func New(db *sql.DB, keys *crypto.KeyRing) *Store {
 		Capability:         &capabilityStore{db: db},
 		Milestone:          &milestoneStore{db: db},
 		Status:             &statusStore{db: db},
+		Category:           &categoryStore{db: db},
 		Sprint:             &sprintStore{db: db},
 		Requirement:        &requirementStore{db: db},
 		Defect:             &defectStore{db: db},
+		Constraint:         &constraintStore{db: db},
 		PyramidLevel:       &pyramidLevelStore{db: db},
 		TestCase:           &testCaseStore{db: db},
 		RuntimeEnvironment: &runtimeEnvironmentStore{db: db},

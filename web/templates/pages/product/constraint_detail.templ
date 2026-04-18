@@ -1,0 +1,183 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// ConstraintDetailProps holds data for the constraint detail page.
+type ConstraintDetailProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Constraint       *model.Constraint
+	CategoryPrefixes map[string]string // category ID → prefix
+	CategoryNames    map[string]string // category ID → name
+	MilestoneName    string
+	CanEdit          bool
+}
+
+templ ConstraintDetailPage(props ConstraintDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "constraints",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Constraints", Href: "/products/" + props.Product.ID + "/constraints"},
+					{Label: model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), props.Constraint.SequenceNumber)},
+				},
+				props.Constraint.Title,
+				model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), props.Constraint.SequenceNumber),
+				constraintEditHref(props),
+				constraintDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@ui.Badge(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), "indigo")
+			}
+			<!-- Tabs -->
+			@ui.TabGroup(constraintDetailTabs(props.Product.ID, props.Constraint.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@ConstraintOverviewTabContent(props)
+			}
+			@ui.TabPanelHidden("capabilities") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ ConstraintOverviewTabContent(props ConstraintDetailProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Identifier", model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), props.Constraint.SequenceNumber))
+				@patterns.DetailField("Category", constraintCategoryName(props.CategoryNames, props.Constraint.CategoryID))
+				<div>
+					<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Compliance</dt>
+					<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+						@complianceBadge(props.Constraint.ComplianceState)
+					</dd>
+				</div>
+				if props.Constraint.MilestoneID != "" && props.MilestoneName != "" {
+					@constraintLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Constraint.MilestoneID))
+				} else {
+					@patterns.DetailField("Milestone", "")
+				}
+				@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Constraint.Priority))
+				@patterns.DetailField("Created", formatDate(props.Constraint.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(props.Constraint.UpdatedAt))
+			}
+			@patterns.DetailDescription(props.Constraint.Description)
+		}
+	}
+}
+
+templ constraintLinkedField(label, name, href string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			if name != "" {
+				<a
+					href={ templ.SafeURL(href) }
+					class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+				>
+					{ name }
+				</a>
+			} else {
+				<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+			}
+		</dd>
+	</div>
+}
+
+templ ConstraintCapabilitiesTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("layers", "No linked capabilities", "Capabilities linked to this constraint will appear here.", "", "")
+	}
+}
+
+templ ConstraintCommentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("message-circle", "No comments", "Comments on this constraint will appear here.", "", "")
+	}
+}
+
+templ ConstraintAttachmentsTabContent() {
+	@ui.Card() {
+		@ui.EmptyState("paperclip", "No attachments", "Attachments for this constraint will appear here.", "", "")
+	}
+}
+
+templ ConstraintHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this constraint will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// ConstraintDeleteConfirmation renders the delete confirmation for a constraint.
+templ ConstraintDeleteConfirmation(name, productID, constraintID string) {
+	@patterns.DeleteConfirmation("constraint", fmt.Sprintf("/products/%s/constraints/%s", productID, constraintID))
+}
+
+func constraintDetailTabs(productID, constraintID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/constraints/%s/tabs", productID, constraintID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func constraintEditHref(props ConstraintDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/constraints/" + props.Constraint.ID + "/edit"
+	}
+	return ""
+}
+
+func constraintDeleteURL(props ConstraintDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/constraints/" + props.Constraint.ID
+	}
+	return ""
+}
+
+func constraintCategoryName(names map[string]string, categoryID string) string {
+	if names != nil {
+		if n, ok := names[categoryID]; ok {
+			return n
+		}
+	}
+	return "Unknown"
+}

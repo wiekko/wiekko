@@ -28,9 +28,9 @@ func (c *BacklogController) ListRequirements(w http.ResponseWriter, r *http.Requ
 	productID := r.PathValue("productId")
 
 	filter := store.RequirementFilter{
-		Category: r.URL.Query().Get("category"),
-		StatusID: r.URL.Query().Get("status_id"),
-		SprintID: r.URL.Query().Get("sprint_id"),
+		CategoryID: r.URL.Query().Get("category_id"),
+		StatusID:   r.URL.Query().Get("status_id"),
+		SprintID:   r.URL.Query().Get("sprint_id"),
 	}
 
 	items, err := c.backlog.ListRequirements(r.Context(), user, productID, filter)
@@ -53,7 +53,7 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 
 	var req struct {
 		ParentID         string `json:"parent_id"`
-		Category         string `json:"category"`
+		CategoryID       string `json:"category_id"`
 		Title            string `json:"title"`
 		Description      string `json:"description"`
 		DefinitionOfDone string `json:"definition_of_done"`
@@ -71,7 +71,7 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 	item, err := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
 		ProductID:        productID,
 		ParentID:         req.ParentID,
-		Category:         req.Category,
+		CategoryID:       req.CategoryID,
 		Title:            req.Title,
 		Description:      req.Description,
 		DefinitionOfDone: req.DefinitionOfDone,
@@ -112,7 +112,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 	id := r.PathValue("id")
 
 	var req struct {
-		Category         *string `json:"category"`
+		CategoryID       *string `json:"category_id"`
 		Title            *string `json:"title"`
 		Description      *string `json:"description"`
 		DefinitionOfDone *string `json:"definition_of_done"`
@@ -129,7 +129,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 	}
 
 	item, err := c.backlog.UpdateRequirement(r.Context(), user, productID, id, service.UpdateRequirementInput{
-		Category:         req.Category,
+		CategoryID:       req.CategoryID,
 		Title:            req.Title,
 		Description:      req.Description,
 		DefinitionOfDone: req.DefinitionOfDone,
@@ -485,7 +485,7 @@ func requirementToJSON(r *model.Requirement) map[string]any {
 		"id":                 r.ID,
 		"product_id":         r.ProductID,
 		"parent_id":          r.ParentID,
-		"category":           r.Category,
+		"category_id":        r.CategoryID,
 		"title":              r.Title,
 		"description":        r.Description,
 		"definition_of_done": r.DefinitionOfDone,

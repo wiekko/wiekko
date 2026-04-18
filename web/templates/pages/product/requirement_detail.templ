@@ -17,6 +17,8 @@ type RequirementDetailProps struct {
 	IsAdmin          bool
 	Product          *model.Product
 	Requirement      *model.Requirement
+	CategoryPrefixes map[string]string // category ID → prefix
+	CategoryNames    map[string]string // category ID → name
 	StatusName       string
 	MilestoneName    string
 	SprintName       string
@@ -42,15 +44,15 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 					{Label: "Dashboard", Href: "/"},
 					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 					{Label: "Requirements", Href: "/products/" + props.Product.ID + "/requirements"},
-					{Label: model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber)},
+					{Label: model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), props.Requirement.SequenceNumber)},
 				},
 				props.Requirement.Title,
-				model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber),
+				model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), props.Requirement.SequenceNumber),
 				requirementEditHref(props),
 				requirementDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@requirementCategoryBadge(props.Requirement.Category)
+				@ui.Badge(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), "blue")
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(requirementDetailTabs(props.Product.ID, props.Requirement.ID))
@@ -84,8 +86,8 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
-				@patterns.DetailField("Identifier", model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber))
-				@patterns.DetailField("Category", requirementCategoryDisplay(props.Requirement.Category))
+				@patterns.DetailField("Identifier", model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), props.Requirement.SequenceNumber))
+				@patterns.DetailField("Category", requirementCategoryName(props.CategoryNames, props.Requirement.CategoryID))
 				if props.Requirement.ParentID != "" && props.ParentName != "" {
 					@requirementLinkedField("Parent", props.ParentIdentifier+" \u2014 "+props.ParentName, fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, props.Requirement.ParentID))
 				} else {
@@ -133,7 +135,7 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 						for _, child := range props.Children {
 							@ui.TableRow("") {
 								@ui.TableCellMuted() {
-									{ model.RequirementIdentifier(child.Category, child.SequenceNumber) }
+									{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, child.CategoryID), child.SequenceNumber) }
 								}
 								@ui.TableCell() {
 									<a
@@ -144,7 +146,7 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									@requirementCategoryBadge(child.Category)
+									@ui.Badge(requirementPrefix(props.CategoryPrefixes, child.CategoryID), "blue")
 								}
 							}
 						}
@@ -245,17 +247,13 @@ func requirementDeleteURL(props RequirementDetailProps) string {
 	return ""
 }
 
-func requirementCategoryDisplay(category string) string {
-	switch category {
-	case "architecture":
-		return "Architecture"
-	case "security":
-		return "Security"
-	case "ux":
-		return "UX"
-	default:
-		return "Functionality"
+func requirementCategoryName(names map[string]string, categoryID string) string {
+	if names != nil {
+		if n, ok := names[categoryID]; ok {
+			return n
+		}
 	}
+	return "Unknown"
 }
 
 func boolDisplay(v bool) string {

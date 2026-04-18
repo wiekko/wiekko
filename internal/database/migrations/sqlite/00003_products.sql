@@ -78,6 +78,20 @@ CREATE TABLE IF NOT EXISTS statuses (
 );
 CREATE INDEX IF NOT EXISTS idx_statuses_product_id ON statuses(product_id, entity_type);
 
+-- Configurable categories for requirements and constraints
+CREATE TABLE IF NOT EXISTS categories (
+    id          TEXT PRIMARY KEY,
+    product_id  TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    entity_type TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    prefix      TEXT NOT NULL,
+    position    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    UNIQUE(product_id, entity_type, name),
+    UNIQUE(product_id, entity_type, prefix)
+);
+CREATE INDEX IF NOT EXISTS idx_categories_product_id ON categories(product_id, entity_type);
+
 -- Sprints: time-boxed iterations (FR-028, FR-029)
 CREATE TABLE IF NOT EXISTS sprints (
     id           TEXT PRIMARY KEY,
@@ -96,7 +110,7 @@ CREATE TABLE IF NOT EXISTS requirements (
     id                 TEXT PRIMARY KEY,
     product_id         TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     parent_id          TEXT REFERENCES requirements(id) ON DELETE SET NULL,
-    category           TEXT NOT NULL,
+    category_id        TEXT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     title              TEXT NOT NULL,
     description        TEXT NOT NULL DEFAULT '',
     definition_of_done TEXT NOT NULL DEFAULT '',
@@ -113,6 +127,7 @@ CREATE TABLE IF NOT EXISTS requirements (
 );
 CREATE INDEX IF NOT EXISTS idx_requirements_product_id ON requirements(product_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_parent_id ON requirements(parent_id);
+CREATE INDEX IF NOT EXISTS idx_requirements_category_id ON requirements(category_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_status_id ON requirements(status_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_milestone_id ON requirements(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_sprint_id ON requirements(sprint_id);
@@ -138,6 +153,25 @@ CREATE INDEX IF NOT EXISTS idx_defects_product_id ON defects(product_id);
 CREATE INDEX IF NOT EXISTS idx_defects_status_id ON defects(status_id);
 CREATE INDEX IF NOT EXISTS idx_defects_milestone_id ON defects(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_defects_sprint_id ON defects(sprint_id);
+
+-- Constraints: non-functional requirements (architecture, security, UX rules)
+CREATE TABLE IF NOT EXISTS constraints (
+    id               TEXT PRIMARY KEY,
+    product_id       TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    category_id      TEXT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    sequence_number  INTEGER NOT NULL DEFAULT 0,
+    title            TEXT NOT NULL,
+    description      TEXT NOT NULL DEFAULT '',
+    compliance_state TEXT NOT NULL DEFAULT 'not_assessed',
+    milestone_id     TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+    priority         INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_constraints_product_id ON constraints(product_id);
+CREATE INDEX IF NOT EXISTS idx_constraints_category_id ON constraints(category_id);
+CREATE INDEX IF NOT EXISTS idx_constraints_milestone_id ON constraints(milestone_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_constraints_product_seq ON constraints(product_id, sequence_number);
 
 -- Pyramid levels: test categorization hierarchy (FR-032..FR-035)
 CREATE TABLE IF NOT EXISTS pyramid_levels (
@@ -251,6 +285,17 @@ CREATE TABLE IF NOT EXISTS requirement_capabilities (
 CREATE INDEX IF NOT EXISTS idx_requirement_capabilities_requirement_id ON requirement_capabilities(requirement_id);
 CREATE INDEX IF NOT EXISTS idx_requirement_capabilities_capability_id ON requirement_capabilities(capability_id);
 
+-- Constraint to capability links
+CREATE TABLE IF NOT EXISTS constraint_capabilities (
+    id            TEXT PRIMARY KEY,
+    constraint_id TEXT NOT NULL REFERENCES constraints(id) ON DELETE CASCADE,
+    capability_id TEXT NOT NULL REFERENCES capabilities(id) ON DELETE CASCADE,
+    created_at    TEXT NOT NULL,
+    UNIQUE(constraint_id, capability_id)
+);
+CREATE INDEX IF NOT EXISTS idx_constraint_capabilities_constraint_id ON constraint_capabilities(constraint_id);
+CREATE INDEX IF NOT EXISTS idx_constraint_capabilities_capability_id ON constraint_capabilities(capability_id);
+
 -- Defect links: polymorphic links to components, capabilities, test cases (FR-023)
 CREATE TABLE IF NOT EXISTS defect_links (
     id          TEXT PRIMARY KEY,
@@ -309,6 +354,7 @@ DROP TABLE IF EXISTS audit_trail;
 DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS defect_links;
+DROP TABLE IF EXISTS constraint_capabilities;
 DROP TABLE IF EXISTS test_case_requirements;
 DROP TABLE IF EXISTS requirement_capabilities;
 DROP TABLE IF EXISTS defect_assignments;
@@ -319,9 +365,11 @@ DROP TABLE IF EXISTS test_case_environments;
 DROP TABLE IF EXISTS runtime_environments;
 DROP TABLE IF EXISTS test_cases;
 DROP TABLE IF EXISTS pyramid_levels;
+DROP TABLE IF EXISTS constraints;
 DROP TABLE IF EXISTS defects;
 DROP TABLE IF EXISTS requirements;
 DROP TABLE IF EXISTS sprints;
+DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS statuses;
 DROP TABLE IF EXISTS capabilities;
 DROP TABLE IF EXISTS components;

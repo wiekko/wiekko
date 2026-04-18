@@ -16,6 +16,8 @@ type RequirementFormProps struct {
 	Product          *model.Product
 	Requirement      *model.Requirement   // nil for create
 	Requirements     []*model.Requirement // all requirements in product (for parent select)
+	Categories       []*model.Category    // requirement categories for dropdown
+	CategoryPrefixes map[string]string    // category ID → prefix (for parent options)
 	Statuses         []*model.Status
 	Milestones       []*model.Milestone
 	Sprints          []*model.Sprint
@@ -25,7 +27,7 @@ type RequirementFormProps struct {
 	Title            string
 	Description      string
 	DefinitionOfDone string
-	Category         string
+	CategoryID       string
 	ParentID         string
 	StatusID         string
 	MilestoneID      string
@@ -64,7 +66,7 @@ templ RequirementFormPage(props RequirementFormProps) {
 								ID:       "identifier",
 								Name:     "identifier",
 								Label:    "Identifier",
-								Value:    model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber),
+								Value:    model.EntityIdentifier(formCategoryPrefix(props.Categories, props.Requirement.CategoryID), props.Requirement.SequenceNumber),
 								Disabled: true,
 							})
 						}
@@ -77,18 +79,18 @@ templ RequirementFormPage(props RequirementFormProps) {
 							Required:    true,
 						})
 						@ui.Select(ui.SelectProps{
-							ID:      "category",
-							Name:    "category",
+							ID:      "category_id",
+							Name:    "category_id",
 							Label:   "Category",
-							Value:   props.Category,
-							Options: categorySelectOptions(props.Category),
+							Value:   props.CategoryID,
+							Options: dynamicCategorySelectOptions(props.Categories, props.CategoryID),
 						})
 						@ui.Select(ui.SelectProps{
 							ID:       "parent_id",
 							Name:     "parent_id",
 							Label:    "Parent Requirement",
 							Value:    props.ParentID,
-							Options:  parentSelectOptions(props.Requirements, requirementSelfID(props)),
+							Options:  parentSelectOptions(props.Requirements, props.CategoryPrefixes, requirementSelfID(props)),
 							HelpText: "Optional. Make this a child of another requirement.",
 						})
 						@ui.TextArea(ui.TextAreaProps{
@@ -163,7 +165,7 @@ func requirementFormBreadcrumbs(props RequirementFormProps) []templates.Breadcru
 	}
 	if props.IsEdit {
 		crumbs = append(crumbs,
-			templates.BreadcrumbItem{Label: model.RequirementIdentifier(props.Requirement.Category, props.Requirement.SequenceNumber), Href: "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID},
+			templates.BreadcrumbItem{Label: model.EntityIdentifier(formCategoryPrefix(props.Categories, props.Requirement.CategoryID), props.Requirement.SequenceNumber), Href: "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID},
 			templates.BreadcrumbItem{Label: "Edit"},
 		)
 	} else {
@@ -193,29 +195,44 @@ func requirementSelfID(props RequirementFormProps) string {
 	return ""
 }
 
-func parentSelectOptions(requirements []*model.Requirement, selfID string) []templates.SelectOption {
+func parentSelectOptions(requirements []*model.Requirement, prefixes map[string]string, selfID string) []templates.SelectOption {
 	opts := make([]templates.SelectOption, 0, len(requirements)+1)
 	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
 	for _, r := range requirements {
 		if r.ID == selfID {
 			continue
 		}
-		label := model.RequirementIdentifier(r.Category, r.SequenceNumber) + " \u2014 " + r.Title
+		prefix := "??"
+		if prefixes != nil {
+			if p, ok := prefixes[r.CategoryID]; ok {
+				prefix = p
+			}
+		}
+		label := model.EntityIdentifier(prefix, r.SequenceNumber) + " \u2014 " + r.Title
 		opts = append(opts, templates.SelectOption{Value: r.ID, Label: label})
 	}
 	return opts
 }
 
-func categorySelectOptions(current string) []templates.SelectOption {
-	if current == "" {
-		current = "functionality"
+func dynamicCategorySelectOptions(categories []*model.Category, currentID string) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(categories))
+	for _, cat := range categories {
+		opts = append(opts, templates.SelectOption{
+			Value:    cat.ID,
+			Label:    cat.Name,
+			Selected: cat.ID == currentID,
+		})
 	}
-	return []templates.SelectOption{
-		{Value: "functionality", Label: "Functionality", Selected: current == "functionality"},
-		{Value: "architecture", Label: "Architecture", Selected: current == "architecture"},
-		{Value: "security", Label: "Security", Selected: current == "security"},
-		{Value: "ux", Label: "UX", Selected: current == "ux"},
+	return opts
+}
+
+func formCategoryPrefix(categories []*model.Category, categoryID string) string {
+	for _, cat := range categories {
+		if cat.ID == categoryID {
+			return cat.Prefix
+		}
 	}
+	return "??"
 }
 
 // statusSelectOptions builds select options from statuses with an empty "None" option.

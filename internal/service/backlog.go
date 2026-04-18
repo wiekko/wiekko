@@ -16,6 +16,7 @@ import (
 type BacklogService struct {
 	requirements store.RequirementStore
 	defects      store.DefectStore
+	categories   store.CategoryStore
 	audit        store.AuditStore
 	authz        *Authorizer
 }
@@ -26,7 +27,7 @@ type BacklogService struct {
 type CreateRequirementInput struct {
 	ProductID        string
 	ParentID         string
-	Category         string
+	CategoryID       string
 	Title            string
 	Description      string
 	DefinitionOfDone string
@@ -41,7 +42,7 @@ type CreateRequirementInput struct {
 // UpdateRequirementInput contains the fields that can be updated on a requirement.
 type UpdateRequirementInput struct {
 	ParentID         *string
-	Category         *string
+	CategoryID       *string
 	Title            *string
 	Description      *string
 	DefinitionOfDone *string
@@ -63,8 +64,15 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 	if input.Title == "" {
 		return nil, errors.New("requirement title is required")
 	}
-	if input.Category == "" {
-		input.Category = model.RequirementCategoryFunctionality
+	if input.CategoryID == "" {
+		cats, err := s.categories.ListByProductID(ctx, input.ProductID, "requirement")
+		if err != nil {
+			return nil, fmt.Errorf("list categories: %w", err)
+		}
+		if len(cats) == 0 {
+			return nil, errors.New("no requirement categories defined for this product")
+		}
+		input.CategoryID = cats[0].ID
 	}
 
 	seq, err := s.requirements.NextSequenceNumber(ctx, input.ProductID)
@@ -77,7 +85,7 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		ID:               uuid.New().String(),
 		ProductID:        input.ProductID,
 		ParentID:         input.ParentID,
-		Category:         input.Category,
+		CategoryID:       input.CategoryID,
 		SequenceNumber:   seq,
 		Title:            input.Title,
 		Description:      input.Description,
@@ -135,7 +143,7 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 	}
 
 	// Fields that require owner role.
-	if input.ParentID != nil || input.Category != nil || input.Title != nil || input.Description != nil ||
+	if input.ParentID != nil || input.CategoryID != nil || input.Title != nil || input.Description != nil ||
 		input.DefinitionOfDone != nil || input.MilestoneID != nil ||
 		input.SprintID != nil || input.Estimation != nil ||
 		input.Priority != nil || input.IsCoarse != nil {
@@ -145,8 +153,8 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 		if input.ParentID != nil {
 			r.ParentID = *input.ParentID
 		}
-		if input.Category != nil {
-			r.Category = *input.Category
+		if input.CategoryID != nil {
+			r.CategoryID = *input.CategoryID
 		}
 		if input.Title != nil {
 			r.Title = *input.Title

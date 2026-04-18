@@ -1,0 +1,180 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// ConstraintFormProps holds data for the constraint create/edit form.
+type ConstraintFormProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Constraint  *model.Constraint  // nil for create
+	Categories  []*model.Category  // constraint categories for dropdown
+	Milestones  []*model.Milestone
+	IsEdit      bool
+	Error       string
+	// Form values (preserved on validation error).
+	Title           string
+	Description     string
+	CategoryID      string
+	ComplianceState string
+	MilestoneID     string
+	Priority        string
+}
+
+templ ConstraintFormPage(props ConstraintFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "constraints",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(constraintFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Constraint
+				} else {
+					New Constraint
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(constraintFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						if props.IsEdit {
+							@ui.TextInput(ui.InputProps{
+								ID:       "identifier",
+								Name:     "identifier",
+								Label:    "Identifier",
+								Value:    model.EntityIdentifier(constraintFormPrefix(props.Categories, props.Constraint.CategoryID), props.Constraint.SequenceNumber),
+								Disabled: true,
+							})
+						}
+						@ui.TextInput(ui.InputProps{
+							ID:          "title",
+							Name:        "title",
+							Label:       "Title",
+							Value:       props.Title,
+							Placeholder: "e.g. All API endpoints must use TLS 1.3",
+							Required:    true,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:      "category_id",
+							Name:    "category_id",
+							Label:   "Category",
+							Value:   props.CategoryID,
+							Options: constraintCategoryOptions(props.Categories, props.CategoryID),
+						})
+						@ui.TextArea(ui.TextAreaProps{
+							ID:          "description",
+							Name:        "description",
+							Label:       "Description",
+							Value:       props.Description,
+							Placeholder: "Describe this constraint... (Markdown supported)",
+							Rows:        6,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:      "compliance_state",
+							Name:    "compliance_state",
+							Label:   "Compliance State",
+							Value:   props.ComplianceState,
+							Options: complianceStateOptions(props.ComplianceState),
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "milestone_id",
+							Name:     "milestone_id",
+							Label:    "Milestone",
+							Value:    props.MilestoneID,
+							Options:  milestoneSelectOptions(props.Milestones),
+							HelpText: "Optional. Link to a milestone.",
+						})
+						@ui.TextInput(ui.InputProps{
+							ID:          "priority",
+							Name:        "priority",
+							Label:       "Priority",
+							Value:       props.Priority,
+							Type:        "number",
+							Placeholder: "0",
+							HelpText:    "Lower numbers indicate higher priority.",
+						})
+						@patterns.FormActions(constraintSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/constraints")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func constraintFormBreadcrumbs(props ConstraintFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Constraints", Href: "/products/" + props.Product.ID + "/constraints"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: model.EntityIdentifier(constraintFormPrefix(props.Categories, props.Constraint.CategoryID), props.Constraint.SequenceNumber), Href: "/products/" + props.Product.ID + "/constraints/" + props.Constraint.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func constraintFormAction(props ConstraintFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/constraints/" + props.Constraint.ID
+	}
+	return "/products/" + props.Product.ID + "/constraints"
+}
+
+func constraintSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Constraint"
+}
+
+func constraintCategoryOptions(categories []*model.Category, currentID string) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(categories))
+	for _, cat := range categories {
+		opts = append(opts, templates.SelectOption{
+			Value:    cat.ID,
+			Label:    cat.Name,
+			Selected: cat.ID == currentID,
+		})
+	}
+	return opts
+}
+
+func complianceStateOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = model.ComplianceNotAssessed
+	}
+	return []templates.SelectOption{
+		{Value: model.ComplianceNotAssessed, Label: "Not Assessed", Selected: current == model.ComplianceNotAssessed},
+		{Value: model.ComplianceMet, Label: "Met", Selected: current == model.ComplianceMet},
+		{Value: model.ComplianceViolated, Label: "Violated", Selected: current == model.ComplianceViolated},
+	}
+}
+
+func constraintFormPrefix(categories []*model.Category, categoryID string) string {
+	for _, cat := range categories {
+		if cat.ID == categoryID {
+			return cat.Prefix
+		}
+	}
+	return "??"
+}

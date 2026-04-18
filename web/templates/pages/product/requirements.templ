@@ -12,13 +12,14 @@ import (
 
 // RequirementsProps holds data for the requirements list page.
 type RequirementsProps struct {
-	Meta         templates.PageMeta
-	DisplayName  string
-	IsAdmin      bool
-	Product      *model.Product
-	Requirements []*model.Requirement
-	Statuses     map[string]string // status ID → name
-	CanEdit      bool              // owner or admin
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Requirements     []*model.Requirement
+	CategoryPrefixes map[string]string // category ID → prefix
+	Statuses         map[string]string // status ID → name
+	CanEdit          bool              // owner or admin
 }
 
 templ RequirementsPage(props RequirementsProps) {
@@ -78,7 +79,7 @@ templ RequirementsPage(props RequirementsProps) {
 							for _, req := range props.Requirements {
 								@ui.TableRow("") {
 									@ui.TableCellMuted() {
-										{ model.RequirementIdentifier(req.Category, req.SequenceNumber) }
+										{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, req.CategoryID), req.SequenceNumber) }
 									}
 									@ui.TableCell() {
 										<a
@@ -89,7 +90,7 @@ templ RequirementsPage(props RequirementsProps) {
 										</a>
 									}
 									@ui.TableCellMuted() {
-										@requirementCategoryBadge(req.Category)
+										@ui.Badge(requirementPrefix(props.CategoryPrefixes, req.CategoryID), "blue")
 									}
 									@ui.TableCellMuted() {
 										if req.StatusID != "" {
@@ -118,15 +119,11 @@ templ RequirementsPage(props RequirementsProps) {
 	}
 }
 
-templ requirementCategoryBadge(category string) {
-	switch category {
-		case "architecture":
-			@ui.Badge("Architecture", "indigo")
-		case "security":
-			@ui.Badge("Security", "red")
-		case "ux":
-			@ui.Badge("UX", "amber")
-		default:
-			@ui.Badge("Functionality", "blue")
+func requirementPrefix(prefixes map[string]string, categoryID string) string {
+	if prefixes != nil {
+		if p, ok := prefixes[categoryID]; ok {
+			return p
+		}
 	}
+	return "??"
 }

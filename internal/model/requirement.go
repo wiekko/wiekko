@@ -7,8 +7,8 @@ type Requirement struct {
 	ID               string
 	ProductID        string
 	ParentID         string // empty if top-level
-	Category         string // "architecture", "security", "functionality", "ux"
-	SequenceNumber   int    // auto-assigned per product, used for identifier
+	CategoryID       string
+	SequenceNumber   int // auto-assigned per product, used for identifier
 	Title            string
 	Description      string // Markdown
 	DefinitionOfDone string // Markdown
@@ -23,24 +23,8 @@ type Requirement struct {
 	UpdatedAt        string // RFC 3339
 }
 
-// Requirement category constants.
-const (
-	RequirementCategoryArchitecture  = "architecture"
-	RequirementCategorySecurity      = "security"
-	RequirementCategoryFunctionality = "functionality"
-	RequirementCategoryUX            = "ux"
-)
-
-// RequirementIdentifier returns the display identifier (e.g. "FR-1", "AR-42").
-func RequirementIdentifier(category string, seqNum int) string {
-	prefix := "FR"
-	switch category {
-	case RequirementCategoryArchitecture:
-		prefix = "AR"
-	case RequirementCategorySecurity:
-		prefix = "SR"
-	case RequirementCategoryUX:
-		prefix = "UR"
-	}
+// EntityIdentifier returns the display identifier (e.g. "FR-1", "AC-42")
+// for a requirement or constraint, given its category prefix.
+func EntityIdentifier(prefix string, seqNum int) string {
 	return fmt.Sprintf("%s-%d", prefix, seqNum)
 }

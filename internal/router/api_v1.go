@@ -19,7 +19,9 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	productCtrl := controller.NewProduct(svc.Product)
 	componentCtrl := controller.NewComponent(svc.Component)
 	planningCtrl := controller.NewPlanning(svc.Milestone)
+	categoryCtrl := controller.NewCategory(svc.Category)
 	backlogCtrl := controller.NewBacklog(svc.Backlog)
+	constraintCtrl := controller.NewConstraint(svc.Constraint)
 	testingCtrl := controller.NewTesting(svc.Testing)
 	commentCtrl := controller.NewComment(svc.Comment)
 	auditCtrl := controller.NewAudit(svc.Audit)
@@ -135,6 +137,13 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("POST /products/{productId}/runtime-environments", authed(csrf(http.HandlerFunc(planningCtrl.CreateRuntimeEnvironment))))
 	apiV1.Handle("DELETE /products/{productId}/runtime-environments/{id}", authed(csrf(http.HandlerFunc(planningCtrl.DeleteRuntimeEnvironment))))
 
+	// Categories.
+	apiV1.Handle("GET /products/{productId}/categories", authed(http.HandlerFunc(categoryCtrl.ListCategories)))
+	apiV1.Handle("POST /products/{productId}/categories", authed(csrf(http.HandlerFunc(categoryCtrl.CreateCategory))))
+	apiV1.Handle("GET /products/{productId}/categories/{id}", authed(http.HandlerFunc(categoryCtrl.GetCategory)))
+	apiV1.Handle("PATCH /products/{productId}/categories/{id}", authed(csrf(http.HandlerFunc(categoryCtrl.UpdateCategory))))
+	apiV1.Handle("DELETE /products/{productId}/categories/{id}", authed(csrf(http.HandlerFunc(categoryCtrl.DeleteCategory))))
+
 	// Requirements.
 	apiV1.Handle("GET /products/{productId}/requirements", authed(http.HandlerFunc(backlogCtrl.ListRequirements)))
 	apiV1.Handle("POST /products/{productId}/requirements", authed(csrf(http.HandlerFunc(backlogCtrl.CreateRequirement))))
@@ -145,6 +154,16 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("GET /products/{productId}/requirements/{id}/assignees", authed(http.HandlerFunc(backlogCtrl.ListRequirementAssignees)))
 	apiV1.Handle("POST /products/{productId}/requirements/{id}/assignees", authed(csrf(http.HandlerFunc(backlogCtrl.AssignRequirement))))
 	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/assignees/{userId}", authed(csrf(http.HandlerFunc(backlogCtrl.UnassignRequirement))))
+
+	// Constraints.
+	apiV1.Handle("GET /products/{productId}/constraints", authed(http.HandlerFunc(constraintCtrl.ListConstraints)))
+	apiV1.Handle("POST /products/{productId}/constraints", authed(csrf(http.HandlerFunc(constraintCtrl.CreateConstraint))))
+	apiV1.Handle("GET /products/{productId}/constraints/{id}", authed(http.HandlerFunc(constraintCtrl.GetConstraint)))
+	apiV1.Handle("PATCH /products/{productId}/constraints/{id}", authed(csrf(http.HandlerFunc(constraintCtrl.UpdateConstraint))))
+	apiV1.Handle("DELETE /products/{productId}/constraints/{id}", authed(csrf(http.HandlerFunc(constraintCtrl.DeleteConstraint))))
+	apiV1.Handle("GET /products/{productId}/constraints/{id}/capabilities", authed(http.HandlerFunc(constraintCtrl.ListConstraintCapabilities)))
+	apiV1.Handle("POST /products/{productId}/constraints/{id}/capabilities", authed(csrf(http.HandlerFunc(constraintCtrl.LinkConstraintCapability))))
+	apiV1.Handle("DELETE /products/{productId}/constraints/{id}/capabilities/{capId}", authed(csrf(http.HandlerFunc(constraintCtrl.UnlinkConstraintCapability))))
 
 	// Defects.
 	apiV1.Handle("GET /products/{productId}/defects", authed(http.HandlerFunc(backlogCtrl.ListDefects)))
