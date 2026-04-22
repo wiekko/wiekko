@@ -354,6 +354,69 @@ func (c *PageProductController) DeleteStatus(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// MoveStatus handles POST /products/{id}/settings/statuses/{statusId}/move.
+// Swaps the status with its neighbor based on form field `direction` ("up" or "down").
+func (c *PageProductController) MoveStatus(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	statusID := r.PathValue("statusId")
+	direction := r.FormValue("direction")
+
+	status, err := c.milestone.GetStatus(r.Context(), user, productID, statusID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, status.EntityType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	idx := -1
+	for i, s := range statuses {
+		if s.ID == statusID {
+			idx = i
+			break
+		}
+	}
+
+	neighborIdx := -1
+	switch direction {
+	case "up":
+		if idx > 0 {
+			neighborIdx = idx - 1
+		}
+	case "down":
+		if idx >= 0 && idx < len(statuses)-1 {
+			neighborIdx = idx + 1
+		}
+	}
+
+	if neighborIdx >= 0 {
+		target := statuses[idx]
+		neighbor := statuses[neighborIdx]
+		// Swap positions via two UpdateStatus calls. The service mirrors each
+		// change to the sibling entity-type status when StatusSync is true.
+		if _, err := c.milestone.UpdateStatus(r.Context(), user, productID, target.ID, service.UpdateStatusInput{Position: &neighbor.Position}); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if _, err := c.milestone.UpdateStatus(r.Context(), user, productID, neighbor.ID, service.UpdateStatusInput{Position: &target.Position}); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+	}
+
+	product, pErr := c.product.GetByID(r.Context(), user, productID)
+	if pErr == nil && product.StatusSync {
+		c.renderSyncedStatusList(w, r, user, productID)
+	} else {
+		c.renderStatusList(w, r, user, productID, status.EntityType)
+	}
+}
+
 // renderStatusList re-renders the status list fragment for a given entity type.
 func (c *PageProductController) renderStatusList(w http.ResponseWriter, r *http.Request, user *model.User, productID, entityType string) {
 	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
