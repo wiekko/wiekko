@@ -2512,6 +2512,16 @@ func categoryPrefix(prefixes map[string]string, categoryID string) string {
 	return "??"
 }
 
+// defaultStatusID returns the ID of the status flagged IsDefault, or "" if none.
+func defaultStatusID(statuses []*model.Status) string {
+	for _, s := range statuses {
+		if s.IsDefault {
+			return s.ID
+		}
+	}
+	return ""
+}
+
 // --- Requirement Pages ---
 
 // Requirements renders GET /products/{id}/requirements.
@@ -2637,6 +2647,7 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 		Milestones:       milestones,
 		Sprints:          sprints,
 		CategoryID:       "",
+		StatusID:         defaultStatusID(statuses),
 		Priority:         "0",
 	}).Render(r.Context(), w)
 }
@@ -3084,6 +3095,7 @@ func (c *PageProductController) DefectCreateForm(w http.ResponseWriter, r *http.
 		Milestones:  milestones,
 		Sprints:     sprints,
 		Criticality: "medium",
+		StatusID:    defaultStatusID(statuses),
 		Priority:    "0",
 	}).Render(r.Context(), w)
 }

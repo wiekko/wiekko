@@ -1,0 +1,156 @@
+package controller
+
+import (
+	"testing"
+
+	"nexmap.net/internal/model"
+	productpage "nexmap.net/web/templates/pages/product"
+)
+
+func TestCanMoveCards(t *testing.T) {
+	tests := []struct {
+		name string
+		user *model.User
+		role string
+		want bool
+	}{
+		{"admin", &model.User{IsAdmin: true}, "", true},
+		{"admin with member role", &model.User{IsAdmin: true}, model.RoleViewer, true},
+		{"owner", &model.User{}, model.RoleOwner, true},
+		{"developer", &model.User{}, model.RoleDeveloper, true},
+		{"tester", &model.User{}, model.RoleTester, false},
+		{"viewer", &model.User{}, model.RoleViewer, false},
+		{"no role", &model.User{}, "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := canMoveCards(tt.user, tt.role); got != tt.want {
+				t.Errorf("canMoveCards(%+v, %q) = %v, want %v", tt.user, tt.role, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildRequirementCards_StrandsItemsWithoutStatus(t *testing.T) {
+	prefixes := map[string]string{"cat-a": "FR"}
+	reqs := []*model.Requirement{
+		{ID: "r1", CategoryID: "cat-a", SequenceNumber: 1, Title: "With status", StatusID: "s1", Priority: 3},
+		{ID: "r2", CategoryID: "cat-a", SequenceNumber: 2, Title: "Stranded", StatusID: "", Priority: 5},
+	}
+
+	byStatus, stranded := buildRequirementCards("p1", reqs, prefixes)
+
+	if len(byStatus["s1"]) != 1 || byStatus["s1"][0].ID != "r1" {
+		t.Errorf("expected r1 bucketed under s1, got %+v", byStatus)
+	}
+	if len(stranded) != 1 || stranded[0].ID != "r2" {
+		t.Errorf("expected r2 in stranded, got %+v", stranded)
+	}
+	if stranded[0].Identifier != "FR-2" {
+		t.Errorf("expected stranded identifier FR-2, got %q", stranded[0].Identifier)
+	}
+	if byStatus["s1"][0].MoveURL != "/products/p1/board/requirements/r1/status" {
+		t.Errorf("unexpected move URL: %q", byStatus["s1"][0].MoveURL)
+	}
+}
+
+func TestBuildDefectCards_StrandsItemsWithoutStatus(t *testing.T) {
+	defects := []*model.Defect{
+		{ID: "d1", Title: "With status", StatusID: "s1", Priority: 2},
+		{ID: "d2", Title: "Stranded", StatusID: "", Priority: 4},
+	}
+
+	byStatus, stranded := buildDefectCards("p1", defects)
+
+	if len(byStatus["s1"]) != 1 || byStatus["s1"][0].ID != "d1" {
+		t.Errorf("expected d1 bucketed under s1, got %+v", byStatus)
+	}
+	if len(stranded) != 1 || stranded[0].ID != "d2" {
+		t.Errorf("expected d2 in stranded, got %+v", stranded)
+	}
+	if stranded[0].EntityType != "defect" {
+		t.Errorf("expected entity type defect, got %q", stranded[0].EntityType)
+	}
+}
+
+func TestMergedBoardColumns_PairsByPosition(t *testing.T) {
+	reqStatuses := []*model.Status{
+		{ID: "req-todo", Name: "To Do", Position: 1},
+		{ID: "req-done", Name: "Done", Position: 2, IsClosed: true},
+	}
+	defStatuses := []*model.Status{
+		{ID: "def-todo", Name: "To Do", Position: 1},
+		{ID: "def-done", Name: "Done", Position: 2, IsClosed: true},
+	}
+	reqCards := map[string][]productpage.BoardCard{
+		"req-todo": {{ID: "r1", EntityType: "requirement"}},
+	}
+	defCards := map[string][]productpage.BoardCard{
+		"def-done": {{ID: "d1", EntityType: "defect"}},
+	}
+
+	cols := mergedBoardColumns(reqStatuses, defStatuses, reqCards, defCards)
+
+	if len(cols) != 2 {
+		t.Fatalf("expected 2 columns, got %d", len(cols))
+	}
+
+	todo := cols[0]
+	if todo.Name != "To Do" || todo.ReqStatusID != "req-todo" || todo.DefectStatusID != "def-todo" {
+		t.Errorf("unexpected To Do column: %+v", todo)
+	}
+	if len(todo.Cards) != 1 || todo.Cards[0].ID != "r1" {
+		t.Errorf("To Do column should contain r1, got %+v", todo.Cards)
+	}
+
+	done := cols[1]
+	if !done.IsClosed {
+		t.Errorf("Done column should be marked closed")
+	}
+	if len(done.Cards) != 1 || done.Cards[0].ID != "d1" {
+		t.Errorf("Done column should contain d1, got %+v", done.Cards)
+	}
+}
+
+func TestMergedBoardColumns_HandlesMissingPair(t *testing.T) {
+	// Simulate a drifted product where defect statuses don't match.
+	reqStatuses := []*model.Status{
+		{ID: "req-todo", Name: "To Do", Position: 1},
+	}
+	defStatuses := []*model.Status{
+		{ID: "def-other", Name: "Other", Position: 99},
+	}
+	cols := mergedBoardColumns(reqStatuses, defStatuses, nil, nil)
+	if len(cols) != 1 {
+		t.Fatalf("expected 1 column, got %d", len(cols))
+	}
+	if cols[0].DefectStatusID != "" {
+		t.Errorf("expected empty defect status id when no match, got %q", cols[0].DefectStatusID)
+	}
+}
+
+func TestEntityBoardColumns_SplitMode(t *testing.T) {
+	statuses := []*model.Status{
+		{ID: "s1", Name: "Open", Position: 1},
+		{ID: "s2", Name: "Closed", Position: 2, IsClosed: true},
+	}
+	cards := map[string][]productpage.BoardCard{
+		"s1": {{ID: "r1", EntityType: "requirement"}},
+	}
+
+	reqCols := entityBoardColumns(statuses, cards, true)
+	if reqCols[0].ReqStatusID != "s1" || reqCols[0].DefectStatusID != "" {
+		t.Errorf("requirement column should carry only ReqStatusID, got %+v", reqCols[0])
+	}
+	if len(reqCols[0].Cards) != 1 {
+		t.Errorf("expected 1 card in Open column, got %d", len(reqCols[0].Cards))
+	}
+	if !reqCols[1].IsClosed {
+		t.Errorf("closed column should be marked closed")
+	}
+
+	defCols := entityBoardColumns(statuses, nil, false)
+	if defCols[0].DefectStatusID != "s1" || defCols[0].ReqStatusID != "" {
+		t.Errorf("defect column should carry only DefectStatusID, got %+v", defCols[0])
+	}
+}

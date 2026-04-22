@@ -62,6 +62,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("DELETE /products/{id}", pageAuthed(http.HandlerFunc(productCtrl.DeleteProduct)))
 	mux.Handle("GET /products/{id}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.DeleteProductConfirm)))
 
+	// Kanban board.
+	mux.Handle("GET /products/{id}/board", pageAuthed(http.HandlerFunc(productCtrl.Board)))
+	mux.Handle("PATCH /products/{id}/board/requirements/{reqId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardRequirementStatus)))
+	mux.Handle("PATCH /products/{id}/board/defects/{defectId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardDefectStatus)))
+
 	// Milestone pages.
 	mux.Handle("GET /products/{id}/milestones", pageAuthed(http.HandlerFunc(productCtrl.Milestones)))
 	mux.Handle("GET /products/{id}/milestones/new", pageAuthed(http.HandlerFunc(productCtrl.MilestoneCreateForm)))
