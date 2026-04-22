@@ -81,14 +81,14 @@ templ MilestonesPage(props MilestonesProps) {
 				if props.View == "timeline" {
 					@milestonesTimeline(props.Product.ID, props.Milestones)
 				} else {
-					@milestonesTable(props.Product.ID, props.Milestones)
+					@milestonesTable(props.Product.ID, props.Milestones, props.IsOwnerOrAdmin, props.Meta.CSRFToken)
 				}
 			}
 		</div>
 	}
 }
 
-templ milestonesTable(productID string, milestones []*model.Milestone) {
+templ milestonesTable(productID string, milestones []*model.Milestone, canEdit bool, csrfToken string) {
 	@ui.Card() {
 		@ui.Table() {
 			@ui.TableHead() {
@@ -103,6 +103,11 @@ templ milestonesTable(productID string, milestones []*model.Milestone) {
 				}
 				@ui.TableHeader() {
 					Created
+				}
+				if canEdit {
+					@ui.TableHeader() {
+						<span class="sr-only">Actions</span>
+					}
 				}
 			}
 			@ui.TableBody("") {
@@ -128,6 +133,15 @@ templ milestonesTable(productID string, milestones []*model.Milestone) {
 						}
 						@ui.TableCellMuted() {
 							{ formatDate(m.CreatedAt) }
+						}
+						if canEdit {
+							@ui.TableCell() {
+								@patterns.RowActions(
+									fmt.Sprintf("/products/%s/milestones/%s/edit?return=list", productID, m.ID),
+									fmt.Sprintf("/products/%s/milestones/%s", productID, m.ID),
+									csrfToken,
+								)
+							}
 						}
 					}
 				}

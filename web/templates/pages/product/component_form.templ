@@ -18,6 +18,7 @@ type ComponentFormProps struct {
 	Milestones  []*model.Milestone
 	IsEdit      bool
 	Error       string
+	ReturnTo    string // "list" to return to list after save; empty = detail
 	// Form values (preserved on validation error).
 	Name        string
 	Description string
@@ -48,6 +49,9 @@ templ ComponentFormPage(props ComponentFormProps) {
 				@ui.CardBody() {
 					<form method="post" action={ templ.SafeURL(componentFormAction(props)) } class="space-y-6">
 						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						if props.ReturnTo != "" {
+							<input type="hidden" name="return" value={ props.ReturnTo }/>
+						}
 						@ui.TextInput(ui.InputProps{
 							ID:          "name",
 							Name:        "name",

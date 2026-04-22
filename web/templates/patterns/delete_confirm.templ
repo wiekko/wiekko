@@ -17,14 +17,23 @@ templ DeleteTrigger(hxDelete, csrfToken string) {
 }
 
 // DeleteConfirmation renders the confirmation modal content for a delete action.
-templ DeleteConfirmation(entityName, hxDelete string) {
+// entityTitle is the user-visible name/title of the specific entity (may be empty
+// to fall back to generic copy).
+templ DeleteConfirmation(entityKind, entityTitle, hxDelete string) {
 	@ui.ConfirmDialog(
 		"delete-confirm",
-		"Delete "+entityName,
-		"Are you sure you want to delete this "+entityName+"? This action cannot be undone.",
+		"Delete "+entityKind,
+		deleteConfirmMessage(entityKind, entityTitle),
 		"Delete",
 		"danger",
 		"delete",
 		hxDelete,
 	)
+}
+
+func deleteConfirmMessage(entityKind, entityTitle string) string {
+	if entityTitle == "" {
+		return "Are you sure you want to delete this " + entityKind + "? This action cannot be undone."
+	}
+	return "Are you sure you want to delete " + entityKind + " “" + entityTitle + "”? This action cannot be undone."
 }

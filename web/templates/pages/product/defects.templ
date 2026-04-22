@@ -71,6 +71,11 @@ templ DefectsPage(props DefectsProps) {
 							@ui.TableHeader() {
 								Created
 							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
 						}
 						@ui.TableBody("") {
 							for _, d := range props.Defects {
@@ -102,6 +107,15 @@ templ DefectsPage(props DefectsProps) {
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(d.CreatedAt) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/defects/%s/edit?return=list", props.Product.ID, d.ID),
+												fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID),
+												props.Meta.CSRFToken,
+											)
+										}
 									}
 								}
 							}

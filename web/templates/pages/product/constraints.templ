@@ -73,6 +73,11 @@ templ ConstraintsPage(props ConstraintsProps) {
 							@ui.TableHeader() {
 								Created
 							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
 						}
 						@ui.TableBody("") {
 							for _, c := range props.Constraints {
@@ -99,6 +104,15 @@ templ ConstraintsPage(props ConstraintsProps) {
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(c.CreatedAt) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/constraints/%s/edit?return=list", props.Product.ID, c.ID),
+												fmt.Sprintf("/products/%s/constraints/%s", props.Product.ID, c.ID),
+												props.Meta.CSRFToken,
+											)
+										}
 									}
 								}
 							}

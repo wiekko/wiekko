@@ -799,6 +799,22 @@ func (c *PageProductController) DeleteProductConfirm(w http.ResponseWriter, r *h
 
 // --- helpers ---
 
+// editReturnTarget reads the edit-flow return target from a GET request's
+// query string. Empty string means the default (redirect to detail view).
+func editReturnTarget(r *http.Request) string {
+	return r.URL.Query().Get("return")
+}
+
+// postEditRedirect chooses where to send the user after a successful edit.
+// If the form carried `return=list`, it sends them to listPath; otherwise
+// detailPath (the detail view).
+func postEditRedirect(r *http.Request, detailPath, listPath string) string {
+	if r.FormValue("return") == "list" {
+		return listPath
+	}
+	return detailPath
+}
+
 func (c *PageProductController) canCreateProduct(r *http.Request, user *model.User) bool {
 	if user.IsAdmin {
 		return true
@@ -1045,6 +1061,7 @@ func (c *PageProductController) MilestoneEditForm(w http.ResponseWriter, r *http
 		Product:     p,
 		Milestone:   m,
 		IsEdit:      true,
+		ReturnTo:    editReturnTarget(r),
 		Name:        m.Name,
 		Description: m.Description,
 		Type:        m.Type,
@@ -1096,6 +1113,7 @@ func (c *PageProductController) MilestoneUpdate(w http.ResponseWriter, r *http.R
 			Product:     p,
 			Milestone:   m,
 			IsEdit:      true,
+			ReturnTo:    r.FormValue("return"),
 			Name:        name,
 			Description: description,
 			Type:        milestoneType,
@@ -1105,7 +1123,10 @@ func (c *PageProductController) MilestoneUpdate(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID), http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID),
+		fmt.Sprintf("/products/%s/milestones", productID),
+	), http.StatusSeeOther)
 }
 
 // MilestoneDelete handles DELETE /products/{id}/milestones/{milestoneId}.
@@ -1381,6 +1402,7 @@ func (c *PageProductController) ComponentEditForm(w http.ResponseWriter, r *http
 		Component:   comp,
 		Milestones:  milestones,
 		IsEdit:      true,
+		ReturnTo:    editReturnTarget(r),
 		Name:        comp.Name,
 		Description: comp.Description,
 		MilestoneID: comp.MilestoneID,
@@ -1431,6 +1453,7 @@ func (c *PageProductController) ComponentUpdate(w http.ResponseWriter, r *http.R
 			Component:   comp,
 			Milestones:  milestones,
 			IsEdit:      true,
+			ReturnTo:    r.FormValue("return"),
 			Name:        name,
 			Description: description,
 			MilestoneID: milestoneID,
@@ -1439,7 +1462,10 @@ func (c *PageProductController) ComponentUpdate(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/products/%s/components/%s", productID, componentID), http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		fmt.Sprintf("/products/%s/components/%s", productID, componentID),
+		fmt.Sprintf("/products/%s/components", productID),
+	), http.StatusSeeOther)
 }
 
 // ComponentDelete handles DELETE /products/{id}/components/{componentId}.
@@ -1740,6 +1766,7 @@ func (c *PageProductController) CapabilityEditForm(w http.ResponseWriter, r *htt
 		Components:  components,
 		Milestones:  milestones,
 		IsEdit:      true,
+		ReturnTo:    editReturnTarget(r),
 		Name:        f.Name,
 		Description: f.Description,
 		ComponentID: f.ComponentID,
@@ -1795,6 +1822,7 @@ func (c *PageProductController) CapabilityUpdate(w http.ResponseWriter, r *http.
 			Components:  components,
 			Milestones:  milestones,
 			IsEdit:      true,
+			ReturnTo:    r.FormValue("return"),
 			Name:        name,
 			Description: description,
 			ComponentID: componentID,
@@ -1804,7 +1832,10 @@ func (c *PageProductController) CapabilityUpdate(w http.ResponseWriter, r *http.
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID), http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID),
+		fmt.Sprintf("/products/%s/capabilities", productID),
+	), http.StatusSeeOther)
 }
 
 // CapabilityDelete handles DELETE /products/{id}/capabilities/{capabilityId}.
@@ -2158,6 +2189,7 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 		Capabilities:   capabilities,
 		PyramidLevels:  pyramidLevels,
 		IsEdit:         true,
+		ReturnTo:       editReturnTarget(r),
 		Title:          tc.Title,
 		Description:    tc.Description,
 		ExecutionMode:  tc.ExecutionMode,
@@ -2223,6 +2255,7 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 			Capabilities:   capabilities,
 			PyramidLevels:  pyramidLevels,
 			IsEdit:         true,
+			ReturnTo:       r.FormValue("return"),
 			Error:          err.Error(),
 			Title:          title,
 			Description:    description,
@@ -2235,7 +2268,10 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	http.Redirect(w, r, "/products/"+productID+"/test-cases/"+testCaseID, http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		"/products/"+productID+"/test-cases/"+testCaseID,
+		"/products/"+productID+"/test-cases",
+	), http.StatusSeeOther)
 }
 
 // TestCaseDelete handles DELETE /products/{id}/test-cases/{testCaseId}.
@@ -2729,6 +2765,7 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 		Milestones:       milestones,
 		Sprints:          sprints,
 		IsEdit:           true,
+		ReturnTo:         editReturnTarget(r),
 		Title:            req.Title,
 		Description:      req.Description,
 		DefinitionOfDone: req.DefinitionOfDone,
@@ -2813,6 +2850,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 			Milestones:       milestones,
 			Sprints:          sprints,
 			IsEdit:           true,
+			ReturnTo:         r.FormValue("return"),
 			Error:            updateErr.Error(),
 			Title:            title,
 			Description:      description,
@@ -2829,7 +2867,10 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 		return
 	}
 
-	http.Redirect(w, r, "/products/"+productID+"/requirements/"+requirementID, http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		"/products/"+productID+"/requirements/"+requirementID,
+		"/products/"+productID+"/requirements",
+	), http.StatusSeeOther)
 }
 
 // RequirementDelete handles DELETE /products/{id}/requirements/{requirementId}.
@@ -3144,6 +3185,7 @@ func (c *PageProductController) DefectEditForm(w http.ResponseWriter, r *http.Re
 		Milestones:  milestones,
 		Sprints:     sprints,
 		IsEdit:      true,
+		ReturnTo:    editReturnTarget(r),
 		Title:       d.Title,
 		Description: d.Description,
 		Criticality: d.Criticality,
@@ -3213,6 +3255,7 @@ func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Requ
 			Milestones:  milestones,
 			Sprints:     sprints,
 			IsEdit:      true,
+			ReturnTo:    r.FormValue("return"),
 			Error:       updateErr.Error(),
 			Title:       title,
 			Description: description,
@@ -3226,7 +3269,10 @@ func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/products/"+productID+"/defects/"+defectID, http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		"/products/"+productID+"/defects/"+defectID,
+		"/products/"+productID+"/defects",
+	), http.StatusSeeOther)
 }
 
 // DefectDelete handles DELETE /products/{id}/defects/{defectId}.
@@ -3515,6 +3561,7 @@ func (c *PageProductController) ConstraintEditForm(w http.ResponseWriter, r *htt
 		Categories:      categories,
 		Milestones:      milestones,
 		IsEdit:          true,
+		ReturnTo:        editReturnTarget(r),
 		Title:           con.Title,
 		Description:     con.Description,
 		CategoryID:      con.CategoryID,
@@ -3576,6 +3623,7 @@ func (c *PageProductController) ConstraintUpdate(w http.ResponseWriter, r *http.
 			Categories:      categories,
 			Milestones:      milestones,
 			IsEdit:          true,
+			ReturnTo:        r.FormValue("return"),
 			Error:           updateErr.Error(),
 			Title:           title,
 			Description:     description,
@@ -3587,7 +3635,10 @@ func (c *PageProductController) ConstraintUpdate(w http.ResponseWriter, r *http.
 		return
 	}
 
-	http.Redirect(w, r, "/products/"+productID+"/constraints/"+constraintID, http.StatusSeeOther)
+	http.Redirect(w, r, postEditRedirect(r,
+		"/products/"+productID+"/constraints/"+constraintID,
+		"/products/"+productID+"/constraints",
+	), http.StatusSeeOther)
 }
 
 // ConstraintDelete handles DELETE /products/{id}/constraints/{constraintId}.
@@ -3607,11 +3658,18 @@ func (c *PageProductController) ConstraintDelete(w http.ResponseWriter, r *http.
 
 // ConstraintDeleteConfirm renders GET /products/{id}/constraints/{constraintId}/delete/confirm.
 func (c *PageProductController) ConstraintDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 	constraintID := r.PathValue("constraintId")
 
+	con, err := c.constraint.GetConstraint(r.Context(), user, productID, constraintID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ConstraintDeleteConfirmation("constraint", productID, constraintID).Render(r.Context(), w)
+	_ = productpage.ConstraintDeleteConfirmation(con.Title, productID, constraintID).Render(r.Context(), w)
 }
 
 // ConstraintOverviewTab renders GET /products/{id}/constraints/{constraintId}/tabs/overview.

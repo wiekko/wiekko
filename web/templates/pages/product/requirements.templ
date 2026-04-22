@@ -74,6 +74,11 @@ templ RequirementsPage(props RequirementsProps) {
 							@ui.TableHeader() {
 								Created
 							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
 						}
 						@ui.TableBody("") {
 							for _, req := range props.Requirements {
@@ -108,6 +113,15 @@ templ RequirementsPage(props RequirementsProps) {
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(req.CreatedAt) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/requirements/%s/edit?return=list", props.Product.ID, req.ID),
+												fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, req.ID),
+												props.Meta.CSRFToken,
+											)
+										}
 									}
 								}
 							}

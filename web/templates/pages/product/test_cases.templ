@@ -71,6 +71,11 @@ templ TestCasesPage(props TestCasesProps) {
 							@ui.TableHeader() {
 								Created
 							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
 						}
 						@ui.TableBody("") {
 							for _, tc := range props.TestCases {
@@ -115,6 +120,15 @@ templ TestCasesPage(props TestCasesProps) {
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(tc.CreatedAt) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/test-cases/%s/edit?return=list", props.Product.ID, tc.ID),
+												fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID),
+												props.Meta.CSRFToken,
+											)
+										}
 									}
 								}
 							}

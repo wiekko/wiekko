@@ -1,0 +1,36 @@
+package patterns
+
+import "nexmap.net/web/templates/ui"
+
+// RowActions renders icon-only Edit + Delete buttons for a table row.
+// editHref should include any return parameter (e.g. ?return=list) so the
+// update controller knows where to send the user after saving.
+// deleteURL is the DELETE endpoint; /confirm is appended for the modal.
+// Pass "" for either URL to hide that action.
+templ RowActions(editHref, deleteURL, csrfToken string) {
+	<div class="flex items-center justify-end gap-1" onclick="event.stopPropagation()">
+		if editHref != "" {
+			<a
+				href={ templ.SafeURL(editHref) }
+				class="inline-flex items-center justify-center rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+				aria-label="Edit"
+				title="Edit"
+			>
+				@ui.Icon("pencil", "sm")
+			</a>
+		}
+		if deleteURL != "" {
+			<button
+				type="button"
+				class="inline-flex items-center justify-center rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+				aria-label="Delete"
+				title="Delete"
+				hx-get={ deleteURL + "/confirm" }
+				hx-target="#modal"
+				hx-swap="innerHTML"
+			>
+				@ui.Icon("trash", "sm")
+			</button>
+		}
+	</div>
+}

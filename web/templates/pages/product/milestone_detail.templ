@@ -103,7 +103,7 @@ templ MilestoneHistoryTabContent(entries []templates.AuditEntryView) {
 
 // MilestoneDeleteConfirmation renders the delete confirmation for a milestone.
 templ MilestoneDeleteConfirmation(name, productID, milestoneID string) {
-	@patterns.DeleteConfirmation("milestone", fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID))
+	@patterns.DeleteConfirmation("milestone", name, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID))
 }
 
 func milestoneDetailTabs(productID, milestoneID string) []templates.TabDef {

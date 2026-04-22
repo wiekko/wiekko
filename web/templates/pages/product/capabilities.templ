@@ -74,6 +74,11 @@ templ CapabilitiesPage(props CapabilitiesProps) {
 							@ui.TableHeader() {
 								Created
 							}
+							if props.IsOwnerOrAdmin {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
 						}
 						@ui.TableBody("") {
 							for _, f := range props.Capabilities {
@@ -115,6 +120,15 @@ templ CapabilitiesPage(props CapabilitiesProps) {
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(f.CreatedAt) }
+									}
+									if props.IsOwnerOrAdmin {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/capabilities/%s/edit?return=list", props.Product.ID, f.ID),
+												fmt.Sprintf("/products/%s/capabilities/%s", props.Product.ID, f.ID),
+												props.Meta.CSRFToken,
+											)
+										}
 									}
 								}
 							}

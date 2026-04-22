@@ -70,6 +70,11 @@ templ ComponentsPage(props ComponentsProps) {
 							@ui.TableHeader() {
 								Created
 							}
+							if props.IsOwnerOrAdmin {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
 						}
 						@ui.TableBody("") {
 							for _, comp := range props.Components {
@@ -95,6 +100,15 @@ templ ComponentsPage(props ComponentsProps) {
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(comp.CreatedAt) }
+									}
+									if props.IsOwnerOrAdmin {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/components/%s/edit?return=list", props.Product.ID, comp.ID),
+												fmt.Sprintf("/products/%s/components/%s", props.Product.ID, comp.ID),
+												props.Meta.CSRFToken,
+											)
+										}
 									}
 								}
 							}

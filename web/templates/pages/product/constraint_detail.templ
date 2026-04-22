@@ -145,7 +145,7 @@ templ ConstraintHistoryTabContent(entries []templates.AuditEntryView) {
 
 // ConstraintDeleteConfirmation renders the delete confirmation for a constraint.
 templ ConstraintDeleteConfirmation(name, productID, constraintID string) {
-	@patterns.DeleteConfirmation("constraint", fmt.Sprintf("/products/%s/constraints/%s", productID, constraintID))
+	@patterns.DeleteConfirmation("constraint", name, fmt.Sprintf("/products/%s/constraints/%s", productID, constraintID))
 }
 
 func constraintDetailTabs(productID, constraintID string) []templates.TabDef {
