@@ -2946,6 +2946,12 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 	}).Render(r.Context(), w)
 }
 
+// RequirementCapabilitiesTab renders GET /products/{id}/requirements/{requirementId}/tabs/capabilities.
+func (c *PageProductController) RequirementCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilitiesTabContent().Render(r.Context(), w)
+}
+
 // RequirementTestCasesTab renders GET /products/{id}/requirements/{requirementId}/tabs/test-cases.
 func (c *PageProductController) RequirementTestCasesTab(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

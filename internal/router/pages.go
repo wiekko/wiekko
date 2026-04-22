@@ -132,6 +132,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("DELETE /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementDelete)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.RequirementDeleteConfirm)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.RequirementOverviewTab)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/capabilities", pageAuthed(http.HandlerFunc(productCtrl.RequirementCapabilitiesTab)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/test-cases", pageAuthed(http.HandlerFunc(productCtrl.RequirementTestCasesTab)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/defects", pageAuthed(http.HandlerFunc(productCtrl.RequirementDefectsTab)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.RequirementCommentsTab)))
