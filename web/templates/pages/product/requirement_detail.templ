@@ -255,7 +255,7 @@ templ RequirementCapabilitiesTabContent(props RequirementCapabilitiesTabProps) {
 											hx-swap="innerHTML"
 											hx-confirm="Unlink this capability from the requirement?"
 										>
-											@ui.Icon("trash", "sm")
+											@ui.Icon("unlink", "sm")
 										</button>
 									</td>
 								}
@@ -325,15 +325,6 @@ templ RequirementCapabilityLinkResults(productID, requirementID string, candidat
 	}
 }
 
-// RequirementCapabilitiesTabOOB wraps the refreshed tab content as an
-// out-of-band swap so a modal-driven action can both close the modal
-// (primary target #modal) and refresh the tab in a single response.
-templ RequirementCapabilitiesTabOOB(props RequirementCapabilitiesTabProps) {
-	<div id="tab-panel-capabilities" hx-swap-oob="innerHTML">
-		@RequirementCapabilitiesTabContent(props)
-	</div>
-}
-
 func requirementCapabilityComponentName(names map[string]string, capabilityID string) string {
 	if names == nil {
 		return "—"
@@ -344,15 +335,299 @@ func requirementCapabilityComponentName(names map[string]string, capabilityID st
 	return "—"
 }
 
-templ RequirementTestCasesTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("beaker", "No linked test cases", "Test cases linked to this requirement will appear here.", "", "")
+// RequirementTestCasesTabProps holds data for the requirement test-cases tab.
+type RequirementTestCasesTabProps struct {
+	ProductID     string
+	RequirementID string
+	CSRFToken     string
+	CanWrite      bool
+	TestCases     []*model.TestCase
+}
+
+templ RequirementTestCasesTabContent(props RequirementTestCasesTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/requirements/%s/test-cases/link-modal", props.ProductID, props.RequirementID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+				@ui.Button(ui.ButtonProps{
+					Label:    "Create new",
+					Variant:  "primary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/requirements/%s/test-cases/create-modal", props.ProductID, props.RequirementID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("plus", "sm")
+				}
+			</div>
+		}
+		if len(props.TestCases) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("beaker", "No linked test cases", "Test cases linked to this requirement will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Mode
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, tc := range props.TestCases {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.ProductID, tc.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ tc.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ tc.ExecutionMode }
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink test case"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/requirements/%s/test-cases/%s", props.ProductID, props.RequirementID, tc.ID) }
+											hx-target="#tab-panel-test-cases"
+											hx-swap="innerHTML"
+											hx-confirm="Unlink this test case from the requirement?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// RequirementTestCaseLinkModal renders the "link existing test case" modal.
+templ RequirementTestCaseLinkModal(productID, requirementID string) {
+	@ui.Modal("test-case-link-modal", "Link existing test case", "md") {
+		<div class="space-y-4">
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search test cases..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/requirements/%s/test-cases/link-search", productID, requirementID) }
+					hx-target="#test-case-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="test-case-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
 	}
 }
 
-templ RequirementDefectsTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("bug", "No linked defects", "Defects linked to this requirement will appear here.", "", "")
+templ RequirementTestCaseLinkResults(productID, requirementID string, candidates []*model.TestCase) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching test cases.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, tc := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ tc.Title }</p>
+						if tc.Description != "" {
+							<p class="truncate text-xs text-gray-500 dark:text-gray-400">{ tc.Description }</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/requirements/%s/test-cases/link", productID, requirementID) }
+						hx-vals={ fmt.Sprintf(`{"test_case_id":"%s"}`, tc.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// RequirementDefectsTabProps holds data for the requirement defects tab.
+type RequirementDefectsTabProps struct {
+	ProductID     string
+	RequirementID string
+	CSRFToken     string
+	CanLink       bool
+	CanUnlink     bool
+	Defects       []*model.Defect
+	LinkIDs       map[string]string // defectID → DefectLink ID
+}
+
+templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
+	<div class="space-y-4">
+		if props.CanLink {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/requirements/%s/defects/link-modal", props.ProductID, props.RequirementID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+				@ui.Button(ui.ButtonProps{
+					Label:    "Create new",
+					Variant:  "primary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/requirements/%s/defects/create-modal", props.ProductID, props.RequirementID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("plus", "sm")
+				}
+			</div>
+		}
+		if len(props.Defects) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("bug", "No linked defects", "Defects linked to this requirement will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Criticality
+						}
+						if props.CanUnlink {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, d := range props.Defects {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, d.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ d.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ d.Criticality }
+								}
+								if props.CanUnlink {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink defect"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/requirements/%s/defects/%s", props.ProductID, props.RequirementID, props.LinkIDs[d.ID]) }
+											hx-target="#tab-panel-defects"
+											hx-swap="innerHTML"
+											hx-confirm="Unlink this defect from the requirement?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// RequirementDefectLinkModal renders the "link existing defect" modal.
+templ RequirementDefectLinkModal(productID, requirementID string) {
+	@ui.Modal("defect-link-modal", "Link existing defect", "md") {
+		<div class="space-y-4">
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search defects..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/requirements/%s/defects/link-search", productID, requirementID) }
+					hx-target="#defect-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="defect-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ RequirementDefectLinkResults(productID, requirementID string, candidates []*model.Defect) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching defects.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, d := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ d.Title }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ d.Criticality }</p>
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/requirements/%s/defects/link", productID, requirementID) }
+						hx-vals={ fmt.Sprintf(`{"defect_id":"%s"}`, d.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
 	}
 }
 

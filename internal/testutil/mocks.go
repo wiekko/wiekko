@@ -506,9 +506,10 @@ type MockDefectStore struct {
 	AssignFunc          func(ctx context.Context, a *model.Assignment) error
 	UnassignFunc        func(ctx context.Context, defectID, userID string) error
 	ListAssigneesFunc   func(ctx context.Context, defectID string) ([]*model.Assignment, error)
-	AddLinkFunc         func(ctx context.Context, link *model.DefectLink) error
-	RemoveLinkFunc      func(ctx context.Context, id string) error
-	ListLinksFunc       func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
+	AddLinkFunc           func(ctx context.Context, link *model.DefectLink) error
+	RemoveLinkFunc        func(ctx context.Context, id string) error
+	ListLinksFunc         func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
+	ListLinksByTargetFunc func(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
 }
 
 func (m *MockDefectStore) Create(ctx context.Context, d *model.Defect) error {
@@ -546,6 +547,12 @@ func (m *MockDefectStore) RemoveLink(ctx context.Context, id string) error {
 }
 func (m *MockDefectStore) ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error) {
 	return m.ListLinksFunc(ctx, defectID)
+}
+func (m *MockDefectStore) ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error) {
+	if m.ListLinksByTargetFunc == nil {
+		return nil, nil
+	}
+	return m.ListLinksByTargetFunc(ctx, targetType, targetID)
 }
 
 // MockCommentStore implements store.CommentStore with configurable function fields.
@@ -601,10 +608,11 @@ type MockTestCaseStore struct {
 	UpdateFunc               func(ctx context.Context, tc *model.TestCase) error
 	DeleteFunc               func(ctx context.Context, id string) error
 	ListByProductIDFunc      func(ctx context.Context, productID string) ([]*model.TestCase, error)
-	LinkRequirementFunc      func(ctx context.Context, link *model.TestCaseRequirement) error
-	UnlinkRequirementFunc    func(ctx context.Context, testCaseID, requirementID string) error
-	ListRequirementLinksFunc func(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
-	AddEnvironmentFunc       func(ctx context.Context, id, testCaseID, environmentID string) error
+	LinkRequirementFunc                func(ctx context.Context, link *model.TestCaseRequirement) error
+	UnlinkRequirementFunc              func(ctx context.Context, testCaseID, requirementID string) error
+	ListRequirementLinksFunc           func(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
+	ListTestCaseLinksByRequirementFunc func(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error)
+	AddEnvironmentFunc                 func(ctx context.Context, id, testCaseID, environmentID string) error
 	RemoveEnvironmentFunc    func(ctx context.Context, testCaseID, environmentID string) error
 	ListEnvironmentsFunc     func(ctx context.Context, testCaseID string) ([]string, error)
 }
@@ -632,6 +640,12 @@ func (m *MockTestCaseStore) UnlinkRequirement(ctx context.Context, testCaseID, r
 }
 func (m *MockTestCaseStore) ListRequirementLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error) {
 	return m.ListRequirementLinksFunc(ctx, testCaseID)
+}
+func (m *MockTestCaseStore) ListTestCaseLinksByRequirement(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error) {
+	if m.ListTestCaseLinksByRequirementFunc == nil {
+		return nil, nil
+	}
+	return m.ListTestCaseLinksByRequirementFunc(ctx, requirementID)
 }
 func (m *MockTestCaseStore) AddEnvironment(ctx context.Context, id, testCaseID, environmentID string) error {
 	return m.AddEnvironmentFunc(ctx, id, testCaseID, environmentID)

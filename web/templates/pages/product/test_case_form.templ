@@ -1,6 +1,8 @@
 package product
 
 import (
+	"strings"
+
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
@@ -10,25 +12,28 @@ import (
 
 // TestCaseFormProps holds data for the test case create/edit form.
 type TestCaseFormProps struct {
-	Meta            templates.PageMeta
-	DisplayName     string
-	IsAdmin         bool
-	Product         *model.Product
-	TestCase        *model.TestCase // nil for create
-	Components      []*model.Component
-	Capabilities    []*model.Capability
-	PyramidLevels   []*model.PyramidLevel
-	IsEdit          bool
-	Error           string
-	ReturnTo        string // "list" to return to list after save; empty = detail
+	Meta          templates.PageMeta
+	DisplayName   string
+	IsAdmin       bool
+	Product       *model.Product
+	TestCase      *model.TestCase // nil for create
+	Components    []*model.Component
+	Capabilities  []*model.Capability
+	PyramidLevels []*model.PyramidLevel
+	IsEdit        bool
+	Error         string
+	ReturnTo      string // "list" to return to list after save; empty = detail
+	// LinkTo, when non-empty, switches the form into modal/htmx mode.
+	// Format: "<entity>:<id>", e.g. "requirement:abc-123".
+	LinkTo string
 	// Form values (preserved on validation error).
-	Title           string
-	Description     string
-	ExecutionMode   string
-	TestIdentifier  string
-	ComponentID     string
-	CapabilityID    string
-	PyramidLevelID  string
+	Title          string
+	Description    string
+	ExecutionMode  string
+	TestIdentifier string
+	ComponentID    string
+	CapabilityID   string
+	PyramidLevelID string
 }
 
 templ TestCaseFormPage(props TestCaseFormProps) {
@@ -51,75 +56,117 @@ templ TestCaseFormPage(props TestCaseFormProps) {
 				}
 			</h1>
 			@patterns.FormError(props.Error)
-			@ui.Card() {
-				@ui.CardBody() {
-					<form method="post" action={ templ.SafeURL(testCaseFormAction(props)) } class="space-y-6">
-						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
-						if props.ReturnTo != "" {
-							<input type="hidden" name="return" value={ props.ReturnTo }/>
-						}
-						@ui.TextInput(ui.InputProps{
-							ID:          "title",
-							Name:        "title",
-							Label:       "Title",
-							Value:       props.Title,
-							Placeholder: "e.g. Login with valid credentials",
-							Required:    true,
-						})
-						@ui.TextArea(ui.TextAreaProps{
-							ID:          "description",
-							Name:        "description",
-							Label:       "Description",
-							Value:       props.Description,
-							Placeholder: "Describe this test case...",
-							Rows:        4,
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "execution_mode",
-							Name:     "execution_mode",
-							Label:    "Execution Mode",
-							Value:    props.ExecutionMode,
-							Options:  executionModeOptions(props.ExecutionMode),
-							HelpText: "Manual tests are executed by testers. Automatic tests are linked to code.",
-						})
-						@ui.TextInput(ui.InputProps{
-							ID:          "test_identifier",
-							Name:        "test_identifier",
-							Label:       "Test Identifier",
-							Value:       props.TestIdentifier,
-							Placeholder: "e.g. TestLoginWithValidCredentials",
-							HelpText:    "Code test function name. Required for automatic tests.",
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "component_id",
-							Name:     "component_id",
-							Label:    "Component",
-							Value:    props.ComponentID,
-							Options:  componentSelectOptions(props.Components),
-							HelpText: "Optional. Assign to a component.",
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "capability_id",
-							Name:     "capability_id",
-							Label:    "Capability",
-							Value:    props.CapabilityID,
-							Options:  capabilitySelectOptions(props.Capabilities),
-							HelpText: "Optional. Assign to a capability.",
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "pyramid_level_id",
-							Name:     "pyramid_level_id",
-							Label:    "Pyramid Level",
-							Value:    props.PyramidLevelID,
-							Options:  pyramidLevelSelectOptions(props.PyramidLevels),
-							HelpText: "Optional. Categorize by test pyramid level.",
-						})
-						@patterns.FormActions(testCaseSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/test-cases")
-					</form>
-				}
-			}
+			@TestCaseFormBody(props)
 		</div>
 	}
+}
+
+// TestCaseFormModal wraps the form body in a modal dialog.
+templ TestCaseFormModal(props TestCaseFormProps) {
+	@ui.Modal("test-case-form-modal", testCaseModalTitle(props), "lg") {
+		@patterns.FormError(props.Error)
+		@TestCaseFormBody(props)
+	}
+}
+
+// TestCaseFormBody renders the inner form (Card + form fields) without page chrome.
+templ TestCaseFormBody(props TestCaseFormProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			<form
+				method="post"
+				action={ templ.SafeURL(testCaseFormAction(props)) }
+				if props.LinkTo != "" {
+					hx-post={ testCaseFormAction(props) }
+					hx-target="#modal"
+					hx-swap="innerHTML"
+				}
+				class="space-y-6"
+			>
+				<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.ReturnTo != "" {
+					<input type="hidden" name="return" value={ props.ReturnTo }/>
+				}
+				if props.LinkTo != "" {
+					<input type="hidden" name="link_to" value={ props.LinkTo }/>
+				}
+				@ui.TextInput(ui.InputProps{
+					ID:          "title",
+					Name:        "title",
+					Label:       "Title",
+					Value:       props.Title,
+					Placeholder: "e.g. Login with valid credentials",
+					Required:    true,
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "description",
+					Name:        "description",
+					Label:       "Description",
+					Value:       props.Description,
+					Placeholder: "Describe this test case...",
+					Rows:        4,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "execution_mode",
+					Name:     "execution_mode",
+					Label:    "Execution Mode",
+					Value:    props.ExecutionMode,
+					Options:  executionModeOptions(props.ExecutionMode),
+					HelpText: "Manual tests are executed by testers. Automatic tests are linked to code.",
+				})
+				@ui.TextInput(ui.InputProps{
+					ID:          "test_identifier",
+					Name:        "test_identifier",
+					Label:       "Test Identifier",
+					Value:       props.TestIdentifier,
+					Placeholder: "e.g. TestLoginWithValidCredentials",
+					HelpText:    "Code test function name. Required for automatic tests.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "component_id",
+					Name:     "component_id",
+					Label:    "Component",
+					Value:    props.ComponentID,
+					Options:  componentSelectOptions(props.Components),
+					HelpText: "Optional. Assign to a component.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "capability_id",
+					Name:     "capability_id",
+					Label:    "Capability",
+					Value:    props.CapabilityID,
+					Options:  capabilitySelectOptions(props.Capabilities),
+					HelpText: "Optional. Assign to a capability.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "pyramid_level_id",
+					Name:     "pyramid_level_id",
+					Label:    "Pyramid Level",
+					Value:    props.PyramidLevelID,
+					Options:  pyramidLevelSelectOptions(props.PyramidLevels),
+					HelpText: "Optional. Categorize by test pyramid level.",
+				})
+				if props.LinkTo != "" {
+					@testCaseModalActions(testCaseSubmitLabel(props.IsEdit))
+				} else {
+					@patterns.FormActions(testCaseSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/test-cases")
+				}
+			</form>
+		}
+	}
+}
+
+templ testCaseModalActions(submitLabel string) {
+	<div class="flex items-center justify-end gap-3 pt-4">
+		@ui.ModalCancelButton("modal")
+		@ui.Button(ui.ButtonProps{
+			Label:   submitLabel,
+			Variant: "primary",
+			Size:    "md",
+			Type:    "submit",
+		})
+	</div>
 }
 
 func testCaseFormBreadcrumbs(props TestCaseFormProps) []templates.BreadcrumbItem {
@@ -143,6 +190,15 @@ func testCaseFormAction(props TestCaseFormProps) string {
 	if props.IsEdit {
 		return "/products/" + props.Product.ID + "/test-cases/" + props.TestCase.ID
 	}
+	if reqID, ok := strings.CutPrefix(props.LinkTo, "requirement:"); ok {
+		return "/products/" + props.Product.ID + "/requirements/" + reqID + "/test-cases"
+	}
+	if capID, ok := strings.CutPrefix(props.LinkTo, "capability:"); ok {
+		return "/products/" + props.Product.ID + "/capabilities/" + capID + "/test-cases"
+	}
+	if compID, ok := strings.CutPrefix(props.LinkTo, "component:"); ok {
+		return "/products/" + props.Product.ID + "/components/" + compID + "/test-cases"
+	}
 	return "/products/" + props.Product.ID + "/test-cases"
 }
 
@@ -151,6 +207,13 @@ func testCaseSubmitLabel(isEdit bool) string {
 		return "Save Changes"
 	}
 	return "Create Test Case"
+}
+
+func testCaseModalTitle(props TestCaseFormProps) string {
+	if props.IsEdit {
+		return "Edit Test Case"
+	}
+	return "New Test Case"
 }
 
 func executionModeOptions(current string) []templates.SelectOption {

@@ -199,6 +199,30 @@ func (s *TestingService) ListTestCaseRequirements(ctx context.Context, user *mod
 	return s.testCases.ListRequirementLinks(ctx, tcID)
 }
 
+// ListLinkedTestCasesForRequirement returns the full TestCase records linked
+// to a requirement. Requires viewer role.
+func (s *TestingService) ListLinkedTestCasesForRequirement(ctx context.Context, user *model.User, productID, requirementID string) ([]*model.TestCase, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	links, err := s.testCases.ListTestCaseLinksByRequirement(ctx, requirementID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.TestCase, 0, len(links))
+	for _, link := range links {
+		tc, err := s.testCases.GetByID(ctx, link.TestCaseID)
+		if err != nil {
+			continue
+		}
+		if tc.ProductID != productID {
+			continue
+		}
+		out = append(out, tc)
+	}
+	return out, nil
+}
+
 // AddTestCaseEnvironment links a test case to a runtime environment. Requires developer role.
 func (s *TestingService) AddTestCaseEnvironment(ctx context.Context, user *model.User, productID, tcID, envID string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {

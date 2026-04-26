@@ -492,3 +492,30 @@ func (s *BacklogService) ListDefectLinks(ctx context.Context, user *model.User, 
 	}
 	return s.defects.ListLinks(ctx, defID)
 }
+
+// ListLinkedDefects returns defects whose DefectLink rows reference the
+// given target (e.g. a requirement or capability), along with a map from
+// defect ID to the link row's ID (needed to unlink). Requires viewer role.
+func (s *BacklogService) ListLinkedDefects(ctx context.Context, user *model.User, productID, targetType, targetID string) ([]*model.Defect, map[string]string, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, nil, err
+	}
+	links, err := s.defects.ListLinksByTarget(ctx, targetType, targetID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defects := make([]*model.Defect, 0, len(links))
+	linkIDs := make(map[string]string, len(links))
+	for _, link := range links {
+		d, err := s.defects.GetByID(ctx, link.DefectID)
+		if err != nil {
+			continue
+		}
+		if d.ProductID != productID {
+			continue
+		}
+		defects = append(defects, d)
+		linkIDs[d.ID] = link.ID
+	}
+	return defects, linkIDs, nil
+}

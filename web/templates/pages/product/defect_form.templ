@@ -1,6 +1,8 @@
 package product
 
 import (
+	"strings"
+
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
@@ -21,6 +23,10 @@ type DefectFormProps struct {
 	IsEdit      bool
 	Error       string
 	ReturnTo    string // "list" to return to list after save; empty = detail
+	// LinkTo, when non-empty, switches the form into modal/htmx mode and
+	// makes the POST handler create-and-link via DefectLink.
+	// Format: "<entity>:<id>", e.g. "requirement:abc-123".
+	LinkTo string
 	// Form values (preserved on validation error).
 	Title       string
 	Description string
@@ -52,81 +58,123 @@ templ DefectFormPage(props DefectFormProps) {
 				}
 			</h1>
 			@patterns.FormError(props.Error)
-			@ui.Card() {
-				@ui.CardBody() {
-					<form method="post" action={ templ.SafeURL(defectFormAction(props)) } class="space-y-6">
-						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
-						if props.ReturnTo != "" {
-							<input type="hidden" name="return" value={ props.ReturnTo }/>
-						}
-						@ui.TextInput(ui.InputProps{
-							ID:          "title",
-							Name:        "title",
-							Label:       "Title",
-							Value:       props.Title,
-							Placeholder: "e.g. Login page crashes on empty password",
-							Required:    true,
-						})
-						@ui.Select(ui.SelectProps{
-							ID:      "criticality",
-							Name:    "criticality",
-							Label:   "Criticality",
-							Value:   props.Criticality,
-							Options: criticalitySelectOptions(props.Criticality),
-						})
-						@ui.TextArea(ui.TextAreaProps{
-							ID:          "description",
-							Name:        "description",
-							Label:       "Description",
-							Value:       props.Description,
-							Placeholder: "Describe the defect, steps to reproduce... (Markdown supported)",
-							Rows:        6,
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "status_id",
-							Name:     "status_id",
-							Label:    "Status",
-							Value:    props.StatusID,
-							Options:  statusSelectOptions(props.Statuses),
-							HelpText: "Optional. Assign to a workflow status.",
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "milestone_id",
-							Name:     "milestone_id",
-							Label:    "Milestone",
-							Value:    props.MilestoneID,
-							Options:  milestoneSelectOptions(props.Milestones),
-							HelpText: "Optional. Link to a milestone.",
-						})
-						if props.Product.WorkflowMode == model.WorkflowModeScrum {
-							@ui.Select(ui.SelectProps{
-								ID:       "sprint_id",
-								Name:     "sprint_id",
-								Label:    "Sprint",
-								Value:    props.SprintID,
-								Options:  sprintSelectOptions(props.Sprints),
-								HelpText: "Optional. Assign to a sprint.",
-							})
-						}
-						@EstimationInput(EstimationInputProps{
-							EstimationMode: props.Product.EstimationMode,
-							Value:          props.Estimation,
-						})
-						@ui.TextInput(ui.InputProps{
-							ID:          "priority",
-							Name:        "priority",
-							Label:       "Priority",
-							Value:       props.Priority,
-							Type:        "number",
-							Placeholder: "0",
-							HelpText:    "Lower numbers indicate higher priority.",
-						})
-						@patterns.FormActions(defectSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/defects")
-					</form>
-				}
-			}
+			@DefectFormBody(props)
 		</div>
 	}
+}
+
+// DefectFormModal wraps the form body in a modal dialog.
+templ DefectFormModal(props DefectFormProps) {
+	@ui.Modal("defect-form-modal", defectModalTitle(props), "lg") {
+		@patterns.FormError(props.Error)
+		@DefectFormBody(props)
+	}
+}
+
+// DefectFormBody renders the inner form (Card + form fields) without page chrome.
+templ DefectFormBody(props DefectFormProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			<form
+				method="post"
+				action={ templ.SafeURL(defectFormAction(props)) }
+				if props.LinkTo != "" {
+					hx-post={ defectFormAction(props) }
+					hx-target="#modal"
+					hx-swap="innerHTML"
+				}
+				class="space-y-6"
+			>
+				<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.ReturnTo != "" {
+					<input type="hidden" name="return" value={ props.ReturnTo }/>
+				}
+				if props.LinkTo != "" {
+					<input type="hidden" name="link_to" value={ props.LinkTo }/>
+				}
+				@ui.TextInput(ui.InputProps{
+					ID:          "title",
+					Name:        "title",
+					Label:       "Title",
+					Value:       props.Title,
+					Placeholder: "e.g. Login page crashes on empty password",
+					Required:    true,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:      "criticality",
+					Name:    "criticality",
+					Label:   "Criticality",
+					Value:   props.Criticality,
+					Options: criticalitySelectOptions(props.Criticality),
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "description",
+					Name:        "description",
+					Label:       "Description",
+					Value:       props.Description,
+					Placeholder: "Describe the defect, steps to reproduce... (Markdown supported)",
+					Rows:        6,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "status_id",
+					Name:     "status_id",
+					Label:    "Status",
+					Value:    props.StatusID,
+					Options:  statusSelectOptions(props.Statuses),
+					HelpText: "Optional. Assign to a workflow status.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "milestone_id",
+					Name:     "milestone_id",
+					Label:    "Milestone",
+					Value:    props.MilestoneID,
+					Options:  milestoneSelectOptions(props.Milestones),
+					HelpText: "Optional. Link to a milestone.",
+				})
+				if props.Product.WorkflowMode == model.WorkflowModeScrum {
+					@ui.Select(ui.SelectProps{
+						ID:       "sprint_id",
+						Name:     "sprint_id",
+						Label:    "Sprint",
+						Value:    props.SprintID,
+						Options:  sprintSelectOptions(props.Sprints),
+						HelpText: "Optional. Assign to a sprint.",
+					})
+				}
+				@EstimationInput(EstimationInputProps{
+					EstimationMode: props.Product.EstimationMode,
+					Value:          props.Estimation,
+				})
+				@ui.TextInput(ui.InputProps{
+					ID:          "priority",
+					Name:        "priority",
+					Label:       "Priority",
+					Value:       props.Priority,
+					Type:        "number",
+					Placeholder: "0",
+					HelpText:    "Lower numbers indicate higher priority.",
+				})
+				if props.LinkTo != "" {
+					@defectModalActions(defectSubmitLabel(props.IsEdit))
+				} else {
+					@patterns.FormActions(defectSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/defects")
+				}
+			</form>
+		}
+	}
+}
+
+templ defectModalActions(submitLabel string) {
+	<div class="flex items-center justify-end gap-3 pt-4">
+		@ui.ModalCancelButton("modal")
+		@ui.Button(ui.ButtonProps{
+			Label:   submitLabel,
+			Variant: "primary",
+			Size:    "md",
+			Type:    "submit",
+		})
+	</div>
 }
 
 func defectFormBreadcrumbs(props DefectFormProps) []templates.BreadcrumbItem {
@@ -150,12 +198,25 @@ func defectFormAction(props DefectFormProps) string {
 	if props.IsEdit {
 		return "/products/" + props.Product.ID + "/defects/" + props.Defect.ID
 	}
+	if reqID, ok := strings.CutPrefix(props.LinkTo, "requirement:"); ok {
+		return "/products/" + props.Product.ID + "/requirements/" + reqID + "/defects"
+	}
+	if capID, ok := strings.CutPrefix(props.LinkTo, "capability:"); ok {
+		return "/products/" + props.Product.ID + "/capabilities/" + capID + "/defects"
+	}
 	return "/products/" + props.Product.ID + "/defects"
 }
 
 func defectSubmitLabel(isEdit bool) string {
 	if isEdit {
 		return "Save Changes"
+	}
+	return "Report Defect"
+}
+
+func defectModalTitle(props DefectFormProps) string {
+	if props.IsEdit {
+		return "Edit Defect"
 	}
 	return "Report Defect"
 }

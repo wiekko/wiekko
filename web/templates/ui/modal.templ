@@ -43,6 +43,18 @@ templ ModalContainer() {
 	<div id="modal"></div>
 }
 
+// ModalCancelButton renders a "Cancel" button that closes the modal with
+// the given id. Used by modal-mode forms to dismiss without submission.
+templ ModalCancelButton(modalID string) {
+	<button
+		type="button"
+		class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
+		onclick={ closeModal(modalID) }
+	>
+		Cancel
+	</button>
+}
+
 // ConfirmDialog renders a confirmation modal with confirm/cancel buttons.
 templ ConfirmDialog(id, title, message, confirmLabel, confirmVariant, hxMethod, hxAction string) {
 	@Modal(id, title, "sm") {

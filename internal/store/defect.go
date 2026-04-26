@@ -30,6 +30,7 @@ type DefectStore interface {
 	AddLink(ctx context.Context, link *model.DefectLink) error
 	RemoveLink(ctx context.Context, id string) error
 	ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error)
+	ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
 }
 
 type defectStore struct {
@@ -158,6 +159,27 @@ func (s *defectStore) ListLinks(ctx context.Context, defectID string) ([]*model.
 		`SELECT id, defect_id, target_type, target_id, created_at
 		 FROM defect_links WHERE defect_id = ? ORDER BY created_at`,
 		defectID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var links []*model.DefectLink
+	for rows.Next() {
+		var l model.DefectLink
+		if err := rows.Scan(&l.ID, &l.DefectID, &l.TargetType, &l.TargetID, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		links = append(links, &l)
+	}
+	return links, rows.Err()
+}
+
+func (s *defectStore) ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, defect_id, target_type, target_id, created_at
+		 FROM defect_links WHERE target_type = ? AND target_id = ? ORDER BY created_at`,
+		targetType, targetID)
 	if err != nil {
 		return nil, err
 	}

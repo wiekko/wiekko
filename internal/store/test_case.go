@@ -19,6 +19,7 @@ type TestCaseStore interface {
 	LinkRequirement(ctx context.Context, link *model.TestCaseRequirement) error
 	UnlinkRequirement(ctx context.Context, testCaseID, requirementID string) error
 	ListRequirementLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
+	ListTestCaseLinksByRequirement(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error)
 	AddEnvironment(ctx context.Context, id, testCaseID, environmentID string) error
 	RemoveEnvironment(ctx context.Context, testCaseID, environmentID string) error
 	ListEnvironments(ctx context.Context, testCaseID string) ([]string, error)
@@ -109,6 +110,27 @@ func (s *testCaseStore) ListRequirementLinks(ctx context.Context, testCaseID str
 		`SELECT id, test_case_id, requirement_id, link_type, created_at
 		 FROM test_case_requirements WHERE test_case_id = ? ORDER BY created_at`,
 		testCaseID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var links []*model.TestCaseRequirement
+	for rows.Next() {
+		var l model.TestCaseRequirement
+		if err := rows.Scan(&l.ID, &l.TestCaseID, &l.RequirementID, &l.LinkType, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		links = append(links, &l)
+	}
+	return links, rows.Err()
+}
+
+func (s *testCaseStore) ListTestCaseLinksByRequirement(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, test_case_id, requirement_id, link_type, created_at
+		 FROM test_case_requirements WHERE requirement_id = ? ORDER BY created_at`,
+		requirementID)
 	if err != nil {
 		return nil, err
 	}

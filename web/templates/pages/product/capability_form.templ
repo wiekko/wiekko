@@ -133,16 +133,9 @@ templ CapabilityFormBody(props CapabilityFormProps) {
 }
 
 // capabilityModalActions renders submit + cancel buttons for the modal mode.
-// Cancel closes the modal via the same script the modal X button uses.
 templ capabilityModalActions(submitLabel string) {
 	<div class="flex items-center justify-end gap-3 pt-4">
-		<button
-			type="button"
-			class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
-			onclick={ closeCapabilityFormModal() }
-		>
-			Cancel
-		</button>
+		@ui.ModalCancelButton("modal")
 		@ui.Button(ui.ButtonProps{
 			Label:   submitLabel,
 			Variant: "primary",
@@ -150,11 +143,6 @@ templ capabilityModalActions(submitLabel string) {
 			Type:    "submit",
 		})
 	</div>
-}
-
-script closeCapabilityFormModal() {
-	const el = document.getElementById('modal');
-	if (el) el.innerHTML = '';
 }
 
 func capabilityFormBreadcrumbs(props CapabilityFormProps) []templates.BreadcrumbItem {
