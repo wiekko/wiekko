@@ -17,6 +17,7 @@ type TestCaseStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string) ([]*model.TestCase, error)
 	ListByCapabilityID(ctx context.Context, capabilityID string) ([]*model.TestCase, error)
+	ListByComponentID(ctx context.Context, componentID string) ([]*model.TestCase, error)
 	LinkRequirement(ctx context.Context, link *model.TestCaseRequirement) error
 	UnlinkRequirement(ctx context.Context, testCaseID, requirementID string) error
 	ListRequirementLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
@@ -94,6 +95,26 @@ func (s *testCaseStore) ListByCapabilityID(ctx context.Context, capabilityID str
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+testCaseColumns+` FROM test_cases WHERE capability_id = ? ORDER BY title`,
 		capabilityID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var cases []*model.TestCase
+	for rows.Next() {
+		tc, err := scanTestCase(rows)
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, tc)
+	}
+	return cases, rows.Err()
+}
+
+func (s *testCaseStore) ListByComponentID(ctx context.Context, componentID string) ([]*model.TestCase, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+testCaseColumns+` FROM test_cases WHERE component_id = ? ORDER BY title`,
+		componentID)
 	if err != nil {
 		return nil, err
 	}

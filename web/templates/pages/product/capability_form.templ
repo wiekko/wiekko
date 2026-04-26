@@ -169,6 +169,12 @@ func capabilityFormAction(props CapabilityFormProps) string {
 	if reqID, ok := strings.CutPrefix(props.LinkTo, "requirement:"); ok {
 		return "/products/" + props.Product.ID + "/requirements/" + reqID + "/capabilities"
 	}
+	if compID, ok := strings.CutPrefix(props.LinkTo, "component:"); ok {
+		return "/products/" + props.Product.ID + "/components/" + compID + "/capabilities"
+	}
+	if conID, ok := strings.CutPrefix(props.LinkTo, "constraint:"); ok {
+		return "/products/" + props.Product.ID + "/constraints/" + conID + "/capabilities"
+	}
 	return "/products/" + props.Product.ID + "/capabilities"
 }
 

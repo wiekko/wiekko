@@ -1592,26 +1592,451 @@ func (c *PageProductController) ComponentOverviewTab(w http.ResponseWriter, r *h
 	_ = productpage.ComponentOverviewTabContent(comp, milestoneName).Render(r.Context(), w)
 }
 
-// ComponentCapabilitiesTab renders GET /products/{id}/components/{componentId}/tabs/capabilities.
+// --- Component → Capability (FK 1:N, re-parent semantics) ---
+
 func (c *PageProductController) ComponentCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 	componentID := r.PathValue("componentId")
 
-	funcs, err := c.component.ListCapabilitiesByComponent(r.Context(), user, productID, componentID)
+	props, err := c.loadComponentCapabilitiesTabProps(r, user, productID, componentID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ComponentCapabilityLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentCapabilitiesTabContent(productID, funcs).Render(r.Context(), w)
+	_ = productpage.ComponentCapabilityLinkModal(productID, componentID).Render(r.Context(), w)
 }
 
-// ComponentTestCasesTab renders GET /products/{id}/components/{componentId}/tabs/test-cases.
-func (c *PageProductController) ComponentTestCasesTab(w http.ResponseWriter, r *http.Request) {
+func (c *PageProductController) ComponentCapabilityLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListCapabilities(r.Context(), user, productID)
+
+	candidates := make([]*model.Capability, 0, len(all))
+	for _, cap := range all {
+		if cap.ComponentID == componentID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(cap.Name), query) {
+			continue
+		}
+		candidates = append(candidates, cap)
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentTestCasesTabContent().Render(r.Context(), w)
+	_ = productpage.ComponentCapabilityLinkResults(productID, componentID, candidates).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ComponentCapabilityLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+	capabilityID := r.FormValue("capability_id")
+
+	if capabilityID == "" {
+		http.Error(w, "capability_id is required", http.StatusBadRequest)
+		return
+	}
+
+	newCompID := componentID
+	if _, err := c.component.UpdateCapability(r.Context(), user, productID, capabilityID, service.UpdateCapabilityInput{
+		ComponentID: &newCompID,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeComponentCapabilitiesTabOOB(w, r, user, productID, componentID)
+}
+
+func (c *PageProductController) ComponentCapabilityCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityFormModal(productpage.CapabilityFormProps{
+		Meta:        templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Components:  components,
+		Milestones:  milestones,
+		LinkTo:      "component:" + componentID,
+		ComponentID: componentID,
+	}).Render(r.Context(), w)
+}
+
+// ComponentCapabilityCreateAndLink handles POST /products/{id}/components/{componentId}/capabilities.
+// FK semantics: just create the capability with ComponentID set; no separate link step.
+func (c *PageProductController) ComponentCapabilityCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	milestoneID := r.FormValue("milestone_id")
+
+	rerenderForm := func(errMsg string) {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.CapabilityFormModal(productpage.CapabilityFormProps{
+			Meta:        templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Components:  components,
+			Milestones:  milestones,
+			LinkTo:      "component:" + componentID,
+			Name:        name,
+			Description: description,
+			ComponentID: componentID,
+			MilestoneID: milestoneID,
+			Error:       errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	_, err = c.component.CreateCapability(r.Context(), user, service.CreateCapabilityInput{
+		ProductID:   productID,
+		ComponentID: componentID,
+		Name:        name,
+		Description: description,
+		MilestoneID: milestoneID,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	c.writeComponentCapabilitiesTabOOB(w, r, user, productID, componentID)
+}
+
+// ComponentCapabilityUnlink clears the ComponentID FK on the given capability.
+func (c *PageProductController) ComponentCapabilityUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+	capabilityID := r.PathValue("capabilityId")
+
+	empty := ""
+	if _, err := c.component.UpdateCapability(r.Context(), user, productID, capabilityID, service.UpdateCapabilityInput{
+		ComponentID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadComponentCapabilitiesTabProps(r, user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadComponentCapabilitiesTabProps(r *http.Request, user *model.User, productID, componentID string) (productpage.ComponentCapabilitiesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.ComponentCapabilitiesTabProps{}, err
+	}
+
+	capabilities, _ := c.component.ListCapabilitiesByComponent(r.Context(), user, productID, componentID)
+
+	return productpage.ComponentCapabilitiesTabProps{
+		ProductID:    productID,
+		ComponentID:  componentID,
+		CSRFToken:    csrfToken,
+		CanWrite:     user.IsAdmin || role == model.RoleOwner,
+		Capabilities: capabilities,
+	}, nil
+}
+
+func (c *PageProductController) writeComponentCapabilitiesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, componentID string) {
+	props, err := c.loadComponentCapabilitiesTabProps(r, user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "capabilities", productpage.ComponentCapabilitiesTabContent(props))
+}
+
+// --- Component → TestCase (FK 1:N, re-parent semantics) ---
+
+func (c *PageProductController) ComponentTestCasesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	props, err := c.loadComponentTestCasesTabProps(r, user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentTestCasesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ComponentTestCaseLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentTestCaseLinkModal(productID, componentID).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ComponentTestCaseLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.testing.ListTestCases(r.Context(), user, productID)
+
+	candidates := make([]*model.TestCase, 0, len(all))
+	for _, tc := range all {
+		if tc.ComponentID == componentID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(tc.Title), query) {
+			continue
+		}
+		candidates = append(candidates, tc)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentTestCaseLinkResults(productID, componentID, candidates).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ComponentTestCaseLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+	testCaseID := r.FormValue("test_case_id")
+
+	if testCaseID == "" {
+		http.Error(w, "test_case_id is required", http.StatusBadRequest)
+		return
+	}
+
+	newCompID := componentID
+	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		ComponentID: &newCompID,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeComponentTestCasesTabOOB(w, r, user, productID, componentID)
+}
+
+func (c *PageProductController) ComponentTestCaseCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
+		Meta:          templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Components:    components,
+		Capabilities:  capabilities,
+		PyramidLevels: pyramidLevels,
+		LinkTo:        "component:" + componentID,
+		ComponentID:   componentID,
+	}).Render(r.Context(), w)
+}
+
+// ComponentTestCaseCreateAndLink handles POST /products/{id}/components/{componentId}/test-cases.
+// FK semantics: just create the test case with ComponentID set; no separate link step.
+func (c *PageProductController) ComponentTestCaseCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	executionMode := r.FormValue("execution_mode")
+	testIdentifier := r.FormValue("test_identifier")
+	capabilityID := r.FormValue("capability_id")
+	pyramidLevelID := r.FormValue("pyramid_level_id")
+
+	rerenderForm := func(errMsg string) {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
+			Meta:           templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:    user.DisplayName,
+			IsAdmin:        user.IsAdmin,
+			Product:        p,
+			Components:     components,
+			Capabilities:   capabilities,
+			PyramidLevels:  pyramidLevels,
+			LinkTo:         "component:" + componentID,
+			Title:          title,
+			Description:    description,
+			ExecutionMode:  executionMode,
+			TestIdentifier: testIdentifier,
+			ComponentID:    componentID,
+			CapabilityID:   capabilityID,
+			PyramidLevelID: pyramidLevelID,
+			Error:          errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	_, err = c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
+		ProductID:      productID,
+		Title:          title,
+		Description:    description,
+		ExecutionMode:  executionMode,
+		TestIdentifier: testIdentifier,
+		ComponentID:    componentID,
+		CapabilityID:   capabilityID,
+		PyramidLevelID: pyramidLevelID,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	c.writeComponentTestCasesTabOOB(w, r, user, productID, componentID)
+}
+
+// ComponentTestCaseUnlink clears the ComponentID FK on the given test case.
+func (c *PageProductController) ComponentTestCaseUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	componentID := r.PathValue("componentId")
+	testCaseID := r.PathValue("testCaseId")
+
+	empty := ""
+	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		ComponentID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadComponentTestCasesTabProps(r, user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ComponentTestCasesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadComponentTestCasesTabProps(r *http.Request, user *model.User, productID, componentID string) (productpage.ComponentTestCasesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.ComponentTestCasesTabProps{}, err
+	}
+
+	testCases, _ := c.testing.ListTestCasesByComponent(r.Context(), user, productID, componentID)
+
+	return productpage.ComponentTestCasesTabProps{
+		ProductID:   productID,
+		ComponentID: componentID,
+		CSRFToken:   csrfToken,
+		CanWrite:    c.canLinkTestCasesForRole(user, role),
+		TestCases:   testCases,
+	}, nil
+}
+
+func (c *PageProductController) writeComponentTestCasesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, componentID string) {
+	props, err := c.loadComponentTestCasesTabProps(r, user, productID, componentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "test-cases", productpage.ComponentTestCasesTabContent(props))
 }
 
 // ComponentCommentsTab renders GET /products/{id}/components/{componentId}/tabs/comments.
@@ -5533,10 +5958,230 @@ func (c *PageProductController) ConstraintOverviewTab(w http.ResponseWriter, r *
 	}).Render(r.Context(), w)
 }
 
-// ConstraintCapabilitiesTab renders GET /products/{id}/constraints/{constraintId}/tabs/capabilities.
+// --- Constraint → Capability (M:N) ---
+
 func (c *PageProductController) ConstraintCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	props, err := c.loadConstraintCapabilitiesTabProps(r, user, productID, constraintID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ConstraintCapabilitiesTabContent().Render(r.Context(), w)
+	_ = productpage.ConstraintCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ConstraintCapabilityLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintCapabilityLinkModal(productID, constraintID).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ConstraintCapabilityLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	links, _ := c.constraint.ListConstraintCapabilities(r.Context(), user, productID, constraintID)
+	linkedIDs := make(map[string]struct{}, len(links))
+	for _, l := range links {
+		linkedIDs[l.CapabilityID] = struct{}{}
+	}
+
+	candidates := make([]*model.Capability, 0, len(all))
+	for _, cap := range all {
+		if _, ok := linkedIDs[cap.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(cap.Name), query) {
+			continue
+		}
+		candidates = append(candidates, cap)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintCapabilityLinkResults(productID, constraintID, candidates).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ConstraintCapabilityLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+	capabilityID := r.FormValue("capability_id")
+
+	if capabilityID == "" {
+		http.Error(w, "capability_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.constraint.LinkCapability(r.Context(), user, productID, constraintID, capabilityID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeConstraintCapabilitiesTabOOB(w, r, user, productID, constraintID)
+}
+
+func (c *PageProductController) ConstraintCapabilityCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityFormModal(productpage.CapabilityFormProps{
+		Meta:        templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Components:  components,
+		Milestones:  milestones,
+		LinkTo:      "constraint:" + constraintID,
+	}).Render(r.Context(), w)
+}
+
+func (c *PageProductController) ConstraintCapabilityCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	componentID := r.FormValue("component_id")
+	milestoneID := r.FormValue("milestone_id")
+
+	rerenderForm := func(errMsg string) {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.CapabilityFormModal(productpage.CapabilityFormProps{
+			Meta:        templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Components:  components,
+			Milestones:  milestones,
+			LinkTo:      "constraint:" + constraintID,
+			Name:        name,
+			Description: description,
+			ComponentID: componentID,
+			MilestoneID: milestoneID,
+			Error:       errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	cap, err := c.component.CreateCapability(r.Context(), user, service.CreateCapabilityInput{
+		ProductID:   productID,
+		ComponentID: componentID,
+		Name:        name,
+		Description: description,
+		MilestoneID: milestoneID,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	if err := c.constraint.LinkCapability(r.Context(), user, productID, constraintID, cap.ID); err != nil {
+		rerenderForm("created capability but failed to link: " + err.Error())
+		return
+	}
+
+	c.writeConstraintCapabilitiesTabOOB(w, r, user, productID, constraintID)
+}
+
+func (c *PageProductController) ConstraintCapabilityUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+	capabilityID := r.PathValue("capabilityId")
+
+	if err := c.constraint.UnlinkCapability(r.Context(), user, productID, constraintID, capabilityID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadConstraintCapabilitiesTabProps(r, user, productID, constraintID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.ConstraintCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadConstraintCapabilitiesTabProps(r *http.Request, user *model.User, productID, constraintID string) (productpage.ConstraintCapabilitiesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.ConstraintCapabilitiesTabProps{}, err
+	}
+
+	links, _ := c.constraint.ListConstraintCapabilities(r.Context(), user, productID, constraintID)
+	capabilities := make([]*model.Capability, 0, len(links))
+	for _, link := range links {
+		cap, err := c.component.GetCapability(r.Context(), user, productID, link.CapabilityID)
+		if err != nil {
+			continue
+		}
+		capabilities = append(capabilities, cap)
+	}
+
+	return productpage.ConstraintCapabilitiesTabProps{
+		ProductID:    productID,
+		ConstraintID: constraintID,
+		CSRFToken:    csrfToken,
+		CanWrite:     user.IsAdmin || role == model.RoleOwner,
+		Capabilities: capabilities,
+	}, nil
+}
+
+func (c *PageProductController) writeConstraintCapabilitiesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, constraintID string) {
+	props, err := c.loadConstraintCapabilitiesTabProps(r, user, productID, constraintID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "capabilities", productpage.ConstraintCapabilitiesTabContent(props))
 }
 
 // ConstraintCommentsTab renders GET /products/{id}/constraints/{constraintId}/tabs/comments.
