@@ -3022,8 +3022,249 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 
 // RequirementCapabilitiesTab renders GET /products/{id}/requirements/{requirementId}/tabs/capabilities.
 func (c *PageProductController) RequirementCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	props, err := c.loadRequirementCapabilitiesTabProps(r, user, productID, requirementID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementCapabilitiesTabContent().Render(r.Context(), w)
+	_ = productpage.RequirementCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+// RequirementCapabilityLinkModal renders GET /products/{id}/requirements/{requirementId}/capabilities/link-modal.
+func (c *PageProductController) RequirementCapabilityLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilityLinkModal(productID, requirementID).Render(r.Context(), w)
+}
+
+// RequirementCapabilityLinkSearch renders GET /products/{id}/requirements/{requirementId}/capabilities/link-search.
+func (c *PageProductController) RequirementCapabilityLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	linked, _ := c.component.ListRequirementCapabilities(r.Context(), user, productID, requirementID)
+	linkedIDs := make(map[string]struct{}, len(linked))
+	for _, link := range linked {
+		linkedIDs[link.CapabilityID] = struct{}{}
+	}
+
+	candidates := make([]*model.Capability, 0, len(all))
+	for _, cap := range all {
+		if _, ok := linkedIDs[cap.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(cap.Name), query) {
+			continue
+		}
+		candidates = append(candidates, cap)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilityLinkResults(productID, requirementID, candidates).Render(r.Context(), w)
+}
+
+// RequirementCapabilityLink handles POST /products/{id}/requirements/{requirementId}/capabilities/link.
+func (c *PageProductController) RequirementCapabilityLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+	capabilityID := r.FormValue("capability_id")
+
+	if capabilityID == "" {
+		http.Error(w, "capability_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeRequirementCapabilitiesTabOOB(w, r, user, productID, requirementID)
+}
+
+// RequirementCapabilityCreateModal renders GET /products/{id}/requirements/{requirementId}/capabilities/create-modal.
+func (c *PageProductController) RequirementCapabilityCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityFormModal(productpage.CapabilityFormProps{
+		Meta:        templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Components:  components,
+		Milestones:  milestones,
+		LinkTo:      "requirement:" + requirementID,
+	}).Render(r.Context(), w)
+}
+
+// RequirementCapabilityCreateAndLink handles POST /products/{id}/requirements/{requirementId}/capabilities.
+func (c *PageProductController) RequirementCapabilityCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	componentID := r.FormValue("component_id")
+	milestoneID := r.FormValue("milestone_id")
+
+	rerenderForm := func(errMsg string) {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.CapabilityFormModal(productpage.CapabilityFormProps{
+			Meta:        templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Components:  components,
+			Milestones:  milestones,
+			LinkTo:      "requirement:" + requirementID,
+			Name:        name,
+			Description: description,
+			ComponentID: componentID,
+			MilestoneID: milestoneID,
+			Error:       errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	cap, err := c.component.CreateCapability(r.Context(), user, service.CreateCapabilityInput{
+		ProductID:   productID,
+		ComponentID: componentID,
+		Name:        name,
+		Description: description,
+		MilestoneID: milestoneID,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, cap.ID, requirementID); err != nil {
+		rerenderForm("created capability but failed to link: " + err.Error())
+		return
+	}
+
+	c.writeRequirementCapabilitiesTabOOB(w, r, user, productID, requirementID)
+}
+
+// RequirementCapabilityUnlink handles DELETE /products/{id}/requirements/{requirementId}/capabilities/{capId}.
+func (c *PageProductController) RequirementCapabilityUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	requirementID := r.PathValue("requirementId")
+	capabilityID := r.PathValue("capId")
+
+	if err := c.component.UnlinkRequirementFromCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadRequirementCapabilitiesTabProps(r, user, productID, requirementID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadRequirementCapabilitiesTabProps(r *http.Request, user *model.User, productID, requirementID string) (productpage.RequirementCapabilitiesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.RequirementCapabilitiesTabProps{}, err
+	}
+
+	capabilities, _ := c.component.ListLinkedCapabilities(r.Context(), user, productID, requirementID)
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	componentIndex := make(map[string]string, len(components))
+	for _, comp := range components {
+		componentIndex[comp.ID] = comp.Name
+	}
+	componentNames := make(map[string]string, len(capabilities))
+	for _, cap := range capabilities {
+		if cap.ComponentID != "" {
+			componentNames[cap.ID] = componentIndex[cap.ComponentID]
+		}
+	}
+
+	return productpage.RequirementCapabilitiesTabProps{
+		ProductID:     productID,
+		RequirementID: requirementID,
+		CSRFToken:     csrfToken,
+		CanWrite:      user.IsAdmin || role == model.RoleOwner,
+		Capabilities:  capabilities,
+		ComponentName: componentNames,
+	}, nil
+}
+
+func (c *PageProductController) writeRequirementCapabilitiesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, requirementID string) {
+	props, err := c.loadRequirementCapabilitiesTabProps(r, user, productID, requirementID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilitiesTabOOB(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) canLinkRequirementCapability(r *http.Request, user *model.User, productID string) bool {
+	if user.IsAdmin {
+		return true
+	}
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return false
+	}
+	return role == model.RoleOwner
 }
 
 // RequirementTestCasesTab renders GET /products/{id}/requirements/{requirementId}/tabs/test-cases.

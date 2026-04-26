@@ -306,3 +306,24 @@ func (s *ComponentService) ListRequirementCapabilities(ctx context.Context, user
 	}
 	return s.capabilities.ListCapabilitiesByRequirement(ctx, requirementID)
 }
+
+// ListLinkedCapabilities returns the full capability records linked to a
+// requirement. Requires viewer role.
+func (s *ComponentService) ListLinkedCapabilities(ctx context.Context, user *model.User, productID, requirementID string) ([]*model.Capability, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	links, err := s.capabilities.ListCapabilitiesByRequirement(ctx, requirementID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Capability, 0, len(links))
+	for _, link := range links {
+		cap, err := s.capabilities.GetByID(ctx, link.CapabilityID)
+		if err != nil {
+			continue
+		}
+		out = append(out, cap)
+	}
+	return out, nil
+}

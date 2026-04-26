@@ -175,10 +175,173 @@ templ requirementLinkedField(label, name, href string) {
 	</div>
 }
 
-templ RequirementCapabilitiesTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("layers", "No linked capabilities", "Capabilities linked to this requirement will appear here.", "", "")
+// RequirementCapabilitiesTabProps holds data for the requirement capabilities tab.
+type RequirementCapabilitiesTabProps struct {
+	ProductID     string
+	RequirementID string
+	CSRFToken     string
+	CanWrite      bool
+	Capabilities  []*model.Capability
+	ComponentName map[string]string // capabilityID → component name
+}
+
+templ RequirementCapabilitiesTabContent(props RequirementCapabilitiesTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/requirements/%s/capabilities/link-modal", props.ProductID, props.RequirementID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+				@ui.Button(ui.ButtonProps{
+					Label:    "Create new",
+					Variant:  "primary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/requirements/%s/capabilities/create-modal", props.ProductID, props.RequirementID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("plus", "sm")
+				}
+			</div>
+		}
+		if len(props.Capabilities) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("layers", "No linked capabilities", "Capabilities linked to this requirement will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Name
+						}
+						@ui.TableHeader() {
+							Component
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, cap := range props.Capabilities {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", props.ProductID, cap.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ cap.Name }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ requirementCapabilityComponentName(props.ComponentName, cap.ID) }
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink capability"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/requirements/%s/capabilities/%s", props.ProductID, props.RequirementID, cap.ID) }
+											hx-target="#tab-panel-capabilities"
+											hx-swap="innerHTML"
+											hx-confirm="Unlink this capability from the requirement?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// RequirementCapabilityLinkModal renders the "link existing capability" modal.
+templ RequirementCapabilityLinkModal(productID, requirementID string) {
+	@ui.Modal("capability-link-modal", "Link existing capability", "md") {
+		<div class="space-y-4">
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search capabilities..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/requirements/%s/capabilities/link-search", productID, requirementID) }
+					hx-target="#capability-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="capability-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
 	}
+}
+
+// RequirementCapabilityLinkResults renders the search results inside the picker modal.
+templ RequirementCapabilityLinkResults(productID, requirementID string, candidates []*model.Capability) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching capabilities.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, cap := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ cap.Name }</p>
+						if cap.Description != "" {
+							<p class="truncate text-xs text-gray-500 dark:text-gray-400">{ cap.Description }</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/requirements/%s/capabilities/link", productID, requirementID) }
+						hx-vals={ fmt.Sprintf(`{"capability_id":"%s"}`, cap.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// RequirementCapabilitiesTabOOB wraps the refreshed tab content as an
+// out-of-band swap so a modal-driven action can both close the modal
+// (primary target #modal) and refresh the tab in a single response.
+templ RequirementCapabilitiesTabOOB(props RequirementCapabilitiesTabProps) {
+	<div id="tab-panel-capabilities" hx-swap-oob="innerHTML">
+		@RequirementCapabilitiesTabContent(props)
+	</div>
+}
+
+func requirementCapabilityComponentName(names map[string]string, capabilityID string) string {
+	if names == nil {
+		return "—"
+	}
+	if n, ok := names[capabilityID]; ok && n != "" {
+		return n
+	}
+	return "—"
 }
 
 templ RequirementTestCasesTabContent() {

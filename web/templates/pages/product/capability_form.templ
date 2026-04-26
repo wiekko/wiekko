@@ -1,6 +1,8 @@
 package product
 
 import (
+	"strings"
+
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
@@ -20,6 +22,10 @@ type CapabilityFormProps struct {
 	IsEdit      bool
 	Error       string
 	ReturnTo    string // "list" to return to list after save; empty = detail
+	// LinkTo, when non-empty, switches the form into modal/htmx mode and
+	// makes the POST handler create-and-link rather than just create.
+	// Format: "<entity>:<id>", e.g. "requirement:abc-123".
+	LinkTo string
 	// Form values (preserved on validation error).
 	Name        string
 	Description string
@@ -47,51 +53,108 @@ templ CapabilityFormPage(props CapabilityFormProps) {
 				}
 			</h1>
 			@patterns.FormError(props.Error)
-			@ui.Card() {
-				@ui.CardBody() {
-					<form method="post" action={ templ.SafeURL(capabilityFormAction(props)) } class="space-y-6">
-						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
-						if props.ReturnTo != "" {
-							<input type="hidden" name="return" value={ props.ReturnTo }/>
-						}
-						@ui.TextInput(ui.InputProps{
-							ID:          "name",
-							Name:        "name",
-							Label:       "Name",
-							Value:       props.Name,
-							Placeholder: "e.g. User Login",
-							Required:    true,
-						})
-						@ui.TextArea(ui.TextAreaProps{
-							ID:          "description",
-							Name:        "description",
-							Label:       "Description",
-							Value:       props.Description,
-							Placeholder: "Describe this capability...",
-							Rows:        4,
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "component_id",
-							Name:     "component_id",
-							Label:    "Component",
-							Value:    props.ComponentID,
-							Options:  componentSelectOptions(props.Components),
-							HelpText: "Optional. Assign to a component or leave as top-level.",
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "milestone_id",
-							Name:     "milestone_id",
-							Label:    "Milestone",
-							Value:    props.MilestoneID,
-							Options:  milestoneSelectOptions(props.Milestones),
-							HelpText: "Optional. Link this capability to a milestone.",
-						})
-						@patterns.FormActions(capabilitySubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/capabilities")
-					</form>
-				}
-			}
+			@CapabilityFormBody(props)
 		</div>
 	}
+}
+
+// CapabilityFormModal wraps the form body in a modal dialog. Used by tab
+// actions where we want create-and-link without leaving the parent page.
+templ CapabilityFormModal(props CapabilityFormProps) {
+	@ui.Modal("capability-form-modal", capabilityModalTitle(props), "lg") {
+		@patterns.FormError(props.Error)
+		@CapabilityFormBody(props)
+	}
+}
+
+// CapabilityFormBody renders the inner form (Card + form fields) without any
+// page chrome. It is shared between the standalone page and the modal.
+templ CapabilityFormBody(props CapabilityFormProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			<form
+				method="post"
+				action={ templ.SafeURL(capabilityFormAction(props)) }
+				if props.LinkTo != "" {
+					hx-post={ capabilityFormAction(props) }
+					hx-target="#modal"
+					hx-swap="innerHTML"
+				}
+				class="space-y-6"
+			>
+				<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.ReturnTo != "" {
+					<input type="hidden" name="return" value={ props.ReturnTo }/>
+				}
+				if props.LinkTo != "" {
+					<input type="hidden" name="link_to" value={ props.LinkTo }/>
+				}
+				@ui.TextInput(ui.InputProps{
+					ID:          "name",
+					Name:        "name",
+					Label:       "Name",
+					Value:       props.Name,
+					Placeholder: "e.g. User Login",
+					Required:    true,
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "description",
+					Name:        "description",
+					Label:       "Description",
+					Value:       props.Description,
+					Placeholder: "Describe this capability...",
+					Rows:        4,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "component_id",
+					Name:     "component_id",
+					Label:    "Component",
+					Value:    props.ComponentID,
+					Options:  componentSelectOptions(props.Components),
+					HelpText: "Optional. Assign to a component or leave as top-level.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "milestone_id",
+					Name:     "milestone_id",
+					Label:    "Milestone",
+					Value:    props.MilestoneID,
+					Options:  milestoneSelectOptions(props.Milestones),
+					HelpText: "Optional. Link this capability to a milestone.",
+				})
+				if props.LinkTo != "" {
+					@capabilityModalActions(capabilitySubmitLabel(props.IsEdit))
+				} else {
+					@patterns.FormActions(capabilitySubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/capabilities")
+				}
+			</form>
+		}
+	}
+}
+
+// capabilityModalActions renders submit + cancel buttons for the modal mode.
+// Cancel closes the modal via the same script the modal X button uses.
+templ capabilityModalActions(submitLabel string) {
+	<div class="flex items-center justify-end gap-3 pt-4">
+		<button
+			type="button"
+			class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
+			onclick={ closeCapabilityFormModal() }
+		>
+			Cancel
+		</button>
+		@ui.Button(ui.ButtonProps{
+			Label:   submitLabel,
+			Variant: "primary",
+			Size:    "md",
+			Type:    "submit",
+		})
+	</div>
+}
+
+script closeCapabilityFormModal() {
+	const el = document.getElementById('modal');
+	if (el) el.innerHTML = '';
 }
 
 func capabilityFormBreadcrumbs(props CapabilityFormProps) []templates.BreadcrumbItem {
@@ -115,6 +178,9 @@ func capabilityFormAction(props CapabilityFormProps) string {
 	if props.IsEdit {
 		return "/products/" + props.Product.ID + "/capabilities/" + props.Capability.ID
 	}
+	if reqID, ok := strings.CutPrefix(props.LinkTo, "requirement:"); ok {
+		return "/products/" + props.Product.ID + "/requirements/" + reqID + "/capabilities"
+	}
 	return "/products/" + props.Product.ID + "/capabilities"
 }
 
@@ -123,6 +189,13 @@ func capabilitySubmitLabel(isEdit bool) string {
 		return "Save Changes"
 	}
 	return "Create Capability"
+}
+
+func capabilityModalTitle(props CapabilityFormProps) string {
+	if props.IsEdit {
+		return "Edit Capability"
+	}
+	return "New Capability"
 }
 
 // componentSelectOptions builds select options from components with an empty "None" option.
