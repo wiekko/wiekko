@@ -199,6 +199,15 @@ func (s *TestingService) ListTestCaseRequirements(ctx context.Context, user *mod
 	return s.testCases.ListRequirementLinks(ctx, tcID)
 }
 
+// ListTestCasesByCapability returns test cases whose CapabilityID FK
+// references the given capability. Requires viewer role.
+func (s *TestingService) ListTestCasesByCapability(ctx context.Context, user *model.User, productID, capabilityID string) ([]*model.TestCase, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.testCases.ListByCapabilityID(ctx, capabilityID)
+}
+
 // ListLinkedTestCasesForRequirement returns the full TestCase records linked
 // to a requirement. Requires viewer role.
 func (s *TestingService) ListLinkedTestCasesForRequirement(ctx context.Context, user *model.User, productID, requirementID string) ([]*model.TestCase, error) {

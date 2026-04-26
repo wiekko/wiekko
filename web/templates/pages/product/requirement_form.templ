@@ -1,6 +1,8 @@
 package product
 
 import (
+	"strings"
+
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
@@ -24,6 +26,9 @@ type RequirementFormProps struct {
 	IsEdit           bool
 	Error            string
 	ReturnTo         string // "list" to return to list after save; empty = detail
+	// LinkTo, when non-empty, switches the form into modal/htmx mode.
+	// Format: "<entity>:<id>", e.g. "test_case:abc-123" or "capability:xyz-789".
+	LinkTo string
 	// Form values (preserved on validation error).
 	Title            string
 	Description      string
@@ -58,107 +63,149 @@ templ RequirementFormPage(props RequirementFormProps) {
 				}
 			</h1>
 			@patterns.FormError(props.Error)
-			@ui.Card() {
-				@ui.CardBody() {
-					<form method="post" action={ templ.SafeURL(requirementFormAction(props)) } class="space-y-6">
-						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
-						if props.ReturnTo != "" {
-							<input type="hidden" name="return" value={ props.ReturnTo }/>
-						}
-						if props.IsEdit {
-							@ui.TextInput(ui.InputProps{
-								ID:       "identifier",
-								Name:     "identifier",
-								Label:    "Identifier",
-								Value:    model.EntityIdentifier(formCategoryPrefix(props.Categories, props.Requirement.CategoryID), props.Requirement.SequenceNumber),
-								Disabled: true,
-							})
-						}
-						@ui.TextInput(ui.InputProps{
-							ID:          "title",
-							Name:        "title",
-							Label:       "Title",
-							Value:       props.Title,
-							Placeholder: "e.g. User can reset password via email",
-							Required:    true,
-						})
-						@ui.Select(ui.SelectProps{
-							ID:      "category_id",
-							Name:    "category_id",
-							Label:   "Category",
-							Value:   props.CategoryID,
-							Options: dynamicCategorySelectOptions(props.Categories, props.CategoryID),
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "parent_id",
-							Name:     "parent_id",
-							Label:    "Parent Requirement",
-							Value:    props.ParentID,
-							Options:  parentSelectOptions(props.Requirements, props.CategoryPrefixes, requirementSelfID(props)),
-							HelpText: "Optional. Make this a child of another requirement.",
-						})
-						@ui.TextArea(ui.TextAreaProps{
-							ID:          "description",
-							Name:        "description",
-							Label:       "Description",
-							Value:       props.Description,
-							Placeholder: "Describe this requirement... (Markdown supported)",
-							Rows:        6,
-						})
-						@ui.TextArea(ui.TextAreaProps{
-							ID:          "definition_of_done",
-							Name:        "definition_of_done",
-							Label:       "Definition of Done",
-							Value:       props.DefinitionOfDone,
-							Placeholder: "Acceptance criteria... (Markdown supported)",
-							Rows:        4,
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "status_id",
-							Name:     "status_id",
-							Label:    "Status",
-							Value:    props.StatusID,
-							Options:  statusSelectOptions(props.Statuses),
-							HelpText: "Optional. Assign to a workflow status.",
-						})
-						@ui.Select(ui.SelectProps{
-							ID:       "milestone_id",
-							Name:     "milestone_id",
-							Label:    "Milestone",
-							Value:    props.MilestoneID,
-							Options:  milestoneSelectOptions(props.Milestones),
-							HelpText: "Optional. Link to a milestone.",
-						})
-						if props.Product.WorkflowMode == model.WorkflowModeScrum {
-							@ui.Select(ui.SelectProps{
-								ID:       "sprint_id",
-								Name:     "sprint_id",
-								Label:    "Sprint",
-								Value:    props.SprintID,
-								Options:  sprintSelectOptions(props.Sprints),
-								HelpText: "Optional. Assign to a sprint.",
-							})
-						}
-						@EstimationInput(EstimationInputProps{
-							EstimationMode: props.Product.EstimationMode,
-							Value:          props.Estimation,
-						})
-						@ui.TextInput(ui.InputProps{
-							ID:          "priority",
-							Name:        "priority",
-							Label:       "Priority",
-							Value:       props.Priority,
-							Type:        "number",
-							Placeholder: "0",
-							HelpText:    "Lower numbers indicate higher priority.",
-						})
-						@ui.Checkbox("is_coarse", "is_coarse", "Needs refinement (coarse requirement)", props.IsCoarse, false)
-						@patterns.FormActions(requirementSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/requirements")
-					</form>
-				}
-			}
+			@RequirementFormBody(props)
 		</div>
 	}
+}
+
+// RequirementFormModal wraps the form body in a modal dialog.
+templ RequirementFormModal(props RequirementFormProps) {
+	@ui.Modal("requirement-form-modal", requirementModalTitle(props), "lg") {
+		@patterns.FormError(props.Error)
+		@RequirementFormBody(props)
+	}
+}
+
+// RequirementFormBody renders the inner form (Card + form fields) without page chrome.
+templ RequirementFormBody(props RequirementFormProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			<form
+				method="post"
+				action={ templ.SafeURL(requirementFormAction(props)) }
+				if props.LinkTo != "" {
+					hx-post={ requirementFormAction(props) }
+					hx-target="#modal"
+					hx-swap="innerHTML"
+				}
+				class="space-y-6"
+			>
+				<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.ReturnTo != "" {
+					<input type="hidden" name="return" value={ props.ReturnTo }/>
+				}
+				if props.LinkTo != "" {
+					<input type="hidden" name="link_to" value={ props.LinkTo }/>
+				}
+				if props.IsEdit {
+					@ui.TextInput(ui.InputProps{
+						ID:       "identifier",
+						Name:     "identifier",
+						Label:    "Identifier",
+						Value:    model.EntityIdentifier(formCategoryPrefix(props.Categories, props.Requirement.CategoryID), props.Requirement.SequenceNumber),
+						Disabled: true,
+					})
+				}
+				@ui.TextInput(ui.InputProps{
+					ID:          "title",
+					Name:        "title",
+					Label:       "Title",
+					Value:       props.Title,
+					Placeholder: "e.g. User can reset password via email",
+					Required:    true,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:      "category_id",
+					Name:    "category_id",
+					Label:   "Category",
+					Value:   props.CategoryID,
+					Options: dynamicCategorySelectOptions(props.Categories, props.CategoryID),
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "parent_id",
+					Name:     "parent_id",
+					Label:    "Parent Requirement",
+					Value:    props.ParentID,
+					Options:  parentSelectOptions(props.Requirements, props.CategoryPrefixes, requirementSelfID(props)),
+					HelpText: "Optional. Make this a child of another requirement.",
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "description",
+					Name:        "description",
+					Label:       "Description",
+					Value:       props.Description,
+					Placeholder: "Describe this requirement... (Markdown supported)",
+					Rows:        6,
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "definition_of_done",
+					Name:        "definition_of_done",
+					Label:       "Definition of Done",
+					Value:       props.DefinitionOfDone,
+					Placeholder: "Acceptance criteria... (Markdown supported)",
+					Rows:        4,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "status_id",
+					Name:     "status_id",
+					Label:    "Status",
+					Value:    props.StatusID,
+					Options:  statusSelectOptions(props.Statuses),
+					HelpText: "Optional. Assign to a workflow status.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "milestone_id",
+					Name:     "milestone_id",
+					Label:    "Milestone",
+					Value:    props.MilestoneID,
+					Options:  milestoneSelectOptions(props.Milestones),
+					HelpText: "Optional. Link to a milestone.",
+				})
+				if props.Product.WorkflowMode == model.WorkflowModeScrum {
+					@ui.Select(ui.SelectProps{
+						ID:       "sprint_id",
+						Name:     "sprint_id",
+						Label:    "Sprint",
+						Value:    props.SprintID,
+						Options:  sprintSelectOptions(props.Sprints),
+						HelpText: "Optional. Assign to a sprint.",
+					})
+				}
+				@EstimationInput(EstimationInputProps{
+					EstimationMode: props.Product.EstimationMode,
+					Value:          props.Estimation,
+				})
+				@ui.TextInput(ui.InputProps{
+					ID:          "priority",
+					Name:        "priority",
+					Label:       "Priority",
+					Value:       props.Priority,
+					Type:        "number",
+					Placeholder: "0",
+					HelpText:    "Lower numbers indicate higher priority.",
+				})
+				@ui.Checkbox("is_coarse", "is_coarse", "Needs refinement (coarse requirement)", props.IsCoarse, false)
+				if props.LinkTo != "" {
+					@requirementModalActions(requirementSubmitLabel(props.IsEdit))
+				} else {
+					@patterns.FormActions(requirementSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/requirements")
+				}
+			</form>
+		}
+	}
+}
+
+templ requirementModalActions(submitLabel string) {
+	<div class="flex items-center justify-end gap-3 pt-4">
+		@ui.ModalCancelButton("modal")
+		@ui.Button(ui.ButtonProps{
+			Label:   submitLabel,
+			Variant: "primary",
+			Size:    "md",
+			Type:    "submit",
+		})
+	</div>
 }
 
 func requirementFormBreadcrumbs(props RequirementFormProps) []templates.BreadcrumbItem {
@@ -182,6 +229,12 @@ func requirementFormAction(props RequirementFormProps) string {
 	if props.IsEdit {
 		return "/products/" + props.Product.ID + "/requirements/" + props.Requirement.ID
 	}
+	if tcID, ok := strings.CutPrefix(props.LinkTo, "test_case:"); ok {
+		return "/products/" + props.Product.ID + "/test-cases/" + tcID + "/requirements"
+	}
+	if capID, ok := strings.CutPrefix(props.LinkTo, "capability:"); ok {
+		return "/products/" + props.Product.ID + "/capabilities/" + capID + "/requirements"
+	}
 	return "/products/" + props.Product.ID + "/requirements"
 }
 
@@ -190,6 +243,13 @@ func requirementSubmitLabel(isEdit bool) string {
 		return "Save Changes"
 	}
 	return "Create Requirement"
+}
+
+func requirementModalTitle(props RequirementFormProps) string {
+	if props.IsEdit {
+		return "Edit Requirement"
+	}
+	return "New Requirement"
 }
 
 func requirementSelfID(props RequirementFormProps) string {

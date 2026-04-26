@@ -1963,16 +1963,745 @@ func (c *PageProductController) CapabilityOverviewTab(w http.ResponseWriter, r *
 	_ = productpage.CapabilityOverviewTabContent(productID, f, componentName, milestoneName).Render(r.Context(), w)
 }
 
+// --- Capability → Requirement (M:N reverse) ---
+
+func (c *PageProductController) CapabilityRequirementsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	props, err := c.loadCapabilityRequirementsTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityRequirementLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityRequirementLinkModal(productID, capabilityID).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityRequirementLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	links, _ := c.component.ListCapabilityRequirements(r.Context(), user, productID, capabilityID)
+	linkedIDs := make(map[string]struct{}, len(links))
+	for _, l := range links {
+		linkedIDs[l.RequirementID] = struct{}{}
+	}
+
+	candidates := make([]*model.Requirement, 0, len(all))
+	for _, req := range all {
+		if _, ok := linkedIDs[req.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(req.Title), query) {
+			continue
+		}
+		candidates = append(candidates, req)
+	}
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityRequirementLinkResults(productID, capabilityID, candidates, prefixes).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityRequirementLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+	requirementID := r.FormValue("requirement_id")
+
+	if requirementID == "" {
+		http.Error(w, "requirement_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeCapabilityRequirementsTabOOB(w, r, user, productID, capabilityID)
+}
+
+func (c *PageProductController) CapabilityRequirementCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canLinkRequirementCapability(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementFormModal(productpage.RequirementFormProps{
+		Meta:             templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Requirements:     requirements,
+		Categories:       categories,
+		CategoryPrefixes: prefixes,
+		Statuses:         statuses,
+		Milestones:       milestones,
+		Sprints:          sprints,
+		LinkTo:           "capability:" + capabilityID,
+		StatusID:         defaultStatusID(statuses),
+		Priority:         "0",
+	}).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityRequirementCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	definitionOfDone := r.FormValue("definition_of_done")
+	categoryID := r.FormValue("category_id")
+	parentID := r.FormValue("parent_id")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := strings.TrimSpace(r.FormValue("estimation"))
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+	isCoarse := r.FormValue("is_coarse") == "on"
+
+	rerenderForm := func(errMsg string) {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.RequirementFormModal(productpage.RequirementFormProps{
+			Meta:             templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:      user.DisplayName,
+			IsAdmin:          user.IsAdmin,
+			Product:          p,
+			Requirements:     requirements,
+			Categories:       categories,
+			CategoryPrefixes: prefixes,
+			Statuses:         statuses,
+			Milestones:       milestones,
+			Sprints:          sprints,
+			LinkTo:           "capability:" + capabilityID,
+			Title:            title,
+			Description:      description,
+			DefinitionOfDone: definitionOfDone,
+			CategoryID:       categoryID,
+			ParentID:         parentID,
+			StatusID:         statusID,
+			MilestoneID:      milestoneID,
+			SprintID:         sprintID,
+			Estimation:       estimation,
+			Priority:         priorityStr,
+			IsCoarse:         isCoarse,
+			Error:            errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	req, err := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
+		ProductID:        productID,
+		ParentID:         parentID,
+		Title:            title,
+		Description:      description,
+		DefinitionOfDone: definitionOfDone,
+		CategoryID:       categoryID,
+		StatusID:         statusID,
+		MilestoneID:      milestoneID,
+		SprintID:         sprintID,
+		Estimation:       estimation,
+		Priority:         priority,
+		IsCoarse:         isCoarse,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, capabilityID, req.ID); err != nil {
+		rerenderForm("created requirement but failed to link: " + err.Error())
+		return
+	}
+
+	c.writeCapabilityRequirementsTabOOB(w, r, user, productID, capabilityID)
+}
+
+func (c *PageProductController) CapabilityRequirementUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+	requirementID := r.PathValue("requirementId")
+
+	if err := c.component.UnlinkRequirementFromCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadCapabilityRequirementsTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadCapabilityRequirementsTabProps(r *http.Request, user *model.User, productID, capabilityID string) (productpage.CapabilityRequirementsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.CapabilityRequirementsTabProps{}, err
+	}
+
+	links, _ := c.component.ListCapabilityRequirements(r.Context(), user, productID, capabilityID)
+	requirements := make([]*model.Requirement, 0, len(links))
+	for _, link := range links {
+		req, err := c.backlog.GetRequirement(r.Context(), user, productID, link.RequirementID)
+		if err != nil {
+			continue
+		}
+		requirements = append(requirements, req)
+	}
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	return productpage.CapabilityRequirementsTabProps{
+		ProductID:        productID,
+		CapabilityID:     capabilityID,
+		CSRFToken:        csrfToken,
+		CanWrite:         user.IsAdmin || role == model.RoleOwner,
+		Requirements:     requirements,
+		CategoryPrefixes: prefixes,
+	}, nil
+}
+
+func (c *PageProductController) writeCapabilityRequirementsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, capabilityID string) {
+	props, err := c.loadCapabilityRequirementsTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "requirements", productpage.CapabilityRequirementsTabContent(props))
+}
+
+// --- Capability → TestCase (FK 1:N, re-parent semantics) ---
+
 // CapabilityTestCasesTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/test-cases.
 func (c *PageProductController) CapabilityTestCasesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	props, err := c.loadCapabilityTestCasesTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CapabilityTestCasesTabContent().Render(r.Context(), w)
+	_ = productpage.CapabilityTestCasesTabContent(props).Render(r.Context(), w)
 }
+
+func (c *PageProductController) CapabilityTestCaseLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityTestCaseLinkModal(productID, capabilityID).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityTestCaseLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.testing.ListTestCases(r.Context(), user, productID)
+
+	candidates := make([]*model.TestCase, 0, len(all))
+	for _, tc := range all {
+		if tc.CapabilityID == capabilityID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(tc.Title), query) {
+			continue
+		}
+		candidates = append(candidates, tc)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityTestCaseLinkResults(productID, capabilityID, candidates).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityTestCaseLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+	testCaseID := r.FormValue("test_case_id")
+
+	if testCaseID == "" {
+		http.Error(w, "test_case_id is required", http.StatusBadRequest)
+		return
+	}
+
+	newCapID := capabilityID
+	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		CapabilityID: &newCapID,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeCapabilityTestCasesTabOOB(w, r, user, productID, capabilityID)
+}
+
+func (c *PageProductController) CapabilityTestCaseCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
+		Meta:          templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Components:    components,
+		Capabilities:  capabilities,
+		PyramidLevels: pyramidLevels,
+		LinkTo:        "capability:" + capabilityID,
+		CapabilityID:  capabilityID,
+	}).Render(r.Context(), w)
+}
+
+// CapabilityTestCaseCreateAndLink handles POST /products/{id}/capabilities/{capabilityId}/test-cases.
+// FK semantics: just create the test case with CapabilityID set; no separate link step.
+func (c *PageProductController) CapabilityTestCaseCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	executionMode := r.FormValue("execution_mode")
+	testIdentifier := r.FormValue("test_identifier")
+	componentID := r.FormValue("component_id")
+	pyramidLevelID := r.FormValue("pyramid_level_id")
+
+	rerenderForm := func(errMsg string) {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
+			Meta:           templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:    user.DisplayName,
+			IsAdmin:        user.IsAdmin,
+			Product:        p,
+			Components:     components,
+			Capabilities:   capabilities,
+			PyramidLevels:  pyramidLevels,
+			LinkTo:         "capability:" + capabilityID,
+			Title:          title,
+			Description:    description,
+			ExecutionMode:  executionMode,
+			TestIdentifier: testIdentifier,
+			ComponentID:    componentID,
+			CapabilityID:   capabilityID,
+			PyramidLevelID: pyramidLevelID,
+			Error:          errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	_, err = c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
+		ProductID:      productID,
+		Title:          title,
+		Description:    description,
+		ExecutionMode:  executionMode,
+		TestIdentifier: testIdentifier,
+		ComponentID:    componentID,
+		CapabilityID:   capabilityID,
+		PyramidLevelID: pyramidLevelID,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	c.writeCapabilityTestCasesTabOOB(w, r, user, productID, capabilityID)
+}
+
+// CapabilityTestCaseUnlink clears the CapabilityID FK on the given test case.
+func (c *PageProductController) CapabilityTestCaseUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+	testCaseID := r.PathValue("testCaseId")
+
+	empty := ""
+	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		CapabilityID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadCapabilityTestCasesTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityTestCasesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadCapabilityTestCasesTabProps(r *http.Request, user *model.User, productID, capabilityID string) (productpage.CapabilityTestCasesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.CapabilityTestCasesTabProps{}, err
+	}
+
+	testCases, _ := c.testing.ListTestCasesByCapability(r.Context(), user, productID, capabilityID)
+
+	return productpage.CapabilityTestCasesTabProps{
+		ProductID:    productID,
+		CapabilityID: capabilityID,
+		CSRFToken:    csrfToken,
+		CanWrite:     c.canLinkTestCasesForRole(user, role),
+		TestCases:    testCases,
+	}, nil
+}
+
+func (c *PageProductController) writeCapabilityTestCasesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, capabilityID string) {
+	props, err := c.loadCapabilityTestCasesTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "test-cases", productpage.CapabilityTestCasesTabContent(props))
+}
+
+// --- Capability → Defect (polymorphic via DefectLink) ---
 
 // CapabilityDefectsTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/defects.
 func (c *PageProductController) CapabilityDefectsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	props, err := c.loadCapabilityDefectsTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CapabilityDefectsTabContent().Render(r.Context(), w)
+	_ = productpage.CapabilityDefectsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityDefectLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityDefectLinkModal(productID, capabilityID).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityDefectLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
+	linked, _, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, "capability", capabilityID)
+	linkedIDs := make(map[string]struct{}, len(linked))
+	for _, d := range linked {
+		linkedIDs[d.ID] = struct{}{}
+	}
+
+	candidates := make([]*model.Defect, 0, len(all))
+	for _, d := range all {
+		if _, ok := linkedIDs[d.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) {
+			continue
+		}
+		candidates = append(candidates, d)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityDefectLinkResults(productID, capabilityID, candidates).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityDefectLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+	defectID := r.FormValue("defect_id")
+
+	if defectID == "" {
+		http.Error(w, "defect_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, "capability", capabilityID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeCapabilityDefectsTabOOB(w, r, user, productID, capabilityID)
+}
+
+func (c *PageProductController) CapabilityDefectCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectFormModal(productpage.DefectFormProps{
+		Meta:        templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Statuses:    statuses,
+		Milestones:  milestones,
+		Sprints:     sprints,
+		LinkTo:      "capability:" + capabilityID,
+		Criticality: "medium",
+		StatusID:    defaultStatusID(statuses),
+	}).Render(r.Context(), w)
+}
+
+func (c *PageProductController) CapabilityDefectCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	criticality := r.FormValue("criticality")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := r.FormValue("estimation")
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+
+	rerenderForm := func(errMsg string) {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.DefectFormModal(productpage.DefectFormProps{
+			Meta:        templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName: user.DisplayName,
+			IsAdmin:     user.IsAdmin,
+			Product:     p,
+			Statuses:    statuses,
+			Milestones:  milestones,
+			Sprints:     sprints,
+			LinkTo:      "capability:" + capabilityID,
+			Title:       title,
+			Description: description,
+			Criticality: criticality,
+			StatusID:    statusID,
+			MilestoneID: milestoneID,
+			SprintID:    sprintID,
+			Estimation:  estimation,
+			Priority:    priorityStr,
+			Error:       errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	d, err := c.backlog.CreateDefect(r.Context(), user, service.CreateDefectInput{
+		ProductID:   productID,
+		Title:       title,
+		Description: description,
+		Criticality: criticality,
+		StatusID:    statusID,
+		MilestoneID: milestoneID,
+		SprintID:    sprintID,
+		Estimation:  estimation,
+		Priority:    priority,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, "capability", capabilityID); err != nil {
+		rerenderForm("created defect but failed to link: " + err.Error())
+		return
+	}
+
+	c.writeCapabilityDefectsTabOOB(w, r, user, productID, capabilityID)
+}
+
+func (c *PageProductController) CapabilityDefectUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	capabilityID := r.PathValue("capabilityId")
+	linkID := r.PathValue("linkId")
+
+	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadCapabilityDefectsTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CapabilityDefectsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadCapabilityDefectsTabProps(r *http.Request, user *model.User, productID, capabilityID string) (productpage.CapabilityDefectsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.CapabilityDefectsTabProps{}, err
+	}
+
+	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, "capability", capabilityID)
+
+	return productpage.CapabilityDefectsTabProps{
+		ProductID:    productID,
+		CapabilityID: capabilityID,
+		CSRFToken:    csrfToken,
+		CanLink:      c.canAddDefectLinksForRole(user, role),
+		CanUnlink:    c.canRemoveDefectLinksForRole(user, role),
+		Defects:      defects,
+		LinkIDs:      linkIDs,
+	}, nil
+}
+
+func (c *PageProductController) writeCapabilityDefectsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, capabilityID string) {
+	props, err := c.loadCapabilityDefectsTabProps(r, user, productID, capabilityID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "defects", productpage.CapabilityDefectsTabContent(props))
 }
 
 // CapabilityHistoryTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/history.
@@ -2399,8 +3128,271 @@ func (c *PageProductController) TestCaseOverviewTab(w http.ResponseWriter, r *ht
 
 // TestCaseRequirementsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/requirements.
 func (c *PageProductController) TestCaseRequirementsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	props, err := c.loadTestCaseRequirementsTabProps(r, user, productID, testCaseID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseRequirementsTabContent().Render(r.Context(), w)
+	_ = productpage.TestCaseRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) TestCaseRequirementLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseRequirementLinkModal(productID, testCaseID).Render(r.Context(), w)
+}
+
+func (c *PageProductController) TestCaseRequirementLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	links, _ := c.testing.ListTestCaseRequirements(r.Context(), user, productID, testCaseID)
+	linkedIDs := make(map[string]struct{}, len(links))
+	for _, l := range links {
+		linkedIDs[l.RequirementID] = struct{}{}
+	}
+
+	candidates := make([]*model.Requirement, 0, len(all))
+	for _, req := range all {
+		if _, ok := linkedIDs[req.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(req.Title), query) {
+			continue
+		}
+		candidates = append(candidates, req)
+	}
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseRequirementLinkResults(productID, testCaseID, candidates, prefixes).Render(r.Context(), w)
+}
+
+func (c *PageProductController) TestCaseRequirementLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+	requirementID := r.FormValue("requirement_id")
+
+	if requirementID == "" {
+		http.Error(w, "requirement_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.testing.LinkRequirement(r.Context(), user, productID, testCaseID, requirementID, "requirement"); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeTestCaseRequirementsTabOOB(w, r, user, productID, testCaseID)
+}
+
+func (c *PageProductController) TestCaseRequirementCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canLinkTestCases(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementFormModal(productpage.RequirementFormProps{
+		Meta:             templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:      user.DisplayName,
+		IsAdmin:          user.IsAdmin,
+		Product:          p,
+		Requirements:     requirements,
+		Categories:       categories,
+		CategoryPrefixes: prefixes,
+		Statuses:         statuses,
+		Milestones:       milestones,
+		Sprints:          sprints,
+		LinkTo:           "test_case:" + testCaseID,
+		StatusID:         defaultStatusID(statuses),
+		Priority:         "0",
+	}).Render(r.Context(), w)
+}
+
+func (c *PageProductController) TestCaseRequirementCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	p, _, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	description := r.FormValue("description")
+	definitionOfDone := r.FormValue("definition_of_done")
+	categoryID := r.FormValue("category_id")
+	parentID := r.FormValue("parent_id")
+	statusID := r.FormValue("status_id")
+	milestoneID := r.FormValue("milestone_id")
+	sprintID := r.FormValue("sprint_id")
+	estimation := strings.TrimSpace(r.FormValue("estimation"))
+	priorityStr := r.FormValue("priority")
+	priority, _ := strconv.Atoi(priorityStr)
+	isCoarse := r.FormValue("is_coarse") == "on"
+
+	rerenderForm := func(errMsg string) {
+		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
+		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
+		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.RequirementFormModal(productpage.RequirementFormProps{
+			Meta:             templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:      user.DisplayName,
+			IsAdmin:          user.IsAdmin,
+			Product:          p,
+			Requirements:     requirements,
+			Categories:       categories,
+			CategoryPrefixes: prefixes,
+			Statuses:         statuses,
+			Milestones:       milestones,
+			Sprints:          sprints,
+			LinkTo:           "test_case:" + testCaseID,
+			Title:            title,
+			Description:      description,
+			DefinitionOfDone: definitionOfDone,
+			CategoryID:       categoryID,
+			ParentID:         parentID,
+			StatusID:         statusID,
+			MilestoneID:      milestoneID,
+			SprintID:         sprintID,
+			Estimation:       estimation,
+			Priority:         priorityStr,
+			IsCoarse:         isCoarse,
+			Error:            errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	req, err := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
+		ProductID:        productID,
+		ParentID:         parentID,
+		Title:            title,
+		Description:      description,
+		DefinitionOfDone: definitionOfDone,
+		CategoryID:       categoryID,
+		StatusID:         statusID,
+		MilestoneID:      milestoneID,
+		SprintID:         sprintID,
+		Estimation:       estimation,
+		Priority:         priority,
+		IsCoarse:         isCoarse,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	if err := c.testing.LinkRequirement(r.Context(), user, productID, testCaseID, req.ID, "requirement"); err != nil {
+		rerenderForm("created requirement but failed to link: " + err.Error())
+		return
+	}
+
+	c.writeTestCaseRequirementsTabOOB(w, r, user, productID, testCaseID)
+}
+
+func (c *PageProductController) TestCaseRequirementUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+	requirementID := r.PathValue("requirementId")
+
+	if err := c.testing.UnlinkRequirement(r.Context(), user, productID, testCaseID, requirementID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadTestCaseRequirementsTabProps(r, user, productID, testCaseID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadTestCaseRequirementsTabProps(r *http.Request, user *model.User, productID, testCaseID string) (productpage.TestCaseRequirementsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.TestCaseRequirementsTabProps{}, err
+	}
+
+	links, _ := c.testing.ListTestCaseRequirements(r.Context(), user, productID, testCaseID)
+	requirements := make([]*model.Requirement, 0, len(links))
+	for _, link := range links {
+		req, err := c.backlog.GetRequirement(r.Context(), user, productID, link.RequirementID)
+		if err != nil {
+			continue
+		}
+		requirements = append(requirements, req)
+	}
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	return productpage.TestCaseRequirementsTabProps{
+		ProductID:        productID,
+		TestCaseID:       testCaseID,
+		CSRFToken:        csrfToken,
+		CanWrite:         c.canLinkTestCasesForRole(user, role),
+		Requirements:     requirements,
+		CategoryPrefixes: prefixes,
+	}, nil
+}
+
+func (c *PageProductController) writeTestCaseRequirementsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, testCaseID string) {
+	props, err := c.loadTestCaseRequirementsTabProps(r, user, productID, testCaseID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "requirements", productpage.TestCaseRequirementsTabContent(props))
 }
 
 // TestCaseCampaignsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/campaigns.

@@ -607,7 +607,8 @@ type MockTestCaseStore struct {
 	GetByIDFunc              func(ctx context.Context, id string) (*model.TestCase, error)
 	UpdateFunc               func(ctx context.Context, tc *model.TestCase) error
 	DeleteFunc               func(ctx context.Context, id string) error
-	ListByProductIDFunc      func(ctx context.Context, productID string) ([]*model.TestCase, error)
+	ListByProductIDFunc                func(ctx context.Context, productID string) ([]*model.TestCase, error)
+	ListByCapabilityIDFunc             func(ctx context.Context, capabilityID string) ([]*model.TestCase, error)
 	LinkRequirementFunc                func(ctx context.Context, link *model.TestCaseRequirement) error
 	UnlinkRequirementFunc              func(ctx context.Context, testCaseID, requirementID string) error
 	ListRequirementLinksFunc           func(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
@@ -631,6 +632,12 @@ func (m *MockTestCaseStore) Delete(ctx context.Context, id string) error {
 }
 func (m *MockTestCaseStore) ListByProductID(ctx context.Context, productID string) ([]*model.TestCase, error) {
 	return m.ListByProductIDFunc(ctx, productID)
+}
+func (m *MockTestCaseStore) ListByCapabilityID(ctx context.Context, capabilityID string) ([]*model.TestCase, error) {
+	if m.ListByCapabilityIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByCapabilityIDFunc(ctx, capabilityID)
 }
 func (m *MockTestCaseStore) LinkRequirement(ctx context.Context, link *model.TestCaseRequirement) error {
 	return m.LinkRequirementFunc(ctx, link)
