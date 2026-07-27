@@ -413,11 +413,14 @@ templ DefectCapabilityLinkResults(productID, defectID string, candidates []*mode
 // --- Test cases tab (FR-023) ---
 
 // DefectTestCasesTabProps holds data for the defect test cases tab.
+// CanLink and CanCreate are gated separately: testers may link an existing test
+// case to a defect, but only developers and owners may create one (FR-405).
 type DefectTestCasesTabProps struct {
 	ProductID string
 	DefectID  string
 	CSRFToken string
 	CanLink   bool
+	CanCreate bool
 	CanUnlink bool
 	TestCases []*model.TestCase
 	LinkIDs   map[string]string // testCaseID → DefectLink ID
@@ -425,17 +428,31 @@ type DefectTestCasesTabProps struct {
 
 templ DefectTestCasesTabContent(props DefectTestCasesTabProps) {
 	<div class="space-y-4">
-		if props.CanLink {
+		if props.CanLink || props.CanCreate {
 			<div class="flex items-center justify-end gap-2">
-				@ui.Button(ui.ButtonProps{
-					Label:    "Link existing",
-					Variant:  "secondary",
-					Size:     "sm",
-					HxGet:    fmt.Sprintf("/products/%s/defects/%s/test-cases/link-modal", props.ProductID, props.DefectID),
-					HxTarget: "#modal",
-					HxSwap:   "innerHTML",
-				}) {
-					@ui.Icon("link", "sm")
+				if props.CanLink {
+					@ui.Button(ui.ButtonProps{
+						Label:    "Link existing",
+						Variant:  "secondary",
+						Size:     "sm",
+						HxGet:    fmt.Sprintf("/products/%s/defects/%s/test-cases/link-modal", props.ProductID, props.DefectID),
+						HxTarget: "#modal",
+						HxSwap:   "innerHTML",
+					}) {
+						@ui.Icon("link", "sm")
+					}
+				}
+				if props.CanCreate {
+					@ui.Button(ui.ButtonProps{
+						Label:    "Create new",
+						Variant:  "primary",
+						Size:     "sm",
+						HxGet:    fmt.Sprintf("/products/%s/defects/%s/test-cases/create-modal", props.ProductID, props.DefectID),
+						HxTarget: "#modal",
+						HxSwap:   "innerHTML",
+					}) {
+						@ui.Icon("plus", "sm")
+					}
 				}
 			</div>
 		}

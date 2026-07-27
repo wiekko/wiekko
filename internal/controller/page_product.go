@@ -6000,10 +6000,119 @@ func (c *PageProductController) loadDefectTestCasesTabProps(r *http.Request, use
 		DefectID:  defectID,
 		CSRFToken: csrfToken,
 		CanLink:   c.canAddDefectLinksForRole(user, role),
+		CanCreate: c.canEditTestCases(user, role),
 		CanUnlink: c.canRemoveDefectLinksForRole(user, role),
 		TestCases: testCases,
 		LinkIDs:   linkIDs,
 	}, nil
+}
+
+// DefectTestCaseCreateModal renders GET /products/{id}/defects/{defectId}/test-cases/create-modal.
+// Creating a test case requires developer role, unlike linking one (tester).
+func (c *PageProductController) DefectTestCaseCreateModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canEditTestCases(user, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
+		Meta:          templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Components:    components,
+		Capabilities:  capabilities,
+		PyramidLevels: pyramidLevels,
+		LinkTo:        "defect:" + defectID,
+	}).Render(r.Context(), w)
+}
+
+// DefectTestCaseCreateAndLink handles POST /products/{id}/defects/{defectId}/test-cases.
+func (c *PageProductController) DefectTestCaseCreateAndLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canEditTestCases(user, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	executionMode := r.FormValue("execution_mode")
+	testIdentifier := r.FormValue("test_identifier")
+	componentID := r.FormValue("component_id")
+	capabilityID := r.FormValue("capability_id")
+	pyramidLevelID := r.FormValue("pyramid_level_id")
+
+	rerenderForm := func(errMsg string) {
+		components, _ := c.component.ListComponents(r.Context(), user, productID)
+		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
+			Meta:           templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:    user.DisplayName,
+			IsAdmin:        user.IsAdmin,
+			Product:        p,
+			Components:     components,
+			Capabilities:   capabilities,
+			PyramidLevels:  pyramidLevels,
+			LinkTo:         "defect:" + defectID,
+			Title:          title,
+			Description:    description,
+			ExecutionMode:  executionMode,
+			TestIdentifier: testIdentifier,
+			ComponentID:    componentID,
+			CapabilityID:   capabilityID,
+			PyramidLevelID: pyramidLevelID,
+			Error:          errMsg,
+		}).Render(r.Context(), w)
+	}
+
+	tc, err := c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
+		ProductID:      productID,
+		Title:          title,
+		Description:    description,
+		ExecutionMode:  executionMode,
+		TestIdentifier: testIdentifier,
+		ComponentID:    componentID,
+		CapabilityID:   capabilityID,
+		PyramidLevelID: pyramidLevelID,
+	})
+	if err != nil {
+		rerenderForm(err.Error())
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetTestCase, tc.ID); err != nil {
+		rerenderForm("created test case but failed to link: " + err.Error())
+		return
+	}
+
+	c.writeDefectTestCasesTabOOB(w, r, user, productID, defectID)
 }
 
 func (c *PageProductController) writeDefectTestCasesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, defectID string) {

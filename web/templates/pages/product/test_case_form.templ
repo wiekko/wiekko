@@ -199,6 +199,9 @@ func testCaseFormAction(props TestCaseFormProps) string {
 	if compID, ok := strings.CutPrefix(props.LinkTo, "component:"); ok {
 		return "/products/" + props.Product.ID + "/components/" + compID + "/test-cases"
 	}
+	if defectID, ok := strings.CutPrefix(props.LinkTo, "defect:"); ok {
+		return "/products/" + props.Product.ID + "/defects/" + defectID + "/test-cases"
+	}
 	return "/products/" + props.Product.ID + "/test-cases"
 }
 

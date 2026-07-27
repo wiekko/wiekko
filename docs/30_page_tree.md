@@ -120,7 +120,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Overview     | Fields, status, assignments, criticality, milestone  |
 | Components   | Linked components                                    |
 | Capabilities | Linked capabilities                                  |
-| Test Cases   | Linked test cases                                    |
+| Test Cases   | Linked test cases (link existing, or create a regression test) |
 | Requirements | Linked requirements                                  |
 | Comments     | Comment thread                                       |
 | Attachments  | File list + upload                                   |
