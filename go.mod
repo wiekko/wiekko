@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/kaugesaar/lucide-go v0.22.0
 	github.com/pressly/goose/v3 v3.26.0
-	github.com/yuin/goldmark v1.8.2
+	github.com/yuin/goldmark v1.8.4
 	modernc.org/sqlite v1.38.2
 )
 
