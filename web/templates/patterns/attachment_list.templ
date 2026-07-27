@@ -2,9 +2,16 @@ package patterns
 
 import (
 	"fmt"
+	"strconv"
 
 	"nexmap.net/web/templates"
 	"nexmap.net/web/templates/ui"
+)
+
+// Error region IDs shared between these templates and the page handlers.
+const (
+	AttachmentsErrorRegion = "attachments-error"
+	CommentsErrorRegion    = "comments-error"
 )
 
 // AttachmentList renders attachments with download, delete and upload actions.
@@ -13,7 +20,7 @@ import (
 // UploadForm swaps into the former with hx-swap="beforeend"; the latter is an
 // out-of-band target so creating the first attachment (or deleting the last)
 // can toggle the empty state without a page reload.
-templ AttachmentList(attachments []templates.AttachmentView, hxPost, csrfToken string, canUpload bool) {
+templ AttachmentList(attachments []templates.AttachmentView, hxPost, csrfToken string, canUpload bool, maxBytes int64) {
 	<div class="space-y-4">
 		<div id="attachments-empty">
 			if len(attachments) == 0 {
@@ -26,7 +33,13 @@ templ AttachmentList(attachments []templates.AttachmentView, hxPost, csrfToken s
 			}
 		</ul>
 		if canUpload {
-			@UploadForm(hxPost, csrfToken)
+			<div class="space-y-2">
+				@ErrorRegion(AttachmentsErrorRegion)
+				<div id={ attachmentsSizeErrorRegion } class="hidden">
+					@FormError(OversizeMessage(maxBytes))
+				</div>
+			</div>
+			@UploadForm(hxPost, csrfToken, maxBytes)
 		}
 	</div>
 }
@@ -78,6 +91,7 @@ templ AttachmentItem(a templates.AttachmentView, csrfToken string) {
 templ AttachmentCreated(a templates.AttachmentView, csrfToken string) {
 	@AttachmentItem(a, csrfToken)
 	<div id="attachments-empty" hx-swap-oob="innerHTML"></div>
+	@ClearedErrorRegion(AttachmentsErrorRegion)
 }
 
 // AttachmentsEmptied restores the empty state after the last row is deleted.
@@ -89,33 +103,110 @@ templ AttachmentsEmptied() {
 }
 
 // UploadForm renders a file upload form using htmx multipart encoding.
-templ UploadForm(hxPost, csrfToken string) {
+//
+// A rejected upload comes back as 200 with an HX-Nexmap-Error header and the
+// message as an out-of-band swap. htmx ignores non-2xx responses entirely, and
+// its htmx:beforeSwap event fires on the swap target (#attachments) rather
+// than on this form, so a hook here could not intercept them. The header keeps
+// the form from resetting and losing the user's selection on failure.
+templ UploadForm(hxPost, csrfToken string, maxBytes int64) {
 	<form
 		hx-post={ hxPost }
 		hx-target="#attachments"
 		hx-swap="beforeend"
 		hx-encoding="multipart/form-data"
-		hx-on::after-request="if (event.detail.successful) this.reset()"
-		class="flex items-center gap-3 pt-4"
+		hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Nexmap-Error')) this.reset()"
+		hx-on::before-request="nexmapGuardUploadSize(event, this)"
+		data-max-bytes={ formatInt(maxBytes) }
+		data-size-error-id={ attachmentsSizeErrorRegion }
+		data-server-error-id={ AttachmentsErrorRegion }
+		class="space-y-2 pt-4"
 	>
 		<input type="hidden" name="_csrf" value={ csrfToken }/>
-		<input
-			type="file"
-			name="file"
-			required
-			class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-400 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/50"
-		/>
-		@ui.Button(ui.ButtonProps{
-			Label:   "Upload",
-			Variant: "secondary",
-			Size:    "sm",
-			Type:    "submit",
-		})
+		<div class="flex items-center gap-3">
+			<input
+				type="file"
+				name="file"
+				required
+				class="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-gray-400 dark:file:bg-indigo-900/30 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/50"
+			/>
+			@ui.Button(ui.ButtonProps{
+				Label:   "Upload",
+				Variant: "secondary",
+				Size:    "sm",
+				Type:    "submit",
+			})
+		</div>
+		if maxBytes > 0 {
+			<p class="text-xs text-gray-500 dark:text-gray-400">{ uploadHint(maxBytes) }</p>
+		}
 	</form>
+	@uploadSizeGuardScript()
+}
+
+// uploadSizeGuardScript stops an oversize upload before it is sent.
+//
+// This is not just a nicety. When the server's body cap trips, Go marks the
+// connection for close without draining the rest of the request, so a client
+// still uploading gets a reset instead of the response — the message never
+// arrives. The browser already knows the file size, so the only reliable fix
+// is not to send it. The server cap remains the actual limit for any client
+// that skips this.
+templ uploadSizeGuardScript() {
+	<script>
+		function nexmapGuardUploadSize(evt, form) {
+			var sizeErr = document.getElementById(form.dataset.sizeErrorId);
+			if (sizeErr) sizeErr.classList.add('hidden');
+
+			var max = Number(form.dataset.maxBytes || 0);
+			var input = form.querySelector('input[type=file]');
+			if (!input || !input.files || !input.files[0] || max <= 0) return;
+
+			if (input.files[0].size > max) {
+				evt.preventDefault();
+				var serverErr = document.getElementById(form.dataset.serverErrorId);
+				if (serverErr) serverErr.innerHTML = '';
+				if (sizeErr) sizeErr.classList.remove('hidden');
+			}
+		}
+	</script>
 }
 
 // csrfVals renders the CSRF token as hx-vals JSON, so htmx-issued requests
 // that carry no form body still pass the CSRF middleware.
 func csrfVals(csrfToken string) string {
 	return fmt.Sprintf(`{"_csrf":%q}`, csrfToken)
+}
+
+// attachmentsSizeErrorRegion holds the client-side size warning. It is kept
+// separate from AttachmentsErrorRegion, which the server overwrites via
+// out-of-band swaps and would otherwise destroy the pre-rendered banner.
+const attachmentsSizeErrorRegion = "attachments-size-error"
+
+func formatInt(n int64) string {
+	return strconv.FormatInt(n, 10)
+}
+
+// OversizeMessage is the wording used for both the client-side guard and the
+// server's own rejection, so the user sees one consistent sentence.
+func OversizeMessage(maxBytes int64) string {
+	return "That file is too large. Maximum file size " + HumanizeBytes(maxBytes) + "."
+}
+
+func uploadHint(maxBytes int64) string {
+	return "Maximum file size " + HumanizeBytes(maxBytes) + "."
+}
+
+// HumanizeBytes renders a byte count for display.
+func HumanizeBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for size := n / unit; size >= unit; size /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
 }

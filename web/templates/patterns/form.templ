@@ -45,6 +45,27 @@ templ FormError(message string) {
 	}
 }
 
+// ErrorRegion renders an always-present container that an htmx response can
+// fill out of band. Render it once next to a form; the server then targets it
+// with InlineError or clears it with ClearedErrorRegion.
+templ ErrorRegion(regionID string) {
+	<div id={ regionID }></div>
+}
+
+// InlineError fills an ErrorRegion out of band, reusing FormError's styling so
+// htmx-driven failures look like every other form error in the app.
+templ InlineError(regionID, message string) {
+	<div id={ regionID } hx-swap-oob="innerHTML">
+		@FormError(message)
+	</div>
+}
+
+// ClearedErrorRegion empties an ErrorRegion out of band, so a previous failure
+// disappears as soon as the next attempt succeeds.
+templ ClearedErrorRegion(regionID string) {
+	<div id={ regionID } hx-swap-oob="innerHTML"></div>
+}
+
 // FormSection groups related form fields with a heading.
 templ FormSection(title, description string) {
 	<div class="border-b border-gray-200 pb-6 dark:border-gray-700">

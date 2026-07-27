@@ -3,8 +3,10 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"nexmap.net/internal/middleware"
@@ -52,13 +54,14 @@ func (c *PageProductController) commentCreate(w http.ResponseWriter, r *http.Req
 
 	body := r.FormValue("body")
 	if body == "" {
-		http.Error(w, "comment body is required", http.StatusBadRequest)
+		c.writeDiscussionError(w, r, patterns.CommentsErrorRegion,
+			http.StatusBadRequest, "Write something before posting.")
 		return
 	}
 
 	created, err := c.comment.CreateComment(r.Context(), user, productID, ownerType, ownerID, body)
 	if err != nil {
-		writePageServiceError(w, err)
+		c.writeDiscussionErrorFor(w, r, patterns.CommentsErrorRegion, err)
 		return
 	}
 
@@ -153,6 +156,7 @@ func (c *PageProductController) attachmentsTab(w http.ResponseWriter, r *http.Re
 		attachmentsBaseURL(productID, ownerType, ownerID),
 		middleware.CSRFTokenFromContext(r.Context()),
 		canUpload,
+		c.maxUploadBytes,
 	).Render(r.Context(), w)
 }
 
@@ -162,7 +166,16 @@ func (c *PageProductController) attachmentCreate(w http.ResponseWriter, r *http.
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "a file is required", http.StatusBadRequest)
+		// A body over the router's cap fails here rather than in storage, so
+		// it needs its own message — "a file is required" would be misleading.
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			c.writeDiscussionError(w, r, patterns.AttachmentsErrorRegion,
+				http.StatusRequestEntityTooLarge, oversizeMessage(c.maxUploadBytes))
+			return
+		}
+		c.writeDiscussionError(w, r, patterns.AttachmentsErrorRegion,
+			http.StatusBadRequest, "Choose a file to upload.")
 		return
 	}
 	defer func() { _ = file.Close() }()
@@ -175,7 +188,7 @@ func (c *PageProductController) attachmentCreate(w http.ResponseWriter, r *http.
 		Content:     file,
 	})
 	if err != nil {
-		writePageServiceError(w, err)
+		c.writeDiscussionErrorFor(w, r, patterns.AttachmentsErrorRegion, err)
 		return
 	}
 
@@ -245,7 +258,7 @@ func attachmentView(a *model.Attachment, productID, ownerType, ownerID string, c
 		ID:          a.ID,
 		Filename:    a.Filename,
 		ContentType: a.ContentType,
-		Size:        humanizeBytes(a.Size),
+		Size:        patterns.HumanizeBytes(a.Size),
 		CreatedAt:   formatTimestamp(a.CreatedAt),
 		DownloadURL: base + "/" + a.ID + "/download",
 	}
@@ -327,17 +340,115 @@ func formatTimestamp(ts string) string {
 	return t.Local().Format("2 Jan 2006, 15:04")
 }
 
-func humanizeBytes(n int64) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%d B", n)
+// writeDiscussionErrorFor renders a service error into a form's error region.
+func (c *PageProductController) writeDiscussionErrorFor(w http.ResponseWriter, r *http.Request, region string, err error) {
+	status, msg := discussionError(err, c.maxUploadBytes)
+	c.writeDiscussionError(w, r, region, status, msg)
+}
+
+// uploadMemoryLimit is how much of a multipart upload is buffered in RAM
+// before spilling to temp files. The total is bounded by LimitUploadBody.
+const uploadMemoryLimit = 1 << 20
+
+// LimitUploadBody caps the request body and parses the multipart form before
+// anything else reads it.
+//
+// This has to happen ahead of CSRF validation: that middleware calls
+// r.FormValue, which parses the body itself. If the body is over the cap the
+// parse fails there, CSRF cannot find the token, and the user gets an opaque
+// 403 instead of a size error — with htmx discarding it, no message at all.
+// Parsing here means the size problem is reported properly, and CSRF then
+// reads the already-parsed form.
+func (c *PageProductController) LimitUploadBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Headroom for the multipart envelope around the file itself.
+		const envelope = 1 << 20
+		body := r.Body
+		r.Body = http.MaxBytesReader(w, body, c.maxUploadBytes+envelope)
+
+		if err := r.ParseMultipartForm(uploadMemoryLimit); err != nil {
+			var tooBig *http.MaxBytesError
+			if errors.As(err, &tooBig) {
+				drainRemainder(body)
+				c.writeDiscussionError(w, r, patterns.AttachmentsErrorRegion,
+					http.StatusRequestEntityTooLarge, oversizeMessage(c.maxUploadBytes))
+				return
+			}
+			c.writeDiscussionError(w, r, patterns.AttachmentsErrorRegion,
+				http.StatusBadRequest, "That upload could not be read. Please try again.")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func oversizeMessage(maxBytes int64) string {
+	return patterns.OversizeMessage(maxBytes)
+}
+
+// maxDrainBytes bounds how much of a rejected upload is read and discarded.
+const maxDrainBytes = 32 << 20
+
+// drainRemainder consumes what is left of an oversize request body.
+//
+// When the body cap trips, Go sets Connection: close and stops reading. If the
+// client is still uploading, the connection is torn down before it can read
+// the response, so the rejection never reaches it. Consuming the rest lets the
+// client finish and receive the reply. The bound keeps a deliberately huge
+// upload from costing us the whole transfer — past that the connection simply
+// closes, which is the correct outcome for a client ignoring the limit.
+//
+// Browsers never reach this: the upload form checks the size before sending.
+func drainRemainder(body io.Reader) {
+	_, _ = io.CopyN(io.Discard, body, maxDrainBytes)
+}
+
+// discussionErrorHeader marks a response as a rejection even though it carries
+// a 200 status, so the form knows not to reset and discard the user's input.
+const discussionErrorHeader = "HX-Nexmap-Error"
+
+// writeDiscussionError sends the message as an out-of-band swap into region.
+//
+// The status is deliberately 200. htmx does not process non-2xx responses at
+// all, and its htmx:beforeSwap escape hatch fires on the swap target rather
+// than on the form, so an error status here reaches the user as nothing but a
+// log line. The primary body stays empty, so the list target — which appends
+// with hx-swap="beforeend" — receives nothing and only the out-of-band region
+// updates. The real status codes are still returned by the JSON API, which has
+// no such constraint.
+func (c *PageProductController) writeDiscussionError(w http.ResponseWriter, r *http.Request, region string, status int, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(discussionErrorHeader, http.StatusText(status))
+	w.WriteHeader(http.StatusOK)
+	_ = patterns.InlineError(region, message).Render(r.Context(), w)
+}
+
+// discussionError maps an error to a status and a message written for the
+// person who tried the action, not for a log.
+func discussionError(err error, maxUploadBytes int64) (int, string) {
+	switch {
+	case errors.Is(err, service.ErrForbidden):
+		return http.StatusForbidden, "You do not have permission to do that."
+	case errors.Is(err, service.ErrNotFound), errors.Is(err, storage.ErrNotFound):
+		return http.StatusNotFound, "That item no longer exists. Reload the page."
+	case errors.Is(err, storage.ErrTooLarge):
+		return http.StatusRequestEntityTooLarge, oversizeMessage(maxUploadBytes)
+	case errors.Is(err, storage.ErrTypeNotAllowed):
+		// The policy error already names the permitted types.
+		return http.StatusUnsupportedMediaType, uploadRejectionMessage(err)
+	default:
+		return http.StatusUnprocessableEntity, "That did not work. Please try again."
 	}
-	div, exp := int64(unit), 0
-	for size := n / unit; size >= unit; size /= unit {
-		div *= unit
-		exp++
+}
+
+// uploadRejectionMessage turns a policy error into a sentence.
+func uploadRejectionMessage(err error) string {
+	msg := strings.TrimPrefix(err.Error(), storage.ErrTypeNotAllowed.Error()+": ")
+	if msg == "" || msg == err.Error() {
+		return "That file type is not allowed."
 	}
-	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
+	return "That file type is not allowed — " + msg + "."
 }
 
 // writePageServiceError maps service errors onto plain-text HTTP responses

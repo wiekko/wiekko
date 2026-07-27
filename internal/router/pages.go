@@ -13,8 +13,8 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
-	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Comment, svc.Audit)
-	upload := pageUpload(maxUploadBytes)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Comment, svc.Audit, maxUploadBytes)
+	upload := pageUpload(productCtrl)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
@@ -352,18 +352,11 @@ func pageCSRF(h http.Handler) http.Handler {
 	return middleware.RequireAuthPage(middleware.CSRF(h))
 }
 
-// pageUpload caps the request body before anything parses the multipart form.
-// middleware.CSRF reads r.FormValue, which would otherwise buffer up to
-// net/http's 32 MB default (spilling to temp files) before our own limit runs.
-func pageUpload(maxBytes int64) func(http.Handler) http.Handler {
+// pageUpload guards a file-upload route. The controller caps and parses the
+// body before CSRF runs — see LimitUploadBody for why that order matters.
+func pageUpload(productCtrl *controller.PageProductController) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
-		// Order matters: the cap must be installed before CSRF touches the body.
-		limited := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Headroom for the multipart envelope around the file itself.
-			r.Body = http.MaxBytesReader(w, r.Body, maxBytes+(1<<20))
-			middleware.CSRF(h).ServeHTTP(w, r)
-		})
-		return middleware.RequireAuthPage(limited)
+		return middleware.RequireAuthPage(productCtrl.LimitUploadBody(middleware.CSRF(h)))
 	}
 }
 

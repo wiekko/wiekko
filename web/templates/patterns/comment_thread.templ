@@ -23,7 +23,8 @@ templ CommentList(comments []templates.CommentView, hxPost, csrfToken string, ca
 			}
 		</div>
 		if canComment {
-			<div class="border-t border-gray-200 pt-4 dark:border-gray-700">
+			<div class="space-y-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+				@ErrorRegion(CommentsErrorRegion)
 				@CommentForm(hxPost, csrfToken)
 			</div>
 		}
@@ -39,6 +40,7 @@ templ CommentsEmptyState() {
 templ CommentCreated(c templates.CommentView, csrfToken string) {
 	@CommentItem(c, csrfToken)
 	<div id="comments-empty" hx-swap-oob="innerHTML"></div>
+	@ClearedErrorRegion(CommentsErrorRegion)
 }
 
 // CommentsEmptied restores the empty state after the last comment is deleted.
@@ -79,13 +81,15 @@ templ CommentItem(c templates.CommentView, csrfToken string) {
 	</div>
 }
 
-// CommentForm renders a new comment form using htmx.
+// CommentForm renders a new comment form using htmx. See UploadForm for how
+// rejections are reported; the header guard matters more here, since resetting
+// on failure would discard whatever the user had typed.
 templ CommentForm(hxPost, csrfToken string) {
 	<form
 		hx-post={ hxPost }
 		hx-target="#comments"
 		hx-swap="beforeend"
-		hx-on::after-request="if (event.detail.successful) this.reset()"
+		hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Nexmap-Error')) this.reset()"
 		class="flex gap-3"
 	>
 		<input type="hidden" name="_csrf" value={ csrfToken }/>

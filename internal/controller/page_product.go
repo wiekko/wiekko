@@ -32,11 +32,15 @@ type PageProductController struct {
 	constraint *service.ConstraintService
 	comment    *service.CommentService
 	audit      *service.AuditService
+
+	// maxUploadBytes mirrors the router's cap so the upload form can state the
+	// limit and rejections can name it.
+	maxUploadBytes int64
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, comment *service.CommentService, audit *service.AuditService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, comment: comment, audit: audit}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, comment *service.CommentService, audit *service.AuditService, maxUploadBytes int64) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, comment: comment, audit: audit, maxUploadBytes: maxUploadBytes}
 }
 
 // CreateForm renders GET /products/new.
