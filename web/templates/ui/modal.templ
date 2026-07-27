@@ -56,7 +56,11 @@ templ ModalCancelButton(modalID string) {
 }
 
 // ConfirmDialog renders a confirmation modal with confirm/cancel buttons.
-templ ConfirmDialog(id, title, message, confirmLabel, confirmVariant, hxMethod, hxAction string) {
+//
+// The confirm button carries its own hx-headers: modal content is swapped into
+// #modal, which sits outside #app-shell, so it does not inherit the shell's
+// CSRF header.
+templ ConfirmDialog(id, title, message, confirmLabel, confirmVariant, hxMethod, hxAction, csrfToken string) {
 	@Modal(id, title, "sm") {
 		<p class="text-sm text-gray-500 dark:text-gray-400">{ message }</p>
 		<div class="mt-4 flex justify-end gap-3">
@@ -74,6 +78,9 @@ templ ConfirmDialog(id, title, message, confirmLabel, confirmVariant, hxMethod, 
 					hx-delete={ hxAction }
 				} else {
 					hx-post={ hxAction }
+				}
+				if csrfToken != "" {
+					hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }
 				}
 				hx-target={ "#" + id }
 				hx-swap="delete"

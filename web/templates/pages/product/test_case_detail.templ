@@ -290,8 +290,8 @@ templ TestCaseHistoryTabContent(entries []templates.AuditEntryView) {
 }
 
 // TestCaseDeleteConfirmation renders the delete confirmation for a test case.
-templ TestCaseDeleteConfirmation(name, productID, testCaseID string) {
-	@patterns.DeleteConfirmation("test case", name, fmt.Sprintf("/products/%s/test-cases/%s", productID, testCaseID))
+templ TestCaseDeleteConfirmation(name, productID, testCaseID, csrfToken string) {
+	@patterns.DeleteConfirmation("test case", name, fmt.Sprintf("/products/%s/test-cases/%s", productID, testCaseID), csrfToken)
 }
 
 func testCaseDetailTabs(productID, testCaseID string) []templates.TabDef {

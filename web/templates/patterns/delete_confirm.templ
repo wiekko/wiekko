@@ -3,11 +3,12 @@ package patterns
 import "nexmap.net/web/templates/ui"
 
 // DeleteTrigger renders a danger button that opens a confirmation modal.
+// hxDelete is the DELETE endpoint; /delete/confirm is appended for the modal.
 templ DeleteTrigger(hxDelete, csrfToken string) {
 	<button
 		type="button"
 		class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-		hx-get={ hxDelete + "/confirm" }
+		hx-get={ hxDelete + "/delete/confirm" }
 		hx-target="#modal"
 		hx-swap="innerHTML"
 	>
@@ -19,7 +20,7 @@ templ DeleteTrigger(hxDelete, csrfToken string) {
 // DeleteConfirmation renders the confirmation modal content for a delete action.
 // entityTitle is the user-visible name/title of the specific entity (may be empty
 // to fall back to generic copy).
-templ DeleteConfirmation(entityKind, entityTitle, hxDelete string) {
+templ DeleteConfirmation(entityKind, entityTitle, hxDelete, csrfToken string) {
 	@ui.ConfirmDialog(
 		"delete-confirm",
 		"Delete "+entityKind,
@@ -28,6 +29,7 @@ templ DeleteConfirmation(entityKind, entityTitle, hxDelete string) {
 		"danger",
 		"delete",
 		hxDelete,
+		csrfToken,
 	)
 }
 

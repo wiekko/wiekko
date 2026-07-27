@@ -735,8 +735,8 @@ templ DefectHistoryTabContent(entries []templates.AuditEntryView) {
 }
 
 // DefectDeleteConfirmation renders the delete confirmation for a defect.
-templ DefectDeleteConfirmation(name, productID, defectID string) {
-	@patterns.DeleteConfirmation("defect", name, fmt.Sprintf("/products/%s/defects/%s", productID, defectID))
+templ DefectDeleteConfirmation(name, productID, defectID, csrfToken string) {
+	@patterns.DeleteConfirmation("defect", name, fmt.Sprintf("/products/%s/defects/%s", productID, defectID), csrfToken)
 }
 
 func defectDetailTabs(productID, defectID string) []templates.TabDef {

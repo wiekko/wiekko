@@ -2,9 +2,16 @@ package ui
 
 // ToastContainer renders a fixed-position container for toast notifications.
 // Toasts are injected via htmx OOB swaps targeting this container.
+//
+// The trailing <template> holds an empty error toast that htmx-errors.js clones
+// to report failed requests, so client-side toasts stay markup-identical to the
+// server-rendered ones.
 templ ToastContainer() {
 	<div id="toast-container" class="pointer-events-none fixed right-0 top-0 z-50 flex flex-col items-end gap-2 p-4">
 	</div>
+	<template id="toast-error-template">
+		@Toast("", "error")
+	</template>
 }
 
 // Toast renders a single notification.

@@ -388,8 +388,8 @@ templ ComponentHistoryTabContent(entries []templates.AuditEntryView) {
 }
 
 // ComponentDeleteConfirmation renders the delete confirmation for a component.
-templ ComponentDeleteConfirmation(name, productID, componentID string) {
-	@patterns.DeleteConfirmation("component", name, fmt.Sprintf("/products/%s/components/%s", productID, componentID))
+templ ComponentDeleteConfirmation(name, productID, componentID, csrfToken string) {
+	@patterns.DeleteConfirmation("component", name, fmt.Sprintf("/products/%s/components/%s", productID, componentID), csrfToken)
 }
 
 func componentDetailTabs(productID, componentID string) []templates.TabDef {

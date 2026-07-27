@@ -548,8 +548,8 @@ templ CapabilityHistoryTabContent(entries []templates.AuditEntryView) {
 }
 
 // CapabilityDeleteConfirmation renders the delete confirmation for a capability.
-templ CapabilityDeleteConfirmation(name, productID, capabilityID string) {
-	@patterns.DeleteConfirmation("capability", name, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID))
+templ CapabilityDeleteConfirmation(name, productID, capabilityID, csrfToken string) {
+	@patterns.DeleteConfirmation("capability", name, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID), csrfToken)
 }
 
 func capabilityDetailTabs(productID, capabilityID string) []templates.TabDef {

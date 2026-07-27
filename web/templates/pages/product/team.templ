@@ -435,7 +435,7 @@ templ MemberRow(m TeamMemberView, productID string, isOwnerOrAdmin bool) {
 }
 
 // DeleteProductConfirmation renders the delete product confirmation modal content.
-templ DeleteProductConfirmation(productName, productID string) {
+templ DeleteProductConfirmation(productName, productID, csrfToken string) {
 	@ui.ConfirmDialog(
 		"delete-confirm",
 		"Delete Product",
@@ -444,6 +444,7 @@ templ DeleteProductConfirmation(productName, productID string) {
 		"danger",
 		"delete",
 		"/products/"+productID,
+		csrfToken,
 	)
 }
 

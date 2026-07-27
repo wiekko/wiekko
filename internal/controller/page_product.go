@@ -864,7 +864,7 @@ func (c *PageProductController) DeleteProductConfirm(w http.ResponseWriter, r *h
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DeleteProductConfirmation(p.Name, productID).Render(r.Context(), w)
+	_ = productpage.DeleteProductConfirmation(p.Name, productID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // --- helpers ---
@@ -1237,7 +1237,7 @@ func (c *PageProductController) MilestoneDeleteConfirm(w http.ResponseWriter, r 
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneDeleteConfirmation(m.Name, productID, milestoneID).Render(r.Context(), w)
+	_ = productpage.MilestoneDeleteConfirmation(m.Name, productID, milestoneID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // MilestoneOverviewTab renders GET /products/{id}/milestones/{milestoneId}/tabs/overview.
@@ -2469,7 +2469,7 @@ func (c *PageProductController) ComponentDeleteConfirm(w http.ResponseWriter, r 
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentDeleteConfirmation(comp.Name, productID, componentID).Render(r.Context(), w)
+	_ = productpage.ComponentDeleteConfirmation(comp.Name, productID, componentID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // ComponentOverviewTab renders GET /products/{id}/components/{componentId}/tabs/overview.
@@ -3252,7 +3252,7 @@ func (c *PageProductController) CapabilityDeleteConfirm(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CapabilityDeleteConfirmation(f.Name, productID, capabilityID).Render(r.Context(), w)
+	_ = productpage.CapabilityDeleteConfirmation(f.Name, productID, capabilityID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // CapabilityOverviewTab renders GET /products/{id}/capabilities/{capabilityId}/tabs/overview.
@@ -4414,7 +4414,7 @@ func (c *PageProductController) TestCaseDeleteConfirm(w http.ResponseWriter, r *
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseDeleteConfirmation(tc.Title, productID, testCaseID).Render(r.Context(), w)
+	_ = productpage.TestCaseDeleteConfirmation(tc.Title, productID, testCaseID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // TestCaseOverviewTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/overview.
@@ -5274,7 +5274,7 @@ func (c *PageProductController) RequirementDeleteConfirm(w http.ResponseWriter, 
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementDeleteConfirmation(req.Title, productID, requirementID).Render(r.Context(), w)
+	_ = productpage.RequirementDeleteConfirmation(req.Title, productID, requirementID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // RequirementOverviewTab renders GET /products/{id}/requirements/{requirementId}/tabs/overview.
@@ -6415,7 +6415,7 @@ func (c *PageProductController) DefectDeleteConfirm(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DefectDeleteConfirmation(d.Title, productID, defectID).Render(r.Context(), w)
+	_ = productpage.DefectDeleteConfirmation(d.Title, productID, defectID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // DefectOverviewTab renders GET /products/{id}/defects/{defectId}/tabs/overview.
@@ -7459,7 +7459,7 @@ func (c *PageProductController) ConstraintDeleteConfirm(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ConstraintDeleteConfirmation(con.Title, productID, constraintID).Render(r.Context(), w)
+	_ = productpage.ConstraintDeleteConfirmation(con.Title, productID, constraintID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
 }
 
 // ConstraintOverviewTab renders GET /products/{id}/constraints/{constraintId}/tabs/overview.
