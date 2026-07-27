@@ -656,3 +656,69 @@ func TestFailedMetadataWriteRemovesTheBlob(t *testing.T) {
 		t.Fatalf("orphan blob left behind: %v", blobs.files)
 	}
 }
+
+// The upload policy inspects real bytes, not the client-declared MIME type.
+func TestCreateAttachmentEnforcesTheUploadPolicy(t *testing.T) {
+	zipMagic := string([]byte{'P', 'K', 0x03, 0x04, 0, 0, 0, 0})
+
+	newSvc := func(blobs *memBlobStore) *CommentService {
+		svc := newCommentServiceWithBlobs(nil,
+			&testutil.MockAttachmentStore{
+				CreateFunc: func(_ context.Context, _ *model.Attachment) error { return nil },
+			},
+			noopAudit(), ownerRoles(), blobs,
+		)
+		svc.policy = storage.NewPolicy("images,logs")
+		return svc
+	}
+
+	t.Run("rejects a disallowed extension", func(t *testing.T) {
+		blobs := memBlobs()
+		_, err := newSvc(blobs).CreateAttachment(context.Background(), testutil.MakeUser(), "product-001", CreateAttachmentInput{
+			OwnerType: model.OwnerTypeDefect, OwnerID: "defect-001",
+			Filename: "payload.zip", Content: strings.NewReader(zipMagic),
+		})
+		if !errors.Is(err, storage.ErrTypeNotAllowed) {
+			t.Fatalf("err = %v, want ErrTypeNotAllowed", err)
+		}
+		if len(blobs.files) != 0 {
+			t.Fatal("a rejected upload was written to storage")
+		}
+	})
+
+	t.Run("rejects a lying content type", func(t *testing.T) {
+		blobs := memBlobs()
+		// Client claims text/plain; the bytes are a zip.
+		_, err := newSvc(blobs).CreateAttachment(context.Background(), testutil.MakeUser(), "product-001", CreateAttachmentInput{
+			OwnerType: model.OwnerTypeDefect, OwnerID: "defect-001",
+			Filename: "notes.log", ContentType: "text/plain", Content: strings.NewReader(zipMagic),
+		})
+		if !errors.Is(err, storage.ErrTypeNotAllowed) {
+			t.Fatalf("err = %v, want ErrTypeNotAllowed", err)
+		}
+		if len(blobs.files) != 0 {
+			t.Fatal("a rejected upload was written to storage")
+		}
+	})
+
+	t.Run("accepts an allowed file and stores every byte", func(t *testing.T) {
+		blobs := memBlobs()
+		// Longer than the 512-byte sniff window, so the peeked prefix must be
+		// stitched back onto the rest of the stream.
+		body := strings.Repeat("log line\n", 200)
+		created, err := newSvc(blobs).CreateAttachment(context.Background(), testutil.MakeUser(), "product-001", CreateAttachmentInput{
+			OwnerType: model.OwnerTypeDefect, OwnerID: "defect-001",
+			Filename: "app.log", Content: strings.NewReader(body),
+		})
+		if err != nil {
+			t.Fatalf("CreateAttachment: %v", err)
+		}
+		if created.Size != int64(len(body)) {
+			t.Fatalf("Size = %d, want %d — the sniff prefix was lost", created.Size, len(body))
+		}
+		stored := string(blobs.files[created.StoragePath])
+		if stored != body {
+			t.Fatalf("stored content differs from the upload (len %d vs %d)", len(stored), len(body))
+		}
+	})
+}

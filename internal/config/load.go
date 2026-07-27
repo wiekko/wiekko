@@ -34,6 +34,7 @@ func defaults() *Config {
 		DevMode:          DefaultDevMode,
 		UploadDir:        DefaultUploadDir,
 		MaxUploadBytes:   DefaultMaxUploadBytes,
+		AllowedUploads:   DefaultAllowedUploads,
 	}
 }
 
@@ -89,6 +90,9 @@ func applyEnv(cfg *Config) {
 			cfg.MaxUploadBytes = n
 		}
 	}
+	if v := os.Getenv("NEXMAP_ALLOWED_UPLOAD_TYPES"); v != "" {
+		cfg.AllowedUploads = v
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -106,6 +110,7 @@ func applyFlags(cfg *Config, args []string) error {
 	cookieSecure := fs.String("cookie-secure", "", "")
 	uploadDir := fs.String("upload-dir", "", "")
 	maxUpload := fs.String("max-upload-bytes", "", "")
+	allowedUploads := fs.String("allowed-upload-types", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("config: flags: %w", err)
@@ -141,6 +146,8 @@ func applyFlags(cfg *Config, args []string) error {
 			if n, err := strconv.ParseInt(*maxUpload, 10, 64); err == nil && n > 0 {
 				cfg.MaxUploadBytes = n
 			}
+		case "allowed-upload-types":
+			cfg.AllowedUploads = *allowedUploads
 		}
 	})
 

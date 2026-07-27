@@ -110,6 +110,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			attachments: st.Attachment,
 			audit:       st.Audit,
 			blobs:       blobs,
+			policy:      storage.NewPolicy(cfg.AllowedUploads),
 			authz:       authz,
 		},
 		Audit: &AuditService{

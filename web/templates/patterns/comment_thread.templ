@@ -12,9 +12,11 @@ import (
 // break the very first comment posted on an entity.
 templ CommentList(comments []templates.CommentView, hxPost, csrfToken string, canComment bool) {
 	<div class="space-y-4">
-		if len(comments) == 0 {
-			@ui.EmptyState("message-circle", "No comments yet", "Start the conversation by adding a comment.", "", "")
-		}
+		<div id="comments-empty">
+			if len(comments) == 0 {
+				@CommentsEmptyState()
+			}
+		</div>
 		<div id="comments" class="space-y-4">
 			for _, c := range comments {
 				@CommentItem(c, csrfToken)
@@ -25,6 +27,24 @@ templ CommentList(comments []templates.CommentView, hxPost, csrfToken string, ca
 				@CommentForm(hxPost, csrfToken)
 			</div>
 		}
+	</div>
+}
+
+templ CommentsEmptyState() {
+	@ui.EmptyState("message-circle", "No comments yet", "Start the conversation by adding a comment.", "", "")
+}
+
+// CommentCreated is the response to a new comment: the rendered comment plus an
+// out-of-band clear of the empty state.
+templ CommentCreated(c templates.CommentView, csrfToken string) {
+	@CommentItem(c, csrfToken)
+	<div id="comments-empty" hx-swap-oob="innerHTML"></div>
+}
+
+// CommentsEmptied restores the empty state after the last comment is deleted.
+templ CommentsEmptied() {
+	<div id="comments-empty" hx-swap-oob="innerHTML">
+		@CommentsEmptyState()
 	</div>
 }
 

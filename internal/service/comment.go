@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ type CommentService struct {
 	attachments store.AttachmentStore
 	audit       store.AuditStore
 	blobs       storage.Store
+	policy      storage.Policy
 	authz       *Authorizer
 }
 
@@ -189,8 +191,24 @@ func (s *CommentService) CreateAttachment(ctx context.Context, user *model.User,
 		return nil, errors.New("file content is required")
 	}
 
+	// Peek the leading bytes so the type policy can inspect real content
+	// rather than the client-declared MIME type, then hand the whole stream
+	// (peeked bytes first) to storage.
+	head := make([]byte, storage.SniffLen)
+	n, err := io.ReadFull(input.Content, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, fmt.Errorf("read upload: %w", err)
+	}
+	head = head[:n]
+
+	if err := s.policy.Check(input.Filename, head); err != nil {
+		return nil, err
+	}
+
+	content := io.MultiReader(bytes.NewReader(head), input.Content)
+
 	id := uuid.New().String()
-	path, size, err := s.blobs.Save(ctx, productID, id, input.Content)
+	path, size, err := s.blobs.Save(ctx, productID, id, content)
 	if err != nil {
 		return nil, err
 	}

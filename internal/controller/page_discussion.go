@@ -62,9 +62,10 @@ func (c *PageProductController) commentCreate(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// The form swaps with hx-swap="beforeend", so return exactly one item.
+	// The form swaps with hx-swap="beforeend", so return exactly one item —
+	// plus an out-of-band clear of the empty state.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = patterns.CommentItem(
+	_ = patterns.CommentCreated(
 		c.commentView(created, user, c.displayNames(r, user), productID, ownerType, ownerID, true),
 		middleware.CSRFTokenFromContext(r.Context()),
 	).Render(r.Context(), w)
@@ -79,8 +80,13 @@ func (c *PageProductController) commentDelete(w http.ResponseWriter, r *http.Req
 		writePageServiceError(w, err)
 		return
 	}
-	// hx-swap="outerHTML" against an empty body removes the row.
-	w.WriteHeader(http.StatusOK)
+
+	// hx-swap="outerHTML" against an empty body removes the row. If that was
+	// the last one, bring the empty state back out of band.
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if remaining, err := c.comment.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
+		_ = patterns.CommentsEmptied().Render(r.Context(), w)
+	}
 }
 
 // buildCommentViews resolves author display names and per-comment permissions.
@@ -174,7 +180,7 @@ func (c *PageProductController) attachmentCreate(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = patterns.AttachmentItem(
+	_ = patterns.AttachmentCreated(
 		attachmentView(created, productID, ownerType, ownerID, true),
 		middleware.CSRFTokenFromContext(r.Context()),
 	).Render(r.Context(), w)
@@ -189,7 +195,11 @@ func (c *PageProductController) attachmentDelete(w http.ResponseWriter, r *http.
 		writePageServiceError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if remaining, err := c.comment.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
+		_ = patterns.AttachmentsEmptied().Render(r.Context(), w)
+	}
 }
 
 // AttachmentDownload streams an attachment. It needs no owner type: the
@@ -236,6 +246,7 @@ func attachmentView(a *model.Attachment, productID, ownerType, ownerID string, c
 		Filename:    a.Filename,
 		ContentType: a.ContentType,
 		Size:        humanizeBytes(a.Size),
+		CreatedAt:   formatTimestamp(a.CreatedAt),
 		DownloadURL: base + "/" + a.ID + "/download",
 	}
 	if canDelete {
@@ -339,6 +350,9 @@ func writePageServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "not found", http.StatusNotFound)
 	case errors.Is(err, storage.ErrTooLarge):
 		http.Error(w, "file exceeds the maximum upload size", http.StatusRequestEntityTooLarge)
+	case errors.Is(err, storage.ErrTypeNotAllowed):
+		// The message carries the allow-list, so surface it verbatim.
+		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 	default:
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 	}

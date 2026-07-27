@@ -15,6 +15,7 @@ const (
 	DefaultDevMode          = false
 	DefaultUploadDir        = "./uploads"
 	DefaultMaxUploadBytes   = 10 << 20 // 10 MiB
+	DefaultAllowedUploads   = ""       // empty = every file type is accepted
 )
 
 type Config struct {
@@ -33,4 +34,5 @@ type Config struct {
 	InitialAdminPass string
 	UploadDir        string
 	MaxUploadBytes   int64
+	AllowedUploads   string
 }

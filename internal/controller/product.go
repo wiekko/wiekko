@@ -8,6 +8,7 @@ import (
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
+	"nexmap.net/internal/storage"
 )
 
 // ProductController handles product CRUD and member management endpoints.
@@ -224,8 +225,16 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		httputil.Error(w, http.StatusForbidden, "FORBIDDEN", err.Error())
 		return
 	}
-	if errors.Is(err, service.ErrNotFound) {
+	if errors.Is(err, service.ErrNotFound) || errors.Is(err, storage.ErrNotFound) {
 		httputil.Error(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+		return
+	}
+	if errors.Is(err, storage.ErrTooLarge) {
+		httputil.Error(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", err.Error())
+		return
+	}
+	if errors.Is(err, storage.ErrTypeNotAllowed) {
+		httputil.Error(w, http.StatusUnsupportedMediaType, "FILE_TYPE_NOT_ALLOWED", err.Error())
 		return
 	}
 	httputil.Error(w, http.StatusBadRequest, "REQUEST_FAILED", err.Error())

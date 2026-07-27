@@ -1,6 +1,8 @@
 // Package templates provides templ UI components for the Nexmap frontend.
 package templates
 
+import "strings"
+
 // SelectOption represents a <select> option.
 type SelectOption struct {
 	Value    string
@@ -45,8 +47,26 @@ type AttachmentView struct {
 	Filename    string
 	ContentType string
 	Size        string
+	CreatedAt   string // already formatted for display
 	DownloadURL string
 	DeleteURL   string // empty when the viewer may not delete it
+}
+
+// Meta renders the secondary line under an attachment's filename, upload date
+// first. Empty parts are skipped so a missing content type doesn't leave a
+// dangling separator.
+func (a AttachmentView) Meta() string {
+	parts := make([]string, 0, 3)
+	if a.CreatedAt != "" {
+		parts = append(parts, a.CreatedAt)
+	}
+	if a.ContentType != "" {
+		parts = append(parts, a.ContentType)
+	}
+	if a.Size != "" {
+		parts = append(parts, a.Size)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // AssigneeView is a display-ready assignee.

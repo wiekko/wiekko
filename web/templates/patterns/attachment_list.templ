@@ -9,14 +9,18 @@ import (
 
 // AttachmentList renders attachments with download, delete and upload actions.
 //
-// The #attachments wrapper is rendered unconditionally so UploadForm's
-// hx-swap="beforeend" has a target even before the first upload.
+// Both #attachments and #attachments-empty are rendered unconditionally.
+// UploadForm swaps into the former with hx-swap="beforeend"; the latter is an
+// out-of-band target so creating the first attachment (or deleting the last)
+// can toggle the empty state without a page reload.
 templ AttachmentList(attachments []templates.AttachmentView, hxPost, csrfToken string, canUpload bool) {
 	<div class="space-y-4">
-		if len(attachments) == 0 {
-			@ui.EmptyState("paperclip", "No attachments", "Upload files to attach them to this item.", "", "")
-		}
-		<ul id="attachments" class={ attachmentListClass(len(attachments)) }>
+		<div id="attachments-empty">
+			if len(attachments) == 0 {
+				@AttachmentsEmptyState()
+			}
+		</div>
+		<ul id="attachments" class="space-y-2">
 			for _, a := range attachments {
 				@AttachmentItem(a, csrfToken)
 			}
@@ -27,10 +31,20 @@ templ AttachmentList(attachments []templates.AttachmentView, hxPost, csrfToken s
 	</div>
 }
 
+templ AttachmentsEmptyState() {
+	@ui.EmptyState("paperclip", "No attachments", "Upload files to attach them to this item.", "", "")
+}
+
 // AttachmentItem renders a single attachment row. Exported because a successful
 // upload returns exactly one of these as the htmx swap payload.
+//
+// The border lives on the row rather than the list so an empty list renders as
+// nothing at all — no server-side class juggling as the list fills or empties.
 templ AttachmentItem(a templates.AttachmentView, csrfToken string) {
-	<li class="flex items-center justify-between px-4 py-3" id={ "attachment-" + a.ID }>
+	<li
+		class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700"
+		id={ "attachment-" + a.ID }
+	>
 		<div class="flex items-center gap-3">
 			<div class="text-gray-400 dark:text-gray-500">
 				@ui.Icon("paperclip", "md")
@@ -39,7 +53,7 @@ templ AttachmentItem(a templates.AttachmentView, csrfToken string) {
 				<a href={ templ.SafeURL(a.DownloadURL) } class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
 					{ a.Filename }
 				</a>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{ a.ContentType } · { a.Size }</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{ a.Meta() }</p>
 			</div>
 		</div>
 		if a.DeleteURL != "" {
@@ -57,6 +71,21 @@ templ AttachmentItem(a templates.AttachmentView, csrfToken string) {
 			</button>
 		}
 	</li>
+}
+
+// AttachmentCreated is the response to a successful upload: the new row plus an
+// out-of-band clear of the empty state.
+templ AttachmentCreated(a templates.AttachmentView, csrfToken string) {
+	@AttachmentItem(a, csrfToken)
+	<div id="attachments-empty" hx-swap-oob="innerHTML"></div>
+}
+
+// AttachmentsEmptied restores the empty state after the last row is deleted.
+// The primary target receives nothing, which removes the deleted row.
+templ AttachmentsEmptied() {
+	<div id="attachments-empty" hx-swap-oob="innerHTML">
+		@AttachmentsEmptyState()
+	</div>
 }
 
 // UploadForm renders a file upload form using htmx multipart encoding.
@@ -83,15 +112,6 @@ templ UploadForm(hxPost, csrfToken string) {
 			Type:    "submit",
 		})
 	</form>
-}
-
-// attachmentListClass drops the border when the list is empty, so the always
-// present wrapper doesn't render as a stray empty box.
-func attachmentListClass(count int) string {
-	if count == 0 {
-		return ""
-	}
-	return "divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700"
 }
 
 // csrfVals renders the CSRF token as hx-vals JSON, so htmx-issued requests
