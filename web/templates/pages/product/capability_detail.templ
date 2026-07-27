@@ -61,6 +61,12 @@ templ CapabilityDetailPage(props CapabilityDetailProps) {
 			@ui.TabPanelHidden("defects") {
 				@ui.LoadingSpinner("md")
 			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
 			@ui.TabPanelHidden("history") {
 				@ui.LoadingSpinner("md")
 			}
@@ -553,6 +559,8 @@ func capabilityDetailTabs(productID, capabilityID string) []templates.TabDef {
 		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},
 	}
 }

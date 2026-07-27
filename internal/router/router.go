@@ -9,11 +9,11 @@ import (
 )
 
 // New creates the top-level HTTP handler with all routes and middleware applied.
-func New(svc *service.Services, cookieSecure, devMode bool) http.Handler {
+func New(svc *service.Services, cookieSecure, devMode bool, maxUploadBytes int64) http.Handler {
 	mux := http.NewServeMux()
 
 	mountStatic(mux)
-	mountPages(mux, svc, cookieSecure)
+	mountPages(mux, svc, cookieSecure, maxUploadBytes)
 	mountAPIv1(mux, svc, cookieSecure)
 
 	if devMode {

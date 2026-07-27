@@ -333,7 +333,8 @@ func MakeComment(overrides ...func(*model.Comment)) *model.Comment {
 	now := time.Now().UTC().Format(time.RFC3339)
 	c := &model.Comment{
 		ID:        "comment-001",
-		OwnerType: "requirement",
+		ProductID: "product-001",
+		OwnerType: model.OwnerTypeRequirement,
 		OwnerID:   "req-001",
 		UserID:    "user-001",
 		Body:      "Test comment",
@@ -351,13 +352,14 @@ func MakeAttachment(overrides ...func(*model.Attachment)) *model.Attachment {
 	now := time.Now().UTC().Format(time.RFC3339)
 	a := &model.Attachment{
 		ID:          "attachment-001",
-		OwnerType:   "requirement",
+		ProductID:   "product-001",
+		OwnerType:   model.OwnerTypeRequirement,
 		OwnerID:     "req-001",
 		UserID:      "user-001",
 		Filename:    "test.pdf",
 		ContentType: "application/pdf",
 		Size:        1024,
-		StoragePath: "/tmp/test.pdf",
+		StoragePath: "product-001/attachment-001",
 		CreatedAt:   now,
 	}
 	for _, fn := range overrides {

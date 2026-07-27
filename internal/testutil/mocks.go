@@ -651,7 +651,7 @@ type MockCommentStore struct {
 	GetByIDFunc     func(ctx context.Context, id string) (*model.Comment, error)
 	UpdateFunc      func(ctx context.Context, c *model.Comment) error
 	DeleteFunc      func(ctx context.Context, id string) error
-	ListByOwnerFunc func(ctx context.Context, ownerType, ownerID string) ([]*model.Comment, error)
+	ListByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error)
 }
 
 func (m *MockCommentStore) Create(ctx context.Context, c *model.Comment) error {
@@ -666,8 +666,8 @@ func (m *MockCommentStore) Update(ctx context.Context, c *model.Comment) error {
 func (m *MockCommentStore) Delete(ctx context.Context, id string) error {
 	return m.DeleteFunc(ctx, id)
 }
-func (m *MockCommentStore) ListByOwner(ctx context.Context, ownerType, ownerID string) ([]*model.Comment, error) {
-	return m.ListByOwnerFunc(ctx, ownerType, ownerID)
+func (m *MockCommentStore) ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error) {
+	return m.ListByOwnerFunc(ctx, productID, ownerType, ownerID)
 }
 
 // MockAttachmentStore implements store.AttachmentStore with configurable function fields.
@@ -675,7 +675,7 @@ type MockAttachmentStore struct {
 	CreateFunc      func(ctx context.Context, a *model.Attachment) error
 	GetByIDFunc     func(ctx context.Context, id string) (*model.Attachment, error)
 	DeleteFunc      func(ctx context.Context, id string) error
-	ListByOwnerFunc func(ctx context.Context, ownerType, ownerID string) ([]*model.Attachment, error)
+	ListByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error)
 }
 
 func (m *MockAttachmentStore) Create(ctx context.Context, a *model.Attachment) error {
@@ -687,8 +687,8 @@ func (m *MockAttachmentStore) GetByID(ctx context.Context, id string) (*model.At
 func (m *MockAttachmentStore) Delete(ctx context.Context, id string) error {
 	return m.DeleteFunc(ctx, id)
 }
-func (m *MockAttachmentStore) ListByOwner(ctx context.Context, ownerType, ownerID string) ([]*model.Attachment, error) {
-	return m.ListByOwnerFunc(ctx, ownerType, ownerID)
+func (m *MockAttachmentStore) ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error) {
+	return m.ListByOwnerFunc(ctx, productID, ownerType, ownerID)
 }
 
 // MockTestCaseStore implements store.TestCaseStore with configurable function fields.

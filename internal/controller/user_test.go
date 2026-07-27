@@ -13,7 +13,7 @@ import (
 )
 
 func TestGetMe(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	ctrl := controller.NewUser(env.Services.User)
 
 	user := testutil.MakeUser(func(u *model.User) { u.Username = "alice" })
@@ -39,7 +39,7 @@ func TestGetMe(t *testing.T) {
 }
 
 func TestUpdateMe(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	user := testutil.MakeUser()
 	env.Users.GetByIDFunc = func(_ context.Context, _ string) (*model.User, error) {
 		u := *user
@@ -58,7 +58,7 @@ func TestUpdateMe(t *testing.T) {
 
 func TestChangePassword(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		user := testutil.MakeUser()
 		env.Users.GetByIDFunc = func(_ context.Context, _ string) (*model.User, error) { return user, nil }
 		env.Users.UpdatePasswordFunc = func(_ context.Context, _, _ string) error { return nil }
@@ -74,7 +74,7 @@ func TestChangePassword(t *testing.T) {
 	})
 
 	t.Run("missing fields", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewUser(env.Services.User)
 		user := testutil.MakeUser()
 		w, r := authedRequest(http.MethodPost, "/user/me/password", `{"old_password":"old"}`, user)
@@ -87,7 +87,7 @@ func TestChangePassword(t *testing.T) {
 }
 
 func TestRequestDeletion(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	user := testutil.MakeUser()
 	env.Users.DeleteFunc = func(_ context.Context, _ string) error { return nil }
 	// moderation disabled (default), so immediate delete.
@@ -102,7 +102,7 @@ func TestRequestDeletion(t *testing.T) {
 }
 
 func TestRequestDeletion_Error(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	user := testutil.MakeUser()
 	env.Users.DeleteFunc = func(_ context.Context, _ string) error { return errors.New("db error") }
 

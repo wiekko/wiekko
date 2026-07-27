@@ -12,7 +12,7 @@ import (
 
 func TestInvitationCreate(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		env.Invitations.CreateFunc = func(_ context.Context, _ *model.Invitation) error { return nil }
 
 		ctrl := controller.NewInvitation(env.Services.Invitation)
@@ -27,7 +27,7 @@ func TestInvitationCreate(t *testing.T) {
 	})
 
 	t.Run("missing email", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewInvitation(env.Services.Invitation)
 		admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
 		w, r := authedRequest(http.MethodPost, "/admin/invitations", `{}`, admin)
@@ -40,7 +40,7 @@ func TestInvitationCreate(t *testing.T) {
 }
 
 func TestInvitationList(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Invitations.ListFunc = func(_ context.Context) ([]*model.Invitation, error) {
 		return []*model.Invitation{testutil.MakeInvitation()}, nil
 	}
@@ -56,7 +56,7 @@ func TestInvitationList(t *testing.T) {
 }
 
 func TestInvitationDelete(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Invitations.DeleteFunc = func(_ context.Context, _ string) error { return nil }
 
 	ctrl := controller.NewInvitation(env.Services.Invitation)

@@ -30,12 +30,13 @@ type PageProductController struct {
 	backlog    *service.BacklogService
 	category   *service.CategoryService
 	constraint *service.ConstraintService
+	comment    *service.CommentService
 	audit      *service.AuditService
 }
 
 // NewPageProduct creates a PageProductController.
-func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, audit *service.AuditService) *PageProductController {
-	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, audit: audit}
+func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, comment *service.CommentService, audit *service.AuditService) *PageProductController {
+	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, comment: comment, audit: audit}
 }
 
 // CreateForm renders GET /products/new.
@@ -2932,18 +2933,6 @@ func (c *PageProductController) writeComponentTestCasesTabOOB(w http.ResponseWri
 	c.writeTabOOB(w, r, "test-cases", productpage.ComponentTestCasesTabContent(props))
 }
 
-// ComponentCommentsTab renders GET /products/{id}/components/{componentId}/tabs/comments.
-func (c *PageProductController) ComponentCommentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentCommentsTabContent().Render(r.Context(), w)
-}
-
-// ComponentAttachmentsTab renders GET /products/{id}/components/{componentId}/tabs/attachments.
-func (c *PageProductController) ComponentAttachmentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentAttachmentsTabContent().Render(r.Context(), w)
-}
-
 // ComponentHistoryTab renders GET /products/{id}/components/{componentId}/tabs/history.
 func (c *PageProductController) ComponentHistoryTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -4719,18 +4708,6 @@ func (c *PageProductController) TestCaseCampaignsTab(w http.ResponseWriter, r *h
 	_ = productpage.TestCaseCampaignsTabContent().Render(r.Context(), w)
 }
 
-// TestCaseCommentsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/comments.
-func (c *PageProductController) TestCaseCommentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseCommentsTabContent().Render(r.Context(), w)
-}
-
-// TestCaseAttachmentsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/attachments.
-func (c *PageProductController) TestCaseAttachmentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseAttachmentsTabContent().Render(r.Context(), w)
-}
-
 // TestCaseHistoryTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/history.
 func (c *PageProductController) TestCaseHistoryTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -6104,18 +6081,6 @@ func (c *PageProductController) canRemoveDefectLinksForRole(user *model.User, ro
 	return user.IsAdmin || role == model.RoleOwner || role == model.RoleDeveloper
 }
 
-// RequirementCommentsTab renders GET /products/{id}/requirements/{requirementId}/tabs/comments.
-func (c *PageProductController) RequirementCommentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementCommentsTabContent().Render(r.Context(), w)
-}
-
-// RequirementAttachmentsTab renders GET /products/{id}/requirements/{requirementId}/tabs/attachments.
-func (c *PageProductController) RequirementAttachmentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementAttachmentsTabContent().Render(r.Context(), w)
-}
-
 // RequirementHistoryTab renders GET /products/{id}/requirements/{requirementId}/tabs/history.
 func (c *PageProductController) RequirementHistoryTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -7171,18 +7136,6 @@ func (c *PageProductController) defectLinkedTargetIDs(r *http.Request, user *mod
 	return set
 }
 
-// DefectCommentsTab renders GET /products/{id}/defects/{defectId}/tabs/comments.
-func (c *PageProductController) DefectCommentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DefectCommentsTabContent().Render(r.Context(), w)
-}
-
-// DefectAttachmentsTab renders GET /products/{id}/defects/{defectId}/tabs/attachments.
-func (c *PageProductController) DefectAttachmentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DefectAttachmentsTabContent().Render(r.Context(), w)
-}
-
 // DefectHistoryTab renders GET /products/{id}/defects/{defectId}/tabs/history.
 func (c *PageProductController) DefectHistoryTab(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -7761,18 +7714,6 @@ func (c *PageProductController) writeConstraintCapabilitiesTabOOB(w http.Respons
 		return
 	}
 	c.writeTabOOB(w, r, "capabilities", productpage.ConstraintCapabilitiesTabContent(props))
-}
-
-// ConstraintCommentsTab renders GET /products/{id}/constraints/{constraintId}/tabs/comments.
-func (c *PageProductController) ConstraintCommentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ConstraintCommentsTabContent().Render(r.Context(), w)
-}
-
-// ConstraintAttachmentsTab renders GET /products/{id}/constraints/{constraintId}/tabs/attachments.
-func (c *PageProductController) ConstraintAttachmentsTab(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ConstraintAttachmentsTabContent().Render(r.Context(), w)
 }
 
 // ConstraintHistoryTab renders GET /products/{id}/constraints/{constraintId}/tabs/history.

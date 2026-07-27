@@ -16,7 +16,7 @@ import (
 
 func TestAuthLogin(t *testing.T) {
 	t.Run("valid credentials", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		user := testutil.MakeUser()
 		env.Provider.AuthenticateFunc = func(_ context.Context, _, _ string) (*auth.Identity, error) {
 			return &auth.Identity{UserID: user.ID}, nil
@@ -63,7 +63,7 @@ func TestAuthLogin(t *testing.T) {
 	})
 
 	t.Run("missing fields", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"username":"test"}`))
@@ -75,7 +75,7 @@ func TestAuthLogin(t *testing.T) {
 	})
 
 	t.Run("wrong credentials", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		env.Provider.AuthenticateFunc = func(_ context.Context, _, _ string) (*auth.Identity, error) {
 			return nil, http.ErrAbortHandler
 		}
@@ -92,7 +92,7 @@ func TestAuthLogin(t *testing.T) {
 
 func TestAuthLogout(t *testing.T) {
 	t.Run("with cookie", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		env.Sessions.DeleteFunc = func(_ context.Context, _ string) error { return nil }
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 
@@ -114,7 +114,7 @@ func TestAuthLogout(t *testing.T) {
 	})
 
 	t.Run("no cookie", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 		w := httptest.NewRecorder()
 		ctrl.Logout(w, httptest.NewRequest(http.MethodPost, "/auth/logout", nil))
@@ -127,7 +127,7 @@ func TestAuthLogout(t *testing.T) {
 
 func TestAuthRegister(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		env.Settings.GetFunc = func(_ context.Context, key string) (string, error) {
 			if key == "self_registration_enabled" {
 				return "true", nil
@@ -148,7 +148,7 @@ func TestAuthRegister(t *testing.T) {
 	})
 
 	t.Run("missing fields", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/auth/register", strings.NewReader(`{"username":"alice"}`))
@@ -162,7 +162,7 @@ func TestAuthRegister(t *testing.T) {
 
 func TestAuthAcceptInvite(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		inv := testutil.MakeInvitation()
 		env.Invitations.GetByTokenHashFunc = func(_ context.Context, _ string) (*model.Invitation, error) {
 			return inv, nil
@@ -182,7 +182,7 @@ func TestAuthAcceptInvite(t *testing.T) {
 	})
 
 	t.Run("missing fields", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/auth/accept-invite", strings.NewReader(`{"token":"tok"}`))

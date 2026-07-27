@@ -14,7 +14,7 @@ import (
 )
 
 func TestAdminListUsers(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	users := []*model.User{testutil.MakeUser()}
 	env.Users.ListFunc = func(_ context.Context, _ store.UserFilter) ([]*model.User, error) {
 		return users, nil
@@ -31,7 +31,7 @@ func TestAdminListUsers(t *testing.T) {
 
 func TestAdminGetUser(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		user := testutil.MakeUser()
 		env.Users.GetByIDFunc = func(_ context.Context, _ string) (*model.User, error) { return user, nil }
 
@@ -46,7 +46,7 @@ func TestAdminGetUser(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		env.Users.GetByIDFunc = func(_ context.Context, _ string) (*model.User, error) {
 			return nil, errors.New("not found")
 		}
@@ -63,7 +63,7 @@ func TestAdminGetUser(t *testing.T) {
 }
 
 func TestAdminLockUser(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Users.UpdateStatusFunc = func(_ context.Context, _, _ string) error { return nil }
 
 	ctrl := controller.NewAdmin(env.Services.User, env.Services.Setting)
@@ -77,7 +77,7 @@ func TestAdminLockUser(t *testing.T) {
 }
 
 func TestAdminUnlockUser(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Users.UpdateStatusFunc = func(_ context.Context, _, _ string) error { return nil }
 
 	ctrl := controller.NewAdmin(env.Services.User, env.Services.Setting)
@@ -92,7 +92,7 @@ func TestAdminUnlockUser(t *testing.T) {
 
 func TestAdminSetPassword(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		env.Users.UpdatePasswordFunc = func(_ context.Context, _, _ string) error { return nil }
 
 		ctrl := controller.NewAdmin(env.Services.User, env.Services.Setting)
@@ -107,7 +107,7 @@ func TestAdminSetPassword(t *testing.T) {
 	})
 
 	t.Run("missing password", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		ctrl := controller.NewAdmin(env.Services.User, env.Services.Setting)
 		admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
 		w, r := authedRequest(http.MethodPost, "/admin/users/u1/password", `{}`, admin)
@@ -121,7 +121,7 @@ func TestAdminSetPassword(t *testing.T) {
 }
 
 func TestAdminApproveUser(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Users.GetByIDFunc = func(_ context.Context, _ string) (*model.User, error) {
 		return testutil.MakeUser(func(u *model.User) { u.Status = model.UserStatusPendingApproval }), nil
 	}
@@ -139,7 +139,7 @@ func TestAdminApproveUser(t *testing.T) {
 }
 
 func TestAdminDeleteUser(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Users.DeleteFunc = func(_ context.Context, _ string) error { return nil }
 
 	ctrl := controller.NewAdmin(env.Services.User, env.Services.Setting)
@@ -154,7 +154,7 @@ func TestAdminDeleteUser(t *testing.T) {
 }
 
 func TestAdminGetSettings(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Settings.GetAllFunc = func(_ context.Context) (map[string]string, error) {
 		return map[string]string{"moderation_enabled": "true"}, nil
 	}
@@ -181,7 +181,7 @@ func TestAdminGetSettings(t *testing.T) {
 }
 
 func TestAdminUpdateSettings(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	env.Settings.SetFunc = func(_ context.Context, _, _ string) error { return nil }
 	env.Settings.GetAllFunc = func(_ context.Context) (map[string]string, error) {
 		return map[string]string{"moderation_enabled": "false"}, nil

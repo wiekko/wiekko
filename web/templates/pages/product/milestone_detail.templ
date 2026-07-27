@@ -70,6 +70,12 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 			@ui.TabPanelHidden("sprints") {
 				@ui.LoadingSpinner("md")
 			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
 			@ui.TabPanelHidden("history") {
 				@ui.LoadingSpinner("md")
 			}
@@ -970,6 +976,8 @@ func milestoneDetailTabs(productID, milestoneID string) []templates.TabDef {
 		{ID: "constraints", Label: "Constraints", HxGet: base + "/constraints"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
 		{ID: "sprints", Label: "Sprints", HxGet: base + "/sprints"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},
 	}
 }

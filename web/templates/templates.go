@@ -32,9 +32,21 @@ type PageMeta struct {
 type CommentView struct {
 	ID         string
 	AuthorName string
-	Body       string
+	Body       string // Markdown; rendered by the template
 	CreatedAt  string
-	IsOwner    bool // whether the current user authored this comment
+	IsOwner    bool   // whether the current user authored this comment
+	CanDelete  bool   // author, product owner or admin
+	DeleteURL  string // empty when CanDelete is false
+}
+
+// AttachmentView is a display-ready attachment with a humanized size.
+type AttachmentView struct {
+	ID          string
+	Filename    string
+	ContentType string
+	Size        string
+	DownloadURL string
+	DeleteURL   string // empty when the viewer may not delete it
 }
 
 // AssigneeView is a display-ready assignee.

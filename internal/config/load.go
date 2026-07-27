@@ -32,6 +32,8 @@ func defaults() *Config {
 		PBKDF2Iterations: DefaultPBKDF2Iterations,
 		CookieSecure:     DefaultCookieSecure,
 		DevMode:          DefaultDevMode,
+		UploadDir:        DefaultUploadDir,
+		MaxUploadBytes:   DefaultMaxUploadBytes,
 	}
 }
 
@@ -79,6 +81,14 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_ADMIN_PASSWORD"); v != "" {
 		cfg.InitialAdminPass = v
 	}
+	if v := os.Getenv("NEXMAP_UPLOAD_DIR"); v != "" {
+		cfg.UploadDir = v
+	}
+	if v := os.Getenv("NEXMAP_MAX_UPLOAD_BYTES"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			cfg.MaxUploadBytes = n
+		}
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -94,6 +104,8 @@ func applyFlags(cfg *Config, args []string) error {
 	sessionTTL := fs.String("session-ttl", "", "")
 	pbkdf2Iter := fs.String("pbkdf2-iterations", "", "")
 	cookieSecure := fs.String("cookie-secure", "", "")
+	uploadDir := fs.String("upload-dir", "", "")
+	maxUpload := fs.String("max-upload-bytes", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("config: flags: %w", err)
@@ -123,6 +135,12 @@ func applyFlags(cfg *Config, args []string) error {
 			}
 		case "cookie-secure":
 			cfg.CookieSecure = *cookieSecure == "true" || *cookieSecure == "1"
+		case "upload-dir":
+			cfg.UploadDir = *uploadDir
+		case "max-upload-bytes":
+			if n, err := strconv.ParseInt(*maxUpload, 10, 64); err == nil && n > 0 {
+				cfg.MaxUploadBytes = n
+			}
 		}
 	})
 

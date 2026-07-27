@@ -22,6 +22,7 @@ import (
 	"nexmap.net/internal/router"
 	"nexmap.net/internal/server"
 	"nexmap.net/internal/service"
+	"nexmap.net/internal/storage"
 	"nexmap.net/internal/store"
 )
 
@@ -79,10 +80,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize attachment storage.
+	blobs, err := storage.NewFS(cfg.UploadDir, cfg.MaxUploadBytes)
+	if err != nil {
+		slog.Error("failed to initialize attachment storage", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("attachment storage ready", "dir", blobs.Root, "max_bytes", cfg.MaxUploadBytes)
+
 	// Create store, auth provider, and services.
 	st := store.New(db, keys)
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
-	svc := service.New(st, provider, cfg)
+	svc := service.New(st, provider, cfg, blobs)
 
 	// Bootstrap admin account if no users exist.
 	if err := bootstrapAdmin(st, provider, cfg.InitialAdminUser, cfg.InitialAdminPass); err != nil {
@@ -98,7 +107,7 @@ func main() {
 	go sessionCleanup(ctx, st.Session)
 
 	// Build the handler and start the server.
-	handler := router.New(svc, cfg.CookieSecure, cfg.DevMode)
+	handler := router.New(svc, cfg.CookieSecure, cfg.DevMode, cfg.MaxUploadBytes)
 	if err := server.Run(ctx, cfg, handler); err != nil {
 		slog.Error("server error", "err", err)
 		os.Exit(1)

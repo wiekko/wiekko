@@ -13,6 +13,7 @@ import (
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
+	"nexmap.net/internal/storage"
 	"nexmap.net/internal/store"
 	"nexmap.net/internal/testutil"
 
@@ -31,7 +32,8 @@ type testEnv struct {
 	Services    *service.Services
 }
 
-func newTestEnv() *testEnv {
+func newTestEnv(t *testing.T) *testEnv {
+	t.Helper()
 	users := &testutil.MockUserStore{}
 	sessions := &testutil.MockSessionStore{}
 	pats := &testutil.MockPATStore{}
@@ -55,7 +57,11 @@ func newTestEnv() *testEnv {
 	}
 
 	cfg := &config.Config{SessionTTL: time.Hour}
-	svc := service.New(st, provider, cfg)
+	blobs, err := storage.NewFS(t.TempDir(), 1<<20)
+	if err != nil {
+		t.Fatalf("storage.NewFS: %v", err)
+	}
+	svc := service.New(st, provider, cfg, blobs)
 
 	return &testEnv{
 		Users:       users,

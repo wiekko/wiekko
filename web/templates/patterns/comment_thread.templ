@@ -5,34 +5,55 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// CommentList renders a list of comments with an add form.
-templ CommentList(comments []templates.CommentView, hxPost, csrfToken string) {
+// CommentList renders a comment thread with an add form.
+//
+// The #comments wrapper is rendered unconditionally: CommentForm swaps into it
+// with hx-swap="beforeend", so hiding it behind the non-empty branch would
+// break the very first comment posted on an entity.
+templ CommentList(comments []templates.CommentView, hxPost, csrfToken string, canComment bool) {
 	<div class="space-y-4">
 		if len(comments) == 0 {
-			@ui.EmptyState("", "No comments yet", "Start the conversation by adding a comment.", "", "")
-		} else {
-			<div id="comments" class="space-y-4">
-				for _, c := range comments {
-					@commentItem(c)
-				}
+			@ui.EmptyState("message-circle", "No comments yet", "Start the conversation by adding a comment.", "", "")
+		}
+		<div id="comments" class="space-y-4">
+			for _, c := range comments {
+				@CommentItem(c, csrfToken)
+			}
+		</div>
+		if canComment {
+			<div class="border-t border-gray-200 pt-4 dark:border-gray-700">
+				@CommentForm(hxPost, csrfToken)
 			</div>
 		}
-		<div class="border-t border-gray-200 pt-4 dark:border-gray-700">
-			@CommentForm(hxPost, csrfToken)
-		</div>
 	</div>
 }
 
-templ commentItem(c templates.CommentView) {
+// CommentItem renders a single comment. Exported because creating a comment
+// returns exactly one of these as the htmx swap payload.
+templ CommentItem(c templates.CommentView, csrfToken string) {
 	<div class="flex gap-3" id={ "comment-" + c.ID }>
 		@ui.UserAvatar(c.AuthorName, "md")
 		<div class="flex-1">
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-medium text-gray-900 dark:text-gray-100">{ c.AuthorName }</span>
 				<span class="text-xs text-gray-500 dark:text-gray-400">{ c.CreatedAt }</span>
+				if c.CanDelete {
+					<button
+						type="button"
+						aria-label="Delete comment"
+						class="ml-auto rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+						hx-delete={ c.DeleteURL }
+						hx-vals={ csrfVals(csrfToken) }
+						hx-target={ "#comment-" + c.ID }
+						hx-swap="outerHTML"
+						hx-confirm="Delete this comment?"
+					>
+						@ui.Icon("trash", "sm")
+					</button>
+				}
 			</div>
-			<div class="mt-1 text-sm text-gray-700 dark:text-gray-300">
-				{ c.Body }
+			<div class="prose prose-sm dark:prose-invert mt-1 max-w-none">
+				@templ.Raw(templates.RenderMarkdown(c.Body))
 			</div>
 		</div>
 	</div>
@@ -44,6 +65,7 @@ templ CommentForm(hxPost, csrfToken string) {
 		hx-post={ hxPost }
 		hx-target="#comments"
 		hx-swap="beforeend"
+		hx-on::after-request="if (event.detail.successful) this.reset()"
 		class="flex gap-3"
 	>
 		<input type="hidden" name="_csrf" value={ csrfToken }/>

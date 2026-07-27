@@ -95,6 +95,10 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/defects/new`            | Create Defect      | Form                                                      |
 | `/products/:id/defects/:did`           | Defect Detail      | Tabbed detail page                                        |
 | `/products/:id/defects/:did/edit`      | Edit Defect        | Form                                                      |
+| `/products/:id/constraints`            | Constraints List   | Table with category filter                                |
+| `/products/:id/constraints/new`        | Create Constraint  | Form                                                      |
+| `/products/:id/constraints/:cid`       | Constraint Detail  | Tabbed detail page                                        |
+| `/products/:id/constraints/:cid/edit`  | Edit Constraint    | Form                                                      |
 | `/products/:id/board`                  | Backlog Board      | Kanban/sprint board view (UR-101..102)                    |
 | `/products/:id/sprints`                | Sprints List       | Table (only in scrum mode)                                |
 | `/products/:id/sprints/new`            | Create Sprint      | Form                                                      |
@@ -125,6 +129,16 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Comments     | Comment thread                                       |
 | Attachments  | File list + upload                                   |
 | History      | Audit trail                                          |
+
+**Constraint Detail tabs:**
+
+| Tab          | Content                                          |
+|--------------|--------------------------------------------------|
+| Overview     | Fields, category, compliance state, milestone    |
+| Capabilities | Linked capabilities                              |
+| Comments     | Comment thread                                   |
+| Attachments  | File list + upload                               |
+| History      | Audit trail                                      |
 
 #### Testing
 
@@ -185,6 +199,8 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Requirements | Linked requirements                        |
 | Test Cases   | Linked test cases                          |
 | Defects      | Linked defects                             |
+| Comments     | Comment thread                             |
+| Attachments  | File list + upload                         |
 | History      | Audit trail                                |
 
 **Milestone Detail tabs:**
@@ -198,6 +214,8 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Constraints  | Constraints assigned to this milestone  |
 | Defects      | Defects assigned to this milestone      |
 | Sprints      | Sprints targeting this milestone        |
+| Comments     | Comment thread                    |
+| Attachments  | File list + upload                |
 | History      | Audit trail                       |
 
 Assignment is a single FK on the child, so an item belongs to at most one milestone.

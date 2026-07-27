@@ -11,7 +11,7 @@ import (
 )
 
 func TestPATList(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	user := testutil.MakeUser()
 	env.PATs.ListByUserIDFunc = func(_ context.Context, _ string) ([]*model.PAT, error) {
 		return []*model.PAT{testutil.MakePAT()}, nil
@@ -28,7 +28,7 @@ func TestPATList(t *testing.T) {
 
 func TestPATCreate(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		user := testutil.MakeUser()
 		env.PATs.CreateFunc = func(_ context.Context, _ *model.PAT) error { return nil }
 
@@ -43,7 +43,7 @@ func TestPATCreate(t *testing.T) {
 	})
 
 	t.Run("missing name", func(t *testing.T) {
-		env := newTestEnv()
+		env := newTestEnv(t)
 		user := testutil.MakeUser()
 		ctrl := controller.NewPAT(env.Services.PAT)
 		w, r := authedRequest(http.MethodPost, "/user/me/tokens", `{}`, user)
@@ -56,7 +56,7 @@ func TestPATCreate(t *testing.T) {
 }
 
 func TestPATRevoke(t *testing.T) {
-	env := newTestEnv()
+	env := newTestEnv(t)
 	user := testutil.MakeUser()
 	pat := testutil.MakePAT(func(p *model.PAT) { p.UserID = user.ID })
 	env.PATs.ListByUserIDFunc = func(_ context.Context, _ string) ([]*model.PAT, error) {

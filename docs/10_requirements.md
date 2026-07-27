@@ -164,7 +164,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-024**: A `defect` shall have a `criticality` and a `status`
 * **FR-025**: A `defect` can be linked to a `milestone`
 * **FR-026**: A `defect` can have `comments` and `attachments`
-* **FR-027**: `requirements`, `constraints`, `test cases` and `components` can also have `comments` and `attachments`
+* **FR-027**: `requirements`, `constraints`, `test cases`, `components`, `capabilities` and `milestones` can also have `comments` and `attachments`
 * **FR-028**: A `sprint` has a start and end date, and can contain `requirements`, and `defects`.
 * **FR-029**: A `sprint` can be linked to a `milestone` ("leads towards" / "enables")
 * **FR-030**: All text fields (descriptions, comments, definitions of done) shall support Markdown formatting

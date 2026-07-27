@@ -1,37 +1,39 @@
 package patterns
 
-import "nexmap.net/web/templates/ui"
+import (
+	"fmt"
 
-// AttachmentView holds display data for an attachment.
-type AttachmentView struct {
-	ID          string
-	Filename    string
-	ContentType string
-	Size        string
-	DownloadURL string
-	DeleteURL   string
-}
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
 
-// AttachmentList renders a list of file attachments with download and delete actions.
-templ AttachmentList(attachments []AttachmentView, csrfToken string) {
+// AttachmentList renders attachments with download, delete and upload actions.
+//
+// The #attachments wrapper is rendered unconditionally so UploadForm's
+// hx-swap="beforeend" has a target even before the first upload.
+templ AttachmentList(attachments []templates.AttachmentView, hxPost, csrfToken string, canUpload bool) {
 	<div class="space-y-4">
 		if len(attachments) == 0 {
-			@ui.EmptyState("upload", "No attachments", "Upload files to attach them to this item.", "", "")
-		} else {
-			<ul id="attachments" class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
-				for _, a := range attachments {
-					@attachmentItem(a, csrfToken)
-				}
-			</ul>
+			@ui.EmptyState("paperclip", "No attachments", "Upload files to attach them to this item.", "", "")
+		}
+		<ul id="attachments" class={ attachmentListClass(len(attachments)) }>
+			for _, a := range attachments {
+				@AttachmentItem(a, csrfToken)
+			}
+		</ul>
+		if canUpload {
+			@UploadForm(hxPost, csrfToken)
 		}
 	</div>
 }
 
-templ attachmentItem(a AttachmentView, csrfToken string) {
+// AttachmentItem renders a single attachment row. Exported because a successful
+// upload returns exactly one of these as the htmx swap payload.
+templ AttachmentItem(a templates.AttachmentView, csrfToken string) {
 	<li class="flex items-center justify-between px-4 py-3" id={ "attachment-" + a.ID }>
 		<div class="flex items-center gap-3">
 			<div class="text-gray-400 dark:text-gray-500">
-				@ui.Icon("download", "md")
+				@ui.Icon("paperclip", "md")
 			</div>
 			<div>
 				<a href={ templ.SafeURL(a.DownloadURL) } class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
@@ -43,8 +45,10 @@ templ attachmentItem(a AttachmentView, csrfToken string) {
 		if a.DeleteURL != "" {
 			<button
 				type="button"
+				aria-label="Delete attachment"
 				class="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
 				hx-delete={ a.DeleteURL }
+				hx-vals={ csrfVals(csrfToken) }
 				hx-target={ "#attachment-" + a.ID }
 				hx-swap="outerHTML"
 				hx-confirm="Delete this attachment?"
@@ -62,6 +66,7 @@ templ UploadForm(hxPost, csrfToken string) {
 		hx-target="#attachments"
 		hx-swap="beforeend"
 		hx-encoding="multipart/form-data"
+		hx-on::after-request="if (event.detail.successful) this.reset()"
 		class="flex items-center gap-3 pt-4"
 	>
 		<input type="hidden" name="_csrf" value={ csrfToken }/>
@@ -78,4 +83,19 @@ templ UploadForm(hxPost, csrfToken string) {
 			Type:    "submit",
 		})
 	</form>
+}
+
+// attachmentListClass drops the border when the list is empty, so the always
+// present wrapper doesn't render as a stray empty box.
+func attachmentListClass(count int) string {
+	if count == 0 {
+		return ""
+	}
+	return "divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700"
+}
+
+// csrfVals renders the CSRF token as hx-vals JSON, so htmx-issued requests
+// that carry no form body still pass the CSRF middleware.
+func csrfVals(csrfToken string) string {
+	return fmt.Sprintf(`{"_csrf":%q}`, csrfToken)
 }

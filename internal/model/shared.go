@@ -3,7 +3,8 @@ package model
 // Comment represents a user comment on any entity.
 type Comment struct {
 	ID        string
-	OwnerType string // "requirement", "constraint", "test_case", "component", "defect"
+	ProductID string // owning product; scopes reads and writes
+	OwnerType string // one of the OwnerType* constants
 	OwnerID   string
 	UserID    string
 	Body      string // Markdown
@@ -14,14 +15,37 @@ type Comment struct {
 // Attachment represents a file attached to any entity.
 type Attachment struct {
 	ID          string
-	OwnerType   string // "requirement", "constraint", "test_case", "component", "defect"
+	ProductID   string // owning product; scopes reads and writes
+	OwnerType   string // one of the OwnerType* constants
 	OwnerID     string
 	UserID      string
 	Filename    string
 	ContentType string
 	Size        int64
-	StoragePath string
+	StoragePath string // server-generated; never accepted from a client
 	CreatedAt   string // RFC 3339
+}
+
+// Owner types for comments and attachments (FR-026, FR-027, FR-401).
+const (
+	OwnerTypeRequirement = "requirement"
+	OwnerTypeConstraint  = "constraint"
+	OwnerTypeTestCase    = "test_case"
+	OwnerTypeComponent   = "component"
+	OwnerTypeCapability  = "capability"
+	OwnerTypeMilestone   = "milestone"
+	OwnerTypeDefect      = "defect"
+)
+
+// ValidOwnerType reports whether ownerType can carry comments and attachments.
+func ValidOwnerType(ownerType string) bool {
+	switch ownerType {
+	case OwnerTypeRequirement, OwnerTypeConstraint, OwnerTypeTestCase,
+		OwnerTypeComponent, OwnerTypeCapability, OwnerTypeMilestone, OwnerTypeDefect:
+		return true
+	default:
+		return false
+	}
 }
 
 // AuditEntry represents a single field-level change in the audit trail.

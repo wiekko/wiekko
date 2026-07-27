@@ -211,6 +211,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("GET /products/{productId}/attachments", authed(http.HandlerFunc(commentCtrl.ListAttachments)))
 	apiV1.Handle("POST /products/{productId}/attachments", authed(csrf(http.HandlerFunc(commentCtrl.CreateAttachment))))
 	apiV1.Handle("GET /products/{productId}/attachments/{id}", authed(http.HandlerFunc(commentCtrl.GetAttachment)))
+	apiV1.Handle("GET /products/{productId}/attachments/{id}/download", authed(http.HandlerFunc(commentCtrl.DownloadAttachment)))
 	apiV1.Handle("DELETE /products/{productId}/attachments/{id}", authed(csrf(http.HandlerFunc(commentCtrl.DeleteAttachment))))
 
 	// Audit trail.

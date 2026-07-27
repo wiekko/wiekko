@@ -256,18 +256,6 @@ templ ConstraintCapabilityLinkResults(productID, constraintID string, candidates
 	}
 }
 
-templ ConstraintCommentsTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("message-circle", "No comments", "Comments on this constraint will appear here.", "", "")
-	}
-}
-
-templ ConstraintAttachmentsTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("paperclip", "No attachments", "Attachments for this constraint will appear here.", "", "")
-	}
-}
-
 templ ConstraintHistoryTabContent(entries []templates.AuditEntryView) {
 	if len(entries) == 0 {
 		@ui.Card() {

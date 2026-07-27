@@ -38,6 +38,9 @@ web/dist/
 /nexmap.db-shm
 /nexmap.db-wal
 
+# Attachment uploads
+/uploads/
+
 # Go templ output (generated *_templ.go files, not hand-written helpers)
 *_templ.go
 

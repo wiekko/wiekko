@@ -377,18 +377,6 @@ templ ComponentTestCaseLinkResults(productID, componentID string, candidates []*
 	}
 }
 
-templ ComponentCommentsTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("message-circle", "No comments", "Comments on this component will appear here.", "", "")
-	}
-}
-
-templ ComponentAttachmentsTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("paperclip", "No attachments", "Attachments for this component will appear here.", "", "")
-	}
-}
-
 templ ComponentHistoryTabContent(entries []templates.AuditEntryView) {
 	if len(entries) == 0 {
 		@ui.Card() {

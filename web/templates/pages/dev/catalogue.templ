@@ -452,11 +452,12 @@ templ CataloguePage() {
 				<div class="max-w-2xl">
 					@patterns.CommentList(
 						[]templates.CommentView{
-							{ID: "1", AuthorName: "Alice Johnson", Body: "This looks good. I think we should also consider the edge case when the user session expires.", CreatedAt: "2 hours ago", IsOwner: false},
-							{ID: "2", AuthorName: "Bob Smith", Body: "Agreed. I'll add a test case for that.", CreatedAt: "1 hour ago", IsOwner: true},
+							{ID: "1", AuthorName: "Alice Johnson", Body: "This looks good. I think we should also consider the edge case when the user session **expires**.", CreatedAt: "2 hours ago", IsOwner: false},
+							{ID: "2", AuthorName: "Bob Smith", Body: "Agreed. I'll add a test case for that.", CreatedAt: "1 hour ago", IsOwner: true, CanDelete: true, DeleteURL: "#"},
 						},
 						"#",
 						"demo-csrf-token",
+						true,
 					)
 				</div>
 			}
@@ -465,11 +466,13 @@ templ CataloguePage() {
 			@section("Attachment List") {
 				<div class="max-w-2xl">
 					@patterns.AttachmentList(
-						[]patterns.AttachmentView{
+						[]templates.AttachmentView{
 							{ID: "1", Filename: "mockup-v2.png", ContentType: "image/png", Size: "245 KB", DownloadURL: "#", DeleteURL: "#"},
 							{ID: "2", Filename: "api-spec.pdf", ContentType: "application/pdf", Size: "1.2 MB", DownloadURL: "#", DeleteURL: "#"},
 						},
+						"#",
 						"demo-csrf-token",
+						true,
 					)
 				</div>
 			}

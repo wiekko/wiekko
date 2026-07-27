@@ -8,12 +8,13 @@ import (
 	"nexmap.net/internal/service"
 )
 
-func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
+func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64) {
 	loginCtrl := controller.NewPageLogin(svc.Auth, svc.Setting, cookieSecure)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
-	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Audit)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Comment, svc.Audit)
+	upload := pageUpload(maxUploadBytes)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
@@ -79,6 +80,13 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /products/{id}/milestones/{milestoneId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.MilestoneDeleteConfirm)))
 	mux.Handle("GET /products/{id}/milestones/{milestoneId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.MilestoneOverviewTab)))
 	mux.Handle("GET /products/{id}/milestones/{milestoneId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.MilestoneHistoryTab)))
+	mux.Handle("GET /products/{id}/milestones/{milestoneId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.MilestoneCommentsTab)))
+	mux.Handle("GET /products/{id}/milestones/{milestoneId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.MilestoneAttachmentsTab)))
+	mux.Handle("POST /products/{id}/milestones/{milestoneId}/comments", pageCSRF(http.HandlerFunc(productCtrl.MilestoneCommentCreate)))
+	mux.Handle("DELETE /products/{id}/milestones/{milestoneId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.MilestoneCommentDelete)))
+	mux.Handle("POST /products/{id}/milestones/{milestoneId}/attachments", upload(http.HandlerFunc(productCtrl.MilestoneAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/milestones/{milestoneId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.MilestoneAttachmentDelete)))
+	mux.Handle("GET /products/{id}/milestones/{milestoneId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/milestones/{milestoneId}/tabs/components", pageAuthed(http.HandlerFunc(productCtrl.MilestoneComponentsTab)))
 	mux.Handle("GET /products/{id}/milestones/{milestoneId}/components/link-modal", pageAuthed(http.HandlerFunc(productCtrl.MilestoneComponentLinkModal)))
 	mux.Handle("GET /products/{id}/milestones/{milestoneId}/components/link-search", pageAuthed(http.HandlerFunc(productCtrl.MilestoneComponentLinkSearch)))
@@ -136,6 +144,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("DELETE /products/{id}/components/{componentId}/test-cases/{testCaseId}", pageAuthed(http.HandlerFunc(productCtrl.ComponentTestCaseUnlink)))
 	mux.Handle("GET /products/{id}/components/{componentId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.ComponentCommentsTab)))
 	mux.Handle("GET /products/{id}/components/{componentId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.ComponentAttachmentsTab)))
+	mux.Handle("POST /products/{id}/components/{componentId}/comments", pageCSRF(http.HandlerFunc(productCtrl.ComponentCommentCreate)))
+	mux.Handle("DELETE /products/{id}/components/{componentId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.ComponentCommentDelete)))
+	mux.Handle("POST /products/{id}/components/{componentId}/attachments", upload(http.HandlerFunc(productCtrl.ComponentAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/components/{componentId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.ComponentAttachmentDelete)))
+	mux.Handle("GET /products/{id}/components/{componentId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/components/{componentId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.ComponentHistoryTab)))
 
 	// Capability pages.
@@ -170,6 +183,13 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("POST /products/{id}/capabilities/{capabilityId}/defects", pageAuthed(http.HandlerFunc(productCtrl.CapabilityDefectCreateAndLink)))
 	mux.Handle("DELETE /products/{id}/capabilities/{capabilityId}/defects/{linkId}", pageAuthed(http.HandlerFunc(productCtrl.CapabilityDefectUnlink)))
 	mux.Handle("GET /products/{id}/capabilities/{capabilityId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.CapabilityHistoryTab)))
+	mux.Handle("GET /products/{id}/capabilities/{capabilityId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.CapabilityCommentsTab)))
+	mux.Handle("GET /products/{id}/capabilities/{capabilityId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.CapabilityAttachmentsTab)))
+	mux.Handle("POST /products/{id}/capabilities/{capabilityId}/comments", pageCSRF(http.HandlerFunc(productCtrl.CapabilityCommentCreate)))
+	mux.Handle("DELETE /products/{id}/capabilities/{capabilityId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.CapabilityCommentDelete)))
+	mux.Handle("POST /products/{id}/capabilities/{capabilityId}/attachments", upload(http.HandlerFunc(productCtrl.CapabilityAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/capabilities/{capabilityId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.CapabilityAttachmentDelete)))
+	mux.Handle("GET /products/{id}/capabilities/{capabilityId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 
 	// Test case pages.
 	mux.Handle("GET /products/{id}/test-cases", pageAuthed(http.HandlerFunc(productCtrl.TestCases)))
@@ -191,6 +211,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/campaigns", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCampaignsTab)))
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.TestCaseCommentsTab)))
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.TestCaseAttachmentsTab)))
+	mux.Handle("POST /products/{id}/test-cases/{testCaseId}/comments", pageCSRF(http.HandlerFunc(productCtrl.TestCaseCommentCreate)))
+	mux.Handle("DELETE /products/{id}/test-cases/{testCaseId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.TestCaseCommentDelete)))
+	mux.Handle("POST /products/{id}/test-cases/{testCaseId}/attachments", upload(http.HandlerFunc(productCtrl.TestCaseAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/test-cases/{testCaseId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.TestCaseAttachmentDelete)))
+	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.TestCaseHistoryTab)))
 
 	// Requirement pages.
@@ -226,6 +251,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("DELETE /products/{id}/requirements/{requirementId}/defects/{linkId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementDefectUnlink)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.RequirementCommentsTab)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.RequirementAttachmentsTab)))
+	mux.Handle("POST /products/{id}/requirements/{requirementId}/comments", pageCSRF(http.HandlerFunc(productCtrl.RequirementCommentCreate)))
+	mux.Handle("DELETE /products/{id}/requirements/{requirementId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.RequirementCommentDelete)))
+	mux.Handle("POST /products/{id}/requirements/{requirementId}/attachments", upload(http.HandlerFunc(productCtrl.RequirementAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/requirements/{requirementId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.RequirementAttachmentDelete)))
+	mux.Handle("GET /products/{id}/requirements/{requirementId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.RequirementHistoryTab)))
 
 	// Defect pages.
@@ -240,6 +270,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.DefectOverviewTab)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.DefectCommentsTab)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.DefectAttachmentsTab)))
+	mux.Handle("POST /products/{id}/defects/{defectId}/comments", pageCSRF(http.HandlerFunc(productCtrl.DefectCommentCreate)))
+	mux.Handle("DELETE /products/{id}/defects/{defectId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.DefectCommentDelete)))
+	mux.Handle("POST /products/{id}/defects/{defectId}/attachments", upload(http.HandlerFunc(productCtrl.DefectAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/defects/{defectId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.DefectAttachmentDelete)))
+	mux.Handle("GET /products/{id}/defects/{defectId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.DefectHistoryTab)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/tabs/components", pageAuthed(http.HandlerFunc(productCtrl.DefectComponentsTab)))
 	mux.Handle("GET /products/{id}/defects/{defectId}/components/link-modal", pageAuthed(http.HandlerFunc(productCtrl.DefectComponentLinkModal)))
@@ -283,6 +318,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	mux.Handle("DELETE /products/{id}/constraints/{constraintId}/capabilities/{capabilityId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintCapabilityUnlink)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.ConstraintCommentsTab)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.ConstraintAttachmentsTab)))
+	mux.Handle("POST /products/{id}/constraints/{constraintId}/comments", pageCSRF(http.HandlerFunc(productCtrl.ConstraintCommentCreate)))
+	mux.Handle("DELETE /products/{id}/constraints/{constraintId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.ConstraintCommentDelete)))
+	mux.Handle("POST /products/{id}/constraints/{constraintId}/attachments", upload(http.HandlerFunc(productCtrl.ConstraintAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/constraints/{constraintId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.ConstraintAttachmentDelete)))
+	mux.Handle("GET /products/{id}/constraints/{constraintId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.ConstraintHistoryTab)))
 
 	// Admin pages.
@@ -303,6 +343,28 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 // pageAuthed wraps a handler with RequireAuthPage middleware (redirect to /login).
 func pageAuthed(h http.Handler) http.Handler {
 	return middleware.RequireAuthPage(h)
+}
+
+// pageCSRF protects a mutating page route. Page routes historically carried no
+// CSRF check even though every form emits a _csrf field; new mutating routes
+// use this rather than inherit that gap.
+func pageCSRF(h http.Handler) http.Handler {
+	return middleware.RequireAuthPage(middleware.CSRF(h))
+}
+
+// pageUpload caps the request body before anything parses the multipart form.
+// middleware.CSRF reads r.FormValue, which would otherwise buffer up to
+// net/http's 32 MB default (spilling to temp files) before our own limit runs.
+func pageUpload(maxBytes int64) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		// Order matters: the cap must be installed before CSRF touches the body.
+		limited := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Headroom for the multipart envelope around the file itself.
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes+(1<<20))
+			middleware.CSRF(h).ServeHTTP(w, r)
+		})
+		return middleware.RequireAuthPage(limited)
+	}
 }
 
 // pageAdmin wraps a handler with RequireAdminPage middleware (redirect to / for non-admins).

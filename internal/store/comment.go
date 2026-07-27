@@ -15,35 +15,41 @@ type CommentStore interface {
 	GetByID(ctx context.Context, id string) (*model.Comment, error)
 	Update(ctx context.Context, c *model.Comment) error
 	Delete(ctx context.Context, id string) error
-	ListByOwner(ctx context.Context, ownerType, ownerID string) ([]*model.Comment, error)
+	ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error)
 }
 
 type commentStore struct {
 	db *sql.DB
 }
 
+const commentColumns = `id, product_id, owner_type, owner_id, user_id, body, created_at, updated_at`
+
+func scanComment(sc scanner) (*model.Comment, error) {
+	var c model.Comment
+	err := sc.Scan(&c.ID, &c.ProductID, &c.OwnerType, &c.OwnerID, &c.UserID,
+		&c.Body, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (s *commentStore) Create(ctx context.Context, c *model.Comment) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO comments (id, owner_type, owner_id, user_id, body, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.OwnerType, c.OwnerID, c.UserID, c.Body, c.CreatedAt, c.UpdatedAt,
+		`INSERT INTO comments (`+commentColumns+`)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.ProductID, c.OwnerType, c.OwnerID, c.UserID, c.Body, c.CreatedAt, c.UpdatedAt,
 	)
 	return err
 }
 
 func (s *commentStore) GetByID(ctx context.Context, id string) (*model.Comment, error) {
-	var c model.Comment
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, owner_type, owner_id, user_id, body, created_at, updated_at
-		 FROM comments WHERE id = ?`, id,
-	).Scan(&c.ID, &c.OwnerType, &c.OwnerID, &c.UserID, &c.Body, &c.CreatedAt, &c.UpdatedAt)
+	row := s.db.QueryRowContext(ctx, `SELECT `+commentColumns+` FROM comments WHERE id = ?`, id)
+	c, err := scanComment(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("comment not found: %w", err)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+	return c, err
 }
 
 func (s *commentStore) Update(ctx context.Context, c *model.Comment) error {
@@ -59,11 +65,14 @@ func (s *commentStore) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *commentStore) ListByOwner(ctx context.Context, ownerType, ownerID string) ([]*model.Comment, error) {
+// ListByOwner returns a thread oldest-first. created_at has second granularity,
+// so id breaks ties to keep the order stable.
+func (s *commentStore) ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, owner_type, owner_id, user_id, body, created_at, updated_at
-		 FROM comments WHERE owner_type = ? AND owner_id = ? ORDER BY created_at`,
-		ownerType, ownerID)
+		`SELECT `+commentColumns+`
+		 FROM comments WHERE product_id = ? AND owner_type = ? AND owner_id = ?
+		 ORDER BY created_at, id`,
+		productID, ownerType, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,11 +80,11 @@ func (s *commentStore) ListByOwner(ctx context.Context, ownerType, ownerID strin
 
 	var comments []*model.Comment
 	for rows.Next() {
-		var c model.Comment
-		if err := rows.Scan(&c.ID, &c.OwnerType, &c.OwnerID, &c.UserID, &c.Body, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		c, err := scanComment(rows)
+		if err != nil {
 			return nil, err
 		}
-		comments = append(comments, &c)
+		comments = append(comments, c)
 	}
 	return comments, rows.Err()
 }

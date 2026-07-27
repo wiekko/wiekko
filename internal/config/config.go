@@ -13,6 +13,8 @@ const (
 	DefaultPBKDF2Iterations = 600_000
 	DefaultCookieSecure     = true
 	DefaultDevMode          = false
+	DefaultUploadDir        = "./uploads"
+	DefaultMaxUploadBytes   = 10 << 20 // 10 MiB
 )
 
 type Config struct {
@@ -29,4 +31,6 @@ type Config struct {
 	DevMode          bool
 	InitialAdminUser string
 	InitialAdminPass string
+	UploadDir        string
+	MaxUploadBytes   int64
 }

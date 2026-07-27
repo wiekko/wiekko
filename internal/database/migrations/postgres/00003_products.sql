@@ -314,6 +314,7 @@ CREATE INDEX IF NOT EXISTS idx_defect_links_target ON defect_links(target_type, 
 -- Comments: polymorphic (FR-026, FR-027)
 CREATE TABLE IF NOT EXISTS comments (
     id         UUID PRIMARY KEY,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     owner_type TEXT NOT NULL,
     owner_id   UUID NOT NULL,
     user_id    UUID NOT NULL REFERENCES users(id),
@@ -322,10 +323,12 @@ CREATE TABLE IF NOT EXISTS comments (
     updated_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_comments_owner ON comments(owner_type, owner_id);
+CREATE INDEX IF NOT EXISTS idx_comments_product_id ON comments(product_id);
 
 -- Attachments: polymorphic (FR-026, FR-027)
 CREATE TABLE IF NOT EXISTS attachments (
     id           UUID PRIMARY KEY,
+    product_id   UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     owner_type   TEXT NOT NULL,
     owner_id     UUID NOT NULL,
     user_id      UUID NOT NULL REFERENCES users(id),
@@ -336,6 +339,7 @@ CREATE TABLE IF NOT EXISTS attachments (
     created_at   TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_type, owner_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_product_id ON attachments(product_id);
 
 -- Audit trail: field-level change tracking (FR-031)
 CREATE TABLE IF NOT EXISTS audit_trail (

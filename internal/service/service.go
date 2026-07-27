@@ -3,6 +3,7 @@ package service
 import (
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/config"
+	"nexmap.net/internal/storage"
 	"nexmap.net/internal/store"
 )
 
@@ -26,7 +27,7 @@ type Services struct {
 }
 
 // New creates the application service layer.
-func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services {
+func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs storage.Store) *Services {
 	settingSvc := &SettingService{settings: st.Setting}
 
 	authz := &Authorizer{productRoles: st.ProductRole}
@@ -108,6 +109,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config) *Services 
 			comments:    st.Comment,
 			attachments: st.Attachment,
 			audit:       st.Audit,
+			blobs:       blobs,
 			authz:       authz,
 		},
 		Audit: &AuditService{
