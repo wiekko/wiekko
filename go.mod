@@ -6,7 +6,7 @@ require (
 	github.com/a-h/templ v0.3.1001
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
-	github.com/kaugesaar/lucide-go v0.12.0
+	github.com/kaugesaar/lucide-go v0.22.0
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/yuin/goldmark v1.8.2
 	modernc.org/sqlite v1.38.2
