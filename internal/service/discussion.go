@@ -15,8 +15,11 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// CommentService handles comments and attachments on any entity.
-type CommentService struct {
+// DiscussionService handles the discussion attached to any entity: its comment
+// thread and its file attachments. The two travel together — same polymorphic
+// owner columns, same lifecycle — and this is the only service holding the blob
+// store, so attachment bytes are created and unlinked here and nowhere else.
+type DiscussionService struct {
 	comments    store.CommentStore
 	attachments store.AttachmentStore
 	audit       store.AuditStore
@@ -36,7 +39,7 @@ func minRoleForOwnerType(ownerType string) string {
 }
 
 // CreateComment creates a new comment. Minimum role depends on owner type.
-func (s *CommentService) CreateComment(ctx context.Context, user *model.User, productID, ownerType, ownerID, body string) (*model.Comment, error) {
+func (s *DiscussionService) CreateComment(ctx context.Context, user *model.User, productID, ownerType, ownerID, body string) (*model.Comment, error) {
 	if !model.ValidOwnerType(ownerType) {
 		return nil, fmt.Errorf("invalid comment owner type: %q", ownerType)
 	}
@@ -75,7 +78,7 @@ func (s *CommentService) CreateComment(ctx context.Context, user *model.User, pr
 }
 
 // GetComment returns a comment by ID. Requires viewer role.
-func (s *CommentService) GetComment(ctx context.Context, user *model.User, productID, id string) (*model.Comment, error) {
+func (s *DiscussionService) GetComment(ctx context.Context, user *model.User, productID, id string) (*model.Comment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
@@ -91,7 +94,7 @@ func (s *CommentService) GetComment(ctx context.Context, user *model.User, produ
 }
 
 // UpdateComment modifies a comment body. Only the author can update.
-func (s *CommentService) UpdateComment(ctx context.Context, user *model.User, productID, id, body string) (*model.Comment, error) {
+func (s *DiscussionService) UpdateComment(ctx context.Context, user *model.User, productID, id, body string) (*model.Comment, error) {
 	if body == "" {
 		return nil, errors.New("comment body is required")
 	}
@@ -122,7 +125,7 @@ func (s *CommentService) UpdateComment(ctx context.Context, user *model.User, pr
 }
 
 // DeleteComment removes a comment. Author or product owner can delete.
-func (s *CommentService) DeleteComment(ctx context.Context, user *model.User, productID, id string) error {
+func (s *DiscussionService) DeleteComment(ctx context.Context, user *model.User, productID, id string) error {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer)
 	if err != nil {
 		return err
@@ -154,7 +157,7 @@ func (s *CommentService) DeleteComment(ctx context.Context, user *model.User, pr
 }
 
 // ListComments returns comments for an entity. Requires viewer role.
-func (s *CommentService) ListComments(ctx context.Context, user *model.User, productID, ownerType, ownerID string) ([]*model.Comment, error) {
+func (s *DiscussionService) ListComments(ctx context.Context, user *model.User, productID, ownerType, ownerID string) ([]*model.Comment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
@@ -173,7 +176,7 @@ type CreateAttachmentInput struct {
 
 // CreateAttachment stores the uploaded bytes and records the metadata.
 // Minimum role depends on owner type.
-func (s *CommentService) CreateAttachment(ctx context.Context, user *model.User, productID string, input CreateAttachmentInput) (*model.Attachment, error) {
+func (s *DiscussionService) CreateAttachment(ctx context.Context, user *model.User, productID string, input CreateAttachmentInput) (*model.Attachment, error) {
 	if !model.ValidOwnerType(input.OwnerType) {
 		return nil, fmt.Errorf("invalid attachment owner type: %q", input.OwnerType)
 	}
@@ -242,7 +245,7 @@ func (s *CommentService) CreateAttachment(ctx context.Context, user *model.User,
 }
 
 // GetAttachment returns attachment metadata by ID. Requires viewer role.
-func (s *CommentService) GetAttachment(ctx context.Context, user *model.User, productID, id string) (*model.Attachment, error) {
+func (s *DiscussionService) GetAttachment(ctx context.Context, user *model.User, productID, id string) (*model.Attachment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
@@ -258,7 +261,7 @@ func (s *CommentService) GetAttachment(ctx context.Context, user *model.User, pr
 
 // OpenAttachment returns the metadata plus a reader over the stored bytes.
 // The caller must close the reader. Requires viewer role.
-func (s *CommentService) OpenAttachment(ctx context.Context, user *model.User, productID, id string) (*model.Attachment, io.ReadCloser, error) {
+func (s *DiscussionService) OpenAttachment(ctx context.Context, user *model.User, productID, id string) (*model.Attachment, io.ReadCloser, error) {
 	a, err := s.GetAttachment(ctx, user, productID, id)
 	if err != nil {
 		return nil, nil, err
@@ -272,7 +275,7 @@ func (s *CommentService) OpenAttachment(ctx context.Context, user *model.User, p
 
 // DeleteAttachment removes an attachment row and its stored bytes.
 // Author or product owner can delete.
-func (s *CommentService) DeleteAttachment(ctx context.Context, user *model.User, productID, id string) error {
+func (s *DiscussionService) DeleteAttachment(ctx context.Context, user *model.User, productID, id string) error {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer)
 	if err != nil {
 		return err
@@ -306,8 +309,66 @@ func (s *CommentService) DeleteAttachment(ctx context.Context, user *model.User,
 	return nil
 }
 
+// ownerPurger discards the comments and attachments of an entity that is being
+// deleted. Entity services depend on this narrow view of DiscussionService.
+type ownerPurger interface {
+	PurgeOwner(ctx context.Context, productID, ownerType, ownerID string) error
+}
+
+// productPurger discards the stored attachment bytes of a product that is being
+// deleted. ProductService depends on this narrow view of DiscussionService.
+type productPurger interface {
+	PurgeProduct(ctx context.Context, productID string) error
+}
+
+// PurgeOwner removes every comment and attachment belonging to one entity,
+// including the stored attachment bytes.
+//
+// It authorizes nothing itself: comments and attachments have no independent
+// existence, so the caller deleting the owning entity has already established
+// the right to discard them. Author-only rules deliberately do not apply here —
+// deleting an entity takes its whole thread with it, whoever wrote it.
+func (s *DiscussionService) PurgeOwner(ctx context.Context, productID, ownerType, ownerID string) error {
+	// Read the storage paths before the rows go away.
+	attachments, err := s.attachments.ListByOwner(ctx, productID, ownerType, ownerID)
+	if err != nil {
+		return fmt.Errorf("list attachments of %s %s: %w", ownerType, ownerID, err)
+	}
+
+	if err := s.attachments.DeleteByOwner(ctx, productID, ownerType, ownerID); err != nil {
+		return fmt.Errorf("delete attachments of %s %s: %w", ownerType, ownerID, err)
+	}
+	if err := s.comments.DeleteByOwner(ctx, productID, ownerType, ownerID); err != nil {
+		return fmt.Errorf("delete comments of %s %s: %w", ownerType, ownerID, err)
+	}
+
+	s.purgeBlobs(ctx, attachments)
+	return nil
+}
+
+// PurgeProduct removes the stored attachment bytes of a product. The rows
+// themselves are cascaded away by the products foreign key, so this covers only
+// what SQL cannot reach: the files on disk.
+func (s *DiscussionService) PurgeProduct(ctx context.Context, productID string) error {
+	attachments, err := s.attachments.ListByProduct(ctx, productID)
+	if err != nil {
+		return fmt.Errorf("list attachments of product %s: %w", productID, err)
+	}
+	s.purgeBlobs(ctx, attachments)
+	return nil
+}
+
+// purgeBlobs unlinks stored bytes best-effort, matching DeleteAttachment: the
+// row is authoritative, so a failed unlink leaves an orphan blob rather than
+// blocking a delete that has already happened.
+func (s *DiscussionService) purgeBlobs(ctx context.Context, attachments []*model.Attachment) {
+	for _, a := range attachments {
+		_ = s.blobs.Delete(ctx, a.StoragePath)
+	}
+}
+
 // ListAttachments returns attachments for an entity. Requires viewer role.
-func (s *CommentService) ListAttachments(ctx context.Context, user *model.User, productID, ownerType, ownerID string) ([]*model.Attachment, error) {
+func (s *DiscussionService) ListAttachments(ctx context.Context, user *model.User, productID, ownerType, ownerID string) ([]*model.Attachment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}

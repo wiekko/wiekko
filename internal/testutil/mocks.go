@@ -647,11 +647,12 @@ func (m *MockDefectStore) ListLinksByTarget(ctx context.Context, targetType, tar
 
 // MockCommentStore implements store.CommentStore with configurable function fields.
 type MockCommentStore struct {
-	CreateFunc      func(ctx context.Context, c *model.Comment) error
-	GetByIDFunc     func(ctx context.Context, id string) (*model.Comment, error)
-	UpdateFunc      func(ctx context.Context, c *model.Comment) error
-	DeleteFunc      func(ctx context.Context, id string) error
-	ListByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error)
+	CreateFunc        func(ctx context.Context, c *model.Comment) error
+	GetByIDFunc       func(ctx context.Context, id string) (*model.Comment, error)
+	UpdateFunc        func(ctx context.Context, c *model.Comment) error
+	DeleteFunc        func(ctx context.Context, id string) error
+	DeleteByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) error
+	ListByOwnerFunc   func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error)
 }
 
 func (m *MockCommentStore) Create(ctx context.Context, c *model.Comment) error {
@@ -666,16 +667,21 @@ func (m *MockCommentStore) Update(ctx context.Context, c *model.Comment) error {
 func (m *MockCommentStore) Delete(ctx context.Context, id string) error {
 	return m.DeleteFunc(ctx, id)
 }
+func (m *MockCommentStore) DeleteByOwner(ctx context.Context, productID, ownerType, ownerID string) error {
+	return m.DeleteByOwnerFunc(ctx, productID, ownerType, ownerID)
+}
 func (m *MockCommentStore) ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error) {
 	return m.ListByOwnerFunc(ctx, productID, ownerType, ownerID)
 }
 
 // MockAttachmentStore implements store.AttachmentStore with configurable function fields.
 type MockAttachmentStore struct {
-	CreateFunc      func(ctx context.Context, a *model.Attachment) error
-	GetByIDFunc     func(ctx context.Context, id string) (*model.Attachment, error)
-	DeleteFunc      func(ctx context.Context, id string) error
-	ListByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error)
+	CreateFunc        func(ctx context.Context, a *model.Attachment) error
+	GetByIDFunc       func(ctx context.Context, id string) (*model.Attachment, error)
+	DeleteFunc        func(ctx context.Context, id string) error
+	DeleteByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) error
+	ListByOwnerFunc   func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error)
+	ListByProductFunc func(ctx context.Context, productID string) ([]*model.Attachment, error)
 }
 
 func (m *MockAttachmentStore) Create(ctx context.Context, a *model.Attachment) error {
@@ -687,8 +693,14 @@ func (m *MockAttachmentStore) GetByID(ctx context.Context, id string) (*model.At
 func (m *MockAttachmentStore) Delete(ctx context.Context, id string) error {
 	return m.DeleteFunc(ctx, id)
 }
+func (m *MockAttachmentStore) DeleteByOwner(ctx context.Context, productID, ownerType, ownerID string) error {
+	return m.DeleteByOwnerFunc(ctx, productID, ownerType, ownerID)
+}
 func (m *MockAttachmentStore) ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error) {
 	return m.ListByOwnerFunc(ctx, productID, ownerType, ownerID)
+}
+func (m *MockAttachmentStore) ListByProduct(ctx context.Context, productID string) ([]*model.Attachment, error) {
+	return m.ListByProductFunc(ctx, productID)
 }
 
 // MockTestCaseStore implements store.TestCaseStore with configurable function fields.

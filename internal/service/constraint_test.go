@@ -17,6 +17,7 @@ func newConstraintService(constraints *testutil.MockConstraintStore, categories 
 	return &ConstraintService{
 		constraints: constraints,
 		categories:  categories,
+		comments:    &recordingPurger{},
 		audit:       audit,
 		authz:       &Authorizer{productRoles: roles},
 	}

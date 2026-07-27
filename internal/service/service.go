@@ -21,7 +21,7 @@ type Services struct {
 	Backlog    *BacklogService
 	Constraint *ConstraintService
 	Testing    *TestingService
-	Comment    *CommentService
+	Discussion *DiscussionService
 	Audit      *AuditService
 	Dashboard  *DashboardService
 }
@@ -31,6 +31,17 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 	settingSvc := &SettingService{settings: st.Setting}
 
 	authz := &Authorizer{productRoles: st.ProductRole}
+
+	// Built first: the entity services below delegate their comment and
+	// attachment cleanup to it when they delete a row.
+	discussionSvc := &DiscussionService{
+		comments:    st.Comment,
+		attachments: st.Attachment,
+		audit:       st.Audit,
+		blobs:       blobs,
+		policy:      storage.NewPolicy(cfg.AllowedUploads),
+		authz:       authz,
+	}
 
 	return &Services{
 		Auth: &AuthService{
@@ -61,12 +72,14 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			categories:    st.Category,
 			pyramidLevels: st.PyramidLevel,
 			settings:      st.Setting,
+			attachments:   discussionSvc,
 			audit:         st.Audit,
 			authz:         authz,
 		},
 		Component: &ComponentService{
 			components:   st.Component,
 			capabilities: st.Capability,
+			comments:     discussionSvc,
 			audit:        st.Audit,
 			authz:        authz,
 		},
@@ -77,6 +90,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			products:      st.Product,
 			pyramidLevels: st.PyramidLevel,
 			runtimeEnvs:   st.RuntimeEnvironment,
+			comments:      discussionSvc,
 			audit:         st.Audit,
 			authz:         authz,
 		},
@@ -89,12 +103,14 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			requirements: st.Requirement,
 			defects:      st.Defect,
 			categories:   st.Category,
+			comments:     discussionSvc,
 			audit:        st.Audit,
 			authz:        authz,
 		},
 		Constraint: &ConstraintService{
 			constraints: st.Constraint,
 			categories:  st.Category,
+			comments:    discussionSvc,
 			audit:       st.Audit,
 			authz:       authz,
 		},
@@ -102,17 +118,11 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			testCases:       st.TestCase,
 			campaigns:       st.TestingCampaign,
 			campaignResults: st.CampaignResult,
+			comments:        discussionSvc,
 			audit:           st.Audit,
 			authz:           authz,
 		},
-		Comment: &CommentService{
-			comments:    st.Comment,
-			attachments: st.Attachment,
-			audit:       st.Audit,
-			blobs:       blobs,
-			policy:      storage.NewPolicy(cfg.AllowedUploads),
-			authz:       authz,
-		},
+		Discussion: discussionSvc,
 		Audit: &AuditService{
 			audit: st.Audit,
 			authz: authz,

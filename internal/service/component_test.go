@@ -13,6 +13,7 @@ func newComponentService(components *testutil.MockComponentStore, capabilities *
 	return &ComponentService{
 		components:   components,
 		capabilities: capabilities,
+		comments:     &recordingPurger{},
 		audit:        audit,
 		authz:        &Authorizer{productRoles: roles},
 	}

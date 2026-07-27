@@ -21,6 +21,7 @@ type MilestoneService struct {
 	products      store.ProductStore
 	pyramidLevels store.PyramidLevelStore
 	runtimeEnvs   store.RuntimeEnvironmentStore
+	comments      ownerPurger
 	audit         store.AuditStore
 	authz         *Authorizer
 }
@@ -135,6 +136,12 @@ func (s *MilestoneService) DeleteMilestone(ctx context.Context, user *model.User
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.milestones.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete milestone: %w", err)
+	}
+
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeMilestone, id); err != nil {
+		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{

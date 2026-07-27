@@ -15,6 +15,7 @@ func newBacklogService(requirements *testutil.MockRequirementStore, defects *tes
 		requirements: requirements,
 		defects:      defects,
 		categories:   &testutil.MockCategoryStore{},
+		comments:     &recordingPurger{},
 		audit:        audit,
 		authz:        &Authorizer{productRoles: roles},
 	}

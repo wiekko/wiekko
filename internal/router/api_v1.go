@@ -23,7 +23,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	backlogCtrl := controller.NewBacklog(svc.Backlog)
 	constraintCtrl := controller.NewConstraint(svc.Constraint)
 	testingCtrl := controller.NewTesting(svc.Testing)
-	commentCtrl := controller.NewComment(svc.Comment)
+	discussionCtrl := controller.NewDiscussion(svc.Discussion)
 	auditCtrl := controller.NewAudit(svc.Audit)
 
 	// Health (public).
@@ -201,18 +201,18 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("PATCH /products/{productId}/campaigns/{id}/results/{resultId}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateResult))))
 
 	// Comments.
-	apiV1.Handle("GET /products/{productId}/comments", authed(http.HandlerFunc(commentCtrl.ListComments)))
-	apiV1.Handle("POST /products/{productId}/comments", authed(csrf(http.HandlerFunc(commentCtrl.CreateComment))))
-	apiV1.Handle("GET /products/{productId}/comments/{id}", authed(http.HandlerFunc(commentCtrl.GetComment)))
-	apiV1.Handle("PATCH /products/{productId}/comments/{id}", authed(csrf(http.HandlerFunc(commentCtrl.UpdateComment))))
-	apiV1.Handle("DELETE /products/{productId}/comments/{id}", authed(csrf(http.HandlerFunc(commentCtrl.DeleteComment))))
+	apiV1.Handle("GET /products/{productId}/comments", authed(http.HandlerFunc(discussionCtrl.ListComments)))
+	apiV1.Handle("POST /products/{productId}/comments", authed(csrf(http.HandlerFunc(discussionCtrl.CreateComment))))
+	apiV1.Handle("GET /products/{productId}/comments/{id}", authed(http.HandlerFunc(discussionCtrl.GetComment)))
+	apiV1.Handle("PATCH /products/{productId}/comments/{id}", authed(csrf(http.HandlerFunc(discussionCtrl.UpdateComment))))
+	apiV1.Handle("DELETE /products/{productId}/comments/{id}", authed(csrf(http.HandlerFunc(discussionCtrl.DeleteComment))))
 
 	// Attachments.
-	apiV1.Handle("GET /products/{productId}/attachments", authed(http.HandlerFunc(commentCtrl.ListAttachments)))
-	apiV1.Handle("POST /products/{productId}/attachments", authed(csrf(http.HandlerFunc(commentCtrl.CreateAttachment))))
-	apiV1.Handle("GET /products/{productId}/attachments/{id}", authed(http.HandlerFunc(commentCtrl.GetAttachment)))
-	apiV1.Handle("GET /products/{productId}/attachments/{id}/download", authed(http.HandlerFunc(commentCtrl.DownloadAttachment)))
-	apiV1.Handle("DELETE /products/{productId}/attachments/{id}", authed(csrf(http.HandlerFunc(commentCtrl.DeleteAttachment))))
+	apiV1.Handle("GET /products/{productId}/attachments", authed(http.HandlerFunc(discussionCtrl.ListAttachments)))
+	apiV1.Handle("POST /products/{productId}/attachments", authed(csrf(http.HandlerFunc(discussionCtrl.CreateAttachment))))
+	apiV1.Handle("GET /products/{productId}/attachments/{id}", authed(http.HandlerFunc(discussionCtrl.GetAttachment)))
+	apiV1.Handle("GET /products/{productId}/attachments/{id}/download", authed(http.HandlerFunc(discussionCtrl.DownloadAttachment)))
+	apiV1.Handle("DELETE /products/{productId}/attachments/{id}", authed(csrf(http.HandlerFunc(discussionCtrl.DeleteAttachment))))
 
 	// Audit trail.
 	apiV1.Handle("GET /products/{productId}/audit", authed(http.HandlerFunc(auditCtrl.List)))

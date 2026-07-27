@@ -16,6 +16,7 @@ import (
 type ConstraintService struct {
 	constraints store.ConstraintStore
 	categories  store.CategoryStore
+	comments    ownerPurger
 	audit       store.AuditStore
 	authz       *Authorizer
 }
@@ -160,6 +161,12 @@ func (s *ConstraintService) DeleteConstraint(ctx context.Context, user *model.Us
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.constraints.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete constraint: %w", err)
+	}
+
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeConstraint, id); err != nil {
+		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{

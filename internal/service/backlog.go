@@ -17,6 +17,7 @@ type BacklogService struct {
 	requirements store.RequirementStore
 	defects      store.DefectStore
 	categories   store.CategoryStore
+	comments     ownerPurger
 	audit        store.AuditStore
 	authz        *Authorizer
 }
@@ -204,6 +205,12 @@ func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.requirements.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete requirement: %w", err)
+	}
+
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeRequirement, id); err != nil {
+		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
@@ -432,6 +439,12 @@ func (s *BacklogService) DeleteDefect(ctx context.Context, user *model.User, pro
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.defects.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete defect: %w", err)
+	}
+
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeDefect, id); err != nil {
+		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{

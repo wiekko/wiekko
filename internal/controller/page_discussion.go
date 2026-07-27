@@ -59,7 +59,7 @@ func (c *PageProductController) commentCreate(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	created, err := c.comment.CreateComment(r.Context(), user, productID, ownerType, ownerID, body)
+	created, err := c.discussion.CreateComment(r.Context(), user, productID, ownerType, ownerID, body)
 	if err != nil {
 		c.writeDiscussionErrorFor(w, r, patterns.CommentsErrorRegion, err)
 		return
@@ -79,7 +79,7 @@ func (c *PageProductController) commentDelete(w http.ResponseWriter, r *http.Req
 	productID := r.PathValue("id")
 	commentID := r.PathValue("commentId")
 
-	if err := c.comment.DeleteComment(r.Context(), user, productID, commentID); err != nil {
+	if err := c.discussion.DeleteComment(r.Context(), user, productID, commentID); err != nil {
 		writePageServiceError(w, err)
 		return
 	}
@@ -87,7 +87,7 @@ func (c *PageProductController) commentDelete(w http.ResponseWriter, r *http.Req
 	// hx-swap="outerHTML" against an empty body removes the row. If that was
 	// the last one, bring the empty state back out of band.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if remaining, err := c.comment.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
+	if remaining, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
 		_ = patterns.CommentsEmptied().Render(r.Context(), w)
 	}
 }
@@ -96,7 +96,7 @@ func (c *PageProductController) commentDelete(w http.ResponseWriter, r *http.Req
 // Mirrors buildAuditViews: display names are encrypted at rest and decrypted in
 // the store layer, so they cannot be joined in SQL.
 func (c *PageProductController) buildCommentViews(r *http.Request, user *model.User, productID, ownerType, ownerID string) ([]templates.CommentView, bool, error) {
-	comments, err := c.comment.ListComments(r.Context(), user, productID, ownerType, ownerID)
+	comments, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -180,7 +180,7 @@ func (c *PageProductController) attachmentCreate(w http.ResponseWriter, r *http.
 	}
 	defer func() { _ = file.Close() }()
 
-	created, err := c.comment.CreateAttachment(r.Context(), user, productID, service.CreateAttachmentInput{
+	created, err := c.discussion.CreateAttachment(r.Context(), user, productID, service.CreateAttachmentInput{
 		OwnerType:   ownerType,
 		OwnerID:     ownerID,
 		Filename:    filepath.Base(header.Filename),
@@ -204,13 +204,13 @@ func (c *PageProductController) attachmentDelete(w http.ResponseWriter, r *http.
 	productID := r.PathValue("id")
 	attachmentID := r.PathValue("attachmentId")
 
-	if err := c.comment.DeleteAttachment(r.Context(), user, productID, attachmentID); err != nil {
+	if err := c.discussion.DeleteAttachment(r.Context(), user, productID, attachmentID); err != nil {
 		writePageServiceError(w, err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if remaining, err := c.comment.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
+	if remaining, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
 		_ = patterns.AttachmentsEmptied().Render(r.Context(), w)
 	}
 }
@@ -222,7 +222,7 @@ func (c *PageProductController) AttachmentDownload(w http.ResponseWriter, r *htt
 	productID := r.PathValue("id")
 	attachmentID := r.PathValue("attachmentId")
 
-	a, rc, err := c.comment.OpenAttachment(r.Context(), user, productID, attachmentID)
+	a, rc, err := c.discussion.OpenAttachment(r.Context(), user, productID, attachmentID)
 	if err != nil {
 		writePageServiceError(w, err)
 		return
@@ -233,7 +233,7 @@ func (c *PageProductController) AttachmentDownload(w http.ResponseWriter, r *htt
 }
 
 func (c *PageProductController) buildAttachmentViews(r *http.Request, user *model.User, productID, ownerType, ownerID string) ([]templates.AttachmentView, bool, error) {
-	items, err := c.comment.ListAttachments(r.Context(), user, productID, ownerType, ownerID)
+	items, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID)
 	if err != nil {
 		return nil, false, err
 	}

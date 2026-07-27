@@ -15,26 +15,26 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// CommentController handles comment and attachment endpoints.
-type CommentController struct {
-	comment *service.CommentService
+// DiscussionController handles comment and attachment endpoints.
+type DiscussionController struct {
+	discussion *service.DiscussionService
 }
 
-// NewComment creates a CommentController.
-func NewComment(comment *service.CommentService) *CommentController {
-	return &CommentController{comment: comment}
+// NewDiscussion creates a DiscussionController.
+func NewDiscussion(discussion *service.DiscussionService) *DiscussionController {
+	return &DiscussionController{discussion: discussion}
 }
 
 // --- Comments ---
 
 // ListComments handles GET /products/{productId}/comments?owner_type=...&owner_id=...
-func (c *CommentController) ListComments(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) ListComments(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	ownerType := r.URL.Query().Get("owner_type")
 	ownerID := r.URL.Query().Get("owner_id")
 
-	items, err := c.comment.ListComments(r.Context(), user, productID, ownerType, ownerID)
+	items, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -48,7 +48,7 @@ func (c *CommentController) ListComments(w http.ResponseWriter, r *http.Request)
 }
 
 // CreateComment handles POST /products/{productId}/comments.
-func (c *CommentController) CreateComment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) CreateComment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
@@ -61,7 +61,7 @@ func (c *CommentController) CreateComment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	item, err := c.comment.CreateComment(r.Context(), user, productID, req.OwnerType, req.OwnerID, req.Body)
+	item, err := c.discussion.CreateComment(r.Context(), user, productID, req.OwnerType, req.OwnerID, req.Body)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -71,12 +71,12 @@ func (c *CommentController) CreateComment(w http.ResponseWriter, r *http.Request
 }
 
 // GetComment handles GET /products/{productId}/comments/{id}.
-func (c *CommentController) GetComment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) GetComment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	item, err := c.comment.GetComment(r.Context(), user, productID, id)
+	item, err := c.discussion.GetComment(r.Context(), user, productID, id)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -86,7 +86,7 @@ func (c *CommentController) GetComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateComment handles PATCH /products/{productId}/comments/{id}.
-func (c *CommentController) UpdateComment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
@@ -98,7 +98,7 @@ func (c *CommentController) UpdateComment(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	item, err := c.comment.UpdateComment(r.Context(), user, productID, id, req.Body)
+	item, err := c.discussion.UpdateComment(r.Context(), user, productID, id, req.Body)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -108,12 +108,12 @@ func (c *CommentController) UpdateComment(w http.ResponseWriter, r *http.Request
 }
 
 // DeleteComment handles DELETE /products/{productId}/comments/{id}.
-func (c *CommentController) DeleteComment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	if err := c.comment.DeleteComment(r.Context(), user, productID, id); err != nil {
+	if err := c.discussion.DeleteComment(r.Context(), user, productID, id); err != nil {
 		writeServiceError(w, err)
 		return
 	}
@@ -124,13 +124,13 @@ func (c *CommentController) DeleteComment(w http.ResponseWriter, r *http.Request
 // --- Attachments ---
 
 // ListAttachments handles GET /products/{productId}/attachments?owner_type=...&owner_id=...
-func (c *CommentController) ListAttachments(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) ListAttachments(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	ownerType := r.URL.Query().Get("owner_type")
 	ownerID := r.URL.Query().Get("owner_id")
 
-	items, err := c.comment.ListAttachments(r.Context(), user, productID, ownerType, ownerID)
+	items, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -145,7 +145,7 @@ func (c *CommentController) ListAttachments(w http.ResponseWriter, r *http.Reque
 
 // CreateAttachment handles POST /products/{productId}/attachments.
 // The body is multipart/form-data with fields owner_type, owner_id and file.
-func (c *CommentController) CreateAttachment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) CreateAttachment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
@@ -156,7 +156,7 @@ func (c *CommentController) CreateAttachment(w http.ResponseWriter, r *http.Requ
 	}
 	defer func() { _ = file.Close() }()
 
-	item, err := c.comment.CreateAttachment(r.Context(), user, productID, service.CreateAttachmentInput{
+	item, err := c.discussion.CreateAttachment(r.Context(), user, productID, service.CreateAttachmentInput{
 		OwnerType:   r.FormValue("owner_type"),
 		OwnerID:     r.FormValue("owner_id"),
 		Filename:    filepath.Base(header.Filename),
@@ -172,12 +172,12 @@ func (c *CommentController) CreateAttachment(w http.ResponseWriter, r *http.Requ
 }
 
 // DownloadAttachment handles GET /products/{productId}/attachments/{id}/download.
-func (c *CommentController) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	a, rc, err := c.comment.OpenAttachment(r.Context(), user, productID, id)
+	a, rc, err := c.discussion.OpenAttachment(r.Context(), user, productID, id)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -188,12 +188,12 @@ func (c *CommentController) DownloadAttachment(w http.ResponseWriter, r *http.Re
 }
 
 // GetAttachment handles GET /products/{productId}/attachments/{id}.
-func (c *CommentController) GetAttachment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) GetAttachment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	item, err := c.comment.GetAttachment(r.Context(), user, productID, id)
+	item, err := c.discussion.GetAttachment(r.Context(), user, productID, id)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -203,12 +203,12 @@ func (c *CommentController) GetAttachment(w http.ResponseWriter, r *http.Request
 }
 
 // DeleteAttachment handles DELETE /products/{productId}/attachments/{id}.
-func (c *CommentController) DeleteAttachment(w http.ResponseWriter, r *http.Request) {
+func (c *DiscussionController) DeleteAttachment(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	if err := c.comment.DeleteAttachment(r.Context(), user, productID, id); err != nil {
+	if err := c.discussion.DeleteAttachment(r.Context(), user, productID, id); err != nil {
 		writeServiceError(w, err)
 		return
 	}

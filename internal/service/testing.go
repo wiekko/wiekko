@@ -17,6 +17,7 @@ type TestingService struct {
 	testCases       store.TestCaseStore
 	campaigns       store.TestingCampaignStore
 	campaignResults store.CampaignResultStore
+	comments        ownerPurger
 	audit           store.AuditStore
 	authz           *Authorizer
 }
@@ -149,6 +150,12 @@ func (s *TestingService) DeleteTestCase(ctx context.Context, user *model.User, p
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.testCases.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete test case: %w", err)
+	}
+
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeTestCase, id); err != nil {
+		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{

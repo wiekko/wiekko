@@ -17,6 +17,7 @@ func newProductService(products *testutil.MockProductStore, roles *testutil.Mock
 		pyramidLevels: &testutil.MockPyramidLevelStore{CreateFunc: func(_ context.Context, _ *model.PyramidLevel) error { return nil }},
 		categories:    &testutil.MockCategoryStore{CreateFunc: func(_ context.Context, _ *model.Category) error { return nil }},
 		settings:      settings,
+		attachments:   &recordingPurger{},
 		audit:         audit,
 		authz:         &Authorizer{productRoles: roles},
 	}

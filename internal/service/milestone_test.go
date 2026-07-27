@@ -26,6 +26,7 @@ func newMilestoneService(
 		products:      products,
 		pyramidLevels: pyramidLevels,
 		runtimeEnvs:   runtimeEnvs,
+		comments:      &recordingPurger{},
 		audit:         audit,
 		authz:         &Authorizer{productRoles: roles},
 	}

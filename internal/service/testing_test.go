@@ -20,6 +20,7 @@ func newTestingService(
 		testCases:       testCases,
 		campaigns:       campaigns,
 		campaignResults: campaignResults,
+		comments:        &recordingPurger{},
 		audit:           audit,
 		authz:           &Authorizer{productRoles: roles},
 	}

@@ -20,6 +20,7 @@ type ProductService struct {
 	categories    store.CategoryStore
 	pyramidLevels store.PyramidLevelStore
 	settings      store.SettingStore
+	attachments   productPurger
 	audit         store.AuditStore
 	authz         *Authorizer
 }
@@ -244,6 +245,13 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 // Delete removes a product. Requires owner role.
 func (s *ProductService) Delete(ctx context.Context, user *model.User, productID string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+
+	// Comment and attachment rows cascade with the product, but the stored
+	// attachment bytes are outside SQL's reach — unlink them while the rows
+	// that name their paths still exist.
+	if err := s.attachments.PurgeProduct(ctx, productID); err != nil {
 		return err
 	}
 

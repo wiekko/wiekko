@@ -16,6 +16,7 @@ import (
 type ComponentService struct {
 	components   store.ComponentStore
 	capabilities store.CapabilityStore
+	comments     ownerPurger
 	audit        store.AuditStore
 	authz        *Authorizer
 }
@@ -138,6 +139,12 @@ func (s *ComponentService) DeleteComponent(ctx context.Context, user *model.User
 		return fmt.Errorf("delete component: %w", err)
 	}
 
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeComponent, id); err != nil {
+		return err
+	}
+
 	_ = s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: "component", EntityID: id,
 		UserID: user.ID, Action: "delete", CreatedAt: now,
@@ -242,6 +249,12 @@ func (s *ComponentService) DeleteCapability(ctx context.Context, user *model.Use
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.capabilities.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete capability: %w", err)
+	}
+
+	// Comments and attachments hang off polymorphic owner columns, so no
+	// foreign key cascades them away with the row above.
+	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeCapability, id); err != nil {
+		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{

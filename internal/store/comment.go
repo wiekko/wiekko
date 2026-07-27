@@ -15,6 +15,7 @@ type CommentStore interface {
 	GetByID(ctx context.Context, id string) (*model.Comment, error)
 	Update(ctx context.Context, c *model.Comment) error
 	Delete(ctx context.Context, id string) error
+	DeleteByOwner(ctx context.Context, productID, ownerType, ownerID string) error
 	ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Comment, error)
 }
 
@@ -62,6 +63,16 @@ func (s *commentStore) Update(ctx context.Context, c *model.Comment) error {
 
 func (s *commentStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM comments WHERE id = ?`, id)
+	return err
+}
+
+// DeleteByOwner removes every comment on one entity. The owner columns are
+// polymorphic and so cannot carry a foreign key; this stands in for the
+// ON DELETE CASCADE the schema cannot express.
+func (s *commentStore) DeleteByOwner(ctx context.Context, productID, ownerType, ownerID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM comments WHERE product_id = ? AND owner_type = ? AND owner_id = ?`,
+		productID, ownerType, ownerID)
 	return err
 }
 

@@ -105,7 +105,7 @@ func newUploadController(t *testing.T, maxBytes int64) *PageProductController {
 	return NewPageProduct(
 		svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation,
 		svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category,
-		svc.Constraint, svc.Comment, svc.Audit, maxBytes,
+		svc.Constraint, svc.Discussion, svc.Audit, maxBytes,
 	)
 }
 

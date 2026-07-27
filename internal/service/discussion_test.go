@@ -13,12 +13,12 @@ import (
 	"nexmap.net/internal/testutil"
 )
 
-func newCommentService(comments *testutil.MockCommentStore, attachments *testutil.MockAttachmentStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *CommentService {
-	return newCommentServiceWithBlobs(comments, attachments, audit, roles, memBlobs())
+func newDiscussionService(comments *testutil.MockCommentStore, attachments *testutil.MockAttachmentStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *DiscussionService {
+	return newDiscussionServiceWithBlobs(comments, attachments, audit, roles, memBlobs())
 }
 
-func newCommentServiceWithBlobs(comments *testutil.MockCommentStore, attachments *testutil.MockAttachmentStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore, blobs storage.Store) *CommentService {
-	return &CommentService{
+func newDiscussionServiceWithBlobs(comments *testutil.MockCommentStore, attachments *testutil.MockAttachmentStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore, blobs storage.Store) *DiscussionService {
+	return &DiscussionService{
 		comments:    comments,
 		attachments: attachments,
 		audit:       audit,
@@ -32,7 +32,7 @@ func newCommentServiceWithBlobs(comments *testutil.MockCommentStore, attachments
 func TestCreateComment(t *testing.T) {
 	t.Run("success on defect (tester role)", func(t *testing.T) {
 		var created *model.Comment
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				CreateFunc: func(_ context.Context, c *model.Comment) error { created = c; return nil },
 			},
@@ -52,7 +52,7 @@ func TestCreateComment(t *testing.T) {
 	})
 
 	t.Run("success on requirement (developer role)", func(t *testing.T) {
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				CreateFunc: func(_ context.Context, _ *model.Comment) error { return nil },
 			},
@@ -66,7 +66,7 @@ func TestCreateComment(t *testing.T) {
 	})
 
 	t.Run("empty body", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, developerRoles())
+		svc := newDiscussionService(nil, nil, nil, developerRoles())
 		_, err := svc.CreateComment(context.Background(), testutil.MakeUser(), "product-001", "requirement", "req-001", "")
 		if err == nil {
 			t.Fatal("expected error")
@@ -74,7 +74,7 @@ func TestCreateComment(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreateComment(context.Background(), testutil.MakeUser(), "product-001", "defect", "defect-001", "text")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -86,7 +86,7 @@ func TestGetComment(t *testing.T) {
 	comment := testutil.MakeComment()
 
 	t.Run("success", func(t *testing.T) {
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 			},
@@ -103,7 +103,7 @@ func TestGetComment(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.GetComment(context.Background(), testutil.MakeUser(), "product-001", "comment-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -115,7 +115,7 @@ func TestUpdateComment(t *testing.T) {
 	t.Run("author can update", func(t *testing.T) {
 		comment := testutil.MakeComment()
 		var updated *model.Comment
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 				UpdateFunc:  func(_ context.Context, c *model.Comment) error { updated = c; return nil },
@@ -137,7 +137,7 @@ func TestUpdateComment(t *testing.T) {
 
 	t.Run("admin can update others comment", func(t *testing.T) {
 		comment := testutil.MakeComment(func(c *model.Comment) { c.UserID = "user-002" })
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 				UpdateFunc:  func(_ context.Context, _ *model.Comment) error { return nil },
@@ -154,7 +154,7 @@ func TestUpdateComment(t *testing.T) {
 
 	t.Run("non-author non-admin cannot update", func(t *testing.T) {
 		comment := testutil.MakeComment(func(c *model.Comment) { c.UserID = "user-002" })
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 			},
@@ -171,7 +171,7 @@ func TestUpdateComment(t *testing.T) {
 	})
 
 	t.Run("forbidden (no product access)", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.UpdateComment(context.Background(), testutil.MakeUser(), "product-001", "comment-001", "text")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -183,7 +183,7 @@ func TestDeleteComment(t *testing.T) {
 	t.Run("author can delete", func(t *testing.T) {
 		comment := testutil.MakeComment()
 		deleted := false
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 				DeleteFunc:  func(_ context.Context, _ string) error { deleted = true; return nil },
@@ -203,7 +203,7 @@ func TestDeleteComment(t *testing.T) {
 	t.Run("product owner can delete others comment", func(t *testing.T) {
 		comment := testutil.MakeComment(func(c *model.Comment) { c.UserID = "user-002" })
 		deleted := false
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 				DeleteFunc:  func(_ context.Context, _ string) error { deleted = true; return nil },
@@ -222,7 +222,7 @@ func TestDeleteComment(t *testing.T) {
 
 	t.Run("non-author non-owner cannot delete", func(t *testing.T) {
 		comment := testutil.MakeComment(func(c *model.Comment) { c.UserID = "user-002" })
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) { return comment, nil },
 			},
@@ -241,7 +241,7 @@ func TestDeleteComment(t *testing.T) {
 
 func TestListComments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				ListByOwnerFunc: func(_ context.Context, _, _, _ string) ([]*model.Comment, error) {
 					return []*model.Comment{testutil.MakeComment()}, nil
@@ -260,7 +260,7 @@ func TestListComments(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListComments(context.Background(), testutil.MakeUser(), "product-001", "requirement", "req-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -273,7 +273,7 @@ func TestListComments(t *testing.T) {
 func TestCreateAttachment(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var created *model.Attachment
-		svc := newCommentService(nil,
+		svc := newDiscussionService(nil,
 			&testutil.MockAttachmentStore{
 				CreateFunc: func(_ context.Context, a *model.Attachment) error { created = a; return nil },
 			},
@@ -302,7 +302,7 @@ func TestCreateAttachment(t *testing.T) {
 	})
 
 	t.Run("missing filename", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, developerRoles())
+		svc := newDiscussionService(nil, nil, nil, developerRoles())
 		_, err := svc.CreateAttachment(context.Background(), testutil.MakeUser(), "product-001", CreateAttachmentInput{
 			OwnerType: model.OwnerTypeRequirement, OwnerID: "req-001", Content: strings.NewReader("x"),
 		})
@@ -312,7 +312,7 @@ func TestCreateAttachment(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.CreateAttachment(context.Background(), testutil.MakeUser(), "product-001", CreateAttachmentInput{
 			OwnerType: model.OwnerTypeRequirement, OwnerID: "req-001", Filename: "x.txt", Content: strings.NewReader("x"),
 		})
@@ -326,7 +326,7 @@ func TestGetAttachment(t *testing.T) {
 	attachment := testutil.MakeAttachment()
 
 	t.Run("success", func(t *testing.T) {
-		svc := newCommentService(nil,
+		svc := newDiscussionService(nil,
 			&testutil.MockAttachmentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Attachment, error) { return attachment, nil },
 			},
@@ -343,7 +343,7 @@ func TestGetAttachment(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.GetAttachment(context.Background(), testutil.MakeUser(), "product-001", "attachment-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
@@ -355,7 +355,7 @@ func TestDeleteAttachment(t *testing.T) {
 	t.Run("author can delete", func(t *testing.T) {
 		attachment := testutil.MakeAttachment()
 		deleted := false
-		svc := newCommentService(nil,
+		svc := newDiscussionService(nil,
 			&testutil.MockAttachmentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Attachment, error) { return attachment, nil },
 				DeleteFunc:  func(_ context.Context, _ string) error { deleted = true; return nil },
@@ -375,7 +375,7 @@ func TestDeleteAttachment(t *testing.T) {
 	t.Run("product owner can delete others attachment", func(t *testing.T) {
 		attachment := testutil.MakeAttachment(func(a *model.Attachment) { a.UserID = "user-002" })
 		deleted := false
-		svc := newCommentService(nil,
+		svc := newDiscussionService(nil,
 			&testutil.MockAttachmentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Attachment, error) { return attachment, nil },
 				DeleteFunc:  func(_ context.Context, _ string) error { deleted = true; return nil },
@@ -394,7 +394,7 @@ func TestDeleteAttachment(t *testing.T) {
 
 	t.Run("non-author non-owner cannot delete", func(t *testing.T) {
 		attachment := testutil.MakeAttachment(func(a *model.Attachment) { a.UserID = "user-002" })
-		svc := newCommentService(nil,
+		svc := newDiscussionService(nil,
 			&testutil.MockAttachmentStore{
 				GetByIDFunc: func(_ context.Context, _ string) (*model.Attachment, error) { return attachment, nil },
 			},
@@ -413,7 +413,7 @@ func TestDeleteAttachment(t *testing.T) {
 
 func TestListAttachments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		svc := newCommentService(nil,
+		svc := newDiscussionService(nil,
 			&testutil.MockAttachmentStore{
 				ListByOwnerFunc: func(_ context.Context, _, _, _ string) ([]*model.Attachment, error) {
 					return []*model.Attachment{testutil.MakeAttachment()}, nil
@@ -432,12 +432,112 @@ func TestListAttachments(t *testing.T) {
 	})
 
 	t.Run("forbidden", func(t *testing.T) {
-		svc := newCommentService(nil, nil, nil, forbiddenRoles())
+		svc := newDiscussionService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListAttachments(context.Background(), testutil.MakeUser(), "product-001", "requirement", "req-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
 		}
 	})
+}
+
+func TestPurgeOwner(t *testing.T) {
+	t.Run("removes rows and stored bytes", func(t *testing.T) {
+		blobs := memBlobs()
+		blobs.files["product-001/att-001"] = []byte("keep me? no")
+		blobs.files["product-001/att-002"] = []byte("me neither")
+		blobs.files["product-001/other"] = []byte("belongs to another entity")
+
+		var commentsPurged, attachmentsPurged bool
+		svc := newDiscussionServiceWithBlobs(
+			&testutil.MockCommentStore{
+				DeleteByOwnerFunc: func(_ context.Context, _, _, _ string) error {
+					commentsPurged = true
+					return nil
+				},
+			},
+			&testutil.MockAttachmentStore{
+				ListByOwnerFunc: func(_ context.Context, _, _, _ string) ([]*model.Attachment, error) {
+					return []*model.Attachment{
+						{ID: "att-001", StoragePath: "product-001/att-001"},
+						{ID: "att-002", StoragePath: "product-001/att-002"},
+					}, nil
+				},
+				DeleteByOwnerFunc: func(_ context.Context, _, _, _ string) error {
+					attachmentsPurged = true
+					return nil
+				},
+			},
+			noopAudit(), ownerRoles(), blobs,
+		)
+
+		err := svc.PurgeOwner(context.Background(), "product-001", model.OwnerTypeComponent, "component-001")
+		if err != nil {
+			t.Fatalf("PurgeOwner: %v", err)
+		}
+		if !commentsPurged {
+			t.Error("comments were not deleted")
+		}
+		if !attachmentsPurged {
+			t.Error("attachment rows were not deleted")
+		}
+		for _, path := range []string{"product-001/att-001", "product-001/att-002"} {
+			if _, ok := blobs.files[path]; ok {
+				t.Errorf("blob %q survived the purge", path)
+			}
+		}
+		if _, ok := blobs.files["product-001/other"]; !ok {
+			t.Error("purge deleted a blob belonging to another entity")
+		}
+	})
+
+	t.Run("listing failure leaves the rows alone", func(t *testing.T) {
+		// Deleting rows before reading their paths would strand the bytes with
+		// nothing left pointing at them.
+		svc := newDiscussionServiceWithBlobs(
+			&testutil.MockCommentStore{
+				DeleteByOwnerFunc: func(_ context.Context, _, _, _ string) error {
+					t.Error("comments deleted despite the attachment listing failing")
+					return nil
+				},
+			},
+			&testutil.MockAttachmentStore{
+				ListByOwnerFunc: func(_ context.Context, _, _, _ string) ([]*model.Attachment, error) {
+					return nil, errors.New("db down")
+				},
+				DeleteByOwnerFunc: func(_ context.Context, _, _, _ string) error {
+					t.Error("attachment rows deleted despite the listing failing")
+					return nil
+				},
+			},
+			noopAudit(), ownerRoles(), memBlobs(),
+		)
+
+		if err := svc.PurgeOwner(context.Background(), "product-001", model.OwnerTypeComponent, "component-001"); err == nil {
+			t.Fatal("PurgeOwner = nil, want error")
+		}
+	})
+}
+
+func TestPurgeProduct(t *testing.T) {
+	blobs := memBlobs()
+	blobs.files["product-001/att-001"] = []byte("orphaned by the cascade")
+
+	svc := newDiscussionServiceWithBlobs(
+		&testutil.MockCommentStore{},
+		&testutil.MockAttachmentStore{
+			ListByProductFunc: func(_ context.Context, _ string) ([]*model.Attachment, error) {
+				return []*model.Attachment{{ID: "att-001", StoragePath: "product-001/att-001"}}, nil
+			},
+		},
+		noopAudit(), ownerRoles(), blobs,
+	)
+
+	if err := svc.PurgeProduct(context.Background(), "product-001"); err != nil {
+		t.Fatalf("PurgeProduct: %v", err)
+	}
+	if _, ok := blobs.files["product-001/att-001"]; ok {
+		t.Error("blob survived the product purge")
+	}
 }
 
 // memBlobs is an in-memory storage.Store for tests.
@@ -492,7 +592,7 @@ func TestCommentsAreScopedToTheirProduct(t *testing.T) {
 	}
 
 	t.Run("get", func(t *testing.T) {
-		svc := newCommentService(store, nil, noopAudit(), ownerRoles())
+		svc := newDiscussionService(store, nil, noopAudit(), ownerRoles())
 		_, err := svc.GetComment(context.Background(), testutil.MakeUser(), "product-001", "comment-001")
 		if !errors.Is(err, ErrNotFound) {
 			t.Fatalf("err = %v, want ErrNotFound", err)
@@ -500,7 +600,7 @@ func TestCommentsAreScopedToTheirProduct(t *testing.T) {
 	})
 
 	t.Run("delete", func(t *testing.T) {
-		svc := newCommentService(store, nil, noopAudit(), ownerRoles())
+		svc := newDiscussionService(store, nil, noopAudit(), ownerRoles())
 		err := svc.DeleteComment(context.Background(), testutil.MakeUser(), "product-001", "comment-001")
 		if !errors.Is(err, ErrNotFound) {
 			t.Fatalf("err = %v, want ErrNotFound", err)
@@ -508,7 +608,7 @@ func TestCommentsAreScopedToTheirProduct(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		svc := newCommentService(store, nil, noopAudit(), ownerRoles())
+		svc := newDiscussionService(store, nil, noopAudit(), ownerRoles())
 		_, err := svc.UpdateComment(context.Background(), testutil.MakeUser(), "product-001", "comment-001", "edited")
 		if !errors.Is(err, ErrNotFound) {
 			t.Fatalf("err = %v, want ErrNotFound", err)
@@ -523,7 +623,7 @@ func TestAttachmentsAreScopedToTheirProduct(t *testing.T) {
 		DeleteFunc:  func(_ context.Context, _ string) error { t.Fatal("delete reached the store"); return nil },
 	}
 
-	svc := newCommentService(nil, store, noopAudit(), ownerRoles())
+	svc := newDiscussionService(nil, store, noopAudit(), ownerRoles())
 
 	if _, err := svc.GetAttachment(context.Background(), testutil.MakeUser(), "product-001", "attachment-001"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("GetAttachment err = %v, want ErrNotFound", err)
@@ -535,7 +635,7 @@ func TestAttachmentsAreScopedToTheirProduct(t *testing.T) {
 
 func TestCreateStampsTheAuthorizingProduct(t *testing.T) {
 	var created *model.Comment
-	svc := newCommentService(
+	svc := newDiscussionService(
 		&testutil.MockCommentStore{
 			CreateFunc: func(_ context.Context, c *model.Comment) error { created = c; return nil },
 		},
@@ -551,7 +651,7 @@ func TestCreateStampsTheAuthorizingProduct(t *testing.T) {
 }
 
 func TestOwnerTypeIsValidated(t *testing.T) {
-	svc := newCommentService(
+	svc := newDiscussionService(
 		&testutil.MockCommentStore{
 			CreateFunc: func(_ context.Context, _ *model.Comment) error { t.Fatal("create reached the store"); return nil },
 		},
@@ -577,7 +677,7 @@ func TestAllSevenOwnerTypesAreAccepted(t *testing.T) {
 		model.OwnerTypeComponent, model.OwnerTypeCapability, model.OwnerTypeMilestone,
 		model.OwnerTypeDefect,
 	} {
-		svc := newCommentService(
+		svc := newDiscussionService(
 			&testutil.MockCommentStore{
 				CreateFunc: func(_ context.Context, _ *model.Comment) error { return nil },
 			},
@@ -593,7 +693,7 @@ func TestAllSevenOwnerTypesAreAccepted(t *testing.T) {
 func TestAttachmentBytesRoundTripAndAreCleanedUp(t *testing.T) {
 	blobs := memBlobs()
 	var stored *model.Attachment
-	svc := newCommentServiceWithBlobs(nil,
+	svc := newDiscussionServiceWithBlobs(nil,
 		&testutil.MockAttachmentStore{
 			CreateFunc:  func(_ context.Context, a *model.Attachment) error { stored = a; return nil },
 			GetByIDFunc: func(_ context.Context, _ string) (*model.Attachment, error) { return stored, nil },
@@ -638,7 +738,7 @@ func TestAttachmentBytesRoundTripAndAreCleanedUp(t *testing.T) {
 // A failed metadata write must not leave an unreferenced blob on disk.
 func TestFailedMetadataWriteRemovesTheBlob(t *testing.T) {
 	blobs := memBlobs()
-	svc := newCommentServiceWithBlobs(nil,
+	svc := newDiscussionServiceWithBlobs(nil,
 		&testutil.MockAttachmentStore{
 			CreateFunc: func(_ context.Context, _ *model.Attachment) error { return errors.New("db down") },
 		},
@@ -661,8 +761,8 @@ func TestFailedMetadataWriteRemovesTheBlob(t *testing.T) {
 func TestCreateAttachmentEnforcesTheUploadPolicy(t *testing.T) {
 	zipMagic := string([]byte{'P', 'K', 0x03, 0x04, 0, 0, 0, 0})
 
-	newSvc := func(blobs *memBlobStore) *CommentService {
-		svc := newCommentServiceWithBlobs(nil,
+	newSvc := func(blobs *memBlobStore) *DiscussionService {
+		svc := newDiscussionServiceWithBlobs(nil,
 			&testutil.MockAttachmentStore{
 				CreateFunc: func(_ context.Context, _ *model.Attachment) error { return nil },
 			},
