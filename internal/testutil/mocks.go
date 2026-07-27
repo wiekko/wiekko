@@ -273,6 +273,61 @@ func (m *MockComponentStore) ListByMilestoneID(ctx context.Context, milestoneID 
 	return m.ListByMilestoneIDFunc(ctx, milestoneID)
 }
 
+// MockConstraintStore implements store.ConstraintStore with configurable function fields.
+type MockConstraintStore struct {
+	CreateFunc                       func(ctx context.Context, c *model.Constraint) error
+	GetByIDFunc                      func(ctx context.Context, id string) (*model.Constraint, error)
+	UpdateFunc                       func(ctx context.Context, c *model.Constraint) error
+	DeleteFunc                       func(ctx context.Context, id string) error
+	ListByProductIDFunc              func(ctx context.Context, productID string, filter store.ConstraintFilter) ([]*model.Constraint, error)
+	ListByMilestoneIDFunc            func(ctx context.Context, milestoneID string) ([]*model.Constraint, error)
+	NextSequenceNumberFunc           func(ctx context.Context, productID string) (int, error)
+	LinkCapabilityFunc               func(ctx context.Context, link *model.ConstraintCapability) error
+	UnlinkCapabilityFunc             func(ctx context.Context, constraintID, capabilityID string) error
+	ListCapabilitiesByConstraintFunc func(ctx context.Context, constraintID string) ([]*model.ConstraintCapability, error)
+	ListConstraintsByCapabilityFunc  func(ctx context.Context, capabilityID string) ([]*model.ConstraintCapability, error)
+}
+
+func (m *MockConstraintStore) Create(ctx context.Context, c *model.Constraint) error {
+	return m.CreateFunc(ctx, c)
+}
+func (m *MockConstraintStore) GetByID(ctx context.Context, id string) (*model.Constraint, error) {
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockConstraintStore) Update(ctx context.Context, c *model.Constraint) error {
+	return m.UpdateFunc(ctx, c)
+}
+func (m *MockConstraintStore) Delete(ctx context.Context, id string) error {
+	return m.DeleteFunc(ctx, id)
+}
+func (m *MockConstraintStore) ListByProductID(ctx context.Context, productID string, filter store.ConstraintFilter) ([]*model.Constraint, error) {
+	return m.ListByProductIDFunc(ctx, productID, filter)
+}
+func (m *MockConstraintStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Constraint, error) {
+	if m.ListByMilestoneIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByMilestoneIDFunc(ctx, milestoneID)
+}
+func (m *MockConstraintStore) NextSequenceNumber(ctx context.Context, productID string) (int, error) {
+	if m.NextSequenceNumberFunc == nil {
+		return 1, nil
+	}
+	return m.NextSequenceNumberFunc(ctx, productID)
+}
+func (m *MockConstraintStore) LinkCapability(ctx context.Context, link *model.ConstraintCapability) error {
+	return m.LinkCapabilityFunc(ctx, link)
+}
+func (m *MockConstraintStore) UnlinkCapability(ctx context.Context, constraintID, capabilityID string) error {
+	return m.UnlinkCapabilityFunc(ctx, constraintID, capabilityID)
+}
+func (m *MockConstraintStore) ListCapabilitiesByConstraint(ctx context.Context, constraintID string) ([]*model.ConstraintCapability, error) {
+	return m.ListCapabilitiesByConstraintFunc(ctx, constraintID)
+}
+func (m *MockConstraintStore) ListConstraintsByCapability(ctx context.Context, capabilityID string) ([]*model.ConstraintCapability, error) {
+	return m.ListConstraintsByCapabilityFunc(ctx, capabilityID)
+}
+
 // MockCapabilityStore implements store.CapabilityStore with configurable function fields.
 type MockCapabilityStore struct {
 	CreateFunc                        func(ctx context.Context, c *model.Capability) error

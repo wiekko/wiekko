@@ -243,6 +243,41 @@ func MakeRequirement(overrides ...func(*model.Requirement)) *model.Requirement {
 	return r
 }
 
+// MakeConstraint returns a constraint with sensible defaults.
+func MakeConstraint(overrides ...func(*model.Constraint)) *model.Constraint {
+	now := time.Now().UTC().Format(time.RFC3339)
+	c := &model.Constraint{
+		ID:              "constraint-001",
+		ProductID:       "product-001",
+		CategoryID:      "cat-001",
+		SequenceNumber:  1,
+		Title:           "Test Constraint",
+		Description:     "A test constraint",
+		ComplianceState: model.ComplianceNotAssessed,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	for _, fn := range overrides {
+		fn(c)
+	}
+	return c
+}
+
+// MakeConstraintCapability returns a constraint-capability link with sensible defaults.
+func MakeConstraintCapability(overrides ...func(*model.ConstraintCapability)) *model.ConstraintCapability {
+	now := time.Now().UTC().Format(time.RFC3339)
+	cc := &model.ConstraintCapability{
+		ID:           "concap-001",
+		ConstraintID: "constraint-001",
+		CapabilityID: "capability-001",
+		CreatedAt:    now,
+	}
+	for _, fn := range overrides {
+		fn(cc)
+	}
+	return cc
+}
+
 // MakeDefect returns a defect with sensible defaults.
 func MakeDefect(overrides ...func(*model.Defect)) *model.Defect {
 	now := time.Now().UTC().Format(time.RFC3339)
