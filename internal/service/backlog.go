@@ -466,6 +466,12 @@ func (s *BacklogService) AddDefectLink(ctx context.Context, user *model.User, pr
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleTester); err != nil {
 		return err
 	}
+	if !model.ValidDefectLinkTarget(targetType) {
+		return fmt.Errorf("invalid defect link target type: %q", targetType)
+	}
+	if targetID == "" {
+		return errors.New("target id is required")
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return s.defects.AddLink(ctx, &model.DefectLink{
@@ -518,4 +524,28 @@ func (s *BacklogService) ListLinkedDefects(ctx context.Context, user *model.User
 		linkIDs[d.ID] = link.ID
 	}
 	return defects, linkIDs, nil
+}
+
+// ListDefectLinkTargets returns the IDs of the entities of the given type linked
+// to a defect, along with a map from target ID to the link row's ID (needed to
+// unlink). Resolving the IDs to full records is left to the caller, which owns
+// the services for the respective target types. Requires viewer role.
+func (s *BacklogService) ListDefectLinkTargets(ctx context.Context, user *model.User, productID, defID, targetType string) ([]string, map[string]string, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, nil, err
+	}
+	links, err := s.defects.ListLinks(ctx, defID)
+	if err != nil {
+		return nil, nil, err
+	}
+	targetIDs := make([]string, 0, len(links))
+	linkIDs := make(map[string]string, len(links))
+	for _, link := range links {
+		if link.TargetType != targetType {
+			continue
+		}
+		targetIDs = append(targetIDs, link.TargetID)
+		linkIDs[link.TargetID] = link.ID
+	}
+	return targetIDs, linkIDs, nil
 }

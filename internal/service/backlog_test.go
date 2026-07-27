@@ -686,6 +686,53 @@ func TestAddDefectLink(t *testing.T) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
 		}
 	})
+
+	t.Run("rejects unknown target type", func(t *testing.T) {
+		linked := false
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				AddLinkFunc: func(_ context.Context, _ *model.DefectLink) error { linked = true; return nil },
+			},
+			nil, testerRoles(),
+		)
+
+		err := svc.AddDefectLink(context.Background(), testutil.MakeUser(), "product-001", "defect-001", "sprint", "sprint-001")
+		if err == nil {
+			t.Fatal("expected an error for an unsupported target type")
+		}
+		if linked {
+			t.Fatal("link was created despite an invalid target type")
+		}
+	})
+
+	t.Run("rejects empty target id", func(t *testing.T) {
+		svc := newBacklogService(nil, &testutil.MockDefectStore{}, nil, testerRoles())
+
+		err := svc.AddDefectLink(context.Background(), testutil.MakeUser(), "product-001", "defect-001", model.DefectLinkTargetComponent, "")
+		if err == nil {
+			t.Fatal("expected an error for an empty target id")
+		}
+	})
+
+	t.Run("accepts every supported target type", func(t *testing.T) {
+		for _, targetType := range []string{
+			model.DefectLinkTargetComponent,
+			model.DefectLinkTargetCapability,
+			model.DefectLinkTargetTestCase,
+			model.DefectLinkTargetRequirement,
+		} {
+			svc := newBacklogService(nil,
+				&testutil.MockDefectStore{
+					AddLinkFunc: func(_ context.Context, _ *model.DefectLink) error { return nil },
+				},
+				nil, testerRoles(),
+			)
+
+			if err := svc.AddDefectLink(context.Background(), testutil.MakeUser(), "product-001", "defect-001", targetType, "target-001"); err != nil {
+				t.Fatalf("AddDefectLink(%q): %v", targetType, err)
+			}
+		}
+	})
 }
 
 func TestRemoveDefectLink(t *testing.T) {
@@ -739,6 +786,61 @@ func TestListDefectLinks(t *testing.T) {
 	t.Run("forbidden", func(t *testing.T) {
 		svc := newBacklogService(nil, nil, nil, forbiddenRoles())
 		_, err := svc.ListDefectLinks(context.Background(), testutil.MakeUser(), "product-001", "defect-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestListDefectLinkTargets(t *testing.T) {
+	allLinks := func(_ context.Context, _ string) ([]*model.DefectLink, error) {
+		return []*model.DefectLink{
+			{ID: "link-001", TargetType: model.DefectLinkTargetComponent, TargetID: "comp-001"},
+			{ID: "link-002", TargetType: model.DefectLinkTargetCapability, TargetID: "cap-001"},
+			{ID: "link-003", TargetType: model.DefectLinkTargetComponent, TargetID: "comp-002"},
+			{ID: "link-004", TargetType: model.DefectLinkTargetRequirement, TargetID: "req-001"},
+		}, nil
+	}
+
+	t.Run("filters by target type and maps link IDs", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{ListLinksFunc: allLinks},
+			nil, viewerRoles(),
+		)
+
+		targetIDs, linkIDs, err := svc.ListDefectLinkTargets(context.Background(), testutil.MakeUser(), "product-001", "defect-001", model.DefectLinkTargetComponent)
+		if err != nil {
+			t.Fatalf("ListDefectLinkTargets: %v", err)
+		}
+		if len(targetIDs) != 2 {
+			t.Fatalf("len(targetIDs) = %d, want 2", len(targetIDs))
+		}
+		if targetIDs[0] != "comp-001" || targetIDs[1] != "comp-002" {
+			t.Fatalf("targetIDs = %v, want [comp-001 comp-002]", targetIDs)
+		}
+		if linkIDs["comp-001"] != "link-001" || linkIDs["comp-002"] != "link-003" {
+			t.Fatalf("linkIDs = %v, want comp-001→link-001, comp-002→link-003", linkIDs)
+		}
+	})
+
+	t.Run("returns empty for a type with no links", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{ListLinksFunc: allLinks},
+			nil, viewerRoles(),
+		)
+
+		targetIDs, _, err := svc.ListDefectLinkTargets(context.Background(), testutil.MakeUser(), "product-001", "defect-001", model.DefectLinkTargetTestCase)
+		if err != nil {
+			t.Fatalf("ListDefectLinkTargets: %v", err)
+		}
+		if len(targetIDs) != 0 {
+			t.Fatalf("len(targetIDs) = %d, want 0", len(targetIDs))
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newBacklogService(nil, nil, nil, forbiddenRoles())
+		_, _, err := svc.ListDefectLinkTargets(context.Background(), testutil.MakeUser(), "product-001", "defect-001", model.DefectLinkTargetComponent)
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
 		}

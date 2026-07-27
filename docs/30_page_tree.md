@@ -115,13 +115,16 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 **Defect Detail tabs:**
 
-| Tab          | Content                                        |
-|--------------|------------------------------------------------|
-| Overview     | Fields, status, assignments, criticality       |
-| Linked Items | Linked components, capabilities, test cases |
-| Comments     | Comment thread                                 |
-| Attachments  | File list + upload                             |
-| History      | Audit trail                                    |
+| Tab          | Content                                              |
+|--------------|------------------------------------------------------|
+| Overview     | Fields, status, assignments, criticality, milestone  |
+| Components   | Linked components                                    |
+| Capabilities | Linked capabilities                                  |
+| Test Cases   | Linked test cases                                    |
+| Requirements | Linked requirements                                  |
+| Comments     | Comment thread                                       |
+| Attachments  | File list + upload                                   |
+| History      | Audit trail                                          |
 
 #### Testing
 

@@ -38,13 +38,32 @@ type AuditEntry struct {
 }
 
 // DefectLink represents a polymorphic link from a defect
-// to a component, capability, or test case.
+// to a component, capability, test case, or requirement.
 type DefectLink struct {
 	ID         string
 	DefectID   string
-	TargetType string // "component", "capability", "test_case"
+	TargetType string // one of the DefectLinkTarget* constants
 	TargetID   string
 	CreatedAt  string // RFC 3339
+}
+
+// Defect link target types (FR-023, FR-501).
+const (
+	DefectLinkTargetComponent   = "component"
+	DefectLinkTargetCapability  = "capability"
+	DefectLinkTargetTestCase    = "test_case"
+	DefectLinkTargetRequirement = "requirement"
+)
+
+// ValidDefectLinkTarget reports whether targetType is a supported defect link target.
+func ValidDefectLinkTarget(targetType string) bool {
+	switch targetType {
+	case DefectLinkTargetComponent, DefectLinkTargetCapability,
+		DefectLinkTargetTestCase, DefectLinkTargetRequirement:
+		return true
+	default:
+		return false
+	}
 }
 
 // Assignment represents a user assigned to a requirement or defect.

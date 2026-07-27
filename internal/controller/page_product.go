@@ -2932,7 +2932,7 @@ func (c *PageProductController) CapabilityDefectLinkSearch(w http.ResponseWriter
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
 	all, _ := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
-	linked, _, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, "capability", capabilityID)
+	linked, _, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, model.DefectLinkTargetCapability, capabilityID)
 	linkedIDs := make(map[string]struct{}, len(linked))
 	for _, d := range linked {
 		linkedIDs[d.ID] = struct{}{}
@@ -2964,7 +2964,7 @@ func (c *PageProductController) CapabilityDefectLink(w http.ResponseWriter, r *h
 		return
 	}
 
-	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, "capability", capabilityID); err != nil {
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetCapability, capabilityID); err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
@@ -3071,7 +3071,7 @@ func (c *PageProductController) CapabilityDefectCreateAndLink(w http.ResponseWri
 		return
 	}
 
-	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, "capability", capabilityID); err != nil {
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, model.DefectLinkTargetCapability, capabilityID); err != nil {
 		rerenderForm("created defect but failed to link: " + err.Error())
 		return
 	}
@@ -3107,7 +3107,7 @@ func (c *PageProductController) loadCapabilityDefectsTabProps(r *http.Request, u
 		return productpage.CapabilityDefectsTabProps{}, err
 	}
 
-	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, "capability", capabilityID)
+	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, model.DefectLinkTargetCapability, capabilityID)
 
 	return productpage.CapabilityDefectsTabProps{
 		ProductID:    productID,
@@ -4989,7 +4989,7 @@ func (c *PageProductController) RequirementDefectLinkSearch(w http.ResponseWrite
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
 	all, _ := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
-	linked, _, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, "requirement", requirementID)
+	linked, _, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, model.DefectLinkTargetRequirement, requirementID)
 	linkedIDs := make(map[string]struct{}, len(linked))
 	for _, d := range linked {
 		linkedIDs[d.ID] = struct{}{}
@@ -5022,7 +5022,7 @@ func (c *PageProductController) RequirementDefectLink(w http.ResponseWriter, r *
 		return
 	}
 
-	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, "requirement", requirementID); err != nil {
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetRequirement, requirementID); err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
@@ -5131,7 +5131,7 @@ func (c *PageProductController) RequirementDefectCreateAndLink(w http.ResponseWr
 		return
 	}
 
-	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, "requirement", requirementID); err != nil {
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, model.DefectLinkTargetRequirement, requirementID); err != nil {
 		rerenderForm("created defect but failed to link: " + err.Error())
 		return
 	}
@@ -5170,7 +5170,7 @@ func (c *PageProductController) loadRequirementDefectsTabProps(r *http.Request, 
 		return productpage.RequirementDefectsTabProps{}, err
 	}
 
-	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, "requirement", requirementID)
+	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, model.DefectLinkTargetRequirement, requirementID)
 
 	return productpage.RequirementDefectsTabProps{
 		ProductID:     productID,
@@ -5586,10 +5586,587 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 	).Render(r.Context(), w)
 }
 
-// DefectLinkedItemsTab renders GET /products/{id}/defects/{defectId}/tabs/linked-items.
-func (c *PageProductController) DefectLinkedItemsTab(w http.ResponseWriter, r *http.Request) {
+// --- Defect link tabs (FR-023, FR-501) ---
+
+// DefectComponentsTab renders GET /products/{id}/defects/{defectId}/tabs/components.
+func (c *PageProductController) DefectComponentsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	props, err := c.loadDefectComponentsTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DefectLinkedItemsTabContent().Render(r.Context(), w)
+	_ = productpage.DefectComponentsTabContent(props).Render(r.Context(), w)
+}
+
+// DefectComponentLinkModal renders GET /products/{id}/defects/{defectId}/components/link-modal.
+func (c *PageProductController) DefectComponentLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectComponentLinkModal(productID, defectID).Render(r.Context(), w)
+}
+
+// DefectComponentLinkSearch renders GET /products/{id}/defects/{defectId}/components/link-search.
+func (c *PageProductController) DefectComponentLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListComponents(r.Context(), user, productID)
+	linkedIDs := c.defectLinkedTargetIDs(r, user, productID, defectID, model.DefectLinkTargetComponent)
+
+	candidates := make([]*model.Component, 0, len(all))
+	for _, comp := range all {
+		if _, ok := linkedIDs[comp.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(comp.Name), query) {
+			continue
+		}
+		candidates = append(candidates, comp)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectComponentLinkResults(productID, defectID, candidates).Render(r.Context(), w)
+}
+
+// DefectComponentLink handles POST /products/{id}/defects/{defectId}/components/link.
+func (c *PageProductController) DefectComponentLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	componentID := r.FormValue("component_id")
+
+	if componentID == "" {
+		http.Error(w, "component_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetComponent, componentID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeDefectComponentsTabOOB(w, r, user, productID, defectID)
+}
+
+// DefectComponentUnlink handles DELETE /products/{id}/defects/{defectId}/components/{linkId}.
+// The path parameter is the DefectLink row's ID, not the component's ID.
+func (c *PageProductController) DefectComponentUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	linkID := r.PathValue("linkId")
+
+	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadDefectComponentsTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectComponentsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadDefectComponentsTabProps(r *http.Request, user *model.User, productID, defectID string) (productpage.DefectComponentsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.DefectComponentsTabProps{}, err
+	}
+
+	targetIDs, linkIDs, _ := c.backlog.ListDefectLinkTargets(r.Context(), user, productID, defectID, model.DefectLinkTargetComponent)
+	components := make([]*model.Component, 0, len(targetIDs))
+	for _, id := range targetIDs {
+		comp, err := c.component.GetComponent(r.Context(), user, productID, id)
+		if err != nil || comp.ProductID != productID {
+			continue
+		}
+		components = append(components, comp)
+	}
+
+	return productpage.DefectComponentsTabProps{
+		ProductID:  productID,
+		DefectID:   defectID,
+		CSRFToken:  csrfToken,
+		CanLink:    c.canAddDefectLinksForRole(user, role),
+		CanUnlink:  c.canRemoveDefectLinksForRole(user, role),
+		Components: components,
+		LinkIDs:    linkIDs,
+	}, nil
+}
+
+func (c *PageProductController) writeDefectComponentsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, defectID string) {
+	props, err := c.loadDefectComponentsTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "components", productpage.DefectComponentsTabContent(props))
+}
+
+// DefectCapabilitiesTab renders GET /products/{id}/defects/{defectId}/tabs/capabilities.
+func (c *PageProductController) DefectCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	props, err := c.loadDefectCapabilitiesTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+// DefectCapabilityLinkModal renders GET /products/{id}/defects/{defectId}/capabilities/link-modal.
+func (c *PageProductController) DefectCapabilityLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectCapabilityLinkModal(productID, defectID).Render(r.Context(), w)
+}
+
+// DefectCapabilityLinkSearch renders GET /products/{id}/defects/{defectId}/capabilities/link-search.
+func (c *PageProductController) DefectCapabilityLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	linkedIDs := c.defectLinkedTargetIDs(r, user, productID, defectID, model.DefectLinkTargetCapability)
+
+	candidates := make([]*model.Capability, 0, len(all))
+	for _, cap := range all {
+		if _, ok := linkedIDs[cap.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(cap.Name), query) {
+			continue
+		}
+		candidates = append(candidates, cap)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectCapabilityLinkResults(productID, defectID, candidates).Render(r.Context(), w)
+}
+
+// DefectCapabilityLink handles POST /products/{id}/defects/{defectId}/capabilities/link.
+func (c *PageProductController) DefectCapabilityLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	capabilityID := r.FormValue("capability_id")
+
+	if capabilityID == "" {
+		http.Error(w, "capability_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetCapability, capabilityID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeDefectCapabilitiesTabOOB(w, r, user, productID, defectID)
+}
+
+// DefectCapabilityUnlink handles DELETE /products/{id}/defects/{defectId}/capabilities/{linkId}.
+// The path parameter is the DefectLink row's ID, not the capability's ID.
+func (c *PageProductController) DefectCapabilityUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	linkID := r.PathValue("linkId")
+
+	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadDefectCapabilitiesTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadDefectCapabilitiesTabProps(r *http.Request, user *model.User, productID, defectID string) (productpage.DefectCapabilitiesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.DefectCapabilitiesTabProps{}, err
+	}
+
+	targetIDs, linkIDs, _ := c.backlog.ListDefectLinkTargets(r.Context(), user, productID, defectID, model.DefectLinkTargetCapability)
+	capabilities := make([]*model.Capability, 0, len(targetIDs))
+	componentNames := make(map[string]string, len(targetIDs))
+	for _, id := range targetIDs {
+		cap, err := c.component.GetCapability(r.Context(), user, productID, id)
+		if err != nil || cap.ProductID != productID {
+			continue
+		}
+		capabilities = append(capabilities, cap)
+		if cap.ComponentID != "" {
+			if comp, err := c.component.GetComponent(r.Context(), user, productID, cap.ComponentID); err == nil {
+				componentNames[cap.ID] = comp.Name
+			}
+		}
+	}
+
+	return productpage.DefectCapabilitiesTabProps{
+		ProductID:     productID,
+		DefectID:      defectID,
+		CSRFToken:     csrfToken,
+		CanLink:       c.canAddDefectLinksForRole(user, role),
+		CanUnlink:     c.canRemoveDefectLinksForRole(user, role),
+		Capabilities:  capabilities,
+		ComponentName: componentNames,
+		LinkIDs:       linkIDs,
+	}, nil
+}
+
+func (c *PageProductController) writeDefectCapabilitiesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, defectID string) {
+	props, err := c.loadDefectCapabilitiesTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "capabilities", productpage.DefectCapabilitiesTabContent(props))
+}
+
+// DefectTestCasesTab renders GET /products/{id}/defects/{defectId}/tabs/test-cases.
+func (c *PageProductController) DefectTestCasesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	props, err := c.loadDefectTestCasesTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectTestCasesTabContent(props).Render(r.Context(), w)
+}
+
+// DefectTestCaseLinkModal renders GET /products/{id}/defects/{defectId}/test-cases/link-modal.
+func (c *PageProductController) DefectTestCaseLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectTestCaseLinkModal(productID, defectID).Render(r.Context(), w)
+}
+
+// DefectTestCaseLinkSearch renders GET /products/{id}/defects/{defectId}/test-cases/link-search.
+func (c *PageProductController) DefectTestCaseLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.testing.ListTestCases(r.Context(), user, productID)
+	linkedIDs := c.defectLinkedTargetIDs(r, user, productID, defectID, model.DefectLinkTargetTestCase)
+
+	candidates := make([]*model.TestCase, 0, len(all))
+	for _, tc := range all {
+		if _, ok := linkedIDs[tc.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(tc.Title), query) {
+			continue
+		}
+		candidates = append(candidates, tc)
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectTestCaseLinkResults(productID, defectID, candidates).Render(r.Context(), w)
+}
+
+// DefectTestCaseLink handles POST /products/{id}/defects/{defectId}/test-cases/link.
+func (c *PageProductController) DefectTestCaseLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	testCaseID := r.FormValue("test_case_id")
+
+	if testCaseID == "" {
+		http.Error(w, "test_case_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetTestCase, testCaseID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeDefectTestCasesTabOOB(w, r, user, productID, defectID)
+}
+
+// DefectTestCaseUnlink handles DELETE /products/{id}/defects/{defectId}/test-cases/{linkId}.
+// The path parameter is the DefectLink row's ID, not the test case's ID.
+func (c *PageProductController) DefectTestCaseUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	linkID := r.PathValue("linkId")
+
+	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadDefectTestCasesTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectTestCasesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadDefectTestCasesTabProps(r *http.Request, user *model.User, productID, defectID string) (productpage.DefectTestCasesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.DefectTestCasesTabProps{}, err
+	}
+
+	targetIDs, linkIDs, _ := c.backlog.ListDefectLinkTargets(r.Context(), user, productID, defectID, model.DefectLinkTargetTestCase)
+	testCases := make([]*model.TestCase, 0, len(targetIDs))
+	for _, id := range targetIDs {
+		tc, err := c.testing.GetTestCase(r.Context(), user, productID, id)
+		if err != nil || tc.ProductID != productID {
+			continue
+		}
+		testCases = append(testCases, tc)
+	}
+
+	return productpage.DefectTestCasesTabProps{
+		ProductID: productID,
+		DefectID:  defectID,
+		CSRFToken: csrfToken,
+		CanLink:   c.canAddDefectLinksForRole(user, role),
+		CanUnlink: c.canRemoveDefectLinksForRole(user, role),
+		TestCases: testCases,
+		LinkIDs:   linkIDs,
+	}, nil
+}
+
+func (c *PageProductController) writeDefectTestCasesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, defectID string) {
+	props, err := c.loadDefectTestCasesTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "test-cases", productpage.DefectTestCasesTabContent(props))
+}
+
+// DefectRequirementsTab renders GET /products/{id}/defects/{defectId}/tabs/requirements.
+func (c *PageProductController) DefectRequirementsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	props, err := c.loadDefectRequirementsTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+// DefectRequirementLinkModal renders GET /products/{id}/defects/{defectId}/requirements/link-modal.
+func (c *PageProductController) DefectRequirementLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectRequirementLinkModal(productID, defectID).Render(r.Context(), w)
+}
+
+// DefectRequirementLinkSearch renders GET /products/{id}/defects/{defectId}/requirements/link-search.
+func (c *PageProductController) DefectRequirementLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+
+	if !c.canAddDefectLinks(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	linkedIDs := c.defectLinkedTargetIDs(r, user, productID, defectID, model.DefectLinkTargetRequirement)
+
+	candidates := make([]*model.Requirement, 0, len(all))
+	for _, req := range all {
+		if _, ok := linkedIDs[req.ID]; ok {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(req.Title), query) {
+			continue
+		}
+		candidates = append(candidates, req)
+	}
+
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectRequirementLinkResults(productID, defectID, candidates, prefixes).Render(r.Context(), w)
+}
+
+// DefectRequirementLink handles POST /products/{id}/defects/{defectId}/requirements/link.
+func (c *PageProductController) DefectRequirementLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	requirementID := r.FormValue("requirement_id")
+
+	if requirementID == "" {
+		http.Error(w, "requirement_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetRequirement, requirementID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeDefectRequirementsTabOOB(w, r, user, productID, defectID)
+}
+
+// DefectRequirementUnlink handles DELETE /products/{id}/defects/{defectId}/requirements/{linkId}.
+// The path parameter is the DefectLink row's ID, not the requirement's ID.
+func (c *PageProductController) DefectRequirementUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	defectID := r.PathValue("defectId")
+	linkID := r.PathValue("linkId")
+
+	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadDefectRequirementsTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.DefectRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadDefectRequirementsTabProps(r *http.Request, user *model.User, productID, defectID string) (productpage.DefectRequirementsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.DefectRequirementsTabProps{}, err
+	}
+
+	targetIDs, linkIDs, _ := c.backlog.ListDefectLinkTargets(r.Context(), user, productID, defectID, model.DefectLinkTargetRequirement)
+	requirements := make([]*model.Requirement, 0, len(targetIDs))
+	for _, id := range targetIDs {
+		req, err := c.backlog.GetRequirement(r.Context(), user, productID, id)
+		if err != nil || req.ProductID != productID {
+			continue
+		}
+		requirements = append(requirements, req)
+	}
+
+	return productpage.DefectRequirementsTabProps{
+		ProductID:        productID,
+		DefectID:         defectID,
+		CSRFToken:        csrfToken,
+		CanLink:          c.canAddDefectLinksForRole(user, role),
+		CanUnlink:        c.canRemoveDefectLinksForRole(user, role),
+		Requirements:     requirements,
+		CategoryPrefixes: c.buildCategoryPrefixMap(r, user, productID, "requirement"),
+		LinkIDs:          linkIDs,
+	}, nil
+}
+
+func (c *PageProductController) writeDefectRequirementsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, defectID string) {
+	props, err := c.loadDefectRequirementsTabProps(r, user, productID, defectID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "requirements", productpage.DefectRequirementsTabContent(props))
+}
+
+// defectLinkedTargetIDs returns the set of target IDs of the given type already
+// linked to the defect, used to exclude them from link-picker candidates.
+func (c *PageProductController) defectLinkedTargetIDs(r *http.Request, user *model.User, productID, defectID, targetType string) map[string]struct{} {
+	targetIDs, _, _ := c.backlog.ListDefectLinkTargets(r.Context(), user, productID, defectID, targetType)
+	set := make(map[string]struct{}, len(targetIDs))
+	for _, id := range targetIDs {
+		set[id] = struct{}{}
+	}
+	return set
 }
 
 // DefectCommentsTab renders GET /products/{id}/defects/{defectId}/tabs/comments.
