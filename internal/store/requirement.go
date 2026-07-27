@@ -25,6 +25,7 @@ type RequirementStore interface {
 	ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error)
 	ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error)
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error)
+	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, requirementID, userID string) error
@@ -110,6 +111,12 @@ func (s *requirementStore) ListBySprintID(ctx context.Context, sprintID string) 
 	return s.listRequirements(ctx,
 		`SELECT `+requirementColumns+` FROM requirements WHERE sprint_id = ? ORDER BY priority DESC, created_at`,
 		sprintID)
+}
+
+func (s *requirementStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error) {
+	return s.listRequirements(ctx,
+		`SELECT `+requirementColumns+` FROM requirements WHERE milestone_id = ? ORDER BY priority DESC, created_at`,
+		milestoneID)
 }
 
 func (s *requirementStore) Assign(ctx context.Context, a *model.Assignment) error {

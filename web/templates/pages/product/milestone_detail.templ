@@ -52,7 +52,19 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 			@ui.TabPanel("overview") {
 				@MilestoneOverviewTabContent(props.Milestone)
 			}
-			@ui.TabPanelHidden("items") {
+			@ui.TabPanelHidden("components") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("capabilities") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("requirements") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("constraints") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("defects") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("sprints") {
@@ -79,17 +91,859 @@ templ MilestoneOverviewTabContent(m *model.Milestone) {
 	}
 }
 
-templ MilestoneItemsTabContent(productID string) {
-	@ui.Card() {
-		@ui.EmptyState("link", "No linked items", "Components, requirements, and defects linked to this milestone will appear here.", "", "")
+// MilestoneComponentsTabProps holds data for the milestone components tab.
+type MilestoneComponentsTabProps struct {
+	ProductID   string
+	MilestoneID string
+	CSRFToken   string
+	CanWrite    bool
+	Components []*model.Component
+}
+
+templ MilestoneComponentsTabContent(props MilestoneComponentsTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/components/link-modal", props.ProductID, props.MilestoneID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Components) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("component", "No linked components", "Components assigned to this milestone will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Name
+						}
+						@ui.TableHeader() {
+							Description
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, comp := range props.Components {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", props.ProductID, comp.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ comp.Name }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ truncate(comp.Description, 80) }
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink component"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/components/%s", props.ProductID, props.MilestoneID, comp.ID) }
+											hx-target="#tab-panel-components"
+											hx-swap="innerHTML"
+											hx-confirm="Remove this component from the milestone?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// MilestoneComponentLinkModal renders the "link existing component" modal.
+templ MilestoneComponentLinkModal(productID, milestoneID string) {
+	@ui.Modal("components-link-modal", "Link existing component", "md") {
+		<div class="space-y-4">
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search components..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/components/link-search", productID, milestoneID) }
+					hx-target="#components-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="components-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
 	}
 }
 
-templ MilestoneSprintsTabContent(productID string) {
-	@ui.Card() {
-		@ui.EmptyState("clock", "No sprints", "Sprints targeting this milestone will appear here.", "", "")
+templ MilestoneComponentLinkResults(productID, milestoneID string, candidates []*model.Component, milestoneNames map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching components.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, comp := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ comp.Name }</p>
+						if comp.Description != "" {
+							<p class="truncate text-xs text-gray-500 dark:text-gray-400">{ truncate(comp.Description, 80) }</p>
+						}
+						if comp.MilestoneID != "" {
+							<p class="text-xs text-amber-600 dark:text-amber-400">
+								{ "currently: " + milestoneNameOf(milestoneNames, comp.MilestoneID) }
+							</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/components/link", productID, milestoneID) }
+						hx-vals={ fmt.Sprintf(`{"component_id":"%s"}`, comp.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
 	}
 }
+
+// MilestoneCapabilitiesTabProps holds data for the milestone capabilities tab.
+type MilestoneCapabilitiesTabProps struct {
+	ProductID   string
+	MilestoneID string
+	CSRFToken   string
+	CanWrite    bool
+	Capabilities []*model.Capability
+}
+
+templ MilestoneCapabilitiesTabContent(props MilestoneCapabilitiesTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/capabilities/link-modal", props.ProductID, props.MilestoneID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Capabilities) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("layers", "No linked capabilities", "Capabilities assigned to this milestone will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Name
+						}
+						@ui.TableHeader() {
+							Description
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, cap := range props.Capabilities {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", props.ProductID, cap.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ cap.Name }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ truncate(cap.Description, 80) }
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink capability"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/capabilities/%s", props.ProductID, props.MilestoneID, cap.ID) }
+											hx-target="#tab-panel-capabilities"
+											hx-swap="innerHTML"
+											hx-confirm="Remove this capability from the milestone?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// MilestoneCapabilityLinkModal renders the "link existing capability" modal.
+templ MilestoneCapabilityLinkModal(productID, milestoneID string) {
+	@ui.Modal("capabilities-link-modal", "Link existing capability", "md") {
+		<div class="space-y-4">
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search capabilities..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/capabilities/link-search", productID, milestoneID) }
+					hx-target="#capabilities-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="capabilities-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ MilestoneCapabilityLinkResults(productID, milestoneID string, candidates []*model.Capability, milestoneNames map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching capabilities.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, cap := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ cap.Name }</p>
+						if cap.Description != "" {
+							<p class="truncate text-xs text-gray-500 dark:text-gray-400">{ truncate(cap.Description, 80) }</p>
+						}
+						if cap.MilestoneID != "" {
+							<p class="text-xs text-amber-600 dark:text-amber-400">
+								{ "currently: " + milestoneNameOf(milestoneNames, cap.MilestoneID) }
+							</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/capabilities/link", productID, milestoneID) }
+						hx-vals={ fmt.Sprintf(`{"capability_id":"%s"}`, cap.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// MilestoneRequirementsTabProps holds data for the milestone requirements tab.
+type MilestoneRequirementsTabProps struct {
+	ProductID   string
+	MilestoneID string
+	CSRFToken   string
+	CanWrite    bool
+	Requirements []*model.Requirement
+	CategoryPrefixes map[string]string
+}
+
+templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/requirements/link-modal", props.ProductID, props.MilestoneID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Requirements) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("clipboard-list", "No linked requirements", "Requirements assigned to this milestone will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, req := range props.Requirements {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									{ model.EntityIdentifier(milestoneCategoryPrefix(props.CategoryPrefixes, req.CategoryID), req.SequenceNumber) }
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/requirements/%s", props.ProductID, req.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ req.Title }
+									</a>
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink requirement"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/requirements/%s", props.ProductID, props.MilestoneID, req.ID) }
+											hx-target="#tab-panel-requirements"
+											hx-swap="innerHTML"
+											hx-confirm="Remove this requirement from the milestone?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// MilestoneRequirementLinkModal renders the "link existing requirement" modal.
+templ MilestoneRequirementLinkModal(productID, milestoneID string) {
+	@ui.Modal("requirements-link-modal", "Link existing requirement", "md") {
+		<div class="space-y-4">
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search requirements..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/requirements/link-search", productID, milestoneID) }
+					hx-target="#requirements-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="requirements-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ MilestoneRequirementLinkResults(productID, milestoneID string, candidates []*model.Requirement, milestoneNames map[string]string, prefixes map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching requirements.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, req := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ req.Title }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ model.EntityIdentifier(milestoneCategoryPrefix(prefixes, req.CategoryID), req.SequenceNumber) }</p>
+						if req.MilestoneID != "" {
+							<p class="text-xs text-amber-600 dark:text-amber-400">
+								{ "currently: " + milestoneNameOf(milestoneNames, req.MilestoneID) }
+							</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/requirements/link", productID, milestoneID) }
+						hx-vals={ fmt.Sprintf(`{"requirement_id":"%s"}`, req.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// MilestoneConstraintsTabProps holds data for the milestone constraints tab.
+type MilestoneConstraintsTabProps struct {
+	ProductID   string
+	MilestoneID string
+	CSRFToken   string
+	CanWrite    bool
+	Constraints []*model.Constraint
+	CategoryPrefixes map[string]string
+}
+
+templ MilestoneConstraintsTabContent(props MilestoneConstraintsTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/constraints/link-modal", props.ProductID, props.MilestoneID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Constraints) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("shield-check", "No linked constraints", "Constraints assigned to this milestone will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, con := range props.Constraints {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									{ model.EntityIdentifier(milestoneCategoryPrefix(props.CategoryPrefixes, con.CategoryID), con.SequenceNumber) }
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/constraints/%s", props.ProductID, con.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ con.Title }
+									</a>
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink constraint"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/constraints/%s", props.ProductID, props.MilestoneID, con.ID) }
+											hx-target="#tab-panel-constraints"
+											hx-swap="innerHTML"
+											hx-confirm="Remove this constraint from the milestone?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// MilestoneConstraintLinkModal renders the "link existing constraint" modal.
+templ MilestoneConstraintLinkModal(productID, milestoneID string) {
+	@ui.Modal("constraints-link-modal", "Link existing constraint", "md") {
+		<div class="space-y-4">
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search constraints..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/constraints/link-search", productID, milestoneID) }
+					hx-target="#constraints-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="constraints-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ MilestoneConstraintLinkResults(productID, milestoneID string, candidates []*model.Constraint, milestoneNames map[string]string, prefixes map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching constraints.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, con := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ con.Title }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ model.EntityIdentifier(milestoneCategoryPrefix(prefixes, con.CategoryID), con.SequenceNumber) }</p>
+						if con.MilestoneID != "" {
+							<p class="text-xs text-amber-600 dark:text-amber-400">
+								{ "currently: " + milestoneNameOf(milestoneNames, con.MilestoneID) }
+							</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/constraints/link", productID, milestoneID) }
+						hx-vals={ fmt.Sprintf(`{"constraint_id":"%s"}`, con.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// MilestoneDefectsTabProps holds data for the milestone defects tab.
+type MilestoneDefectsTabProps struct {
+	ProductID   string
+	MilestoneID string
+	CSRFToken   string
+	CanWrite    bool
+	Defects []*model.Defect
+}
+
+templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/defects/link-modal", props.ProductID, props.MilestoneID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Defects) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("bug", "No linked defects", "Defects assigned to this milestone will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Criticality
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, d := range props.Defects {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, d.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ d.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ d.Criticality }
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink defect"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/defects/%s", props.ProductID, props.MilestoneID, d.ID) }
+											hx-target="#tab-panel-defects"
+											hx-swap="innerHTML"
+											hx-confirm="Remove this defect from the milestone?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// MilestoneDefectLinkModal renders the "link existing defect" modal.
+templ MilestoneDefectLinkModal(productID, milestoneID string) {
+	@ui.Modal("defects-link-modal", "Link existing defect", "md") {
+		<div class="space-y-4">
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search defects..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/defects/link-search", productID, milestoneID) }
+					hx-target="#defects-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="defects-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ MilestoneDefectLinkResults(productID, milestoneID string, candidates []*model.Defect, milestoneNames map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching defects.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, d := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ d.Title }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ d.Criticality }</p>
+						if d.MilestoneID != "" {
+							<p class="text-xs text-amber-600 dark:text-amber-400">
+								{ "currently: " + milestoneNameOf(milestoneNames, d.MilestoneID) }
+							</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/defects/link", productID, milestoneID) }
+						hx-vals={ fmt.Sprintf(`{"defect_id":"%s"}`, d.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// MilestoneSprintsTabProps holds data for the milestone sprints tab.
+type MilestoneSprintsTabProps struct {
+	ProductID   string
+	MilestoneID string
+	CSRFToken   string
+	CanWrite    bool
+	Sprints []*model.Sprint
+}
+
+templ MilestoneSprintsTabContent(props MilestoneSprintsTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/sprints/link-modal", props.ProductID, props.MilestoneID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Sprints) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("clock", "No linked sprints", "Sprints assigned to this milestone will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Name
+						}
+						@ui.TableHeader() {
+							Dates
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, sp := range props.Sprints {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									{ sp.Name }
+								}
+								@ui.TableCellMuted() {
+									{ milestoneSprintDates(sp) }
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink sprint"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/sprints/%s", props.ProductID, props.MilestoneID, sp.ID) }
+											hx-target="#tab-panel-sprints"
+											hx-swap="innerHTML"
+											hx-confirm="Remove this sprint from the milestone?"
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// MilestoneSprintLinkModal renders the "link existing sprint" modal.
+templ MilestoneSprintLinkModal(productID, milestoneID string) {
+	@ui.Modal("sprints-link-modal", "Link existing sprint", "md") {
+		<div class="space-y-4">
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search sprints..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/sprints/link-search", productID, milestoneID) }
+					hx-target="#sprints-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="sprints-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ MilestoneSprintLinkResults(productID, milestoneID string, candidates []*model.Sprint, milestoneNames map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching sprints.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, sp := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ sp.Name }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ milestoneSprintDates(sp) }</p>
+						if sp.MilestoneID != "" {
+							<p class="text-xs text-amber-600 dark:text-amber-400">
+								{ "currently: " + milestoneNameOf(milestoneNames, sp.MilestoneID) }
+							</p>
+						}
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/sprints/link", productID, milestoneID) }
+						hx-vals={ fmt.Sprintf(`{"sprint_id":"%s"}`, sp.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
 
 templ MilestoneHistoryTabContent(entries []templates.AuditEntryView) {
 	if len(entries) == 0 {
@@ -110,7 +964,11 @@ func milestoneDetailTabs(productID, milestoneID string) []templates.TabDef {
 	base := fmt.Sprintf("/products/%s/milestones/%s/tabs", productID, milestoneID)
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
-		{ID: "items", Label: "Items", HxGet: base + "/items"},
+		{ID: "components", Label: "Components", HxGet: base + "/components"},
+		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
+		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
+		{ID: "constraints", Label: "Constraints", HxGet: base + "/constraints"},
+		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
 		{ID: "sprints", Label: "Sprints", HxGet: base + "/sprints"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},
 	}
@@ -153,4 +1011,32 @@ func milestoneDate(d string) string {
 		return "Not set"
 	}
 	return formatDate(d)
+}
+
+func milestoneNameOf(names map[string]string, milestoneID string) string {
+	if name, ok := names[milestoneID]; ok {
+		return name
+	}
+	return "another milestone"
+}
+
+func milestoneCategoryPrefix(prefixes map[string]string, categoryID string) string {
+	if prefix, ok := prefixes[categoryID]; ok {
+		return prefix
+	}
+	return "?"
+}
+
+// milestoneSprintDates renders a sprint's date range for the milestone tabs.
+func milestoneSprintDates(sp *model.Sprint) string {
+	switch {
+	case sp.StartDate == "" && sp.EndDate == "":
+		return "Not scheduled"
+	case sp.EndDate == "":
+		return formatDate(sp.StartDate)
+	case sp.StartDate == "":
+		return "until " + formatDate(sp.EndDate)
+	default:
+		return formatDate(sp.StartDate) + " – " + formatDate(sp.EndDate)
+	}
 }

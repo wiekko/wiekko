@@ -793,3 +793,38 @@ func TestListRuntimeEnvironments(t *testing.T) {
 		}
 	})
 }
+
+func TestListSprintsByMilestone(t *testing.T) {
+	t.Run("skips sprints from another product", func(t *testing.T) {
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				ListByMilestoneIDFunc: func(_ context.Context, milestoneID string) ([]*model.Sprint, error) {
+					if milestoneID != "milestone-001" {
+						t.Fatalf("milestoneID = %q, want milestone-001", milestoneID)
+					}
+					return []*model.Sprint{
+						{ID: "sprint-001", ProductID: "product-001", Name: "Sprint 1"},
+						{ID: "sprint-002", ProductID: "other-product", Name: "Sprint 2"},
+					}, nil
+				},
+			},
+			nil, nil, nil, nil, nil, viewerRoles(),
+		)
+
+		result, err := svc.ListSprintsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if err != nil {
+			t.Fatalf("ListSprintsByMilestone: %v", err)
+		}
+		if len(result) != 1 || result[0].ID != "sprint-001" {
+			t.Fatalf("result = %v, want just sprint-001", result)
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListSprintsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}

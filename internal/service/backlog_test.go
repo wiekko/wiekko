@@ -846,3 +846,70 @@ func TestListDefectLinkTargets(t *testing.T) {
 		}
 	})
 }
+
+func TestListRequirementsByMilestone(t *testing.T) {
+	t.Run("skips requirements from another product", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				ListByMilestoneIDFunc: func(_ context.Context, milestoneID string) ([]*model.Requirement, error) {
+					if milestoneID != "milestone-001" {
+						t.Fatalf("milestoneID = %q, want milestone-001", milestoneID)
+					}
+					return []*model.Requirement{
+						{ID: "req-001", ProductID: "product-001", Title: "A"},
+						{ID: "req-002", ProductID: "other-product", Title: "B"},
+					}, nil
+				},
+			},
+			nil, nil, viewerRoles(),
+		)
+
+		result, err := svc.ListRequirementsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if err != nil {
+			t.Fatalf("ListRequirementsByMilestone: %v", err)
+		}
+		if len(result) != 1 || result[0].ID != "req-001" {
+			t.Fatalf("result = %v, want just req-001", result)
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newBacklogService(nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListRequirementsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestListDefectsByMilestone(t *testing.T) {
+	t.Run("skips defects from another product", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				ListByMilestoneIDFunc: func(_ context.Context, _ string) ([]*model.Defect, error) {
+					return []*model.Defect{
+						{ID: "defect-001", ProductID: "product-001", Title: "A"},
+						{ID: "defect-002", ProductID: "other-product", Title: "B"},
+					}, nil
+				},
+			},
+			nil, viewerRoles(),
+		)
+
+		result, err := svc.ListDefectsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if err != nil {
+			t.Fatalf("ListDefectsByMilestone: %v", err)
+		}
+		if len(result) != 1 || result[0].ID != "defect-001" {
+			t.Fatalf("result = %v, want just defect-001", result)
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newBacklogService(nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListDefectsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}

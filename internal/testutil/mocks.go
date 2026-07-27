@@ -243,11 +243,12 @@ func (m *MockAuditStore) ListByEntity(ctx context.Context, entityType, entityID 
 
 // MockComponentStore implements store.ComponentStore with configurable function fields.
 type MockComponentStore struct {
-	CreateFunc          func(ctx context.Context, c *model.Component) error
-	GetByIDFunc         func(ctx context.Context, id string) (*model.Component, error)
-	UpdateFunc          func(ctx context.Context, c *model.Component) error
-	DeleteFunc          func(ctx context.Context, id string) error
-	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.Component, error)
+	CreateFunc            func(ctx context.Context, c *model.Component) error
+	GetByIDFunc           func(ctx context.Context, id string) (*model.Component, error)
+	UpdateFunc            func(ctx context.Context, c *model.Component) error
+	DeleteFunc            func(ctx context.Context, id string) error
+	ListByProductIDFunc   func(ctx context.Context, productID string) ([]*model.Component, error)
+	ListByMilestoneIDFunc func(ctx context.Context, milestoneID string) ([]*model.Component, error)
 }
 
 func (m *MockComponentStore) Create(ctx context.Context, c *model.Component) error {
@@ -265,6 +266,12 @@ func (m *MockComponentStore) Delete(ctx context.Context, id string) error {
 func (m *MockComponentStore) ListByProductID(ctx context.Context, productID string) ([]*model.Component, error) {
 	return m.ListByProductIDFunc(ctx, productID)
 }
+func (m *MockComponentStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Component, error) {
+	if m.ListByMilestoneIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByMilestoneIDFunc(ctx, milestoneID)
+}
 
 // MockCapabilityStore implements store.CapabilityStore with configurable function fields.
 type MockCapabilityStore struct {
@@ -274,6 +281,7 @@ type MockCapabilityStore struct {
 	DeleteFunc                        func(ctx context.Context, id string) error
 	ListByProductIDFunc               func(ctx context.Context, productID string) ([]*model.Capability, error)
 	ListByComponentIDFunc             func(ctx context.Context, componentID string) ([]*model.Capability, error)
+	ListByMilestoneIDFunc             func(ctx context.Context, milestoneID string) ([]*model.Capability, error)
 	LinkRequirementFunc               func(ctx context.Context, link *model.RequirementCapability) error
 	UnlinkRequirementFunc             func(ctx context.Context, capabilityID, requirementID string) error
 	ListRequirementsByCapabilityFunc  func(ctx context.Context, capabilityID string) ([]*model.RequirementCapability, error)
@@ -297,6 +305,12 @@ func (m *MockCapabilityStore) ListByProductID(ctx context.Context, productID str
 }
 func (m *MockCapabilityStore) ListByComponentID(ctx context.Context, componentID string) ([]*model.Capability, error) {
 	return m.ListByComponentIDFunc(ctx, componentID)
+}
+func (m *MockCapabilityStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Capability, error) {
+	if m.ListByMilestoneIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByMilestoneIDFunc(ctx, milestoneID)
 }
 func (m *MockCapabilityStore) LinkRequirement(ctx context.Context, link *model.RequirementCapability) error {
 	return m.LinkRequirementFunc(ctx, link)
@@ -338,11 +352,12 @@ func (m *MockMilestoneStore) ListByProductID(ctx context.Context, productID stri
 
 // MockSprintStore implements store.SprintStore with configurable function fields.
 type MockSprintStore struct {
-	CreateFunc          func(ctx context.Context, sprint *model.Sprint) error
-	GetByIDFunc         func(ctx context.Context, id string) (*model.Sprint, error)
-	UpdateFunc          func(ctx context.Context, sprint *model.Sprint) error
-	DeleteFunc          func(ctx context.Context, id string) error
-	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.Sprint, error)
+	CreateFunc            func(ctx context.Context, sprint *model.Sprint) error
+	GetByIDFunc           func(ctx context.Context, id string) (*model.Sprint, error)
+	UpdateFunc            func(ctx context.Context, sprint *model.Sprint) error
+	DeleteFunc            func(ctx context.Context, id string) error
+	ListByProductIDFunc   func(ctx context.Context, productID string) ([]*model.Sprint, error)
+	ListByMilestoneIDFunc func(ctx context.Context, milestoneID string) ([]*model.Sprint, error)
 }
 
 func (m *MockSprintStore) Create(ctx context.Context, sprint *model.Sprint) error {
@@ -359,6 +374,12 @@ func (m *MockSprintStore) Delete(ctx context.Context, id string) error {
 }
 func (m *MockSprintStore) ListByProductID(ctx context.Context, productID string) ([]*model.Sprint, error) {
 	return m.ListByProductIDFunc(ctx, productID)
+}
+func (m *MockSprintStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Sprint, error) {
+	if m.ListByMilestoneIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByMilestoneIDFunc(ctx, milestoneID)
 }
 
 // MockStatusStore implements store.StatusStore with configurable function fields.
@@ -452,6 +473,7 @@ type MockRequirementStore struct {
 	ListByProductIDFunc    func(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error)
 	ListByParentIDFunc     func(ctx context.Context, parentID string) ([]*model.Requirement, error)
 	ListBySprintIDFunc     func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
+	ListByMilestoneIDFunc  func(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumberFunc func(ctx context.Context, productID string) (int, error)
 	AssignFunc             func(ctx context.Context, a *model.Assignment) error
 	UnassignFunc           func(ctx context.Context, requirementID, userID string) error
@@ -479,6 +501,12 @@ func (m *MockRequirementStore) ListByParentID(ctx context.Context, parentID stri
 func (m *MockRequirementStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error) {
 	return m.ListBySprintIDFunc(ctx, sprintID)
 }
+func (m *MockRequirementStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error) {
+	if m.ListByMilestoneIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByMilestoneIDFunc(ctx, milestoneID)
+}
 func (m *MockRequirementStore) NextSequenceNumber(ctx context.Context, productID string) (int, error) {
 	if m.NextSequenceNumberFunc != nil {
 		return m.NextSequenceNumberFunc(ctx, productID)
@@ -497,15 +525,16 @@ func (m *MockRequirementStore) ListAssignees(ctx context.Context, requirementID 
 
 // MockDefectStore implements store.DefectStore with configurable function fields.
 type MockDefectStore struct {
-	CreateFunc          func(ctx context.Context, d *model.Defect) error
-	GetByIDFunc         func(ctx context.Context, id string) (*model.Defect, error)
-	UpdateFunc          func(ctx context.Context, d *model.Defect) error
-	DeleteFunc          func(ctx context.Context, id string) error
-	ListByProductIDFunc func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
-	ListBySprintIDFunc  func(ctx context.Context, sprintID string) ([]*model.Defect, error)
-	AssignFunc          func(ctx context.Context, a *model.Assignment) error
-	UnassignFunc        func(ctx context.Context, defectID, userID string) error
-	ListAssigneesFunc   func(ctx context.Context, defectID string) ([]*model.Assignment, error)
+	CreateFunc            func(ctx context.Context, d *model.Defect) error
+	GetByIDFunc           func(ctx context.Context, id string) (*model.Defect, error)
+	UpdateFunc            func(ctx context.Context, d *model.Defect) error
+	DeleteFunc            func(ctx context.Context, id string) error
+	ListByProductIDFunc   func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
+	ListBySprintIDFunc    func(ctx context.Context, sprintID string) ([]*model.Defect, error)
+	ListByMilestoneIDFunc func(ctx context.Context, milestoneID string) ([]*model.Defect, error)
+	AssignFunc            func(ctx context.Context, a *model.Assignment) error
+	UnassignFunc          func(ctx context.Context, defectID, userID string) error
+	ListAssigneesFunc     func(ctx context.Context, defectID string) ([]*model.Assignment, error)
 	AddLinkFunc           func(ctx context.Context, link *model.DefectLink) error
 	RemoveLinkFunc        func(ctx context.Context, id string) error
 	ListLinksFunc         func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
@@ -529,6 +558,12 @@ func (m *MockDefectStore) ListByProductID(ctx context.Context, productID string,
 }
 func (m *MockDefectStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error) {
 	return m.ListBySprintIDFunc(ctx, sprintID)
+}
+func (m *MockDefectStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Defect, error) {
+	if m.ListByMilestoneIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByMilestoneIDFunc(ctx, milestoneID)
 }
 func (m *MockDefectStore) Assign(ctx context.Context, a *model.Assignment) error {
 	return m.AssignFunc(ctx, a)
@@ -603,10 +638,10 @@ func (m *MockAttachmentStore) ListByOwner(ctx context.Context, ownerType, ownerI
 
 // MockTestCaseStore implements store.TestCaseStore with configurable function fields.
 type MockTestCaseStore struct {
-	CreateFunc               func(ctx context.Context, tc *model.TestCase) error
-	GetByIDFunc              func(ctx context.Context, id string) (*model.TestCase, error)
-	UpdateFunc               func(ctx context.Context, tc *model.TestCase) error
-	DeleteFunc               func(ctx context.Context, id string) error
+	CreateFunc                         func(ctx context.Context, tc *model.TestCase) error
+	GetByIDFunc                        func(ctx context.Context, id string) (*model.TestCase, error)
+	UpdateFunc                         func(ctx context.Context, tc *model.TestCase) error
+	DeleteFunc                         func(ctx context.Context, id string) error
 	ListByProductIDFunc                func(ctx context.Context, productID string) ([]*model.TestCase, error)
 	ListByCapabilityIDFunc             func(ctx context.Context, capabilityID string) ([]*model.TestCase, error)
 	ListByComponentIDFunc              func(ctx context.Context, componentID string) ([]*model.TestCase, error)
@@ -615,8 +650,8 @@ type MockTestCaseStore struct {
 	ListRequirementLinksFunc           func(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
 	ListTestCaseLinksByRequirementFunc func(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error)
 	AddEnvironmentFunc                 func(ctx context.Context, id, testCaseID, environmentID string) error
-	RemoveEnvironmentFunc    func(ctx context.Context, testCaseID, environmentID string) error
-	ListEnvironmentsFunc     func(ctx context.Context, testCaseID string) ([]string, error)
+	RemoveEnvironmentFunc              func(ctx context.Context, testCaseID, environmentID string) error
+	ListEnvironmentsFunc               func(ctx context.Context, testCaseID string) ([]string, error)
 }
 
 func (m *MockTestCaseStore) Create(ctx context.Context, tc *model.TestCase) error {

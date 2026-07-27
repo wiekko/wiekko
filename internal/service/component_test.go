@@ -488,3 +488,72 @@ func TestListRequirementCapabilities(t *testing.T) {
 		}
 	})
 }
+
+func TestListComponentsByMilestone(t *testing.T) {
+	store := &testutil.MockComponentStore{
+		ListByMilestoneIDFunc: func(_ context.Context, milestoneID string) ([]*model.Component, error) {
+			if milestoneID != "milestone-001" {
+				t.Fatalf("milestoneID = %q, want milestone-001", milestoneID)
+			}
+			return []*model.Component{
+				{ID: "comp-001", ProductID: "product-001", Name: "A"},
+				{ID: "comp-002", ProductID: "other-product", Name: "B"},
+			}, nil
+		},
+	}
+
+	t.Run("skips components from another product", func(t *testing.T) {
+		svc := newComponentService(store, nil, nil, viewerRoles())
+
+		result, err := svc.ListComponentsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if err != nil {
+			t.Fatalf("ListComponentsByMilestone: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("len(result) = %d, want 1", len(result))
+		}
+		if result[0].ID != "comp-001" {
+			t.Fatalf("result[0].ID = %q, want comp-001", result[0].ID)
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newComponentService(nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListComponentsByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestListCapabilitiesByMilestone(t *testing.T) {
+	t.Run("skips capabilities from another product", func(t *testing.T) {
+		svc := newComponentService(nil,
+			&testutil.MockCapabilityStore{
+				ListByMilestoneIDFunc: func(_ context.Context, _ string) ([]*model.Capability, error) {
+					return []*model.Capability{
+						{ID: "cap-001", ProductID: "product-001", Name: "A"},
+						{ID: "cap-002", ProductID: "other-product", Name: "B"},
+					}, nil
+				},
+			},
+			nil, viewerRoles(),
+		)
+
+		result, err := svc.ListCapabilitiesByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if err != nil {
+			t.Fatalf("ListCapabilitiesByMilestone: %v", err)
+		}
+		if len(result) != 1 || result[0].ID != "cap-001" {
+			t.Fatalf("result = %v, want just cap-001", result)
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newComponentService(nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListCapabilitiesByMilestone(context.Background(), testutil.MakeUser(), "product-001", "milestone-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}

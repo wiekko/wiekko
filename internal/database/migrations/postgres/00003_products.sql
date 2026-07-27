@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS components (
     UNIQUE(product_id, name)
 );
 CREATE INDEX IF NOT EXISTS idx_components_product_id ON components(product_id);
+CREATE INDEX IF NOT EXISTS idx_components_milestone_id ON components(milestone_id);
 
 -- Capabilities: linked to components or top-level (FR-003, FR-004)
 CREATE TABLE IF NOT EXISTS capabilities (
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS capabilities (
 );
 CREATE INDEX IF NOT EXISTS idx_capabilities_product_id ON capabilities(product_id);
 CREATE INDEX IF NOT EXISTS idx_capabilities_component_id ON capabilities(component_id);
+CREATE INDEX IF NOT EXISTS idx_capabilities_milestone_id ON capabilities(milestone_id);
 
 -- Configurable statuses for requirements and defects (FR-323)
 CREATE TABLE IF NOT EXISTS statuses (
@@ -104,6 +106,7 @@ CREATE TABLE IF NOT EXISTS sprints (
     updated_at   TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sprints_product_id ON sprints(product_id);
+CREATE INDEX IF NOT EXISTS idx_sprints_milestone_id ON sprints(milestone_id);
 
 -- Requirements: backlog items (FR-005..FR-010, FR-013)
 CREATE TABLE IF NOT EXISTS requirements (

@@ -223,6 +223,26 @@ func (s *BacklogService) ListRequirements(ctx context.Context, user *model.User,
 }
 
 // ListChildRequirements returns child requirements. Requires viewer role.
+// ListRequirementsByMilestone returns the requirements assigned to a milestone.
+// Rows belonging to another product are skipped. Requires viewer role.
+func (s *BacklogService) ListRequirementsByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Requirement, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	all, err := s.requirements.ListByMilestoneID(ctx, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Requirement, 0, len(all))
+	for _, r := range all {
+		if r.ProductID != productID {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 func (s *BacklogService) ListChildRequirements(ctx context.Context, user *model.User, productID, parentID string) ([]*model.Requirement, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
@@ -428,6 +448,26 @@ func (s *BacklogService) ListDefects(ctx context.Context, user *model.User, prod
 		return nil, err
 	}
 	return s.defects.ListByProductID(ctx, productID, filter)
+}
+
+// ListDefectsByMilestone returns the defects assigned to a milestone.
+// Rows belonging to another product are skipped. Requires viewer role.
+func (s *BacklogService) ListDefectsByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Defect, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	all, err := s.defects.ListByMilestoneID(ctx, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Defect, 0, len(all))
+	for _, d := range all {
+		if d.ProductID != productID {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out, nil
 }
 
 // AssignDefect assigns a user to a defect. Requires owner role.

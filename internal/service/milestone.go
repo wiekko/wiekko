@@ -278,6 +278,26 @@ func (s *MilestoneService) ListSprints(ctx context.Context, user *model.User, pr
 	return s.sprints.ListByProductID(ctx, productID)
 }
 
+// ListSprintsByMilestone returns the sprints targeting a milestone.
+// Rows belonging to another product are skipped. Requires viewer role.
+func (s *MilestoneService) ListSprintsByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Sprint, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	all, err := s.sprints.ListByMilestoneID(ctx, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Sprint, 0, len(all))
+	for _, sp := range all {
+		if sp.ProductID != productID {
+			continue
+		}
+		out = append(out, sp)
+	}
+	return out, nil
+}
+
 // --- Status ---
 
 // otherEntityType returns the counterpart entity type for status sync.

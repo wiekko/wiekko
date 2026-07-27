@@ -17,6 +17,7 @@ type CapabilityStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string) ([]*model.Capability, error)
 	ListByComponentID(ctx context.Context, componentID string) ([]*model.Capability, error)
+	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Capability, error)
 	LinkRequirement(ctx context.Context, link *model.RequirementCapability) error
 	UnlinkRequirement(ctx context.Context, capabilityID, requirementID string) error
 	ListRequirementsByCapability(ctx context.Context, capabilityID string) ([]*model.RequirementCapability, error)
@@ -68,6 +69,26 @@ func (s *capabilityStore) ListByProductID(ctx context.Context, productID string)
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, product_id, component_id, name, description, milestone_id, created_at, updated_at
 		 FROM capabilities WHERE product_id = ? ORDER BY name`, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var caps []*model.Capability
+	for rows.Next() {
+		c, err := scanCapability(rows)
+		if err != nil {
+			return nil, err
+		}
+		caps = append(caps, c)
+	}
+	return caps, rows.Err()
+}
+
+func (s *capabilityStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Capability, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, product_id, component_id, name, description, milestone_id, created_at, updated_at
+		 FROM capabilities WHERE milestone_id = ? ORDER BY name`, milestoneID)
 	if err != nil {
 		return nil, err
 	}

@@ -16,6 +16,7 @@ type ComponentStore interface {
 	Update(ctx context.Context, c *model.Component) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string) ([]*model.Component, error)
+	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Component, error)
 }
 
 type componentStore struct {
@@ -62,6 +63,26 @@ func (s *componentStore) ListByProductID(ctx context.Context, productID string) 
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, product_id, name, description, milestone_id, created_at, updated_at
 		 FROM components WHERE product_id = ? ORDER BY name`, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var components []*model.Component
+	for rows.Next() {
+		c, err := scanComponent(rows)
+		if err != nil {
+			return nil, err
+		}
+		components = append(components, c)
+	}
+	return components, rows.Err()
+}
+
+func (s *componentStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Component, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, product_id, name, description, milestone_id, created_at, updated_at
+		 FROM components WHERE milestone_id = ? ORDER BY name`, milestoneID)
 	if err != nil {
 		return nil, err
 	}

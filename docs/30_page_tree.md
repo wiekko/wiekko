@@ -189,12 +189,20 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 **Milestone Detail tabs:**
 
-| Tab      | Content                                  |
-|----------|------------------------------------------|
-| Overview | Fields, type, due date                   |
-| Items    | Linked components, requirements, defects |
-| Sprints  | Sprints targeting this milestone         |
-| History  | Audit trail                              |
+| Tab          | Content                           |
+|--------------|-----------------------------------|
+| Overview     | Fields, type, due date            |
+| Components   | Components assigned to this milestone   |
+| Capabilities | Capabilities assigned to this milestone |
+| Requirements | Requirements assigned to this milestone |
+| Constraints  | Constraints assigned to this milestone  |
+| Defects      | Defects assigned to this milestone      |
+| Sprints      | Sprints targeting this milestone        |
+| History      | Audit trail                       |
+
+Assignment is a single FK on the child, so an item belongs to at most one milestone.
+The link picker therefore offers items already assigned elsewhere, labelled with their
+current milestone; linking reassigns them.
 
 **Sprint Detail tabs:**
 

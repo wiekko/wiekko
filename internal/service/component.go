@@ -268,6 +268,46 @@ func (s *ComponentService) ListCapabilitiesByComponent(ctx context.Context, user
 	return s.capabilities.ListByComponentID(ctx, componentID)
 }
 
+// ListComponentsByMilestone returns the components assigned to a milestone.
+// Rows belonging to another product are skipped. Requires viewer role.
+func (s *ComponentService) ListComponentsByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Component, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	all, err := s.components.ListByMilestoneID(ctx, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Component, 0, len(all))
+	for _, c := range all {
+		if c.ProductID != productID {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// ListCapabilitiesByMilestone returns the capabilities assigned to a milestone.
+// Rows belonging to another product are skipped. Requires viewer role.
+func (s *ComponentService) ListCapabilitiesByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Capability, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	all, err := s.capabilities.ListByMilestoneID(ctx, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Capability, 0, len(all))
+	for _, c := range all {
+		if c.ProductID != productID {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
 // LinkRequirementToCapability creates a link between a requirement and a capability. Requires owner role.
 func (s *ComponentService) LinkRequirementToCapability(ctx context.Context, user *model.User, productID, capabilityID, requirementID string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {

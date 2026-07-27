@@ -21,6 +21,7 @@ type ConstraintStore interface {
 	Update(ctx context.Context, c *model.Constraint) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter ConstraintFilter) ([]*model.Constraint, error)
+	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Constraint, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	LinkCapability(ctx context.Context, link *model.ConstraintCapability) error
 	UnlinkCapability(ctx context.Context, constraintID, capabilityID string) error
@@ -81,6 +82,26 @@ func (s *constraintStore) ListByProductID(ctx context.Context, productID string,
 	query += ` ORDER BY priority DESC, created_at`
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var constraints []*model.Constraint
+	for rows.Next() {
+		c, err := scanConstraint(rows)
+		if err != nil {
+			return nil, err
+		}
+		constraints = append(constraints, c)
+	}
+	return constraints, rows.Err()
+}
+
+func (s *constraintStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Constraint, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+constraintColumns+` FROM constraints WHERE milestone_id = ? ORDER BY priority DESC, created_at`,
+		milestoneID)
 	if err != nil {
 		return nil, err
 	}

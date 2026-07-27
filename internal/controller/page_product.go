@@ -1251,20 +1251,913 @@ func (c *PageProductController) MilestoneOverviewTab(w http.ResponseWriter, r *h
 	_ = productpage.MilestoneOverviewTabContent(m).Render(r.Context(), w)
 }
 
-// MilestoneItemsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/items.
-func (c *PageProductController) MilestoneItemsTab(w http.ResponseWriter, r *http.Request) {
+// --- Milestone link tabs (FR-013, FR-025, FR-029) ---
+//
+// A milestone link is a nullable FK on the child entity, so linking is an
+// update of that column and unlinking clears it. Every write path requires
+// owner role, so one predicate gates all six tabs.
+
+func (c *PageProductController) canEditMilestoneLinks(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner
+}
+
+func (c *PageProductController) canEditMilestoneLinksFor(r *http.Request, user *model.User, productID string) bool {
+	if user.IsAdmin {
+		return true
+	}
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return false
+	}
+	return c.canEditMilestoneLinks(user, role)
+}
+
+// MilestoneComponentsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/components.
+func (c *PageProductController) MilestoneComponentsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	props, err := c.loadMilestoneComponentsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneComponentsTabContent(props).Render(r.Context(), w)
+}
+
+// MilestoneComponentLinkModal renders GET /products/{id}/milestones/{milestoneId}/components/link-modal.
+func (c *PageProductController) MilestoneComponentLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneItemsTabContent(productID).Render(r.Context(), w)
+	_ = productpage.MilestoneComponentLinkModal(productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneComponentLinkSearch renders GET /products/{id}/milestones/{milestoneId}/components/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneComponentLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListComponents(r.Context(), user, productID)
+
+	candidates := make([]*model.Component, 0, len(all))
+	for _, comp := range all {
+		if comp.MilestoneID == milestoneID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(comp.Name), query) {
+			continue
+		}
+		candidates = append(candidates, comp)
+	}
+
+	milestoneNames := c.buildMilestoneMap(r, user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneComponentLinkResults(productID, milestoneID, candidates, milestoneNames).Render(r.Context(), w)
+}
+
+// MilestoneComponentLink handles POST /products/{id}/milestones/{milestoneId}/components/link.
+func (c *PageProductController) MilestoneComponentLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.FormValue("component_id")
+
+	if targetID == "" {
+		http.Error(w, "component_id is required", http.StatusBadRequest)
+		return
+	}
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := milestoneID
+	if _, err := c.component.UpdateComponent(r.Context(), user, productID, targetID, service.UpdateComponentInput{
+		MilestoneID: &mid,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeMilestoneComponentsTabOOB(w, r, user, productID, milestoneID)
+}
+
+// MilestoneComponentUnlink handles DELETE /products/{id}/milestones/{milestoneId}/components/{componentId}.
+// The path parameter is the component's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneComponentUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.PathValue("componentId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	empty := ""
+	if _, err := c.component.UpdateComponent(r.Context(), user, productID, targetID, service.UpdateComponentInput{
+		MilestoneID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadMilestoneComponentsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneComponentsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadMilestoneComponentsTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneComponentsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.MilestoneComponentsTabProps{}, err
+	}
+
+	items, _ := c.component.ListComponentsByMilestone(r.Context(), user, productID, milestoneID)
+
+	return productpage.MilestoneComponentsTabProps{
+		ProductID:   productID,
+		MilestoneID: milestoneID,
+		CSRFToken:   csrfToken,
+		CanWrite:    c.canEditMilestoneLinks(user, role),
+		Components:  items,
+	}, nil
+}
+
+func (c *PageProductController) writeMilestoneComponentsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
+	props, err := c.loadMilestoneComponentsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "components", productpage.MilestoneComponentsTabContent(props))
+}
+
+// MilestoneCapabilitiesTab renders GET /products/{id}/milestones/{milestoneId}/tabs/capabilities.
+func (c *PageProductController) MilestoneCapabilitiesTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	props, err := c.loadMilestoneCapabilitiesTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+// MilestoneCapabilityLinkModal renders GET /products/{id}/milestones/{milestoneId}/capabilities/link-modal.
+func (c *PageProductController) MilestoneCapabilityLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneCapabilityLinkModal(productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneCapabilityLinkSearch renders GET /products/{id}/milestones/{milestoneId}/capabilities/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneCapabilityLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.component.ListCapabilities(r.Context(), user, productID)
+
+	candidates := make([]*model.Capability, 0, len(all))
+	for _, cap := range all {
+		if cap.MilestoneID == milestoneID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(cap.Name), query) {
+			continue
+		}
+		candidates = append(candidates, cap)
+	}
+
+	milestoneNames := c.buildMilestoneMap(r, user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneCapabilityLinkResults(productID, milestoneID, candidates, milestoneNames).Render(r.Context(), w)
+}
+
+// MilestoneCapabilityLink handles POST /products/{id}/milestones/{milestoneId}/capabilities/link.
+func (c *PageProductController) MilestoneCapabilityLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.FormValue("capability_id")
+
+	if targetID == "" {
+		http.Error(w, "capability_id is required", http.StatusBadRequest)
+		return
+	}
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := milestoneID
+	if _, err := c.component.UpdateCapability(r.Context(), user, productID, targetID, service.UpdateCapabilityInput{
+		MilestoneID: &mid,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeMilestoneCapabilitiesTabOOB(w, r, user, productID, milestoneID)
+}
+
+// MilestoneCapabilityUnlink handles DELETE /products/{id}/milestones/{milestoneId}/capabilities/{capabilityId}.
+// The path parameter is the capability's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneCapabilityUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.PathValue("capabilityId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	empty := ""
+	if _, err := c.component.UpdateCapability(r.Context(), user, productID, targetID, service.UpdateCapabilityInput{
+		MilestoneID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadMilestoneCapabilitiesTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneCapabilitiesTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadMilestoneCapabilitiesTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneCapabilitiesTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.MilestoneCapabilitiesTabProps{}, err
+	}
+
+	items, _ := c.component.ListCapabilitiesByMilestone(r.Context(), user, productID, milestoneID)
+
+	return productpage.MilestoneCapabilitiesTabProps{
+		ProductID:    productID,
+		MilestoneID:  milestoneID,
+		CSRFToken:    csrfToken,
+		CanWrite:     c.canEditMilestoneLinks(user, role),
+		Capabilities: items,
+	}, nil
+}
+
+func (c *PageProductController) writeMilestoneCapabilitiesTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
+	props, err := c.loadMilestoneCapabilitiesTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "capabilities", productpage.MilestoneCapabilitiesTabContent(props))
+}
+
+// MilestoneRequirementsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/requirements.
+func (c *PageProductController) MilestoneRequirementsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	props, err := c.loadMilestoneRequirementsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+// MilestoneRequirementLinkModal renders GET /products/{id}/milestones/{milestoneId}/requirements/link-modal.
+func (c *PageProductController) MilestoneRequirementLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneRequirementLinkModal(productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneRequirementLinkSearch renders GET /products/{id}/milestones/{milestoneId}/requirements/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneRequirementLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+
+	candidates := make([]*model.Requirement, 0, len(all))
+	for _, req := range all {
+		if req.MilestoneID == milestoneID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(req.Title), query) {
+			continue
+		}
+		candidates = append(candidates, req)
+	}
+
+	milestoneNames := c.buildMilestoneMap(r, user, productID)
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneRequirementLinkResults(productID, milestoneID, candidates, milestoneNames, prefixes).Render(r.Context(), w)
+}
+
+// MilestoneRequirementLink handles POST /products/{id}/milestones/{milestoneId}/requirements/link.
+func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.FormValue("requirement_id")
+
+	if targetID == "" {
+		http.Error(w, "requirement_id is required", http.StatusBadRequest)
+		return
+	}
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := milestoneID
+	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
+		MilestoneID: &mid,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeMilestoneRequirementsTabOOB(w, r, user, productID, milestoneID)
+}
+
+// MilestoneRequirementUnlink handles DELETE /products/{id}/milestones/{milestoneId}/requirements/{requirementId}.
+// The path parameter is the requirement's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.PathValue("requirementId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	empty := ""
+	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
+		MilestoneID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadMilestoneRequirementsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneRequirementsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadMilestoneRequirementsTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneRequirementsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.MilestoneRequirementsTabProps{}, err
+	}
+
+	items, _ := c.backlog.ListRequirementsByMilestone(r.Context(), user, productID, milestoneID)
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+
+	return productpage.MilestoneRequirementsTabProps{
+		ProductID:        productID,
+		MilestoneID:      milestoneID,
+		CSRFToken:        csrfToken,
+		CanWrite:         c.canEditMilestoneLinks(user, role),
+		Requirements:     items,
+		CategoryPrefixes: prefixes,
+	}, nil
+}
+
+func (c *PageProductController) writeMilestoneRequirementsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
+	props, err := c.loadMilestoneRequirementsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "requirements", productpage.MilestoneRequirementsTabContent(props))
+}
+
+// MilestoneConstraintsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/constraints.
+func (c *PageProductController) MilestoneConstraintsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	props, err := c.loadMilestoneConstraintsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneConstraintsTabContent(props).Render(r.Context(), w)
+}
+
+// MilestoneConstraintLinkModal renders GET /products/{id}/milestones/{milestoneId}/constraints/link-modal.
+func (c *PageProductController) MilestoneConstraintLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneConstraintLinkModal(productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneConstraintLinkSearch renders GET /products/{id}/milestones/{milestoneId}/constraints/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneConstraintLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.constraint.ListConstraints(r.Context(), user, productID, store.ConstraintFilter{})
+
+	candidates := make([]*model.Constraint, 0, len(all))
+	for _, con := range all {
+		if con.MilestoneID == milestoneID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(con.Title), query) {
+			continue
+		}
+		candidates = append(candidates, con)
+	}
+
+	milestoneNames := c.buildMilestoneMap(r, user, productID)
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneConstraintLinkResults(productID, milestoneID, candidates, milestoneNames, prefixes).Render(r.Context(), w)
+}
+
+// MilestoneConstraintLink handles POST /products/{id}/milestones/{milestoneId}/constraints/link.
+func (c *PageProductController) MilestoneConstraintLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.FormValue("constraint_id")
+
+	if targetID == "" {
+		http.Error(w, "constraint_id is required", http.StatusBadRequest)
+		return
+	}
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := milestoneID
+	if _, err := c.constraint.UpdateConstraint(r.Context(), user, productID, targetID, service.UpdateConstraintInput{
+		MilestoneID: &mid,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeMilestoneConstraintsTabOOB(w, r, user, productID, milestoneID)
+}
+
+// MilestoneConstraintUnlink handles DELETE /products/{id}/milestones/{milestoneId}/constraints/{constraintId}.
+// The path parameter is the constraint's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneConstraintUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.PathValue("constraintId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	empty := ""
+	if _, err := c.constraint.UpdateConstraint(r.Context(), user, productID, targetID, service.UpdateConstraintInput{
+		MilestoneID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadMilestoneConstraintsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneConstraintsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadMilestoneConstraintsTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneConstraintsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.MilestoneConstraintsTabProps{}, err
+	}
+
+	items, _ := c.constraint.ListConstraintsByMilestone(r.Context(), user, productID, milestoneID)
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
+
+	return productpage.MilestoneConstraintsTabProps{
+		ProductID:        productID,
+		MilestoneID:      milestoneID,
+		CSRFToken:        csrfToken,
+		CanWrite:         c.canEditMilestoneLinks(user, role),
+		Constraints:      items,
+		CategoryPrefixes: prefixes,
+	}, nil
+}
+
+func (c *PageProductController) writeMilestoneConstraintsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
+	props, err := c.loadMilestoneConstraintsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "constraints", productpage.MilestoneConstraintsTabContent(props))
+}
+
+// MilestoneDefectsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/defects.
+func (c *PageProductController) MilestoneDefectsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	props, err := c.loadMilestoneDefectsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneDefectsTabContent(props).Render(r.Context(), w)
+}
+
+// MilestoneDefectLinkModal renders GET /products/{id}/milestones/{milestoneId}/defects/link-modal.
+func (c *PageProductController) MilestoneDefectLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneDefectLinkModal(productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneDefectLinkSearch renders GET /products/{id}/milestones/{milestoneId}/defects/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneDefectLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
+
+	candidates := make([]*model.Defect, 0, len(all))
+	for _, d := range all {
+		if d.MilestoneID == milestoneID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) {
+			continue
+		}
+		candidates = append(candidates, d)
+	}
+
+	milestoneNames := c.buildMilestoneMap(r, user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneDefectLinkResults(productID, milestoneID, candidates, milestoneNames).Render(r.Context(), w)
+}
+
+// MilestoneDefectLink handles POST /products/{id}/milestones/{milestoneId}/defects/link.
+func (c *PageProductController) MilestoneDefectLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.FormValue("defect_id")
+
+	if targetID == "" {
+		http.Error(w, "defect_id is required", http.StatusBadRequest)
+		return
+	}
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := milestoneID
+	if _, err := c.backlog.UpdateDefect(r.Context(), user, productID, targetID, service.UpdateDefectInput{
+		MilestoneID: &mid,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeMilestoneDefectsTabOOB(w, r, user, productID, milestoneID)
+}
+
+// MilestoneDefectUnlink handles DELETE /products/{id}/milestones/{milestoneId}/defects/{defectId}.
+// The path parameter is the defect's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneDefectUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.PathValue("defectId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	empty := ""
+	if _, err := c.backlog.UpdateDefect(r.Context(), user, productID, targetID, service.UpdateDefectInput{
+		MilestoneID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadMilestoneDefectsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneDefectsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadMilestoneDefectsTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneDefectsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.MilestoneDefectsTabProps{}, err
+	}
+
+	items, _ := c.backlog.ListDefectsByMilestone(r.Context(), user, productID, milestoneID)
+
+	return productpage.MilestoneDefectsTabProps{
+		ProductID:   productID,
+		MilestoneID: milestoneID,
+		CSRFToken:   csrfToken,
+		CanWrite:    c.canEditMilestoneLinks(user, role),
+		Defects:     items,
+	}, nil
+}
+
+func (c *PageProductController) writeMilestoneDefectsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
+	props, err := c.loadMilestoneDefectsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "defects", productpage.MilestoneDefectsTabContent(props))
 }
 
 // MilestoneSprintsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/sprints.
 func (c *PageProductController) MilestoneSprintsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	props, err := c.loadMilestoneSprintsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneSprintsTabContent(props).Render(r.Context(), w)
+}
+
+// MilestoneSprintLinkModal renders GET /products/{id}/milestones/{milestoneId}/sprints/link-modal.
+func (c *PageProductController) MilestoneSprintLinkModal(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneSprintsTabContent(productID).Render(r.Context(), w)
+	_ = productpage.MilestoneSprintLinkModal(productID, milestoneID).Render(r.Context(), w)
+}
+
+// MilestoneSprintLinkSearch renders GET /products/{id}/milestones/{milestoneId}/sprints/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneSprintLinkSearch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
+	all, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	candidates := make([]*model.Sprint, 0, len(all))
+	for _, sp := range all {
+		if sp.MilestoneID == milestoneID {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(sp.Name), query) {
+			continue
+		}
+		candidates = append(candidates, sp)
+	}
+
+	milestoneNames := c.buildMilestoneMap(r, user, productID)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneSprintLinkResults(productID, milestoneID, candidates, milestoneNames).Render(r.Context(), w)
+}
+
+// MilestoneSprintLink handles POST /products/{id}/milestones/{milestoneId}/sprints/link.
+func (c *PageProductController) MilestoneSprintLink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.FormValue("sprint_id")
+
+	if targetID == "" {
+		http.Error(w, "sprint_id is required", http.StatusBadRequest)
+		return
+	}
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	mid := milestoneID
+	if _, err := c.milestone.UpdateSprint(r.Context(), user, productID, targetID, service.UpdateSprintInput{
+		MilestoneID: &mid,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.writeMilestoneSprintsTabOOB(w, r, user, productID, milestoneID)
+}
+
+// MilestoneSprintUnlink handles DELETE /products/{id}/milestones/{milestoneId}/sprints/{sprintId}.
+// The path parameter is the sprint's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneSprintUnlink(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	milestoneID := r.PathValue("milestoneId")
+	targetID := r.PathValue("sprintId")
+
+	if !c.canEditMilestoneLinksFor(r, user, productID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	empty := ""
+	if _, err := c.milestone.UpdateSprint(r.Context(), user, productID, targetID, service.UpdateSprintInput{
+		MilestoneID: &empty,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	props, err := c.loadMilestoneSprintsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.MilestoneSprintsTabContent(props).Render(r.Context(), w)
+}
+
+func (c *PageProductController) loadMilestoneSprintsTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneSprintsTabProps, error) {
+	csrfToken := middleware.CSRFTokenFromContext(r.Context())
+
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.MilestoneSprintsTabProps{}, err
+	}
+
+	items, _ := c.milestone.ListSprintsByMilestone(r.Context(), user, productID, milestoneID)
+
+	return productpage.MilestoneSprintsTabProps{
+		ProductID:   productID,
+		MilestoneID: milestoneID,
+		CSRFToken:   csrfToken,
+		CanWrite:    c.canEditMilestoneLinks(user, role),
+		Sprints:     items,
+	}, nil
+}
+
+func (c *PageProductController) writeMilestoneSprintsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
+	props, err := c.loadMilestoneSprintsTabProps(r, user, productID, milestoneID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, "sprints", productpage.MilestoneSprintsTabContent(props))
 }
 
 // MilestoneHistoryTab renders GET /products/{id}/milestones/{milestoneId}/tabs/history.

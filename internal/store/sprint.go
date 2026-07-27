@@ -16,6 +16,7 @@ type SprintStore interface {
 	Update(ctx context.Context, sprint *model.Sprint) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string) ([]*model.Sprint, error)
+	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Sprint, error)
 }
 
 type sprintStore struct {
@@ -65,6 +66,26 @@ func (s *sprintStore) ListByProductID(ctx context.Context, productID string) ([]
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, product_id, name, milestone_id, start_date, end_date, created_at, updated_at
 		 FROM sprints WHERE product_id = ? ORDER BY start_date`, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var sprints []*model.Sprint
+	for rows.Next() {
+		sp, err := scanSprint(rows)
+		if err != nil {
+			return nil, err
+		}
+		sprints = append(sprints, sp)
+	}
+	return sprints, rows.Err()
+}
+
+func (s *sprintStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Sprint, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, product_id, name, milestone_id, start_date, end_date, created_at, updated_at
+		 FROM sprints WHERE milestone_id = ? ORDER BY start_date`, milestoneID)
 	if err != nil {
 		return nil, err
 	}

@@ -24,6 +24,7 @@ type DefectStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter DefectFilter) ([]*model.Defect, error)
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error)
+	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Defect, error)
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, defectID, userID string) error
 	ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error)
@@ -101,6 +102,12 @@ func (s *defectStore) ListBySprintID(ctx context.Context, sprintID string) ([]*m
 	return s.listDefects(ctx,
 		`SELECT `+defectColumns+` FROM defects WHERE sprint_id = ? ORDER BY priority DESC, created_at`,
 		sprintID)
+}
+
+func (s *defectStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Defect, error) {
+	return s.listDefects(ctx,
+		`SELECT `+defectColumns+` FROM defects WHERE milestone_id = ? ORDER BY priority DESC, created_at`,
+		milestoneID)
 }
 
 func (s *defectStore) Assign(ctx context.Context, a *model.Assignment) error {

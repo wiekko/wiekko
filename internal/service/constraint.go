@@ -178,6 +178,26 @@ func (s *ConstraintService) ListConstraints(ctx context.Context, user *model.Use
 	return s.constraints.ListByProductID(ctx, productID, filter)
 }
 
+// ListConstraintsByMilestone returns the constraints assigned to a milestone.
+// Rows belonging to another product are skipped. Requires viewer role.
+func (s *ConstraintService) ListConstraintsByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Constraint, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	all, err := s.constraints.ListByMilestoneID(ctx, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Constraint, 0, len(all))
+	for _, c := range all {
+		if c.ProductID != productID {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
 // LinkCapability links a capability to a constraint. Requires owner role.
 func (s *ConstraintService) LinkCapability(ctx context.Context, user *model.User, productID, constraintID, capabilityID string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
