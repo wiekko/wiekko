@@ -256,7 +256,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-502**: Testers shall be able to set the status of any result in an active test campaign. Marking a result as failed requires a `defect`: the tester either links an existing one or creates one inline. The defect is linked to the `test case` (FR-023) and recorded on the result.
 * **FR-503**: Testers shall be able to add comments and attachments to defects.
 * **FR-504**: When a `defect` recorded on a failed campaign result is closed, that result shall move to re-test. Only an explicit tester action can mark it as passed.
-* **FR-505**: Results of a closed testing campaign shall be read-only.
+* **FR-505**: Results shall be writable only while their testing campaign is active. Results of a draft or closed campaign are read-only.
 
 #### Notifications
 
