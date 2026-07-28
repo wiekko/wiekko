@@ -76,12 +76,14 @@ func (c *PageLoginController) renderLoginError(w http.ResponseWriter, r *http.Re
 	selfReg, _ := c.settings.Get(r.Context(), "self_registration_enabled")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusUnprocessableEntity)
 	if r.Header.Get("HX-Request") == "true" {
-		// Return just the form fragment for htmx swap.
+		// Return just the form fragment for htmx swap. It must be 2xx: htmx's
+		// default responseHandling drops the body of any 4xx, which would leave
+		// the user with no error message at all.
 		_ = login.LoginForm(selfReg == "true", message).Render(r.Context(), w)
 		return
 	}
+	w.WriteHeader(http.StatusUnprocessableEntity)
 	_ = login.LoginPage(selfReg == "true", message).Render(r.Context(), w)
 }
 
