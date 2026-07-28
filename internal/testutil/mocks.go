@@ -681,7 +681,6 @@ type MockAttachmentStore struct {
 	DeleteFunc        func(ctx context.Context, id string) error
 	DeleteByOwnerFunc func(ctx context.Context, productID, ownerType, ownerID string) error
 	ListByOwnerFunc   func(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error)
-	ListByProductFunc func(ctx context.Context, productID string) ([]*model.Attachment, error)
 }
 
 func (m *MockAttachmentStore) Create(ctx context.Context, a *model.Attachment) error {
@@ -698,9 +697,6 @@ func (m *MockAttachmentStore) DeleteByOwner(ctx context.Context, productID, owne
 }
 func (m *MockAttachmentStore) ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error) {
 	return m.ListByOwnerFunc(ctx, productID, ownerType, ownerID)
-}
-func (m *MockAttachmentStore) ListByProduct(ctx context.Context, productID string) ([]*model.Attachment, error) {
-	return m.ListByProductFunc(ctx, productID)
 }
 
 // MockTestCaseStore implements store.TestCaseStore with configurable function fields.

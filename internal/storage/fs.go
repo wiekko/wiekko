@@ -124,3 +124,17 @@ func (f *FS) Delete(ctx context.Context, path string) error {
 	}
 	return nil
 }
+
+// DeleteProduct removes a product's directory with everything in it. It runs
+// once the product and its attachment rows are being deleted, so anything left
+// under the directory is garbage — including bytes an earlier unlink failed to
+// remove. Without this the emptied directory would linger under Root forever.
+func (f *FS) DeleteProduct(ctx context.Context, productID string) error {
+	if err := safeSegment(productID); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(filepath.Join(f.Root, productID)); err != nil {
+		return fmt.Errorf("remove product dir: %w", err)
+	}
+	return nil
+}

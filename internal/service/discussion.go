@@ -346,15 +346,17 @@ func (s *DiscussionService) PurgeOwner(ctx context.Context, productID, ownerType
 	return nil
 }
 
-// PurgeProduct removes the stored attachment bytes of a product. The rows
-// themselves are cascaded away by the products foreign key, so this covers only
-// what SQL cannot reach: the files on disk.
+// PurgeProduct removes the attachment storage of a product. The rows themselves
+// are cascaded away by the products foreign key, so this covers only what SQL
+// cannot reach: the files on disk and the directory that holds them.
+//
+// It discards the product's storage wholesale rather than walking the rows,
+// which also collects blobs whose row-driven unlink failed at some earlier
+// point — nothing under a deleted product is worth keeping.
 func (s *DiscussionService) PurgeProduct(ctx context.Context, productID string) error {
-	attachments, err := s.attachments.ListByProduct(ctx, productID)
-	if err != nil {
-		return fmt.Errorf("list attachments of product %s: %w", productID, err)
+	if err := s.blobs.DeleteProduct(ctx, productID); err != nil {
+		return fmt.Errorf("purge attachment storage of product %s: %w", productID, err)
 	}
-	s.purgeBlobs(ctx, attachments)
 	return nil
 }
 

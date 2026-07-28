@@ -521,14 +521,10 @@ func TestPurgeOwner(t *testing.T) {
 func TestPurgeProduct(t *testing.T) {
 	blobs := memBlobs()
 	blobs.files["product-001/att-001"] = []byte("orphaned by the cascade")
+	blobs.files["product-002/att-002"] = []byte("belongs to another product")
 
 	svc := newDiscussionServiceWithBlobs(
-		&testutil.MockCommentStore{},
-		&testutil.MockAttachmentStore{
-			ListByProductFunc: func(_ context.Context, _ string) ([]*model.Attachment, error) {
-				return []*model.Attachment{{ID: "att-001", StoragePath: "product-001/att-001"}}, nil
-			},
-		},
+		&testutil.MockCommentStore{}, &testutil.MockAttachmentStore{},
 		noopAudit(), ownerRoles(), blobs,
 	)
 
@@ -537,6 +533,9 @@ func TestPurgeProduct(t *testing.T) {
 	}
 	if _, ok := blobs.files["product-001/att-001"]; ok {
 		t.Error("blob survived the product purge")
+	}
+	if _, ok := blobs.files["product-002/att-002"]; !ok {
+		t.Error("purging one product took another product's blob with it")
 	}
 }
 
@@ -576,6 +575,17 @@ func (m *memBlobStore) Delete(_ context.Context, path string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.files, path)
+	return nil
+}
+
+func (m *memBlobStore) DeleteProduct(_ context.Context, productID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for path := range m.files {
+		if strings.HasPrefix(path, productID+"/") {
+			delete(m.files, path)
+		}
+	}
 	return nil
 }
 

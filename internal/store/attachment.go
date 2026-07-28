@@ -16,7 +16,6 @@ type AttachmentStore interface {
 	Delete(ctx context.Context, id string) error
 	DeleteByOwner(ctx context.Context, productID, ownerType, ownerID string) error
 	ListByOwner(ctx context.Context, productID, ownerType, ownerID string) ([]*model.Attachment, error)
-	ListByProduct(ctx context.Context, productID string) ([]*model.Attachment, error)
 }
 
 type attachmentStore struct {
@@ -77,23 +76,6 @@ func (s *attachmentStore) ListByOwner(ctx context.Context, productID, ownerType,
 		 FROM attachments WHERE product_id = ? AND owner_type = ? AND owner_id = ?
 		 ORDER BY created_at, id`,
 		productID, ownerType, ownerID)
-	if err != nil {
-		return nil, err
-	}
-	defer closeRows(rows)
-
-	return collectAttachments(rows)
-}
-
-// ListByProduct returns every attachment in a product. Deleting a product
-// cascades the rows away in SQL, so this exists to collect the storage paths
-// whose bytes must be unlinked before that happens.
-func (s *attachmentStore) ListByProduct(ctx context.Context, productID string) ([]*model.Attachment, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+attachmentColumns+`
-		 FROM attachments WHERE product_id = ?
-		 ORDER BY created_at, id`,
-		productID)
 	if err != nil {
 		return nil, err
 	}

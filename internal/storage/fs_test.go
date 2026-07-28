@@ -62,6 +62,53 @@ func TestFSDeleteIsIdempotent(t *testing.T) {
 	}
 }
 
+// Deleting a product must leave nothing behind — not the files, and not the
+// directory that held them (regression: the emptied directory stayed under
+// Root after the product was gone).
+func TestFSDeleteProduct(t *testing.T) {
+	fs := newTestFS(t, 1<<20)
+	ctx := context.Background()
+
+	for _, id := range []string{"attachment-001", "attachment-002"} {
+		if _, _, err := fs.Save(ctx, "product-001", id, strings.NewReader("x")); err != nil {
+			t.Fatalf("Save %s: %v", id, err)
+		}
+	}
+	if _, _, err := fs.Save(ctx, "product-002", "attachment-003", strings.NewReader("y")); err != nil {
+		t.Fatalf("Save into the second product: %v", err)
+	}
+
+	if err := fs.DeleteProduct(ctx, "product-001"); err != nil {
+		t.Fatalf("DeleteProduct: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(fs.Root, "product-001")); !os.IsNotExist(err) {
+		t.Fatal("the product directory survived DeleteProduct")
+	}
+	if _, err := os.Stat(filepath.Join(fs.Root, "product-002", "attachment-003")); err != nil {
+		t.Fatalf("another product's files were touched: %v", err)
+	}
+}
+
+func TestFSDeleteProductIsIdempotent(t *testing.T) {
+	fs := newTestFS(t, 1<<20)
+	if err := fs.DeleteProduct(context.Background(), "product-001"); err != nil {
+		t.Fatalf("DeleteProduct of a product that stored nothing should succeed, got %v", err)
+	}
+}
+
+// A hostile product identifier must not turn a purge into an arbitrary
+// recursive delete.
+func TestFSDeleteProductRejectsTraversal(t *testing.T) {
+	fs := newTestFS(t, 1<<20)
+	ctx := context.Background()
+
+	for _, bad := range []string{"..", "../evil", "a/b", `a\b`, "", ".", "..\x00", "/etc"} {
+		if err := fs.DeleteProduct(ctx, bad); err == nil {
+			t.Fatalf("DeleteProduct accepted a hostile productID %q", bad)
+		}
+	}
+}
+
 func TestFSRejectsOversizedUpload(t *testing.T) {
 	fs := newTestFS(t, 8)
 	ctx := context.Background()
