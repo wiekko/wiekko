@@ -248,7 +248,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 #### Testing
 
 * **FR-501**: Testers shall be able to create defects and link them to a test case, requirement, component or capability
-* **FR-502**: Testers shall be able to mark test cases as processed. If no defect is recorded, they count as passed. A recorded (or linked) defect marks them as failed.
+* **FR-502**: Testers shall be able to mark test cases in the frame of a test campaign as processed. If no defect is recorded, they count as passed. A recorded (or linked) defect marks them as failed.
 * **FR-503**: Testers shall be able to add comments and attachments to defects.
 
 #### Notifications
