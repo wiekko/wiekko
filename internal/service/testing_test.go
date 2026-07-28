@@ -20,9 +20,24 @@ func newTestingService(
 		testCases:       testCases,
 		campaigns:       campaigns,
 		campaignResults: campaignResults,
-		comments:        &recordingPurger{},
-		audit:           audit,
-		authz:           &Authorizer{productRoles: roles},
+		// Events are fire-and-forget; tests that assert on them replace this.
+		campaignEvents: &testutil.MockCampaignResultEventStore{},
+		comments:       &recordingPurger{},
+		audit:          audit,
+		authz:          &Authorizer{productRoles: roles},
+	}
+}
+
+// activeCampaign returns a campaign store whose GetByID yields an active
+// campaign, the state in which results are writable (FR-505).
+func activeCampaign() *testutil.MockTestingCampaignStore {
+	return &testutil.MockTestingCampaignStore{
+		GetByIDFunc: func(_ context.Context, id string) (*model.TestingCampaign, error) {
+			return testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+				c.ID = id
+				c.Status = model.CampaignStatusActive
+			}), nil
+		},
 	}
 }
 
@@ -364,18 +379,36 @@ func TestListTestCaseEnvironments(t *testing.T) {
 
 // --- Campaigns ---
 
+// scopedTestCases returns a test case store where every requested test case
+// belongs to product-001 and carries the given environments.
+func scopedTestCases(envs map[string][]string) *testutil.MockTestCaseStore {
+	return &testutil.MockTestCaseStore{
+		GetByIDFunc: func(_ context.Context, id string) (*model.TestCase, error) {
+			return testutil.MakeTestCase(func(tc *model.TestCase) { tc.ID = id }), nil
+		},
+		ListEnvironmentsFunc: func(_ context.Context, testCaseID string) ([]string, error) {
+			return envs[testCaseID], nil
+		},
+	}
+}
+
 func TestCreateCampaign(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var created *model.TestingCampaign
-		svc := newTestingService(nil,
+		var seeded []*model.CampaignResult
+		svc := newTestingService(
+			scopedTestCases(map[string][]string{"tc-001": {"env-001", "env-002"}}),
 			&testutil.MockTestingCampaignStore{
 				CreateFunc: func(_ context.Context, c *model.TestingCampaign) error { created = c; return nil },
 			},
-			nil, noopAudit(), ownerRoles(),
+			&testutil.MockCampaignResultStore{
+				CreateBatchFunc: func(_ context.Context, rs []*model.CampaignResult) error { seeded = rs; return nil },
+			},
+			noopAudit(), ownerRoles(),
 		)
 
 		result, err := svc.CreateCampaign(context.Background(), testutil.MakeUser(), CreateCampaignInput{
-			ProductID: "product-001", Name: "Release 1.0",
+			ProductID: "product-001", Name: "Release 1.0", TestCaseIDs: []string{"tc-001"},
 		})
 		if err != nil {
 			t.Fatalf("CreateCampaign: %v", err)
@@ -383,8 +416,71 @@ func TestCreateCampaign(t *testing.T) {
 		if result.Name != "Release 1.0" {
 			t.Fatalf("Name = %q, want %q", result.Name, "Release 1.0")
 		}
+		if result.Status != model.CampaignStatusDraft {
+			t.Fatalf("Status = %q, want %q", result.Status, model.CampaignStatusDraft)
+		}
 		if created == nil {
 			t.Fatal("campaign was not created")
+		}
+		// One result per linked environment (FR-021).
+		if len(seeded) != 2 {
+			t.Fatalf("seeded %d results, want 2", len(seeded))
+		}
+		for _, r := range seeded {
+			if r.Status != model.CampaignResultStatusPending {
+				t.Fatalf("seeded status = %q, want pending", r.Status)
+			}
+			if r.EnvironmentID == "" {
+				t.Fatal("seeded result lost its environment")
+			}
+		}
+	})
+
+	t.Run("test case without environments seeds one result", func(t *testing.T) {
+		var seeded []*model.CampaignResult
+		svc := newTestingService(
+			scopedTestCases(map[string][]string{"tc-001": nil}),
+			&testutil.MockTestingCampaignStore{
+				CreateFunc: func(_ context.Context, _ *model.TestingCampaign) error { return nil },
+			},
+			&testutil.MockCampaignResultStore{
+				CreateBatchFunc: func(_ context.Context, rs []*model.CampaignResult) error { seeded = rs; return nil },
+			},
+			noopAudit(), ownerRoles(),
+		)
+
+		if _, err := svc.CreateCampaign(context.Background(), testutil.MakeUser(), CreateCampaignInput{
+			ProductID: "product-001", Name: "Release 1.0", TestCaseIDs: []string{"tc-001"},
+		}); err != nil {
+			t.Fatalf("CreateCampaign: %v", err)
+		}
+		if len(seeded) != 1 {
+			t.Fatalf("seeded %d results, want 1", len(seeded))
+		}
+		if seeded[0].EnvironmentID != "" {
+			t.Fatalf("EnvironmentID = %q, want empty", seeded[0].EnvironmentID)
+		}
+	})
+
+	t.Run("rejects test case from another product", func(t *testing.T) {
+		svc := newTestingService(
+			&testutil.MockTestCaseStore{
+				GetByIDFunc: func(_ context.Context, id string) (*model.TestCase, error) {
+					return testutil.MakeTestCase(func(tc *model.TestCase) {
+						tc.ID = id
+						tc.ProductID = "product-999"
+					}), nil
+				},
+			},
+			&testutil.MockTestingCampaignStore{}, &testutil.MockCampaignResultStore{},
+			noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.CreateCampaign(context.Background(), testutil.MakeUser(), CreateCampaignInput{
+			ProductID: "product-001", Name: "X", TestCaseIDs: []string{"tc-001"},
+		})
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
 		}
 	})
 
@@ -396,9 +492,191 @@ func TestCreateCampaign(t *testing.T) {
 		}
 	})
 
+	t.Run("empty scope", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, ownerRoles())
+		_, err := svc.CreateCampaign(context.Background(), testutil.MakeUser(), CreateCampaignInput{
+			ProductID: "product-001", Name: "X",
+		})
+		if err == nil {
+			t.Fatal("expected error for a campaign with no test cases")
+		}
+	})
+
 	t.Run("forbidden", func(t *testing.T) {
 		svc := newTestingService(nil, nil, nil, nil, forbiddenRoles())
-		_, err := svc.CreateCampaign(context.Background(), testutil.MakeUser(), CreateCampaignInput{ProductID: "product-001", Name: "X"})
+		_, err := svc.CreateCampaign(context.Background(), testutil.MakeUser(), CreateCampaignInput{
+			ProductID: "product-001", Name: "X", TestCaseIDs: []string{"tc-001"},
+		})
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestActivateCampaign(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		var updated *model.TestingCampaign
+		svc := newTestingService(nil,
+			&testutil.MockTestingCampaignStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.TestingCampaign, error) {
+					return testutil.MakeTestingCampaign(), nil
+				},
+				UpdateFunc: func(_ context.Context, c *model.TestingCampaign) error { updated = c; return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		result, err := svc.ActivateCampaign(context.Background(), testutil.MakeUser(), "product-001", "campaign-001")
+		if err != nil {
+			t.Fatalf("ActivateCampaign: %v", err)
+		}
+		if result.Status != model.CampaignStatusActive {
+			t.Fatalf("Status = %q, want %q", result.Status, model.CampaignStatusActive)
+		}
+		if updated == nil {
+			t.Fatal("campaign was not persisted")
+		}
+	})
+
+	t.Run("rejects a second active campaign", func(t *testing.T) {
+		svc := newTestingService(nil,
+			&testutil.MockTestingCampaignStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.TestingCampaign, error) {
+					return testutil.MakeTestingCampaign(), nil
+				},
+				GetActiveByProductIDFunc: func(_ context.Context, _ string) (*model.TestingCampaign, error) {
+					return testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+						c.ID = "campaign-002"
+						c.Status = model.CampaignStatusActive
+					}), nil
+				},
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		if _, err := svc.ActivateCampaign(context.Background(), testutil.MakeUser(), "product-001", "campaign-001"); err == nil {
+			t.Fatal("expected error when another campaign is already active")
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, testerRoles())
+		_, err := svc.ActivateCampaign(context.Background(), testutil.MakeUser(), "product-001", "campaign-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestCloseCampaign(t *testing.T) {
+	activeStore := func(updated **model.TestingCampaign) *testutil.MockTestingCampaignStore {
+		return &testutil.MockTestingCampaignStore{
+			GetByIDFunc: func(_ context.Context, _ string) (*model.TestingCampaign, error) {
+				return testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+					c.Status = model.CampaignStatusActive
+				}), nil
+			},
+			UpdateFunc: func(_ context.Context, c *model.TestingCampaign) error { *updated = c; return nil },
+		}
+	}
+
+	t.Run("success records who closed it", func(t *testing.T) {
+		var updated *model.TestingCampaign
+		var entries []*model.AuditEntry
+		svc := newTestingService(nil, activeStore(&updated),
+			&testutil.MockCampaignResultStore{
+				ListByCampaignIDFunc: func(_ context.Context, _ string) ([]*model.CampaignResult, error) {
+					return []*model.CampaignResult{
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.Status = model.CampaignResultStatusPassed
+						}),
+					}, nil
+				},
+			},
+			&testutil.MockAuditStore{
+				CreateFunc: func(_ context.Context, e *model.AuditEntry) error {
+					entries = append(entries, e)
+					return nil
+				},
+			},
+			ownerRoles(),
+		)
+
+		user := testutil.MakeUser()
+		result, err := svc.CloseCampaign(context.Background(), user, "product-001", "campaign-001", false)
+		if err != nil {
+			t.Fatalf("CloseCampaign: %v", err)
+		}
+		if result.Status != model.CampaignStatusClosed {
+			t.Fatalf("Status = %q, want %q", result.Status, model.CampaignStatusClosed)
+		}
+		if result.ClosedBy != user.ID {
+			t.Fatalf("ClosedBy = %q, want %q", result.ClosedBy, user.ID)
+		}
+		if updated == nil {
+			t.Fatal("campaign was not persisted")
+		}
+		// The audit entry must name the transition (FR-332).
+		if len(entries) != 1 {
+			t.Fatalf("recorded %d audit entries, want 1", len(entries))
+		}
+		if entries[0].FieldName != "status" ||
+			entries[0].OldValue != model.CampaignStatusActive ||
+			entries[0].NewValue != model.CampaignStatusClosed {
+			t.Fatalf("audit entry = %+v, want a status active->closed change", entries[0])
+		}
+	})
+
+	t.Run("incomplete results need confirmation", func(t *testing.T) {
+		var updated *model.TestingCampaign
+		svc := newTestingService(nil, activeStore(&updated),
+			&testutil.MockCampaignResultStore{
+				ListByCampaignIDFunc: func(_ context.Context, _ string) ([]*model.CampaignResult, error) {
+					return []*model.CampaignResult{
+						testutil.MakeCampaignResult(),
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.ID = "cr-002"
+							cr.Status = model.CampaignResultStatusBlocked
+						}),
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.ID = "cr-003"
+							cr.Status = model.CampaignResultStatusSkipped
+						}),
+					}, nil
+				},
+			},
+			noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.CloseCampaign(context.Background(), testutil.MakeUser(), "product-001", "campaign-001", false)
+		var incomplete *IncompleteResultsError
+		if !errors.As(err, &incomplete) {
+			t.Fatalf("err = %v, want *IncompleteResultsError", err)
+		}
+		// Pending and blocked count; skipped does not (FR-041).
+		if incomplete.Incomplete != 2 {
+			t.Fatalf("Incomplete = %d, want 2", incomplete.Incomplete)
+		}
+		if updated != nil {
+			t.Fatal("campaign must not be closed without confirmation")
+		}
+	})
+
+	t.Run("force closes anyway", func(t *testing.T) {
+		var updated *model.TestingCampaign
+		svc := newTestingService(nil, activeStore(&updated), nil, noopAudit(), ownerRoles())
+
+		if _, err := svc.CloseCampaign(context.Background(), testutil.MakeUser(), "product-001", "campaign-001", true); err != nil {
+			t.Fatalf("CloseCampaign: %v", err)
+		}
+		if updated == nil {
+			t.Fatal("campaign was not persisted")
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, testerRoles())
+		_, err := svc.CloseCampaign(context.Background(), testutil.MakeUser(), "product-001", "campaign-001", true)
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
 		}
@@ -554,57 +832,181 @@ func TestListCampaignResults(t *testing.T) {
 	})
 }
 
-func TestUpdateCampaignResult(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		var updated *model.CampaignResult
-		svc := newTestingService(nil, nil,
-			&testutil.MockCampaignResultStore{
-				GetByCampaignAndTestCaseFunc: func(_ context.Context, _, _, _ string) (*model.CampaignResult, error) {
-					return &model.CampaignResult{
-						ID:         "cr-001",
-						CampaignID: "campaign-001",
-						TestCaseID: "tc-001",
-						Status:     model.CampaignResultStatusPending,
-					}, nil
-				},
-				UpdateFunc: func(_ context.Context, cr *model.CampaignResult) error { updated = cr; return nil },
+func TestSetResultStatus(t *testing.T) {
+	pendingResult := func(updated **model.CampaignResult) *testutil.MockCampaignResultStore {
+		return &testutil.MockCampaignResultStore{
+			GetByIDFunc: func(_ context.Context, id string) (*model.CampaignResult, error) {
+				return testutil.MakeCampaignResult(func(cr *model.CampaignResult) { cr.ID = id }), nil
 			},
-			nil, testerRoles(),
-		)
+			UpdateFunc: func(_ context.Context, cr *model.CampaignResult) error { *updated = cr; return nil },
+		}
+	}
 
-		err := svc.UpdateCampaignResult(context.Background(), testutil.MakeUser(), "product-001", "campaign-001", "tc-001", "", model.CampaignResultStatusPassed)
+	t.Run("success records the tester and an event", func(t *testing.T) {
+		var updated *model.CampaignResult
+		var events []*model.CampaignResultEvent
+		svc := newTestingService(nil, activeCampaign(), pendingResult(&updated), nil, testerRoles())
+		svc.campaignEvents = &testutil.MockCampaignResultEventStore{
+			CreateFunc: func(_ context.Context, ev *model.CampaignResultEvent) error {
+				events = append(events, ev)
+				return nil
+			},
+		}
+
+		user := testutil.MakeUser()
+		result, err := svc.SetResultStatus(context.Background(), user,
+			"product-001", "campaign-001", "cr-001", model.CampaignResultStatusPassed, "")
 		if err != nil {
-			t.Fatalf("UpdateCampaignResult: %v", err)
+			t.Fatalf("SetResultStatus: %v", err)
+		}
+		if result.Status != model.CampaignResultStatusPassed {
+			t.Fatalf("Status = %q, want %q", result.Status, model.CampaignResultStatusPassed)
+		}
+		if result.ExecutedBy != user.ID || result.ExecutedAt == "" {
+			t.Fatalf("execution not recorded: by=%q at=%q", result.ExecutedBy, result.ExecutedAt)
 		}
 		if updated == nil {
-			t.Fatal("result was not updated")
+			t.Fatal("result was not persisted")
 		}
-		if updated.Status != model.CampaignResultStatusPassed {
-			t.Fatalf("Status = %q, want %q", updated.Status, model.CampaignResultStatusPassed)
+		if len(events) != 1 {
+			t.Fatalf("recorded %d events, want 1", len(events))
+		}
+		if events[0].FromStatus != model.CampaignResultStatusPending ||
+			events[0].ToStatus != model.CampaignResultStatusPassed {
+			t.Fatalf("event = %+v, want pending->passed", events[0])
 		}
 	})
 
-	t.Run("result not found", func(t *testing.T) {
-		svc := newTestingService(nil, nil,
+	t.Run("failing requires a defect", func(t *testing.T) {
+		var updated *model.CampaignResult
+		svc := newTestingService(nil, activeCampaign(), pendingResult(&updated), nil, testerRoles())
+
+		_, err := svc.SetResultStatus(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001", model.CampaignResultStatusFailed, "")
+		if err == nil {
+			t.Fatal("expected error when failing without a defect")
+		}
+		if updated != nil {
+			t.Fatal("result must not change without a defect")
+		}
+	})
+
+	t.Run("failing with a defect records it", func(t *testing.T) {
+		var updated *model.CampaignResult
+		svc := newTestingService(nil, activeCampaign(), pendingResult(&updated), nil, testerRoles())
+
+		result, err := svc.SetResultStatus(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001", model.CampaignResultStatusFailed, "defect-001")
+		if err != nil {
+			t.Fatalf("SetResultStatus: %v", err)
+		}
+		if result.DefectID != "defect-001" {
+			t.Fatalf("DefectID = %q, want defect-001", result.DefectID)
+		}
+	})
+
+	t.Run("passing clears a previous defect", func(t *testing.T) {
+		svc := newTestingService(nil, activeCampaign(),
 			&testutil.MockCampaignResultStore{
-				GetByCampaignAndTestCaseFunc: func(_ context.Context, _, _, _ string) (*model.CampaignResult, error) {
-					return nil, errors.New("not found")
+				GetByIDFunc: func(_ context.Context, id string) (*model.CampaignResult, error) {
+					return testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+						cr.ID = id
+						cr.Status = model.CampaignResultStatusRetest
+						cr.DefectID = "defect-001"
+					}), nil
 				},
+				UpdateFunc: func(_ context.Context, _ *model.CampaignResult) error { return nil },
 			},
 			nil, testerRoles(),
 		)
 
-		err := svc.UpdateCampaignResult(context.Background(), testutil.MakeUser(), "product-001", "campaign-001", "tc-001", "", model.CampaignResultStatusPassed)
+		result, err := svc.SetResultStatus(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001", model.CampaignResultStatusPassed, "")
+		if err != nil {
+			t.Fatalf("SetResultStatus: %v", err)
+		}
+		if result.DefectID != "" {
+			t.Fatalf("DefectID = %q, want empty", result.DefectID)
+		}
+	})
+
+	t.Run("rejects an unknown status", func(t *testing.T) {
+		svc := newTestingService(nil, activeCampaign(), nil, nil, testerRoles())
+		_, err := svc.SetResultStatus(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001", "nonsense", "")
 		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
 
+	t.Run("rejects changes once the campaign is closed", func(t *testing.T) {
+		var updated *model.CampaignResult
+		svc := newTestingService(nil,
+			&testutil.MockTestingCampaignStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.TestingCampaign, error) {
+					return testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+						c.Status = model.CampaignStatusClosed
+					}), nil
+				},
+			},
+			pendingResult(&updated), nil, testerRoles(),
+		)
+
+		_, err := svc.SetResultStatus(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001", model.CampaignResultStatusPassed, "")
+		if err == nil {
+			t.Fatal("expected error for a closed campaign")
+		}
+		if updated != nil {
+			t.Fatal("result of a closed campaign must not change")
+		}
+	})
+
 	t.Run("forbidden", func(t *testing.T) {
 		svc := newTestingService(nil, nil, nil, nil, forbiddenRoles())
-		err := svc.UpdateCampaignResult(context.Background(), testutil.MakeUser(), "product-001", "campaign-001", "tc-001", "", model.CampaignResultStatusPassed)
+		_, err := svc.SetResultStatus(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001", model.CampaignResultStatusPassed, "")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestMarkResultsForRetest(t *testing.T) {
+	t.Run("only failed results move to retest", func(t *testing.T) {
+		var updated []*model.CampaignResult
+		svc := newTestingService(nil, nil,
+			&testutil.MockCampaignResultStore{
+				ListByDefectIDFunc: func(_ context.Context, _ string) ([]*model.CampaignResult, error) {
+					return []*model.CampaignResult{
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.Status = model.CampaignResultStatusFailed
+							cr.DefectID = "defect-001"
+						}),
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.ID = "cr-002"
+							cr.Status = model.CampaignResultStatusSkipped
+							cr.DefectID = "defect-001"
+						}),
+					}, nil
+				},
+				UpdateFunc: func(_ context.Context, cr *model.CampaignResult) error {
+					updated = append(updated, cr)
+					return nil
+				},
+			},
+			nil, ownerRoles(),
+		)
+
+		if err := svc.MarkResultsForRetest(context.Background(), "defect-001", "user-001"); err != nil {
+			t.Fatalf("MarkResultsForRetest: %v", err)
+		}
+		if len(updated) != 1 {
+			t.Fatalf("updated %d results, want 1", len(updated))
+		}
+		// Never straight to passed — a tester must confirm (FR-504).
+		if updated[0].Status != model.CampaignResultStatusRetest {
+			t.Fatalf("Status = %q, want %q", updated[0].Status, model.CampaignResultStatusRetest)
 		}
 	})
 }

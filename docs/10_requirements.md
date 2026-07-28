@@ -124,12 +124,13 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 
 #### Test Campaigns
 
-* **UC-201**: Test campaigns shall be visualized in tabular form (matrix)
+* **UC-201**: Test campaigns shall be visualized as a matrix with `test cases` in rows, `runtime environments` in columns, and the result status in the cells
 * **UC-202**: Test case status in a campaign shall be visualized using icons and colors
-* **UC-203**: Use collapsible sections by component to structure the test campaign status overview
+* **UC-203**: The campaign matrix shall be groupable by `component` or by `pyramid level` (user-toggled), using collapsible sections. `test cases` linked to neither a `component` nor a `capability` shall be grouped at product level.
 * **UC-204**: Test progress metrics shall be displayed (e.g. percentage passed, failed, pending; progress over time)
 * **UC-205**: Users shall be able to group and/or filter `test cases` by their `pyramid level` attribute (if defined)
-* **UC-206**: Product owners shall be able to use the `pyramid level` attribute to select test cases for a test campaign
+* **UC-206**: Product owners shall select the `test cases` for a test campaign explicitly, assisted by filters (component, capability, pyramid level, execution mode) and a select-all action over the filtered list
+* **UC-207**: Campaign progress over time shall be derived from recorded campaign result events (FR-042)
 
 ## Requirements
 
@@ -158,7 +159,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-018**: Automatic `test cases` shall be linked to a specific test identifier in code (e.g. a Go test function name), allowing results to be ingested from CI pipelines or the CLI
 * **FR-019**: `test cases` can have a matrix of `runtime environments`
 * **FR-020**: `runtime environments` shall be freely definable labels (e.g. OS, browser, third-party software) configurable per product
-* **FR-021**: `test cases` have a status (pending, passed, failed) in conjunction with a `testing campaign`
+* **FR-021**: `test cases` have a status (pending, passed, failed, blocked, skipped, re-test) in conjunction with a `testing campaign`, tracked per `runtime environment` where the test case defines one
 * **FR-022**: A `product` shall have `defects`
 * **FR-023**: A `defect` can be linked to `components`, `capabilities` or a `test case`
 * **FR-024**: A `defect` shall have a `criticality` and a `status`
@@ -178,6 +179,8 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-038**: `constraints` can be linked to `capabilities` (many-to-many)
 * **FR-039**: `constraints` shall support CRUD operations (create, read, update, delete) with the same role-based access as requirements
 * **FR-040**: `categories` shall be configurable per product, with separate sets for requirements and constraints. Each category has a name and a prefix used in human-readable identifiers (e.g. FR-1, AC-42).
+* **FR-041**: A `testing campaign` is complete when none of its results is pending, blocked or awaiting re-test. Skipped results do not influence the campaign outcome. A campaign passes when every non-skipped result is passed.
+* **FR-042**: Every change to a campaign result status shall be recorded as an immutable event capturing the user, timestamp, previous status, new status and any linked `defect`.
 
 #### Administration
 
@@ -220,9 +223,9 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-317**: Product owners shall be able to schedule sprints (optional feature)
 * **FR-318**: Product owners shall be able to activate requirements and defects by adding them to a sprint, or by activating them directly (kanban approach)
 * **FR-319**: Product owners shall be able to import and export requirements via the CLI ("To Do Markdown format")
-* **FR-320**: Product owners shall be able to schedule a testing campaign
-* **FR-321**: Testing campaigns can target all test cases, or a subset (e.g. only test cases linked to components that changed since the last campaign)
-* **FR-322**: Testing campaigns can inherit state from a previous campaign, only resetting test cases affected by changes
+* **FR-320**: Product owners shall be able to schedule a testing campaign. Campaigns have a status (draft, active, closed) and optional planned start and end dates.
+* **FR-321**: When creating a testing campaign, the product owner explicitly selects the `test cases` in scope. The selection is a snapshot taken at creation; test cases created afterwards do not join a running campaign. The scope remains editable while the campaign is draft and is locked once it is active.
+* **FR-322**: At most one testing campaign per product may be active at a time
 * **FR-323**: Product owners shall be able to define status (columns) for requirements and defects
 * **FR-324**: Product owners can decide whether they want to use sprints (scrum) or a continuous flow (kanban)
 * **FR-325**: Product owners shall be able to mark backlog items as coarse (requiring refinement)
@@ -232,6 +235,8 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-329**: Product owners shall be able to configure the pyramid levels for their product
 * **FR-330**: Product owners shall be able to create, update and delete constraints
 * **FR-331**: Product owners shall be able to configure categories for requirements and constraints
+* **FR-332**: Closing a testing campaign shall require an explicit action by a product owner. Closing records the acting user in the audit trail and freezes all results against further changes.
+* **FR-333**: Closing a testing campaign that still has incomplete results (FR-041) shall require confirmation, but shall not be prevented
 
 #### Development
 
@@ -248,8 +253,10 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 #### Testing
 
 * **FR-501**: Testers shall be able to create defects and link them to a test case, requirement, component or capability
-* **FR-502**: Testers shall be able to mark test cases in the frame of a test campaign as processed. If no defect is recorded, they count as passed. A recorded (or linked) defect marks them as failed.
+* **FR-502**: Testers shall be able to set the status of any result in an active test campaign. Marking a result as failed requires a `defect`: the tester either links an existing one or creates one inline. The defect is linked to the `test case` (FR-023) and recorded on the result.
 * **FR-503**: Testers shall be able to add comments and attachments to defects.
+* **FR-504**: When a `defect` recorded on a failed campaign result is closed, that result shall move to re-test. Only an explicit tester action can mark it as passed.
+* **FR-505**: Results of a closed testing campaign shall be read-only.
 
 #### Notifications
 

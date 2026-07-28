@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"nexmap.net/internal/httputil"
@@ -273,15 +274,23 @@ func (c *TestingController) CreateCampaign(w http.ResponseWriter, r *http.Reques
 	productID := r.PathValue("productId")
 
 	var req struct {
-		Name string `json:"name"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		StartsAt    string   `json:"starts_at"`
+		EndsAt      string   `json:"ends_at"`
+		TestCaseIDs []string `json:"test_case_ids"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	item, err := c.testing.CreateCampaign(r.Context(), user, service.CreateCampaignInput{
-		ProductID: productID,
-		Name:      req.Name,
+		ProductID:   productID,
+		Name:        req.Name,
+		Description: req.Description,
+		StartsAt:    req.StartsAt,
+		EndsAt:      req.EndsAt,
+		TestCaseIDs: req.TestCaseIDs,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -313,14 +322,20 @@ func (c *TestingController) UpdateCampaign(w http.ResponseWriter, r *http.Reques
 	id := r.PathValue("id")
 
 	var req struct {
-		Name *string `json:"name"`
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+		StartsAt    *string `json:"starts_at"`
+		EndsAt      *string `json:"ends_at"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	item, err := c.testing.UpdateCampaign(r.Context(), user, productID, id, service.UpdateCampaignInput{
-		Name: req.Name,
+		Name:        req.Name,
+		Description: req.Description,
+		StartsAt:    req.StartsAt,
+		EndsAt:      req.EndsAt,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -363,27 +378,108 @@ func (c *TestingController) ListCampaignResults(w http.ResponseWriter, r *http.R
 	httputil.JSON(w, http.StatusOK, result)
 }
 
-// UpdateResult handles PATCH /products/{productId}/campaigns/{id}/results/{resultId}.
-func (c *TestingController) UpdateResult(w http.ResponseWriter, r *http.Request) {
+// ListResultEvents handles GET /products/{productId}/campaigns/{id}/events.
+func (c *TestingController) ListResultEvents(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
-	campaignID := r.PathValue("id")
+	id := r.PathValue("id")
+
+	items, err := c.testing.ListResultEvents(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		result = append(result, campaignResultEventToJSON(item))
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+// Progress handles GET /products/{productId}/campaigns/{id}/progress.
+func (c *TestingController) Progress(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	counts, err := c.testing.CampaignProgress(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, map[string]any{
+		"counts":  counts,
+		"verdict": model.CampaignVerdict(counts),
+	})
+}
+
+// ActivateCampaign handles POST /products/{productId}/campaigns/{id}/activate.
+func (c *TestingController) ActivateCampaign(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	item, err := c.testing.ActivateCampaign(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, campaignToJSON(item))
+}
+
+// CloseCampaign handles POST /products/{productId}/campaigns/{id}/close.
+// Closing a campaign with results still awaiting testing requires "force".
+func (c *TestingController) CloseCampaign(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
 
 	var req struct {
-		TestCaseID    string `json:"test_case_id"`
-		EnvironmentID string `json:"environment_id"`
-		Status        string `json:"status"`
+		Force bool `json:"force"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
-	if err := c.testing.UpdateCampaignResult(r.Context(), user, productID, campaignID, req.TestCaseID, req.EnvironmentID, req.Status); err != nil {
+	item, err := c.testing.CloseCampaign(r.Context(), user, productID, id, req.Force)
+	if err != nil {
+		var incomplete *service.IncompleteResultsError
+		if errors.As(err, &incomplete) {
+			httputil.Error(w, http.StatusConflict, "CAMPAIGN_INCOMPLETE", incomplete.Error())
+			return
+		}
 		writeServiceError(w, err)
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, map[string]string{"status": "updated"})
+	httputil.JSON(w, http.StatusOK, campaignToJSON(item))
+}
+
+// UpdateResult handles PATCH /products/{productId}/campaigns/{id}/results/{resultId}.
+func (c *TestingController) UpdateResult(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	campaignID := r.PathValue("id")
+	resultID := r.PathValue("resultId")
+
+	var req struct {
+		Status   string `json:"status"`
+		DefectID string `json:"defect_id"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	item, err := c.testing.SetResultStatus(r.Context(), user, productID, campaignID, resultID, req.Status, req.DefectID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, campaignResultToJSON(item))
 }
 
 func testCaseToJSON(tc *model.TestCase) map[string]any {
@@ -414,11 +510,17 @@ func testCaseRequirementToJSON(tcr *model.TestCaseRequirement) map[string]any {
 
 func campaignToJSON(c *model.TestingCampaign) map[string]any {
 	return map[string]any{
-		"id":         c.ID,
-		"product_id": c.ProductID,
-		"name":       c.Name,
-		"created_at": c.CreatedAt,
-		"updated_at": c.UpdatedAt,
+		"id":          c.ID,
+		"product_id":  c.ProductID,
+		"name":        c.Name,
+		"description": c.Description,
+		"status":      c.Status,
+		"starts_at":   c.StartsAt,
+		"ends_at":     c.EndsAt,
+		"closed_at":   c.ClosedAt,
+		"closed_by":   c.ClosedBy,
+		"created_at":  c.CreatedAt,
+		"updated_at":  c.UpdatedAt,
 	}
 }
 
@@ -429,6 +531,22 @@ func campaignResultToJSON(cr *model.CampaignResult) map[string]any {
 		"test_case_id":   cr.TestCaseID,
 		"environment_id": cr.EnvironmentID,
 		"status":         cr.Status,
+		"defect_id":      cr.DefectID,
+		"executed_by":    cr.ExecutedBy,
+		"executed_at":    cr.ExecutedAt,
 		"updated_at":     cr.UpdatedAt,
+	}
+}
+
+func campaignResultEventToJSON(ev *model.CampaignResultEvent) map[string]any {
+	return map[string]any{
+		"id":          ev.ID,
+		"result_id":   ev.ResultID,
+		"campaign_id": ev.CampaignID,
+		"user_id":     ev.UserID,
+		"from_status": ev.FromStatus,
+		"to_status":   ev.ToStatus,
+		"defect_id":   ev.DefectID,
+		"created_at":  ev.CreatedAt,
 	}
 }

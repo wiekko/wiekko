@@ -29,6 +29,7 @@ type Store struct {
 	RuntimeEnvironment RuntimeEnvironmentStore
 	TestingCampaign    TestingCampaignStore
 	CampaignResult     CampaignResultStore
+	CampaignEvent      CampaignResultEventStore
 	Comment            CommentStore
 	Attachment         AttachmentStore
 	Audit              AuditStore
@@ -58,6 +59,7 @@ func New(db *sql.DB, keys *crypto.KeyRing) *Store {
 		RuntimeEnvironment: &runtimeEnvironmentStore{db: db},
 		TestingCampaign:    &testingCampaignStore{db: db},
 		CampaignResult:     &campaignResultStore{db: db},
+		CampaignEvent:      &campaignResultEventStore{db: db},
 		Comment:            &commentStore{db: db},
 		Attachment:         &attachmentStore{db: db},
 		Audit:              &auditStore{db: db},

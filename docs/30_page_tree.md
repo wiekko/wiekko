@@ -148,9 +148,21 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/test-cases/new`       | Create Test Case | Form                                                                                 |
 | `/products/:id/test-cases/:tid`      | Test Case Detail | Tabbed detail page                                                                   |
 | `/products/:id/test-cases/:tid/edit` | Edit Test Case   | Form                                                                                 |
-| `/products/:id/campaigns`            | Campaigns List   | Table of testing campaigns with progress summary                                     |
-| `/products/:id/campaigns/new`        | Create Campaign  | Form (scope selection, inheritance from previous campaign)                           |
-| `/products/:id/campaigns/:cid`       | Campaign Detail  | Execution matrix (test cases x environments), collapsible by component (UR-201..204) |
+| `/products/:id/campaigns`            | Campaigns List   | Table of testing campaigns with status and progress summary                          |
+| `/products/:id/campaigns/new`        | Create Campaign  | Form (name, dates, test case selection with filters and select-all) (UC-206)         |
+| `/products/:id/campaigns/:cid`       | Campaign Detail  | Tabbed detail page; execution matrix grouped by component or pyramid level (UC-201..205) |
+
+**Campaign Detail tabs:**
+
+| Tab      | Content                                                                   |
+|----------|---------------------------------------------------------------------------|
+| Matrix   | Execution matrix (test cases x environments) with grouping toggle (UC-201) |
+| Progress | Status breakdown, percentages, progress over time (UC-204, UC-207)        |
+| History  | Audit trail                                                               |
+
+Campaigns move through draft > active > closed (FR-320). Scope is editable while draft and locked once
+active (FR-321); results are writable only while active (FR-505). Closing is an explicit product owner
+action and warns about incomplete results rather than blocking (FR-332, FR-333).
 
 **Test Case Detail tabs:**
 

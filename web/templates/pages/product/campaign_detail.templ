@@ -1,0 +1,451 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// CampaignDetailProps holds data for the campaign detail page.
+type CampaignDetailProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Campaign    *model.TestingCampaign
+	Progress    CampaignView
+	Matrix      CampaignMatrixProps
+	CanEdit     bool // owner or admin
+}
+
+templ CampaignDetailPage(props CampaignDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "campaigns",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Campaigns", Href: "/products/" + props.Product.ID + "/campaigns"},
+					{Label: props.Campaign.Name},
+				},
+				props.Campaign.Name,
+				campaignScheduleDisplay(props.Campaign),
+				campaignEditHref(props),
+				campaignDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@campaignStatusBadge(props.Campaign.Status)
+				@campaignVerdictBadge(props.Progress.Verdict)
+				if props.CanEdit {
+					@campaignLifecycleActions(props)
+				}
+			}
+			@ui.TabGroup(campaignDetailTabs(props.Product.ID, props.Campaign.ID))
+			@ui.TabPanel("matrix") {
+				@CampaignMatrixTabContent(props.Matrix)
+			}
+			@ui.TabPanelHidden("progress") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+// campaignLifecycleActions renders the draft > active > closed controls (FR-320).
+templ campaignLifecycleActions(props CampaignDetailProps) {
+	switch props.Campaign.Status {
+		case model.CampaignStatusDraft:
+			@ui.Button(ui.ButtonProps{
+				Label:    "Activate",
+				Variant:  "primary",
+				Size:     "md",
+				HxPost:   fmt.Sprintf("/products/%s/campaigns/%s/activate", props.Product.ID, props.Campaign.ID),
+				HxTarget: "body",
+				HxSwap:   "none",
+			}) {
+				@ui.Icon("play", "sm")
+			}
+		case model.CampaignStatusActive:
+			@ui.Button(ui.ButtonProps{
+				Label:    "Close",
+				Variant:  "primary",
+				Size:     "md",
+				HxGet:    fmt.Sprintf("/products/%s/campaigns/%s/close/confirm", props.Product.ID, props.Campaign.ID),
+				HxTarget: "#modal",
+				HxSwap:   "innerHTML",
+			}) {
+				@ui.Icon("lock", "sm")
+			}
+	}
+}
+
+func campaignDetailTabs(productID, campaignID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/campaigns/%s/tabs", productID, campaignID)
+	return []templates.TabDef{
+		{ID: "matrix", Label: "Matrix", HxGet: base + "/matrix", Active: true},
+		{ID: "progress", Label: "Progress", HxGet: base + "/progress"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+// A closed campaign is frozen (FR-332), so it offers no edit affordance.
+func campaignEditHref(props CampaignDetailProps) string {
+	if !props.CanEdit || props.Campaign.Status == model.CampaignStatusClosed {
+		return ""
+	}
+	return fmt.Sprintf("/products/%s/campaigns/%s/edit", props.Product.ID, props.Campaign.ID)
+}
+
+func campaignDeleteURL(props CampaignDetailProps) string {
+	if !props.CanEdit {
+		return ""
+	}
+	return fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, props.Campaign.ID)
+}
+
+// --- Matrix tab ---
+
+// CampaignMatrixColumn is one runtime environment column. An empty ID is the
+// column for test cases that define no environment matrix.
+type CampaignMatrixColumn struct {
+	ID    string
+	Label string
+}
+
+// CampaignMatrixRow is one test case, with cells aligned to the column list.
+// A nil cell means the test case does not run in that environment.
+type CampaignMatrixRow struct {
+	TestCase *model.TestCase
+	Cells    []*model.CampaignResult
+}
+
+// CampaignMatrixGroup collects rows under a component or pyramid level (UC-203).
+type CampaignMatrixGroup struct {
+	Label string
+	Rows  []CampaignMatrixRow
+}
+
+// CampaignMatrixProps holds the execution matrix (UC-201).
+type CampaignMatrixProps struct {
+	ProductID  string
+	CampaignID string
+	CSRFToken  string
+	GroupBy    string // "component" or "pyramid"
+	Columns    []CampaignMatrixColumn
+	Groups     []CampaignMatrixGroup
+	// CanExecute is false for viewers and for any campaign that is not active.
+	CanExecute bool
+}
+
+templ CampaignMatrixTabContent(props CampaignMatrixProps) {
+	<div class="space-y-4">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			@campaignGroupToggle(props)
+			@campaignMatrixLegend()
+		</div>
+		if len(props.Groups) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("beaker", "No test cases", "This campaign has no test cases in scope.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Test Case
+						}
+						for _, col := range props.Columns {
+							@ui.TableHeader() {
+								if col.Label != "" {
+									{ col.Label }
+								} else {
+									<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+								}
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, group := range props.Groups {
+							<tr class="bg-gray-50 dark:bg-gray-800/60">
+								<td
+									colspan={ fmt.Sprintf("%d", len(props.Columns)+1) }
+									class="px-6 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400"
+								>
+									{ group.Label }
+								</td>
+							</tr>
+							for _, row := range group.Rows {
+								@ui.TableRow("") {
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.ProductID, row.TestCase.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ row.TestCase.Title }
+										</a>
+									}
+									for _, cell := range row.Cells {
+										@ui.TableCell() {
+											@campaignMatrixCell(props, cell)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// campaignMatrixCell renders one result. While the campaign is active a tester
+// can click it to pick a new status; otherwise it is a plain indicator (FR-505).
+templ campaignMatrixCell(props CampaignMatrixProps, result *model.CampaignResult) {
+	if result == nil {
+		@campaignResultIcon("")
+	} else if props.CanExecute {
+		<button
+			type="button"
+			class="rounded-md p-1 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:hover:bg-gray-700"
+			aria-label={ "Set status, currently " + campaignResultLabel(result.Status) }
+			hx-get={ fmt.Sprintf("/products/%s/campaigns/%s/results/%s/status-menu?group=%s", props.ProductID, props.CampaignID, result.ID, props.GroupBy) }
+			hx-target="#modal"
+			hx-swap="innerHTML"
+		>
+			@campaignResultIcon(result.Status)
+		</button>
+	} else {
+		@campaignResultIcon(result.Status)
+	}
+}
+
+templ campaignGroupToggle(props CampaignMatrixProps) {
+	<div class="inline-flex rounded-md shadow-sm" role="group">
+		@campaignGroupToggleButton(props, "component", "Component")
+		@campaignGroupToggleButton(props, "pyramid", "Pyramid Level")
+	</div>
+}
+
+templ campaignGroupToggleButton(props CampaignMatrixProps, value, label string) {
+	<button
+		type="button"
+		class={ "px-3 py-2 text-sm font-medium ring-1 ring-gray-300 ring-inset first:rounded-l-md last:rounded-r-md dark:ring-gray-600",
+			campaignGroupToggleClass(props.GroupBy == value) }
+		hx-get={ fmt.Sprintf("/products/%s/campaigns/%s/tabs/matrix?group=%s", props.ProductID, props.CampaignID, value) }
+		hx-target="#tab-panel-matrix"
+		hx-swap="innerHTML"
+	>
+		{ label }
+	</button>
+}
+
+func campaignGroupToggleClass(active bool) string {
+	if active {
+		return "bg-indigo-600 text-white ring-indigo-600 dark:ring-indigo-500"
+	}
+	return "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+}
+
+templ campaignMatrixLegend() {
+	<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+		for _, status := range campaignResultStatuses() {
+			<span class="inline-flex items-center gap-1">
+				@campaignResultIcon(status)
+				{ campaignResultLabel(status) }
+			</span>
+		}
+	</div>
+}
+
+// --- Result status menu ---
+
+// CampaignResultMenuProps holds the status picker for one matrix cell.
+type CampaignResultMenuProps struct {
+	ProductID   string
+	CampaignID  string
+	Result      *model.CampaignResult
+	TestCase    *model.TestCase
+	Environment string
+	// GroupBy is carried through so the matrix repaint keeps the grouping the
+	// tester was looking at.
+	GroupBy   string
+	CSRFToken string
+}
+
+templ CampaignResultStatusMenu(props CampaignResultMenuProps) {
+	@ui.Modal("result-status-modal", "Set result", "sm") {
+		<p class="text-sm text-gray-500 dark:text-gray-400">
+			{ props.TestCase.Title }
+			if props.Environment != "" {
+				<span class="text-gray-400 dark:text-gray-500">&nbsp;·&nbsp;{ props.Environment }</span>
+			}
+		</p>
+		<div class="mt-4 space-y-1">
+			for _, status := range campaignResultStatuses() {
+				@campaignResultStatusOption(props, status)
+			}
+		</div>
+		<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+			Failing a test case requires a defect. You can link an existing one or create it in the next step.
+		</p>
+	}
+}
+
+templ campaignResultStatusOption(props CampaignResultMenuProps, status string) {
+	<button
+		type="button"
+		class={ "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700",
+			campaignResultOptionClass(props.Result.Status == status) }
+		if status == model.CampaignResultStatusFailed {
+			hx-get={ fmt.Sprintf("/products/%s/campaigns/%s/results/%s/defect-modal?group=%s", props.ProductID, props.CampaignID, props.Result.ID, props.GroupBy) }
+		} else {
+			hx-post={ fmt.Sprintf("/products/%s/campaigns/%s/results/%s/status", props.ProductID, props.CampaignID, props.Result.ID) }
+			hx-vals={ fmt.Sprintf(`{"status": %q, "group": %q}`, status, props.GroupBy) }
+		}
+		hx-headers={ `{"X-CSRF-Token":"` + props.CSRFToken + `"}` }
+		hx-target="#modal"
+		hx-swap="innerHTML"
+	>
+		@campaignResultIcon(status)
+		{ campaignResultLabel(status) }
+	</button>
+}
+
+func campaignResultOptionClass(current bool) string {
+	if current {
+		return "bg-gray-100 font-medium dark:bg-gray-700"
+	}
+	return ""
+}
+
+// --- Progress tab ---
+
+// CampaignProgressProps holds the progress breakdown (UC-204, UC-207).
+type CampaignProgressProps struct {
+	View CampaignView
+	// Timeline is the cumulative settled count after each recorded event,
+	// oldest first.
+	Timeline []CampaignProgressPoint
+}
+
+// CampaignProgressPoint is one step of the progress-over-time series.
+type CampaignProgressPoint struct {
+	At      string
+	Settled int
+	Percent int
+}
+
+templ CampaignProgressTabContent(props CampaignProgressProps) {
+	<div class="space-y-4">
+		@ui.Card() {
+			@ui.CardBody() {
+				@ui.ProgressBar(props.View.Percent, campaignProgressColor(props.View.Verdict),
+					fmt.Sprintf("%d of %d results tested", props.View.Settled, props.View.Total))
+				<dl class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+					for _, status := range campaignResultStatuses() {
+						<div class="rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+							<dt class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+								@campaignResultIcon(status)
+								{ campaignResultLabel(status) }
+							</dt>
+							<dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+								{ fmt.Sprintf("%d", props.View.Counts[status]) }
+							</dd>
+						</div>
+					}
+				</dl>
+			}
+		}
+		@ui.Card() {
+			@ui.CardHeader("Progress over time")
+			@ui.CardBody() {
+				if len(props.Timeline) == 0 {
+					<p class="text-sm text-gray-500 dark:text-gray-400">
+						No results have been recorded yet.
+					</p>
+				} else {
+					<ol class="space-y-3">
+						for _, point := range props.Timeline {
+							<li class="flex items-center gap-3">
+								<span class="w-36 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+									{ formatDateTime(point.At) }
+								</span>
+								<span class="flex-1">
+									@ui.ProgressBar(point.Percent, "indigo", "")
+								</span>
+								<span class="w-20 shrink-0 text-right text-xs text-gray-500 dark:text-gray-400">
+									{ fmt.Sprintf("%d/%d", point.Settled, props.View.Total) }
+								</span>
+							</li>
+						}
+					</ol>
+				}
+			}
+		}
+	</div>
+}
+
+templ CampaignHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this campaign will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// --- Close confirmation ---
+
+// CampaignCloseProps holds the close confirmation dialog (FR-332, FR-333).
+type CampaignCloseProps struct {
+	ProductID  string
+	CampaignID string
+	Incomplete int
+	CSRFToken  string
+}
+
+templ CampaignCloseConfirmation(props CampaignCloseProps) {
+	@ui.ConfirmDialog(
+		"campaign-close-confirm",
+		"Close campaign",
+		campaignCloseMessage(props.Incomplete),
+		"Close campaign",
+		"primary",
+		"post",
+		fmt.Sprintf("/products/%s/campaigns/%s/close", props.ProductID, props.CampaignID),
+		props.CSRFToken,
+	)
+}
+
+func campaignCloseMessage(incomplete int) string {
+	if incomplete == 0 {
+		return "Closing freezes all results. They can no longer be changed."
+	}
+	return fmt.Sprintf(
+		"%d result(s) are still pending, blocked or awaiting re-test. Closing freezes them at their current status.",
+		incomplete)
+}
+
+func formatDateTime(rfc3339 string) string {
+	if len(rfc3339) >= 16 {
+		return rfc3339[:10] + " " + rfc3339[11:16]
+	}
+	return formatDate(rfc3339)
+}

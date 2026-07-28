@@ -222,28 +222,59 @@ CREATE TABLE IF NOT EXISTS test_case_environments (
     environment_id UUID NOT NULL REFERENCES runtime_environments(id) ON DELETE CASCADE,
     UNIQUE(test_case_id, environment_id)
 );
+CREATE INDEX IF NOT EXISTS idx_test_case_environments_test_case_id ON test_case_environments(test_case_id);
 
--- Testing campaigns (FR-021)
+-- Testing campaigns (FR-320, FR-322, FR-332)
 CREATE TABLE IF NOT EXISTS testing_campaigns (
-    id         UUID PRIMARY KEY,
-    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    id          UUID PRIMARY KEY,
+    product_id  UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'draft',
+    starts_at   TIMESTAMPTZ,
+    ends_at     TIMESTAMPTZ,
+    closed_at   TIMESTAMPTZ,
+    closed_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ NOT NULL,
+    updated_at  TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_testing_campaigns_product_id ON testing_campaigns(product_id);
+-- At most one active campaign per product (FR-322)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_testing_campaigns_active ON testing_campaigns(product_id) WHERE status = 'active';
 
 -- Campaign results: status per campaign x test case x environment (FR-021)
+-- environment_id cascades: on environment deletion the matrix rows must disappear, not
+-- collapse into NULL rows that the UNIQUE constraint below cannot deduplicate.
 CREATE TABLE IF NOT EXISTS campaign_results (
     id             UUID PRIMARY KEY,
     campaign_id    UUID NOT NULL REFERENCES testing_campaigns(id) ON DELETE CASCADE,
     test_case_id   UUID NOT NULL REFERENCES test_cases(id) ON DELETE CASCADE,
-    environment_id UUID REFERENCES runtime_environments(id) ON DELETE SET NULL,
+    environment_id UUID REFERENCES runtime_environments(id) ON DELETE CASCADE,
     status         TEXT NOT NULL DEFAULT 'pending',
+    defect_id      UUID REFERENCES defects(id) ON DELETE SET NULL,
+    executed_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+    executed_at    TIMESTAMPTZ,
     updated_at     TIMESTAMPTZ NOT NULL,
     UNIQUE(campaign_id, test_case_id, environment_id)
 );
 CREATE INDEX IF NOT EXISTS idx_campaign_results_campaign_id ON campaign_results(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_results_test_case_id ON campaign_results(test_case_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_results_defect_id ON campaign_results(defect_id);
+
+-- Campaign result events: immutable status change log (FR-042, UC-207)
+-- campaign_id is denormalised so progress-over-time is one indexed scan without a join.
+CREATE TABLE IF NOT EXISTS campaign_result_events (
+    id          UUID PRIMARY KEY,
+    result_id   UUID NOT NULL REFERENCES campaign_results(id) ON DELETE CASCADE,
+    campaign_id UUID NOT NULL REFERENCES testing_campaigns(id) ON DELETE CASCADE,
+    user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+    from_status TEXT NOT NULL DEFAULT '',
+    to_status   TEXT NOT NULL,
+    defect_id   UUID REFERENCES defects(id) ON DELETE SET NULL,
+    created_at  TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_campaign_result_events_result_id ON campaign_result_events(result_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_result_events_campaign ON campaign_result_events(campaign_id, created_at);
 
 -- Requirement assignments: users assigned to requirements (FR-009)
 CREATE TABLE IF NOT EXISTS requirement_assignments (
@@ -366,6 +397,7 @@ DROP TABLE IF EXISTS test_case_requirements;
 DROP TABLE IF EXISTS requirement_capabilities;
 DROP TABLE IF EXISTS defect_assignments;
 DROP TABLE IF EXISTS requirement_assignments;
+DROP TABLE IF EXISTS campaign_result_events;
 DROP TABLE IF EXISTS campaign_results;
 DROP TABLE IF EXISTS testing_campaigns;
 DROP TABLE IF EXISTS test_case_environments;

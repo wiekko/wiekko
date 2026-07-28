@@ -776,6 +776,8 @@ type MockTestingCampaignStore struct {
 	UpdateFunc          func(ctx context.Context, tc *model.TestingCampaign) error
 	DeleteFunc          func(ctx context.Context, id string) error
 	ListByProductIDFunc func(ctx context.Context, productID string) ([]*model.TestingCampaign, error)
+	// Added later; nil-guarded so existing tests need no update.
+	GetActiveByProductIDFunc func(ctx context.Context, productID string) (*model.TestingCampaign, error)
 }
 
 func (m *MockTestingCampaignStore) Create(ctx context.Context, tc *model.TestingCampaign) error {
@@ -793,6 +795,12 @@ func (m *MockTestingCampaignStore) Delete(ctx context.Context, id string) error 
 func (m *MockTestingCampaignStore) ListByProductID(ctx context.Context, productID string) ([]*model.TestingCampaign, error) {
 	return m.ListByProductIDFunc(ctx, productID)
 }
+func (m *MockTestingCampaignStore) GetActiveByProductID(ctx context.Context, productID string) (*model.TestingCampaign, error) {
+	if m.GetActiveByProductIDFunc == nil {
+		return nil, nil
+	}
+	return m.GetActiveByProductIDFunc(ctx, productID)
+}
 
 // MockCampaignResultStore implements store.CampaignResultStore with configurable function fields.
 type MockCampaignResultStore struct {
@@ -800,6 +808,13 @@ type MockCampaignResultStore struct {
 	UpdateFunc                   func(ctx context.Context, cr *model.CampaignResult) error
 	GetByCampaignAndTestCaseFunc func(ctx context.Context, campaignID, testCaseID, environmentID string) (*model.CampaignResult, error)
 	ListByCampaignIDFunc         func(ctx context.Context, campaignID string) ([]*model.CampaignResult, error)
+	// Added later; nil-guarded so existing tests need no update.
+	CreateBatchFunc                 func(ctx context.Context, results []*model.CampaignResult) error
+	GetByIDFunc                     func(ctx context.Context, id string) (*model.CampaignResult, error)
+	ListByTestCaseIDFunc            func(ctx context.Context, testCaseID string) ([]*model.CampaignResult, error)
+	ListByDefectIDFunc              func(ctx context.Context, defectID string) ([]*model.CampaignResult, error)
+	DeleteByCampaignAndTestCaseFunc func(ctx context.Context, campaignID, testCaseID string) error
+	CountsByProductIDFunc           func(ctx context.Context, productID string) (map[string]map[string]int, error)
 }
 
 func (m *MockCampaignResultStore) Create(ctx context.Context, cr *model.CampaignResult) error {
@@ -812,6 +827,68 @@ func (m *MockCampaignResultStore) GetByCampaignAndTestCase(ctx context.Context, 
 	return m.GetByCampaignAndTestCaseFunc(ctx, campaignID, testCaseID, environmentID)
 }
 func (m *MockCampaignResultStore) ListByCampaignID(ctx context.Context, campaignID string) ([]*model.CampaignResult, error) {
+	return m.ListByCampaignIDFunc(ctx, campaignID)
+}
+func (m *MockCampaignResultStore) CreateBatch(ctx context.Context, results []*model.CampaignResult) error {
+	if m.CreateBatchFunc == nil {
+		return nil
+	}
+	return m.CreateBatchFunc(ctx, results)
+}
+func (m *MockCampaignResultStore) GetByID(ctx context.Context, id string) (*model.CampaignResult, error) {
+	if m.GetByIDFunc == nil {
+		return nil, nil
+	}
+	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockCampaignResultStore) ListByTestCaseID(ctx context.Context, testCaseID string) ([]*model.CampaignResult, error) {
+	if m.ListByTestCaseIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByTestCaseIDFunc(ctx, testCaseID)
+}
+func (m *MockCampaignResultStore) ListByDefectID(ctx context.Context, defectID string) ([]*model.CampaignResult, error) {
+	if m.ListByDefectIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByDefectIDFunc(ctx, defectID)
+}
+func (m *MockCampaignResultStore) DeleteByCampaignAndTestCase(ctx context.Context, campaignID, testCaseID string) error {
+	if m.DeleteByCampaignAndTestCaseFunc == nil {
+		return nil
+	}
+	return m.DeleteByCampaignAndTestCaseFunc(ctx, campaignID, testCaseID)
+}
+func (m *MockCampaignResultStore) CountsByProductID(ctx context.Context, productID string) (map[string]map[string]int, error) {
+	if m.CountsByProductIDFunc == nil {
+		return nil, nil
+	}
+	return m.CountsByProductIDFunc(ctx, productID)
+}
+
+// MockCampaignResultEventStore implements store.CampaignResultEventStore with configurable function fields.
+type MockCampaignResultEventStore struct {
+	CreateFunc           func(ctx context.Context, ev *model.CampaignResultEvent) error
+	ListByResultIDFunc   func(ctx context.Context, resultID string) ([]*model.CampaignResultEvent, error)
+	ListByCampaignIDFunc func(ctx context.Context, campaignID string) ([]*model.CampaignResultEvent, error)
+}
+
+func (m *MockCampaignResultEventStore) Create(ctx context.Context, ev *model.CampaignResultEvent) error {
+	if m.CreateFunc == nil {
+		return nil
+	}
+	return m.CreateFunc(ctx, ev)
+}
+func (m *MockCampaignResultEventStore) ListByResultID(ctx context.Context, resultID string) ([]*model.CampaignResultEvent, error) {
+	if m.ListByResultIDFunc == nil {
+		return nil, nil
+	}
+	return m.ListByResultIDFunc(ctx, resultID)
+}
+func (m *MockCampaignResultEventStore) ListByCampaignID(ctx context.Context, campaignID string) ([]*model.CampaignResultEvent, error) {
+	if m.ListByCampaignIDFunc == nil {
+		return nil, nil
+	}
 	return m.ListByCampaignIDFunc(ctx, campaignID)
 }
 

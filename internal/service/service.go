@@ -43,6 +43,18 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		authz:       authz,
 	}
 
+	// Built before the backlog service, which calls into it to reopen campaign
+	// results once the defect that failed them is closed (FR-504).
+	testingSvc := &TestingService{
+		testCases:       st.TestCase,
+		campaigns:       st.TestingCampaign,
+		campaignResults: st.CampaignResult,
+		campaignEvents:  st.CampaignEvent,
+		comments:        discussionSvc,
+		audit:           st.Audit,
+		authz:           authz,
+	}
+
 	return &Services{
 		Auth: &AuthService{
 			users:    st.User,
@@ -103,7 +115,9 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			requirements: st.Requirement,
 			defects:      st.Defect,
 			categories:   st.Category,
+			statuses:     st.Status,
 			comments:     discussionSvc,
+			retester:     testingSvc,
 			audit:        st.Audit,
 			authz:        authz,
 		},
@@ -114,14 +128,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			audit:       st.Audit,
 			authz:       authz,
 		},
-		Testing: &TestingService{
-			testCases:       st.TestCase,
-			campaigns:       st.TestingCampaign,
-			campaignResults: st.CampaignResult,
-			comments:        discussionSvc,
-			audit:           st.Audit,
-			authz:           authz,
-		},
+		Testing:    testingSvc,
 		Discussion: discussionSvc,
 		Audit: &AuditService{
 			audit: st.Audit,

@@ -1,0 +1,265 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// CampaignView pairs a campaign with the progress derived from its results.
+type CampaignView struct {
+	Campaign *model.TestingCampaign
+	Counts   map[string]int // result status → count
+	Total    int
+	Settled  int // results no longer awaiting testing
+	Percent  int
+	Verdict  string
+}
+
+// CampaignsProps holds data for the campaigns list page.
+type CampaignsProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Campaigns   []CampaignView
+	CanEdit     bool // owner or admin
+}
+
+templ CampaignsPage(props CampaignsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "campaigns",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Campaigns"},
+			})
+			if len(props.Campaigns) == 0 {
+				@patterns.ListPageHeader("Campaigns", "", "", -1)
+				@ui.Card() {
+					if props.CanEdit {
+						@ui.EmptyState("flag", "No campaigns yet", "Schedule a testing campaign to track test execution across environments.", "New Campaign", "/products/"+props.Product.ID+"/campaigns/new")
+					} else {
+						@ui.EmptyState("flag", "No campaigns yet", "No testing campaigns have been scheduled for this product.", "", "")
+					}
+				}
+			} else {
+				if props.CanEdit {
+					@patterns.ListPageHeader("Campaigns", "/products/"+props.Product.ID+"/campaigns/new", "New Campaign", len(props.Campaigns))
+				} else {
+					@patterns.ListPageHeader("Campaigns", "", "", len(props.Campaigns))
+				}
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								Name
+							}
+							@ui.TableHeader() {
+								State
+							}
+							@ui.TableHeader() {
+								Outcome
+							}
+							@ui.TableHeader() {
+								Progress
+							}
+							@ui.TableHeader() {
+								Planned
+							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
+						}
+						@ui.TableBody("") {
+							for _, view := range props.Campaigns {
+								@ui.TableRow("") {
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, view.Campaign.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ view.Campaign.Name }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										@campaignStatusBadge(view.Campaign.Status)
+									}
+									@ui.TableCellMuted() {
+										@campaignVerdictBadge(view.Verdict)
+									}
+									@ui.TableCellMuted() {
+										<div class="w-40">
+											@ui.ProgressBar(view.Percent, campaignProgressColor(view.Verdict), "")
+											<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+												{ fmt.Sprintf("%d of %d tested", view.Settled, view.Total) }
+											</p>
+										</div>
+									}
+									@ui.TableCellMuted() {
+										{ campaignScheduleDisplay(view.Campaign) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/campaigns/%s/edit?return=list", props.Product.ID, view.Campaign.ID),
+												fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, view.Campaign.ID),
+												props.Meta.CSRFToken,
+											)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+// --- Shared campaign display helpers ---
+
+templ campaignStatusBadge(status string) {
+	switch status {
+		case model.CampaignStatusActive:
+			@ui.Badge("Active", "indigo")
+		case model.CampaignStatusClosed:
+			@ui.Badge("Closed", "gray")
+		default:
+			@ui.Badge("Draft", "amber")
+	}
+}
+
+templ campaignVerdictBadge(verdict string) {
+	switch verdict {
+		case model.CampaignVerdictPassed:
+			@ui.Badge("Passed", "green")
+		case model.CampaignVerdictFailed:
+			@ui.Badge("Failed", "red")
+		default:
+			@ui.Badge("In progress", "gray")
+	}
+}
+
+// campaignResultIcon renders a result status as a coloured icon (UC-202).
+// An empty status marks a cell where the test case does not run.
+templ campaignResultIcon(status string) {
+	if status == "" {
+		<span class="text-gray-300 dark:text-gray-600" title="Not applicable">
+			@ui.Icon("minus", "sm")
+		</span>
+	} else {
+		<span class={ campaignResultColor(status) } title={ campaignResultLabel(status) }>
+			@ui.Icon(campaignResultIconName(status), "sm")
+		</span>
+	}
+}
+
+func campaignResultIconName(status string) string {
+	switch status {
+	case model.CampaignResultStatusPassed:
+		return "circle-check"
+	case model.CampaignResultStatusFailed:
+		return "circle-x"
+	case model.CampaignResultStatusBlocked:
+		return "circle-pause"
+	case model.CampaignResultStatusSkipped:
+		return "circle-minus"
+	case model.CampaignResultStatusRetest:
+		return "refresh-cw"
+	default:
+		return "circle-dashed"
+	}
+}
+
+func campaignResultColor(status string) string {
+	switch status {
+	case model.CampaignResultStatusPassed:
+		return "text-emerald-600 dark:text-emerald-400"
+	case model.CampaignResultStatusFailed:
+		return "text-red-600 dark:text-red-400"
+	case model.CampaignResultStatusBlocked:
+		return "text-amber-600 dark:text-amber-400"
+	case model.CampaignResultStatusSkipped:
+		return "text-gray-400 dark:text-gray-500"
+	case model.CampaignResultStatusRetest:
+		return "text-indigo-600 dark:text-indigo-400"
+	default:
+		return "text-gray-400 dark:text-gray-500"
+	}
+}
+
+func campaignResultLabel(status string) string {
+	switch status {
+	case model.CampaignResultStatusPassed:
+		return "Passed"
+	case model.CampaignResultStatusFailed:
+		return "Failed"
+	case model.CampaignResultStatusBlocked:
+		return "Blocked"
+	case model.CampaignResultStatusSkipped:
+		return "Skipped"
+	case model.CampaignResultStatusRetest:
+		return "Needs re-test"
+	case model.CampaignResultStatusPending:
+		return "Pending"
+	default:
+		return "Not applicable"
+	}
+}
+
+// campaignResultStatuses lists the statuses a tester can pick, in menu order.
+func campaignResultStatuses() []string {
+	return []string{
+		model.CampaignResultStatusPassed,
+		model.CampaignResultStatusFailed,
+		model.CampaignResultStatusBlocked,
+		model.CampaignResultStatusRetest,
+		model.CampaignResultStatusSkipped,
+		model.CampaignResultStatusPending,
+	}
+}
+
+func campaignProgressColor(verdict string) string {
+	switch verdict {
+	case model.CampaignVerdictPassed:
+		return "green"
+	case model.CampaignVerdictFailed:
+		return "red"
+	default:
+		return "indigo"
+	}
+}
+
+func campaignScheduleDisplay(c *model.TestingCampaign) string {
+	switch {
+	case c.StartsAt != "" && c.EndsAt != "":
+		return formatDate(c.StartsAt) + " – " + formatDate(c.EndsAt)
+	case c.StartsAt != "":
+		return "from " + formatDate(c.StartsAt)
+	case c.EndsAt != "":
+		return "until " + formatDate(c.EndsAt)
+	default:
+		return "—"
+	}
+}
+
+// CampaignDeleteConfirmation renders the delete confirmation for a campaign.
+templ CampaignDeleteConfirmation(name, productID, campaignID, csrfToken string) {
+	@patterns.DeleteConfirmation("campaign", name, fmt.Sprintf("/products/%s/campaigns/%s", productID, campaignID), csrfToken)
+}

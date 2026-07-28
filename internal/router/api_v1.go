@@ -197,6 +197,10 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("GET /products/{productId}/campaigns/{id}", authed(http.HandlerFunc(testingCtrl.GetCampaign)))
 	apiV1.Handle("PATCH /products/{productId}/campaigns/{id}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateCampaign))))
 	apiV1.Handle("DELETE /products/{productId}/campaigns/{id}", authed(csrf(http.HandlerFunc(testingCtrl.DeleteCampaign))))
+	apiV1.Handle("POST /products/{productId}/campaigns/{id}/activate", authed(csrf(http.HandlerFunc(testingCtrl.ActivateCampaign))))
+	apiV1.Handle("POST /products/{productId}/campaigns/{id}/close", authed(csrf(http.HandlerFunc(testingCtrl.CloseCampaign))))
+	apiV1.Handle("GET /products/{productId}/campaigns/{id}/progress", authed(http.HandlerFunc(testingCtrl.Progress)))
+	apiV1.Handle("GET /products/{productId}/campaigns/{id}/events", authed(http.HandlerFunc(testingCtrl.ListResultEvents)))
 	apiV1.Handle("GET /products/{productId}/campaigns/{id}/results", authed(http.HandlerFunc(testingCtrl.ListCampaignResults)))
 	apiV1.Handle("PATCH /products/{productId}/campaigns/{id}/results/{resultId}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateResult))))
 

@@ -218,6 +218,26 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/test-cases/{testCaseId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.TestCaseHistoryTab)))
 
+	// Testing campaign pages.
+	mux.Handle("GET /products/{id}/campaigns", pageAuthed(http.HandlerFunc(productCtrl.Campaigns)))
+	mux.Handle("GET /products/{id}/campaigns/new", pageAuthed(http.HandlerFunc(productCtrl.CampaignCreateForm)))
+	mux.Handle("POST /products/{id}/campaigns", pageAuthed(http.HandlerFunc(productCtrl.CampaignCreate)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}", pageAuthed(http.HandlerFunc(productCtrl.CampaignDetail)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/edit", pageAuthed(http.HandlerFunc(productCtrl.CampaignEditForm)))
+	mux.Handle("POST /products/{id}/campaigns/{campaignId}", pageAuthed(http.HandlerFunc(productCtrl.CampaignUpdate)))
+	mux.Handle("DELETE /products/{id}/campaigns/{campaignId}", pageCSRF(http.HandlerFunc(productCtrl.CampaignDelete)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.CampaignDeleteConfirm)))
+	mux.Handle("POST /products/{id}/campaigns/{campaignId}/activate", pageCSRF(http.HandlerFunc(productCtrl.CampaignActivate)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/close/confirm", pageAuthed(http.HandlerFunc(productCtrl.CampaignCloseConfirm)))
+	mux.Handle("POST /products/{id}/campaigns/{campaignId}/close", pageCSRF(http.HandlerFunc(productCtrl.CampaignClose)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/tabs/matrix", pageAuthed(http.HandlerFunc(productCtrl.CampaignMatrixTab)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/tabs/progress", pageAuthed(http.HandlerFunc(productCtrl.CampaignProgressTab)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.CampaignHistoryTab)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/results/{resultId}/status-menu", pageAuthed(http.HandlerFunc(productCtrl.CampaignResultStatusMenu)))
+	mux.Handle("POST /products/{id}/campaigns/{campaignId}/results/{resultId}/status", pageCSRF(http.HandlerFunc(productCtrl.CampaignResultSetStatus)))
+	mux.Handle("GET /products/{id}/campaigns/{campaignId}/results/{resultId}/defect-modal", pageAuthed(http.HandlerFunc(productCtrl.CampaignResultDefectModal)))
+	mux.Handle("POST /products/{id}/campaigns/{campaignId}/results/{resultId}/defect", pageCSRF(http.HandlerFunc(productCtrl.CampaignResultFailWithDefect)))
+
 	// Requirement pages.
 	mux.Handle("GET /products/{id}/requirements", pageAuthed(http.HandlerFunc(productCtrl.Requirements)))
 	mux.Handle("GET /products/{id}/requirements/new", pageAuthed(http.HandlerFunc(productCtrl.RequirementCreateForm)))

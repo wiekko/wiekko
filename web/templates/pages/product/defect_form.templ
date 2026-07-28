@@ -204,6 +204,19 @@ func defectFormAction(props DefectFormProps) string {
 	if capID, ok := strings.CutPrefix(props.LinkTo, "capability:"); ok {
 		return "/products/" + props.Product.ID + "/capabilities/" + capID + "/defects"
 	}
+	// "campaign-result:<campaignID>:<resultID>:<group>" — a tester failing a
+	// matrix cell reports the defect that explains the failure (FR-502). The
+	// group rides along so the matrix repaint keeps its current grouping.
+	if rest, ok := strings.CutPrefix(props.LinkTo, "campaign-result:"); ok {
+		if campaignID, tail, found := strings.Cut(rest, ":"); found {
+			resultID, group, _ := strings.Cut(tail, ":")
+			action := "/products/" + props.Product.ID + "/campaigns/" + campaignID + "/results/" + resultID + "/defect"
+			if group != "" {
+				action += "?group=" + group
+			}
+			return action
+		}
+	}
 	return "/products/" + props.Product.ID + "/defects"
 }
 

@@ -12,12 +12,21 @@ import (
 	"nexmap.net/internal/store"
 )
 
+// campaignRetester reopens campaign results for re-testing once the defect that
+// failed them is closed. Narrow interface so the backlog service does not depend
+// on the whole testing service (FR-504).
+type campaignRetester interface {
+	MarkResultsForRetest(ctx context.Context, defectID, userID string) error
+}
+
 // BacklogService handles requirements and defects.
 type BacklogService struct {
 	requirements store.RequirementStore
 	defects      store.DefectStore
 	categories   store.CategoryStore
+	statuses     store.StatusStore
 	comments     ownerPurger
+	retester     campaignRetester
 	audit        store.AuditStore
 	authz        *Authorizer
 }
@@ -380,6 +389,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
 
 	now := time.Now().UTC().Format(time.RFC3339)
+	previousStatusID := d.StatusID
 	if input.StatusID != nil {
 		d.StatusID = *input.StatusID
 	}
@@ -422,12 +432,38 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 		return nil, fmt.Errorf("update defect: %w", err)
 	}
 
+	if s.defectJustClosed(ctx, previousStatusID, d.StatusID) && s.retester != nil {
+		if err := s.retester.MarkResultsForRetest(ctx, d.ID, user.ID); err != nil {
+			return nil, err
+		}
+	}
+
 	_ = s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
 		UserID: user.ID, Action: "update", CreatedAt: now,
 	})
 
 	return d, nil
+}
+
+// defectJustClosed reports whether a status change moved a defect into a closed
+// state. Statuses are configured per product, so "closed" is whatever the
+// product marked as such.
+func (s *BacklogService) defectJustClosed(ctx context.Context, fromID, toID string) bool {
+	if s.statuses == nil || toID == "" || fromID == toID {
+		return false
+	}
+	to, err := s.statuses.GetByID(ctx, toID)
+	if err != nil || !to.IsClosed {
+		return false
+	}
+	if fromID == "" {
+		return true
+	}
+	from, err := s.statuses.GetByID(ctx, fromID)
+	// An unreadable previous status is treated as open: re-testing a result
+	// that was already settled is recoverable, silently skipping it is not.
+	return err != nil || !from.IsClosed
 }
 
 // DeleteDefect removes a defect. Requires owner role.

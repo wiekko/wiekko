@@ -319,6 +319,7 @@ func MakeTestingCampaign(overrides ...func(*model.TestingCampaign)) *model.Testi
 		ID:        "campaign-001",
 		ProductID: "product-001",
 		Name:      "Test Campaign",
+		Status:    model.CampaignStatusDraft,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -326,6 +327,37 @@ func MakeTestingCampaign(overrides ...func(*model.TestingCampaign)) *model.Testi
 		fn(c)
 	}
 	return c
+}
+
+// MakeCampaignResult returns a pending campaign result with sensible defaults.
+func MakeCampaignResult(overrides ...func(*model.CampaignResult)) *model.CampaignResult {
+	now := time.Now().UTC().Format(time.RFC3339)
+	cr := &model.CampaignResult{
+		ID:         "cr-001",
+		CampaignID: "campaign-001",
+		TestCaseID: "tc-001",
+		Status:     model.CampaignResultStatusPending,
+		UpdatedAt:  now,
+	}
+	for _, fn := range overrides {
+		fn(cr)
+	}
+	return cr
+}
+
+// MakeRuntimeEnvironment returns a runtime environment with sensible defaults.
+func MakeRuntimeEnvironment(overrides ...func(*model.RuntimeEnvironment)) *model.RuntimeEnvironment {
+	now := time.Now().UTC().Format(time.RFC3339)
+	e := &model.RuntimeEnvironment{
+		ID:        "env-001",
+		ProductID: "product-001",
+		Name:      "linux",
+		CreatedAt: now,
+	}
+	for _, fn := range overrides {
+		fn(e)
+	}
+	return e
 }
 
 // MakeComment returns a comment with sensible defaults.

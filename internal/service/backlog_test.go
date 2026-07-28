@@ -914,3 +914,107 @@ func TestListDefectsByMilestone(t *testing.T) {
 		}
 	})
 }
+
+// --- Defect close hook (FR-504) ---
+
+// retestRecorder captures calls from the backlog service into the testing service.
+type retestRecorder struct {
+	defectIDs []string
+	err       error
+}
+
+func (r *retestRecorder) MarkResultsForRetest(_ context.Context, defectID, _ string) error {
+	if r.err != nil {
+		return r.err
+	}
+	r.defectIDs = append(r.defectIDs, defectID)
+	return nil
+}
+
+func TestUpdateDefectReopensCampaignResults(t *testing.T) {
+	// statuses maps a status ID to whether that status is closed.
+	statusStore := func(closed map[string]bool) *testutil.MockStatusStore {
+		return &testutil.MockStatusStore{
+			GetByIDFunc: func(_ context.Context, id string) (*model.Status, error) {
+				return testutil.MakeStatus(func(s *model.Status) {
+					s.ID = id
+					s.EntityType = "defect"
+					s.IsClosed = closed[id]
+				}), nil
+			},
+		}
+	}
+
+	newSvc := func(from string, closed map[string]bool, recorder *retestRecorder) *BacklogService {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				GetByIDFunc: func(_ context.Context, id string) (*model.Defect, error) {
+					return testutil.MakeDefect(func(d *model.Defect) {
+						d.ID = id
+						d.StatusID = from
+					}), nil
+				},
+				UpdateFunc: func(_ context.Context, _ *model.Defect) error { return nil },
+			},
+			noopAudit(), ownerRoles(),
+		)
+		svc.statuses = statusStore(closed)
+		svc.retester = recorder
+		return svc
+	}
+
+	closedStatuses := map[string]bool{"status-open": false, "status-closed": true}
+
+	t.Run("closing a defect flags its results for retest", func(t *testing.T) {
+		recorder := &retestRecorder{}
+		svc := newSvc("status-open", closedStatuses, recorder)
+
+		toClosed := "status-closed"
+		if _, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001", UpdateDefectInput{StatusID: &toClosed}); err != nil {
+			t.Fatalf("UpdateDefect: %v", err)
+		}
+		if len(recorder.defectIDs) != 1 || recorder.defectIDs[0] != "defect-001" {
+			t.Fatalf("retest calls = %v, want [defect-001]", recorder.defectIDs)
+		}
+	})
+
+	t.Run("a non-closing status change does not", func(t *testing.T) {
+		recorder := &retestRecorder{}
+		svc := newSvc("status-closed", closedStatuses, recorder)
+
+		toOpen := "status-open"
+		if _, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001", UpdateDefectInput{StatusID: &toOpen}); err != nil {
+			t.Fatalf("UpdateDefect: %v", err)
+		}
+		if len(recorder.defectIDs) != 0 {
+			t.Fatalf("retest calls = %v, want none", recorder.defectIDs)
+		}
+	})
+
+	t.Run("staying closed does not re-trigger", func(t *testing.T) {
+		recorder := &retestRecorder{}
+		svc := newSvc("status-closed", closedStatuses, recorder)
+
+		stillClosed := "status-closed"
+		if _, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001", UpdateDefectInput{StatusID: &stillClosed}); err != nil {
+			t.Fatalf("UpdateDefect: %v", err)
+		}
+		if len(recorder.defectIDs) != 0 {
+			t.Fatalf("retest calls = %v, want none", recorder.defectIDs)
+		}
+	})
+
+	t.Run("a retest failure fails the update", func(t *testing.T) {
+		recorder := &retestRecorder{err: errors.New("boom")}
+		svc := newSvc("status-open", closedStatuses, recorder)
+
+		toClosed := "status-closed"
+		if _, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001", UpdateDefectInput{StatusID: &toClosed}); err == nil {
+			t.Fatal("expected the retest error to surface")
+		}
+	})
+}

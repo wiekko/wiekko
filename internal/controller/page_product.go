@@ -4708,8 +4708,66 @@ func (c *PageProductController) writeTestCaseRequirementsTabOOB(w http.ResponseW
 
 // TestCaseCampaignsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/campaigns.
 func (c *PageProductController) TestCaseCampaignsTab(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	testCaseID := r.PathValue("testCaseId")
+
+	results, err := c.testing.ListResultsForTestCase(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	envNames := c.buildEnvironmentMap(r, user, productID)
+	campaignNames := map[string]string{}
+	for _, campaign := range c.listCampaignsQuietly(r, user, productID) {
+		campaignNames[campaign.ID] = campaign.Name
+	}
+
+	views := make([]productpage.TestCaseCampaignResultView, 0, len(results))
+	for _, result := range results {
+		view := productpage.TestCaseCampaignResultView{
+			Result:       result,
+			CampaignName: campaignNames[result.CampaignID],
+			Environment:  envNames[result.EnvironmentID],
+			ExecutedBy:   c.resolveUserDisplayName(r, user, result.ExecutedBy),
+		}
+		if result.DefectID != "" {
+			if d, err := c.backlog.GetDefect(r.Context(), user, productID, result.DefectID); err == nil {
+				view.DefectTitle = d.Title
+			} else {
+				view.DefectTitle = "Defect"
+			}
+		}
+		views = append(views, view)
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseCampaignsTabContent().Render(r.Context(), w)
+	_ = productpage.TestCaseCampaignsTabContent(productpage.TestCaseCampaignsTabProps{
+		ProductID: productID,
+		Results:   views,
+	}).Render(r.Context(), w)
+}
+
+func (c *PageProductController) listCampaignsQuietly(r *http.Request, user *model.User, productID string) []*model.TestingCampaign {
+	campaigns, _ := c.testing.ListCampaigns(r.Context(), user, productID)
+	return campaigns
+}
+
+// resolveUserDisplayName resolves a user ID to a display name, falling back to
+// the raw ID so a deleted account still shows something meaningful.
+func (c *PageProductController) resolveUserDisplayName(r *http.Request, actor *model.User, userID string) string {
+	if userID == "" {
+		return ""
+	}
+	if userID == actor.ID {
+		return actor.DisplayName
+	}
+	u, err := c.user.GetByID(r.Context(), userID)
+	if err != nil || u.DisplayName == "" {
+		return userID
+	}
+	return u.DisplayName
 }
 
 // TestCaseHistoryTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/history.

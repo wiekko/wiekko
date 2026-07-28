@@ -1,0 +1,280 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// CampaignTestCaseOption is one selectable row in the scope picker. The names
+// are resolved server-side so the picker can filter without another round trip.
+type CampaignTestCaseOption struct {
+	TestCase       *model.TestCase
+	ComponentName  string
+	CapabilityName string
+	PyramidName    string
+	Selected       bool
+}
+
+// CampaignFormProps holds data for the campaign create/edit form.
+type CampaignFormProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Campaign    *model.TestingCampaign // nil for create
+	IsEdit      bool
+	Error       string
+	ReturnTo    string // "list" to return to the list after save; empty = detail
+	// TestCases is the pool the scope is chosen from. Empty on edit, where
+	// scope is managed on the campaign itself.
+	TestCases  []CampaignTestCaseOption
+	Components []*model.Component
+	// Form values (preserved on validation error).
+	Name        string
+	Description string
+	StartsAt    string
+	EndsAt      string
+}
+
+templ CampaignFormPage(props CampaignFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "campaigns",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-3xl space-y-6">
+			@ui.Breadcrumb(campaignFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Campaign
+				} else {
+					New Campaign
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@CampaignFormBody(props)
+		</div>
+	}
+}
+
+// CampaignFormBody renders the inner form without page chrome.
+templ CampaignFormBody(props CampaignFormProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			<form
+				method="post"
+				action={ templ.SafeURL(campaignFormAction(props)) }
+				class="space-y-6"
+			>
+				<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.ReturnTo != "" {
+					<input type="hidden" name="return" value={ props.ReturnTo }/>
+				}
+				@ui.TextInput(ui.InputProps{
+					ID:          "name",
+					Name:        "name",
+					Label:       "Name",
+					Value:       props.Name,
+					Placeholder: "e.g. Release 1.0 regression",
+					Required:    true,
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "description",
+					Name:        "description",
+					Label:       "Description",
+					Value:       props.Description,
+					Placeholder: "What is this campaign for?",
+					Rows:        3,
+				})
+				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+					@ui.DateInput(ui.InputProps{
+						ID:       "starts_at",
+						Name:     "starts_at",
+						Label:    "Planned Start",
+						Value:    formatDate(props.StartsAt),
+						HelpText: "Optional.",
+					})
+					@ui.DateInput(ui.InputProps{
+						ID:       "ends_at",
+						Name:     "ends_at",
+						Label:    "Planned End",
+						Value:    formatDate(props.EndsAt),
+						HelpText: "Optional.",
+					})
+				</div>
+				if !props.IsEdit {
+					@campaignScopePicker(props)
+				}
+				@patterns.FormActions(campaignSubmitLabel(props.IsEdit), campaignFormCancelHref(props))
+			</form>
+		}
+	}
+}
+
+// campaignScopePicker renders the test case selection (FR-321, UC-206).
+// Filtering and select-all run in the browser so a filter change never discards
+// selections made under a previous filter.
+templ campaignScopePicker(props CampaignFormProps) {
+	<div class="border-t border-gray-200 pt-6 dark:border-gray-700">
+		<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Test Cases</h3>
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+			Pick the test cases this campaign covers. The selection is fixed once the campaign is created.
+		</p>
+		if len(props.TestCases) == 0 {
+			<div class="mt-4">
+				@ui.EmptyState("beaker", "No test cases", "Create test cases before scheduling a campaign.", "New Test Case", "/products/"+props.Product.ID+"/test-cases/new")
+			</div>
+		} else {
+			<div id="campaign-picker" class="mt-4 space-y-3" data-campaign-picker>
+				<div class="flex flex-wrap items-end gap-3">
+					@ui.Select(ui.SelectProps{
+						ID:      "picker-component",
+						Label:   "Component",
+						Options: campaignPickerComponentOptions(props.Components),
+					})
+					@ui.Select(ui.SelectProps{
+						ID:      "picker-mode",
+						Label:   "Execution Mode",
+						Options: campaignPickerModeOptions(),
+					})
+					<div class="flex items-center gap-2 pb-1">
+						<button
+							type="button"
+							data-picker-select-all
+							class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
+						>
+							Select all
+						</button>
+						<button
+							type="button"
+							data-picker-clear
+							class="rounded-md px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+						>
+							Clear
+						</button>
+					</div>
+				</div>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					<span data-picker-count>0</span> selected
+				</p>
+				<div class="max-h-96 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+					<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+						for _, opt := range props.TestCases {
+							<li
+								class="flex items-start gap-3 px-4 py-3"
+								data-picker-row
+								data-component={ opt.TestCase.ComponentID }
+								data-mode={ opt.TestCase.ExecutionMode }
+							>
+								<input
+									type="checkbox"
+									name="test_case_ids"
+									value={ opt.TestCase.ID }
+									checked?={ opt.Selected }
+									class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 dark:border-gray-600 dark:bg-gray-800"
+								/>
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ opt.TestCase.Title }</p>
+									<p class="text-xs text-gray-500 dark:text-gray-400">
+										{ campaignScopeSubtitle(opt) }
+									</p>
+								</div>
+							</li>
+						}
+					</ul>
+				</div>
+			</div>
+			<script src="/static/js/campaign-picker.js" defer></script>
+		}
+	</div>
+}
+
+func campaignScopeSubtitle(opt CampaignTestCaseOption) string {
+	parts := make([]string, 0, 3)
+	if opt.ComponentName != "" {
+		parts = append(parts, opt.ComponentName)
+	} else if opt.CapabilityName != "" {
+		parts = append(parts, opt.CapabilityName)
+	} else {
+		parts = append(parts, "Product level")
+	}
+	if opt.PyramidName != "" {
+		parts = append(parts, opt.PyramidName)
+	}
+	parts = append(parts, opt.TestCase.ExecutionMode)
+
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += " · "
+		}
+		out += p
+	}
+	return out
+}
+
+func campaignPickerComponentOptions(components []*model.Component) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(components)+2)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "All components"})
+	opts = append(opts, templates.SelectOption{Value: "__none__", Label: "Product level"})
+	for _, c := range components {
+		opts = append(opts, templates.SelectOption{Value: c.ID, Label: c.Name})
+	}
+	return opts
+}
+
+func campaignPickerModeOptions() []templates.SelectOption {
+	return []templates.SelectOption{
+		{Value: "", Label: "All modes"},
+		{Value: model.ExecutionModeManual, Label: "Manual"},
+		{Value: model.ExecutionModeAutomatic, Label: "Automatic"},
+	}
+}
+
+func campaignFormBreadcrumbs(props CampaignFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Campaigns", Href: "/products/" + props.Product.ID + "/campaigns"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Campaign.Name, Href: fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, props.Campaign.ID)},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func campaignFormAction(props CampaignFormProps) string {
+	if props.IsEdit {
+		return fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, props.Campaign.ID)
+	}
+	return "/products/" + props.Product.ID + "/campaigns"
+}
+
+func campaignFormCancelHref(props CampaignFormProps) string {
+	if props.IsEdit {
+		return fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, props.Campaign.ID)
+	}
+	return "/products/" + props.Product.ID + "/campaigns"
+}
+
+func campaignSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Campaign"
+}

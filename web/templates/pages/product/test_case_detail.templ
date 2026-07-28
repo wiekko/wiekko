@@ -273,9 +273,104 @@ func testCasePrefix(prefixes map[string]string, categoryID string) string {
 	return "??"
 }
 
-templ TestCaseCampaignsTabContent() {
-	@ui.Card() {
-		@ui.EmptyState("flag", "No campaigns", "Campaign results for this test case will appear here.", "", "")
+// TestCaseCampaignResultView is one row of a test case's campaign history.
+type TestCaseCampaignResultView struct {
+	Result       *model.CampaignResult
+	CampaignName string
+	Environment  string
+	ExecutedBy   string
+	DefectTitle  string
+}
+
+// TestCaseCampaignsTabProps holds a test case's results across campaigns.
+type TestCaseCampaignsTabProps struct {
+	ProductID string
+	Results   []TestCaseCampaignResultView
+}
+
+templ TestCaseCampaignsTabContent(props TestCaseCampaignsTabProps) {
+	if len(props.Results) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("flag", "No campaigns", "Campaign results for this test case will appear here.", "", "")
+		}
+	} else {
+		@ui.Card() {
+			@ui.Table() {
+				@ui.TableHead() {
+					@ui.TableHeader() {
+						Campaign
+					}
+					@ui.TableHeader() {
+						Environment
+					}
+					@ui.TableHeader() {
+						Status
+					}
+					@ui.TableHeader() {
+						Defect
+					}
+					@ui.TableHeader() {
+						Tested By
+					}
+					@ui.TableHeader() {
+						Tested
+					}
+				}
+				@ui.TableBody("") {
+					for _, view := range props.Results {
+						@ui.TableRow("") {
+							@ui.TableCell() {
+								<a
+									href={ templ.SafeURL(fmt.Sprintf("/products/%s/campaigns/%s", props.ProductID, view.Result.CampaignID)) }
+									class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+								>
+									{ view.CampaignName }
+								</a>
+							}
+							@ui.TableCellMuted() {
+								if view.Environment != "" {
+									{ view.Environment }
+								} else {
+									<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+								}
+							}
+							@ui.TableCellMuted() {
+								<span class="inline-flex items-center gap-1">
+									@campaignResultIcon(view.Result.Status)
+									{ campaignResultLabel(view.Result.Status) }
+								</span>
+							}
+							@ui.TableCellMuted() {
+								if view.Result.DefectID != "" {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, view.Result.DefectID)) }
+										class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ view.DefectTitle }
+									</a>
+								} else {
+									<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+								}
+							}
+							@ui.TableCellMuted() {
+								if view.ExecutedBy != "" {
+									{ view.ExecutedBy }
+								} else {
+									<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+								}
+							}
+							@ui.TableCellMuted() {
+								if view.Result.ExecutedAt != "" {
+									{ formatDate(view.Result.ExecutedAt) }
+								} else {
+									<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
