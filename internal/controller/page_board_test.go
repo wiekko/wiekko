@@ -31,14 +31,14 @@ func TestCanMoveCards(t *testing.T) {
 	}
 }
 
-func TestBuildRequirementCards_StrandsItemsWithoutStatus(t *testing.T) {
+func TestBuildBacklogCards_StrandsItemsWithoutStatus(t *testing.T) {
 	prefixes := map[string]string{"cat-a": "FR"}
 	reqs := []*model.Requirement{
-		{ID: "r1", CategoryID: "cat-a", SequenceNumber: 1, Title: "With status", StatusID: "s1", Priority: 3},
-		{ID: "r2", CategoryID: "cat-a", SequenceNumber: 2, Title: "Stranded", StatusID: "", Priority: 5},
+		{ID: "r1", Kind: model.RequirementKindRequirement, CategoryID: "cat-a", SequenceNumber: 1, Title: "With status", StatusID: "s1", Priority: 3},
+		{ID: "r2", Kind: model.RequirementKindRequirement, CategoryID: "cat-a", SequenceNumber: 2, Title: "Stranded", StatusID: "", Priority: 5},
 	}
 
-	byStatus, stranded := buildRequirementCards("p1", reqs, prefixes)
+	byStatus, stranded, strandedTask := buildBacklogCards("p1", reqs, prefixes)
 
 	if len(byStatus["s1"]) != 1 || byStatus["s1"][0].ID != "r1" {
 		t.Errorf("expected r1 bucketed under s1, got %+v", byStatus)
@@ -46,11 +46,47 @@ func TestBuildRequirementCards_StrandsItemsWithoutStatus(t *testing.T) {
 	if len(stranded) != 1 || stranded[0].ID != "r2" {
 		t.Errorf("expected r2 in stranded, got %+v", stranded)
 	}
+	if len(strandedTask) != 0 {
+		t.Errorf("expected no stranded tasks, got %+v", strandedTask)
+	}
 	if stranded[0].Identifier != "FR-2" {
 		t.Errorf("expected stranded identifier FR-2, got %q", stranded[0].Identifier)
 	}
 	if byStatus["s1"][0].MoveURL != "/products/p1/board/requirements/r1/status" {
 		t.Errorf("unexpected move URL: %q", byStatus["s1"][0].MoveURL)
+	}
+}
+
+// Tasks share the requirement status columns but carry their own entity type,
+// move URL and identifier prefix.
+func TestBuildBacklogCards_TasksShareColumnsWithRequirements(t *testing.T) {
+	prefixes := map[string]string{"cat-a": "FR", "cat-t": "MT"}
+	items := []*model.Requirement{
+		{ID: "r1", Kind: model.RequirementKindRequirement, CategoryID: "cat-a", SequenceNumber: 1, Title: "Requirement", StatusID: "s1"},
+		{ID: "t1", Kind: model.RequirementKindTask, CategoryID: "cat-t", SequenceNumber: 2, Title: "Task", StatusID: "s1"},
+		{ID: "t2", Kind: model.RequirementKindTask, CategoryID: "cat-t", SequenceNumber: 3, Title: "Stranded task", StatusID: ""},
+	}
+
+	byStatus, strandedReq, strandedTask := buildBacklogCards("p1", items, prefixes)
+
+	if len(byStatus["s1"]) != 2 {
+		t.Fatalf("expected requirement and task in the same column, got %+v", byStatus["s1"])
+	}
+	task := byStatus["s1"][1]
+	if task.EntityType != model.RequirementKindTask {
+		t.Errorf("expected task entity type, got %q", task.EntityType)
+	}
+	if task.Identifier != "MT-2" {
+		t.Errorf("expected identifier MT-2, got %q", task.Identifier)
+	}
+	if task.MoveURL != "/products/p1/board/tasks/t1/status" {
+		t.Errorf("unexpected task move URL: %q", task.MoveURL)
+	}
+	if len(strandedReq) != 0 {
+		t.Errorf("expected no stranded requirements, got %+v", strandedReq)
+	}
+	if len(strandedTask) != 1 || strandedTask[0].ID != "t2" {
+		t.Errorf("expected t2 in stranded tasks, got %+v", strandedTask)
 	}
 }
 

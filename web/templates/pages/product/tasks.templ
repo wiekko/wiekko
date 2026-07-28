@@ -1,0 +1,134 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TasksProps holds data for the tasks list page.
+type TasksProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Tasks            []*model.Requirement
+	CategoryPrefixes map[string]string // category ID → prefix
+	Statuses         map[string]string // status ID → name
+	CanEdit          bool              // owner or admin
+}
+
+templ TasksPage(props TasksProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "tasks",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Tasks"},
+			})
+			if len(props.Tasks) == 0 {
+				@patterns.ListPageHeader("Tasks", "", "", -1)
+				@ui.Card() {
+					if props.CanEdit {
+						@ui.EmptyState("list-checks", "No tasks yet", "Tasks cover work that is neither a requirement nor a defect — maintenance, tooling and spikes.", "New Task", "/products/"+props.Product.ID+"/tasks/new")
+					} else {
+						@ui.EmptyState("list-checks", "No tasks yet", "No tasks have been created for this product.", "", "")
+					}
+				}
+			} else {
+				if props.CanEdit {
+					@patterns.ListPageHeader("Tasks", "/products/"+props.Product.ID+"/tasks/new", "New Task", len(props.Tasks))
+				} else {
+					@patterns.ListPageHeader("Tasks", "", "", len(props.Tasks))
+				}
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								ID
+							}
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Category
+							}
+							@ui.TableHeader() {
+								Status
+							}
+							@ui.TableHeader() {
+								Priority
+							}
+							@ui.TableHeader() {
+								Created
+							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
+						}
+						@ui.TableBody("") {
+							for _, task := range props.Tasks {
+								@ui.TableRow("") {
+									@ui.TableCellMuted() {
+										{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, task.CategoryID), task.SequenceNumber) }
+									}
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/products/%s/tasks/%s", props.Product.ID, task.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ task.Title }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										@ui.Badge(requirementPrefix(props.CategoryPrefixes, task.CategoryID), "emerald")
+									}
+									@ui.TableCellMuted() {
+										if task.StatusID != "" {
+											if name, ok := props.Statuses[task.StatusID]; ok {
+												{ name }
+											} else {
+												{ task.StatusID }
+											}
+										} else {
+											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+									@ui.TableCellMuted() {
+										{ fmt.Sprintf("%d", task.Priority) }
+									}
+									@ui.TableCellMuted() {
+										{ formatDate(task.CreatedAt) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(
+												fmt.Sprintf("/products/%s/tasks/%s/edit?return=list", props.Product.ID, task.ID),
+												fmt.Sprintf("/products/%s/tasks/%s", props.Product.ID, task.ID),
+												props.Meta.CSRFToken,
+											)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}

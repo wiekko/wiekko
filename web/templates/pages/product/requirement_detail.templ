@@ -118,7 +118,7 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 	if len(props.Children) > 0 {
 		@ui.Card() {
 			@ui.CardBody() {
-				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Child Requirements</h3>
+				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Children</h3>
 				@ui.Table() {
 					@ui.TableHead() {
 						@ui.TableHeader() {
@@ -139,14 +139,14 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 								}
 								@ui.TableCell() {
 									<a
-										href={ templ.SafeURL(fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, child.ID)) }
+										href={ templ.SafeURL(backlogChildHref(props.Product.ID, child)) }
 										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
 									>
 										{ child.Title }
 									</a>
 								}
 								@ui.TableCellMuted() {
-									@ui.Badge(requirementPrefix(props.CategoryPrefixes, child.CategoryID), "blue")
+									@ui.Badge(requirementPrefix(props.CategoryPrefixes, child.CategoryID), backlogKindBadgeColor(child.Kind))
 								}
 							}
 						}

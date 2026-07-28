@@ -67,6 +67,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	// Kanban board.
 	mux.Handle("GET /products/{id}/board", pageAuthed(http.HandlerFunc(productCtrl.Board)))
 	mux.Handle("PATCH /products/{id}/board/requirements/{reqId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardRequirementStatus)))
+	mux.Handle("PATCH /products/{id}/board/tasks/{taskId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardTaskStatus)))
 	mux.Handle("PATCH /products/{id}/board/defects/{defectId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardDefectStatus)))
 
 	// Milestone pages.
@@ -277,6 +278,27 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("DELETE /products/{id}/requirements/{requirementId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.RequirementAttachmentDelete)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.RequirementHistoryTab)))
+
+	// Task pages. Tasks share the requirements table and the requirement
+	// status set, but carry no traceability links, so there are no
+	// capability/test-case/defect tabs here.
+	mux.Handle("GET /products/{id}/tasks", pageAuthed(http.HandlerFunc(productCtrl.Tasks)))
+	mux.Handle("GET /products/{id}/tasks/new", pageAuthed(http.HandlerFunc(productCtrl.TaskCreateForm)))
+	mux.Handle("POST /products/{id}/tasks", pageAuthed(http.HandlerFunc(productCtrl.TaskCreate)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}", pageAuthed(http.HandlerFunc(productCtrl.TaskDetail)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/edit", pageAuthed(http.HandlerFunc(productCtrl.TaskEditForm)))
+	mux.Handle("POST /products/{id}/tasks/{taskId}", pageAuthed(http.HandlerFunc(productCtrl.TaskUpdate)))
+	mux.Handle("DELETE /products/{id}/tasks/{taskId}", pageCSRF(http.HandlerFunc(productCtrl.TaskDelete)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.TaskDeleteConfirm)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.TaskOverviewTab)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.TaskCommentsTab)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.TaskAttachmentsTab)))
+	mux.Handle("POST /products/{id}/tasks/{taskId}/comments", pageCSRF(http.HandlerFunc(productCtrl.TaskCommentCreate)))
+	mux.Handle("DELETE /products/{id}/tasks/{taskId}/comments/{commentId}", pageCSRF(http.HandlerFunc(productCtrl.TaskCommentDelete)))
+	mux.Handle("POST /products/{id}/tasks/{taskId}/attachments", upload(http.HandlerFunc(productCtrl.TaskAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/tasks/{taskId}/attachments/{attachmentId}", pageCSRF(http.HandlerFunc(productCtrl.TaskAttachmentDelete)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
+	mux.Handle("GET /products/{id}/tasks/{taskId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.TaskHistoryTab)))
 
 	// Defect pages.
 	mux.Handle("GET /products/{id}/defects", pageAuthed(http.HandlerFunc(productCtrl.Defects)))

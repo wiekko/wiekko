@@ -29,6 +29,7 @@ type Attachment struct {
 // Owner types for comments and attachments (FR-026, FR-027, FR-401).
 const (
 	OwnerTypeRequirement = "requirement"
+	OwnerTypeTask        = "task"
 	OwnerTypeConstraint  = "constraint"
 	OwnerTypeTestCase    = "test_case"
 	OwnerTypeComponent   = "component"
@@ -40,7 +41,7 @@ const (
 // ValidOwnerType reports whether ownerType can carry comments and attachments.
 func ValidOwnerType(ownerType string) bool {
 	switch ownerType {
-	case OwnerTypeRequirement, OwnerTypeConstraint, OwnerTypeTestCase,
+	case OwnerTypeRequirement, OwnerTypeTask, OwnerTypeConstraint, OwnerTypeTestCase,
 		OwnerTypeComponent, OwnerTypeCapability, OwnerTypeMilestone, OwnerTypeDefect:
 		return true
 	default:

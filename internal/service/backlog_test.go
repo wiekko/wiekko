@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"nexmap.net/internal/model"
@@ -14,10 +15,38 @@ func newBacklogService(requirements *testutil.MockRequirementStore, defects *tes
 	return &BacklogService{
 		requirements: requirements,
 		defects:      defects,
-		categories:   &testutil.MockCategoryStore{},
+		categories:   backlogCategories(),
 		comments:     &recordingPurger{},
 		audit:        audit,
 		authz:        &Authorizer{productRoles: roles},
+	}
+}
+
+// backlogCategories resolves "cat-*" IDs as requirement categories and
+// "taskcat-*" IDs as task categories, so kind checks can be exercised without
+// each test wiring its own category store.
+func backlogCategories() *testutil.MockCategoryStore {
+	return &testutil.MockCategoryStore{
+		GetByIDFunc: func(_ context.Context, id string) (*model.Category, error) {
+			return testutil.MakeCategory(func(c *model.Category) {
+				c.ID = id
+				if strings.HasPrefix(id, "taskcat") {
+					c.EntityType = model.RequirementKindTask
+					c.Prefix = "MT"
+					c.Name = "Maintenance"
+				}
+			}), nil
+		},
+		ListByProductIDFunc: func(_ context.Context, _, entityType string) ([]*model.Category, error) {
+			id := "cat-001"
+			if entityType == model.RequirementKindTask {
+				id = "taskcat-001"
+			}
+			return []*model.Category{testutil.MakeCategory(func(c *model.Category) {
+				c.ID = id
+				c.EntityType = entityType
+			})}, nil
+		},
 	}
 }
 
@@ -78,6 +107,191 @@ func TestCreateRequirement(t *testing.T) {
 		_, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{ProductID: "product-001", Title: "X"})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+// --- Tasks ---
+
+func TestCreateTask(t *testing.T) {
+	t.Run("defaults to a task category", func(t *testing.T) {
+		var created *model.Requirement
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				CreateFunc: func(_ context.Context, r *model.Requirement) error { created = r; return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Kind: model.RequirementKindTask, Title: "Upgrade Go toolchain",
+		})
+		if err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if created.Kind != model.RequirementKindTask {
+			t.Errorf("Kind = %q, want %q", created.Kind, model.RequirementKindTask)
+		}
+		if created.CategoryID != "taskcat-001" {
+			t.Errorf("CategoryID = %q, want the seeded task category", created.CategoryID)
+		}
+	})
+
+	t.Run("kind defaults to requirement", func(t *testing.T) {
+		var created *model.Requirement
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				CreateFunc: func(_ context.Context, r *model.Requirement) error { created = r; return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		if _, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Title: "X", CategoryID: "cat-001",
+		}); err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if created.Kind != model.RequirementKindRequirement {
+			t.Errorf("Kind = %q, want %q", created.Kind, model.RequirementKindRequirement)
+		}
+	})
+
+	t.Run("rejects an unknown kind", func(t *testing.T) {
+		svc := newBacklogService(nil, nil, nil, ownerRoles())
+		_, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Kind: "epic", Title: "X",
+		})
+		if err == nil {
+			t.Fatal("expected an error for kind \"epic\"")
+		}
+	})
+
+	t.Run("rejects a category of the wrong kind", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				CreateFunc: func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		// "cat-001" resolves to a requirement category.
+		_, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Kind: model.RequirementKindTask, Title: "X", CategoryID: "cat-001",
+		})
+		if err == nil {
+			t.Fatal("expected a task filed under a requirement category to be rejected")
+		}
+	})
+}
+
+func TestValidateParent(t *testing.T) {
+	requirement := testutil.MakeRequirement()
+	task := testutil.MakeTask()
+
+	byID := func(items ...*model.Requirement) func(context.Context, string) (*model.Requirement, error) {
+		return func(_ context.Context, id string) (*model.Requirement, error) {
+			for _, item := range items {
+				if item.ID == id {
+					return item, nil
+				}
+			}
+			return nil, errors.New("not found: " + id)
+		}
+	}
+
+	t.Run("a requirement cannot hang off a task", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				GetByIDFunc: byID(requirement, task),
+				CreateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Title: "X", CategoryID: "cat-001", ParentID: task.ID,
+		})
+		if err == nil {
+			t.Fatal("expected a requirement parented to a task to be rejected")
+		}
+	})
+
+	t.Run("a task can hang off a requirement", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				GetByIDFunc: byID(requirement, task),
+				CreateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		if _, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Kind: model.RequirementKindTask, Title: "X",
+			CategoryID: "taskcat-001", ParentID: requirement.ID,
+		}); err != nil {
+			t.Fatalf("expected a task parented to a requirement to be allowed, got %v", err)
+		}
+	})
+
+	t.Run("rejects a parent in another product", func(t *testing.T) {
+		foreign := testutil.MakeRequirement(func(r *model.Requirement) {
+			r.ID = "req-foreign"
+			r.ProductID = "product-999"
+		})
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				GetByIDFunc: byID(foreign),
+				CreateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Title: "X", CategoryID: "cat-001", ParentID: foreign.ID,
+		})
+		if err == nil {
+			t.Fatal("expected a cross-product parent to be rejected")
+		}
+	})
+
+	t.Run("rejects a cycle", func(t *testing.T) {
+		// child -> parent -> grandparent, then try to reparent child's own
+		// descendant chain back onto child.
+		child := testutil.MakeRequirement(func(r *model.Requirement) { r.ID = "req-child" })
+		descendant := testutil.MakeRequirement(func(r *model.Requirement) {
+			r.ID = "req-descendant"
+			r.ParentID = child.ID
+		})
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				GetByIDFunc: byID(child, descendant),
+				UpdateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		parentID := descendant.ID
+		_, err := svc.UpdateRequirement(context.Background(), testutil.MakeUser(), "product-001", child.ID,
+			UpdateRequirementInput{ParentID: &parentID})
+		if err == nil {
+			t.Fatal("expected a cyclic parent link to be rejected")
+		}
+	})
+
+	t.Run("rejects self-parenting", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				GetByIDFunc: byID(requirement),
+				UpdateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+
+		parentID := requirement.ID
+		_, err := svc.UpdateRequirement(context.Background(), testutil.MakeUser(), "product-001", requirement.ID,
+			UpdateRequirementInput{ParentID: &parentID})
+		if err == nil {
+			t.Fatal("expected self-parenting to be rejected")
 		}
 	})
 }

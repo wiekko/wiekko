@@ -147,8 +147,13 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-006**: `requirements` shall be grouped into configurable categories (defined per product). Default categories are Functionality, Architecture, Security and UX. Architecture, security and UX rules are modeled as `constraints` (a separate entity).
 * **FR-007**: `requirements` shall have a `definition of done`.
 * **FR-008**: `requirements` can have parent-child relations, allowing hierarchical decomposition without prescribing specific agile terminology (e.g. epic, story, task)
-* **FR-009**: `requirements` and `defects` can be assigned to one or more users
-* **FR-010**: `requirements` and `defects` can optionally have an estimation (e.g. story points or time-based); the estimation mechanism shall be configurable per product
+* **FR-008a**: A `product` shall have `tasks`: backlog items that carry no statement about the product (maintenance, tooling, spikes, technical debt). `tasks` and `requirements` share one table, one status set and one board, distinguished by a `kind` discriminator.
+* **FR-008b**: `tasks` shall be grouped into their own configurable categories, separate from the requirement categories. Default task categories are Maintenance (MT), Tooling (TL) and Spike (SP).
+* **FR-008c**: A `requirement`'s parent must be a `requirement`. Consequently a `task` may hang off a `requirement` or another `task`, but a `requirement` never hangs off a `task`. Parent links shall be rejected when they cross products or would close a cycle.
+* **FR-008d**: `tasks` shall not participate in traceability: they cannot be linked to `capabilities` or `test cases`, they have no `definition of done`, and they shall be excluded from the requirement list and from every requirement picker.
+* **FR-008e**: `statuses` shall remain defined for exactly two entity types (`requirement` and `defect`). `tasks` use the `requirement` status set; they shall never get a status set of their own.
+* **FR-009**: `requirements`, `tasks` and `defects` can be assigned to one or more users
+* **FR-010**: `requirements`, `tasks` and `defects` can optionally have an estimation (e.g. story points or time-based); the estimation mechanism shall be configurable per product
 * **FR-011**: A `product` shall have a `roadmap` with `milestones`
 * **FR-012**: `milestones` shall have a `type` (e.g. planning, release, internal) to distinguish regular planning checkpoints from shippable releases
 * **FR-013**: `components`, `capabilities`, `requirements` and `constraints` can be linked to `milestones`
@@ -165,8 +170,8 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-024**: A `defect` shall have a `criticality` and a `status`
 * **FR-025**: A `defect` can be linked to a `milestone`
 * **FR-026**: A `defect` can have `comments` and `attachments`
-* **FR-027**: `requirements`, `constraints`, `test cases`, `components`, `capabilities` and `milestones` can also have `comments` and `attachments`
-* **FR-028**: A `sprint` has a start and end date, and can contain `requirements`, and `defects`.
+* **FR-027**: `requirements`, `tasks`, `constraints`, `test cases`, `components`, `capabilities` and `milestones` can also have `comments` and `attachments`
+* **FR-028**: A `sprint` has a start and end date, and can contain `requirements`, `tasks` and `defects`.
 * **FR-029**: A `sprint` can be linked to a `milestone` ("leads towards" / "enables")
 * **FR-030**: All text fields (descriptions, comments, definitions of done) shall support Markdown formatting
 * **FR-031**: All changes to `products`, `components`, `capabilities`, `requirements`, `constraints`, `test cases`, `defects`, `milestones` and `sprints` shall be recorded in an audit trail (who changed what, when)
@@ -178,7 +183,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-037**: `constraints` shall have a `compliance_state` (not assessed, met, violated)
 * **FR-038**: `constraints` can be linked to `capabilities` (many-to-many)
 * **FR-039**: `constraints` shall support CRUD operations (create, read, update, delete) with the same role-based access as requirements
-* **FR-040**: `categories` shall be configurable per product, with separate sets for requirements and constraints. Each category has a name and a prefix used in human-readable identifiers (e.g. FR-1, AC-42).
+* **FR-040**: `categories` shall be configurable per product, with separate sets for requirements, tasks and constraints. Each category has a name and a prefix used in human-readable identifiers (e.g. FR-1, MT-18, AC-42). Identifier sequence numbers are drawn from one counter per product, shared across requirements and tasks, so identifiers can never collide.
 * **FR-041**: A `testing campaign` is complete when none of its results is pending, blocked or awaiting re-test. Skipped results do not influence the campaign outcome. A campaign passes when every non-skipped result is passed.
 * **FR-042**: Every change to a campaign result status shall be recorded as an immutable event capturing the user, timestamp, previous status, new status and any linked `defect`.
 
@@ -212,6 +217,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-306**: Product owners shall be able to transfer ownership to another user account. If the account has not yet been created (pending invitation), the transfer shall be pending as well, and only be completed once the new account is fully established.
 * **FR-307**: Product owners shall be able to create, update and delete components and capabilities
 * **FR-308**: Product owners shall be able to create, update and delete requirements (including definition of done).
+* **FR-308a**: Product owners shall be able to create, update and delete tasks. Tasks carry the same authorization as requirements: owners for full edits, developers for status and activation only (FR-407).
 * **FR-309**: Product owners shall be able to update the product roadmap (create, update, delete milestones).
 * **FR-310**: Product owners shall be able to create, update and delete test cases
 * **FR-311**: Product owners shall define which conditions re-set a test case (mainly for the webhook API, e.g. a new push to branch main or similar)
@@ -229,12 +235,12 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-323**: Product owners shall be able to define status (columns) for requirements and defects
 * **FR-324**: Product owners can decide whether they want to use sprints (scrum) or a continuous flow (kanban)
 * **FR-325**: Product owners shall be able to mark backlog items as coarse (requiring refinement)
-* **FR-326**: Product owners shall be able to refine a requirement (break down into child requirements)
+* **FR-326**: Product owners shall be able to refine a requirement (break down into child requirements or into child tasks)
 * **FR-327**: Product owners shall be able to assign requirements and defects to users
 * **FR-328**: Product owners shall be able to configure the estimation mechanism for their product (e.g. story points, t-shirt sizes, hours) or disable it entirely
 * **FR-329**: Product owners shall be able to configure the pyramid levels for their product
 * **FR-330**: Product owners shall be able to create, update and delete constraints
-* **FR-331**: Product owners shall be able to configure categories for requirements and constraints
+* **FR-331**: Product owners shall be able to configure categories for requirements, tasks and constraints
 * **FR-332**: Closing a testing campaign shall require an explicit action by a product owner. Closing records the acting user in the audit trail and freezes all results against further changes.
 * **FR-333**: Closing a testing campaign that still has incomplete results (FR-041) shall require confirmation, but shall not be prevented
 
@@ -246,7 +252,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-404**: Developers shall be able to manually re-set a test case (slate for re-testing after a change)
 * **FR-405**: Developers shall be able to create, update, close and reject defects.
 * **FR-406**: Developers shall be able to add comments and attachments to defects.
-* **FR-407**: Developers shall be able to update the status of defects and requirements if they have been activated upfront
+* **FR-407**: Developers shall be able to update the status of defects, requirements and tasks if they have been activated upfront
 * **FR-408**: Developers shall be able to mark backlog items as coarse (requiring refinement)
 * **FR-409**: Developers shall be able to ingest unit test results via the CLI (e.g. `go test -v ./... | nexmap utest`) or via CI pipeline webhook
 

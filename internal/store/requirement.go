@@ -11,6 +11,7 @@ import (
 
 // RequirementFilter controls which requirements are returned by ListByProductID.
 type RequirementFilter struct {
+	Kind       string // empty = all kinds (requirements and tasks)
 	CategoryID string // empty = all categories
 	StatusID   string // empty = all statuses
 	SprintID   string // empty = all sprints
@@ -38,11 +39,11 @@ type requirementStore struct {
 
 func (s *requirementStore) Create(ctx context.Context, r *model.Requirement) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO requirements (id, product_id, parent_id, category_id, sequence_number, title, description,
+		`INSERT INTO requirements (id, product_id, kind, parent_id, category_id, sequence_number, title, description,
 		 definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 		 is_coarse, is_active, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ProductID, nullableText(r.ParentID), r.CategoryID, r.SequenceNumber,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.ProductID, r.Kind, nullableText(r.ParentID), r.CategoryID, r.SequenceNumber,
 		r.Title, r.Description, r.DefinitionOfDone,
 		nullableText(r.StatusID), nullableText(r.MilestoneID), nullableText(r.SprintID),
 		nullableText(r.Estimation), r.Priority,
@@ -85,6 +86,10 @@ func (s *requirementStore) Delete(ctx context.Context, id string) error {
 func (s *requirementStore) ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error) {
 	query := `SELECT ` + requirementColumns + ` FROM requirements WHERE product_id = ?`
 	args := []any{productID}
+	if filter.Kind != "" {
+		query += ` AND kind = ?`
+		args = append(args, filter.Kind)
+	}
 	if filter.CategoryID != "" {
 		query += ` AND category_id = ?`
 		args = append(args, filter.CategoryID)
@@ -188,7 +193,7 @@ func (s *requirementStore) NextSequenceNumber(ctx context.Context, productID str
 	return 1, nil
 }
 
-const requirementColumns = `id, product_id, parent_id, category_id, sequence_number, title, description,
+const requirementColumns = `id, product_id, kind, parent_id, category_id, sequence_number, title, description,
 	definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 	is_coarse, is_active, created_at, updated_at`
 
@@ -196,7 +201,7 @@ func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement
 	var parentID, statusID, milestoneID, sprintID, estimation sql.NullString
 	var isCoarse, isActive int
-	err := sc.Scan(&r.ID, &r.ProductID, &parentID, &r.CategoryID, &r.SequenceNumber,
+	err := sc.Scan(&r.ID, &r.ProductID, &r.Kind, &parentID, &r.CategoryID, &r.SequenceNumber,
 		&r.Title, &r.Description, &r.DefinitionOfDone,
 		&statusID, &milestoneID, &sprintID, &estimation, &r.Priority,
 		&isCoarse, &isActive, &r.CreatedAt, &r.UpdatedAt)

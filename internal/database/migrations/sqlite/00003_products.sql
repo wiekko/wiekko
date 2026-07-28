@@ -112,6 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_sprints_milestone_id ON sprints(milestone_id);
 CREATE TABLE IF NOT EXISTS requirements (
     id                 TEXT PRIMARY KEY,
     product_id         TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    kind               TEXT NOT NULL DEFAULT 'requirement',
     parent_id          TEXT REFERENCES requirements(id) ON DELETE SET NULL,
     category_id        TEXT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
     title              TEXT NOT NULL,
@@ -129,6 +130,7 @@ CREATE TABLE IF NOT EXISTS requirements (
     updated_at         TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_requirements_product_id ON requirements(product_id);
+CREATE INDEX IF NOT EXISTS idx_requirements_kind ON requirements(product_id, kind);
 CREATE INDEX IF NOT EXISTS idx_requirements_parent_id ON requirements(parent_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_category_id ON requirements(category_id);
 CREATE INDEX IF NOT EXISTS idx_requirements_status_id ON requirements(status_id);

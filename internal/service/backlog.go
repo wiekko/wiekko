@@ -36,6 +36,7 @@ type BacklogService struct {
 // CreateRequirementInput contains the fields required to create a requirement.
 type CreateRequirementInput struct {
 	ProductID        string
+	Kind             string // "requirement" (default) or "task"
 	ParentID         string
 	CategoryID       string
 	Title            string
@@ -71,18 +72,21 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		return nil, err
 	}
 
-	if input.Title == "" {
-		return nil, errors.New("requirement title is required")
+	if input.Kind == "" {
+		input.Kind = model.RequirementKindRequirement
 	}
-	if input.CategoryID == "" {
-		cats, err := s.categories.ListByProductID(ctx, input.ProductID, "requirement")
-		if err != nil {
-			return nil, fmt.Errorf("list categories: %w", err)
-		}
-		if len(cats) == 0 {
-			return nil, errors.New("no requirement categories defined for this product")
-		}
-		input.CategoryID = cats[0].ID
+	if !model.ValidRequirementKind(input.Kind) {
+		return nil, fmt.Errorf("invalid kind %q", input.Kind)
+	}
+
+	if input.Title == "" {
+		return nil, errors.New(input.Kind + " title is required")
+	}
+	if err := s.resolveCategory(ctx, input.ProductID, input.Kind, &input.CategoryID); err != nil {
+		return nil, err
+	}
+	if err := s.validateParent(ctx, input.ProductID, "", input.Kind, input.ParentID); err != nil {
+		return nil, err
 	}
 
 	seq, err := s.requirements.NextSequenceNumber(ctx, input.ProductID)
@@ -94,6 +98,7 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 	r := &model.Requirement{
 		ID:               uuid.New().String(),
 		ProductID:        input.ProductID,
+		Kind:             input.Kind,
 		ParentID:         input.ParentID,
 		CategoryID:       input.CategoryID,
 		SequenceNumber:   seq,
@@ -110,11 +115,11 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		UpdatedAt:        now,
 	}
 	if err := s.requirements.Create(ctx, r); err != nil {
-		return nil, fmt.Errorf("create requirement: %w", err)
+		return nil, fmt.Errorf("create %s: %w", input.Kind, err)
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "requirement", EntityID: r.ID,
+		ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
 		UserID: user.ID, Action: "create", CreatedAt: now,
 	})
 
@@ -161,9 +166,15 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
 		}
 		if input.ParentID != nil {
+			if err := s.validateParent(ctx, productID, r.ID, r.Kind, *input.ParentID); err != nil {
+				return nil, err
+			}
 			r.ParentID = *input.ParentID
 		}
 		if input.CategoryID != nil {
+			if err := s.checkCategoryKind(ctx, r.Kind, *input.CategoryID); err != nil {
+				return nil, err
+			}
 			r.CategoryID = *input.CategoryID
 		}
 		if input.Title != nil {
@@ -194,11 +205,11 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 	r.UpdatedAt = now
 
 	if err := s.requirements.Update(ctx, r); err != nil {
-		return nil, fmt.Errorf("update requirement: %w", err)
+		return nil, fmt.Errorf("update %s: %w", r.Kind, err)
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "requirement", EntityID: r.ID,
+		ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
 		UserID: user.ID, Action: "update", CreatedAt: now,
 	})
 
@@ -211,19 +222,25 @@ func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User
 		return err
 	}
 
+	// The kind decides which owner type the comments were filed under.
+	kind := model.RequirementKindRequirement
+	if r, err := s.requirements.GetByID(ctx, id); err == nil {
+		kind = r.Kind
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.requirements.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete requirement: %w", err)
+		return fmt.Errorf("delete %s: %w", kind, err)
 	}
 
 	// Comments and attachments hang off polymorphic owner columns, so no
 	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeRequirement, id); err != nil {
+	if err := s.comments.PurgeOwner(ctx, productID, kind, id); err != nil {
 		return err
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "requirement", EntityID: id,
+		ID: uuid.New().String(), EntityType: kind, EntityID: id,
 		UserID: user.ID, Action: "delete", CreatedAt: now,
 	})
 
@@ -264,6 +281,84 @@ func (s *BacklogService) ListChildRequirements(ctx context.Context, user *model.
 		return nil, err
 	}
 	return s.requirements.ListByParentID(ctx, parentID)
+}
+
+// resolveCategory fills in categoryID with the product's first category for
+// kind when the caller left it empty, and otherwise checks the one supplied.
+func (s *BacklogService) resolveCategory(ctx context.Context, productID, kind string, categoryID *string) error {
+	if *categoryID != "" {
+		return s.checkCategoryKind(ctx, kind, *categoryID)
+	}
+	cats, err := s.categories.ListByProductID(ctx, productID, kind)
+	if err != nil {
+		return fmt.Errorf("list categories: %w", err)
+	}
+	if len(cats) == 0 {
+		return fmt.Errorf("no %s categories defined for this product", kind)
+	}
+	*categoryID = cats[0].ID
+	return nil
+}
+
+// checkCategoryKind rejects a category belonging to a different kind, so a
+// task cannot be filed under FR and a requirement cannot be filed under MT.
+func (s *BacklogService) checkCategoryKind(ctx context.Context, kind, categoryID string) error {
+	cat, err := s.categories.GetByID(ctx, categoryID)
+	if err != nil {
+		return fmt.Errorf("category not found: %w", err)
+	}
+	if cat.EntityType != kind {
+		return fmt.Errorf("category is not a %s category", kind)
+	}
+	return nil
+}
+
+// maxParentDepth caps the ancestor walk in validateParent. A backlog tree
+// deeper than this is a data problem in its own right.
+const maxParentDepth = 100
+
+// validateParent checks a proposed parent link. childID is empty on create.
+//
+// A requirement's parent must be a requirement: requirements decompose into
+// requirements, and both requirements and tasks may decompose into tasks, but
+// a requirement never hangs off a task. Cross-product parents and cycles are
+// rejected for both kinds — neither was checked before this.
+func (s *BacklogService) validateParent(ctx context.Context, productID, childID, childKind, parentID string) error {
+	if parentID == "" {
+		return nil
+	}
+	if parentID == childID {
+		return errors.New("a backlog item cannot be its own parent")
+	}
+
+	parent, err := s.requirements.GetByID(ctx, parentID)
+	if err != nil {
+		return fmt.Errorf("parent not found: %w", err)
+	}
+	if parent.ProductID != productID {
+		return errors.New("parent belongs to a different product")
+	}
+	if childKind == model.RequirementKindRequirement && parent.Kind != model.RequirementKindRequirement {
+		return errors.New("a requirement's parent must be a requirement")
+	}
+
+	// Walk up from the proposed parent; reaching the child means the link
+	// would close a cycle.
+	for i, cur := 0, parent; i < maxParentDepth; i++ {
+		if cur.ParentID == "" {
+			return nil
+		}
+		if cur.ParentID == childID {
+			return errors.New("parent link would create a cycle")
+		}
+		cur, err = s.requirements.GetByID(ctx, cur.ParentID)
+		if err != nil {
+			// A dangling ancestor is pre-existing damage, not a reason to
+			// block this edit.
+			return nil
+		}
+	}
+	return errors.New("parent chain is too deep")
 }
 
 // AssignRequirement assigns a user to a requirement. Requires owner role.

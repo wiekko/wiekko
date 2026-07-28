@@ -1614,7 +1614,7 @@ func (c *PageProductController) MilestoneRequirementLinkSearch(w http.ResponseWr
 	}
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 
 	candidates := make([]*model.Requirement, 0, len(all))
 	for _, req := range all {
@@ -3315,7 +3315,7 @@ func (c *PageProductController) CapabilityRequirementLinkSearch(w http.ResponseW
 	}
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	links, _ := c.component.ListCapabilityRequirements(r.Context(), user, productID, capabilityID)
 	linkedIDs := make(map[string]struct{}, len(links))
 	for _, l := range links {
@@ -3376,7 +3376,7 @@ func (c *PageProductController) CapabilityRequirementCreateModal(w http.Response
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -3427,7 +3427,7 @@ func (c *PageProductController) CapabilityRequirementCreateAndLink(w http.Respon
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -4477,7 +4477,7 @@ func (c *PageProductController) TestCaseRequirementLinkSearch(w http.ResponseWri
 	}
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	links, _ := c.testing.ListTestCaseRequirements(r.Context(), user, productID, testCaseID)
 	linkedIDs := make(map[string]struct{}, len(links))
 	for _, l := range links {
@@ -4538,7 +4538,7 @@ func (c *PageProductController) TestCaseRequirementCreateModal(w http.ResponseWr
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -4589,7 +4589,7 @@ func (c *PageProductController) TestCaseRequirementCreateAndLink(w http.Response
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -4915,6 +4915,28 @@ func (c *PageProductController) buildCategoryPrefixMap(r *http.Request, user *mo
 	return m
 }
 
+// requirementsOnly excludes tasks from a requirement listing. Requirements and
+// tasks share the requirements table, so every requirement-facing list, picker
+// and parent dropdown has to say so explicitly.
+var requirementsOnly = store.RequirementFilter{Kind: model.RequirementKindRequirement}
+
+// tasksOnly is the mirror of requirementsOnly for the task pages.
+var tasksOnly = store.RequirementFilter{Kind: model.RequirementKindTask}
+
+// buildBacklogPrefixMap merges the requirement and task category prefixes into
+// one map, for views that render both kinds side by side (the board). Category
+// IDs are UUIDs, so the two sets cannot collide.
+func (c *PageProductController) buildBacklogPrefixMap(r *http.Request, user *model.User, productID string) map[string]string {
+	m := c.buildCategoryPrefixMap(r, user, productID, model.RequirementKindRequirement)
+	if m == nil {
+		m = make(map[string]string)
+	}
+	for id, prefix := range c.buildCategoryPrefixMap(r, user, productID, model.RequirementKindTask) {
+		m[id] = prefix
+	}
+	return m
+}
+
 // buildCategoryNameMap returns a map of category ID to name for the given entity type.
 func (c *PageProductController) buildCategoryNameMap(r *http.Request, user *model.User, productID, entityType string) map[string]string {
 	cats, err := c.category.ListCategories(r.Context(), user, productID, entityType)
@@ -4960,7 +4982,7 @@ func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -4999,7 +5021,9 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 	}
 
 	// Load categories for prefix and name mapping.
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	// Merged across kinds: a requirement can be refined into child tasks
+	// (FR-326), so the children table has to resolve task prefixes too.
+	prefixes := c.buildBacklogPrefixMap(r, user, productID)
 	catNames := c.buildCategoryNameMap(r, user, productID, "requirement")
 
 	// Resolve parent requirement name if set.
@@ -5051,7 +5075,7 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -5119,7 +5143,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -5179,7 +5203,7 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -5264,7 +5288,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
-		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
@@ -5353,7 +5377,9 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 		return
 	}
 
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	// Merged across kinds: a requirement can be refined into child tasks
+	// (FR-326), so the children table has to resolve task prefixes too.
+	prefixes := c.buildBacklogPrefixMap(r, user, productID)
 	catNames := c.buildCategoryNameMap(r, user, productID, "requirement")
 
 	var parentName, parentIdentifier string
@@ -7086,7 +7112,7 @@ func (c *PageProductController) DefectRequirementLinkSearch(w http.ResponseWrite
 	}
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 	linkedIDs := c.defectLinkedTargetIDs(r, user, productID, defectID, model.DefectLinkTargetRequirement)
 
 	candidates := make([]*model.Requirement, 0, len(all))

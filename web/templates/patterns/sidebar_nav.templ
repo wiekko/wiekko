@@ -20,9 +20,10 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string, isA
 					@SidebarLink("Settings", "/products/"+productID+"/settings", "settings", activeSection == "settings", "")
 					@SidebarLink("Team", "/products/"+productID+"/team", "users", activeSection == "team", "")
 				}
-				@SidebarSection("Backlog", activeSection == "requirements" || activeSection == "defects" || activeSection == "sprints" || activeSection == "board") {
+				@SidebarSection("Backlog", activeSection == "requirements" || activeSection == "defects" || activeSection == "tasks" || activeSection == "sprints" || activeSection == "board") {
 					@SidebarLink("Requirements", "/products/"+productID+"/requirements", "clipboard-list", activeSection == "requirements", "")
 					@SidebarLink("Defects", "/products/"+productID+"/defects", "bug", activeSection == "defects", "")
+					@SidebarLink("Tasks", "/products/"+productID+"/tasks", "list-checks", activeSection == "tasks", "")
 					@SidebarWorkflowItem(productID, workflowMode, activeSection)
 				}
 				@SidebarSection("Testing", activeSection == "test-cases" || activeSection == "campaigns") {

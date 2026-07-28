@@ -273,6 +273,7 @@ func attachmentView(a *model.Attachment, productID, ownerType, ownerID string, c
 // ownerSegments maps an owner type to its URL path segment.
 var ownerSegments = map[string]string{
 	model.OwnerTypeRequirement: "requirements",
+	model.OwnerTypeTask:        "tasks",
 	model.OwnerTypeConstraint:  "constraints",
 	model.OwnerTypeTestCase:    "test-cases",
 	model.OwnerTypeComponent:   "components",
@@ -488,6 +489,25 @@ func (c *PageProductController) RequirementAttachmentCreate(w http.ResponseWrite
 }
 func (c *PageProductController) RequirementAttachmentDelete(w http.ResponseWriter, r *http.Request) {
 	c.attachmentDelete(w, r, model.OwnerTypeRequirement, r.PathValue("requirementId"))
+}
+
+func (c *PageProductController) TaskCommentsTab(w http.ResponseWriter, r *http.Request) {
+	c.commentsTab(w, r, model.OwnerTypeTask, r.PathValue("taskId"))
+}
+func (c *PageProductController) TaskCommentCreate(w http.ResponseWriter, r *http.Request) {
+	c.commentCreate(w, r, model.OwnerTypeTask, r.PathValue("taskId"))
+}
+func (c *PageProductController) TaskCommentDelete(w http.ResponseWriter, r *http.Request) {
+	c.commentDelete(w, r, model.OwnerTypeTask, r.PathValue("taskId"))
+}
+func (c *PageProductController) TaskAttachmentsTab(w http.ResponseWriter, r *http.Request) {
+	c.attachmentsTab(w, r, model.OwnerTypeTask, r.PathValue("taskId"))
+}
+func (c *PageProductController) TaskAttachmentCreate(w http.ResponseWriter, r *http.Request) {
+	c.attachmentCreate(w, r, model.OwnerTypeTask, r.PathValue("taskId"))
+}
+func (c *PageProductController) TaskAttachmentDelete(w http.ResponseWriter, r *http.Request) {
+	c.attachmentDelete(w, r, model.OwnerTypeTask, r.PathValue("taskId"))
 }
 
 func (c *PageProductController) DefectCommentsTab(w http.ResponseWriter, r *http.Request) {

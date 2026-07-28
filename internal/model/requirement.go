@@ -2,10 +2,24 @@ package model
 
 import "fmt"
 
+// Requirement kinds. Requirements and tasks share one table and one status
+// set; the kind distinguishes a statement about the product (requirement)
+// from work that carries no product statement of its own (task).
+const (
+	RequirementKindRequirement = "requirement"
+	RequirementKindTask        = "task"
+)
+
+// ValidRequirementKind reports whether kind is a supported backlog item kind.
+func ValidRequirementKind(kind string) bool {
+	return kind == RequirementKindRequirement || kind == RequirementKindTask
+}
+
 // Requirement represents a backlog item within a product.
 type Requirement struct {
 	ID               string
 	ProductID        string
+	Kind             string // "requirement" or "task"
 	ParentID         string // empty if top-level
 	CategoryID       string
 	SequenceNumber   int // auto-assigned per product, used for identifier

@@ -152,6 +152,30 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 		})
 	}
 
+	// Default task categories. Tasks carry no product statement, so they get
+	// their own prefix axis rather than sharing the requirement one.
+	defaultTaskCategories := []struct {
+		Name     string
+		Prefix   string
+		Position int
+	}{
+		{Name: "Maintenance", Prefix: "MT", Position: 1},
+		{Name: "Tooling", Prefix: "TL", Position: 2},
+		{Name: "Spike", Prefix: "SP", Position: 3},
+	}
+
+	for _, dc := range defaultTaskCategories {
+		_ = s.categories.Create(ctx, &model.Category{
+			ID:         uuid.New().String(),
+			ProductID:  productID,
+			EntityType: "task",
+			Name:       dc.Name,
+			Prefix:     dc.Prefix,
+			Position:   dc.Position,
+			CreatedAt:  now,
+		})
+	}
+
 	// Default constraint categories.
 	defaultConCategories := []struct {
 		Name     string

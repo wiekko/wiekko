@@ -499,3 +499,44 @@ func TestProductTransferOwnership(t *testing.T) {
 		}
 	})
 }
+
+// Tasks get their own category axis so the FR/AR/SR/UR prefixes stay reserved
+// for statements about the product.
+func TestProductCreate_SeedsTaskCategories(t *testing.T) {
+	var seeded []*model.Category
+	svc := newProductService(
+		&testutil.MockProductStore{
+			CreateFunc: func(_ context.Context, _ *model.Product) error { return nil },
+		},
+		ownerRoles(),
+		&testutil.MockSettingStore{},
+		noopAudit(),
+	)
+	svc.categories = &testutil.MockCategoryStore{
+		CreateFunc: func(_ context.Context, c *model.Category) error {
+			seeded = append(seeded, c)
+			return nil
+		},
+	}
+
+	admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
+	if _, err := svc.Create(context.Background(), admin, CreateProductInput{Name: "Nexmap"}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	want := map[string]string{"Maintenance": "MT", "Tooling": "TL", "Spike": "SP"}
+	got := make(map[string]string)
+	for _, c := range seeded {
+		if c.EntityType == model.RequirementKindTask {
+			got[c.Name] = c.Prefix
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("seeded task categories = %v, want %v", got, want)
+	}
+	for name, prefix := range want {
+		if got[name] != prefix {
+			t.Errorf("category %q prefix = %q, want %q", name, got[name], prefix)
+		}
+	}
+}

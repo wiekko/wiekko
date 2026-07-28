@@ -5,7 +5,7 @@ package model
 type Category struct {
 	ID         string
 	ProductID  string
-	EntityType string // "requirement" or "constraint"
+	EntityType string // "requirement", "task" or "constraint"
 	Name       string
 	Prefix     string // e.g. "FR", "AR", "AC"
 	Position   int

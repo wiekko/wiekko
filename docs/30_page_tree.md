@@ -95,6 +95,10 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/defects/new`            | Create Defect      | Form                                                      |
 | `/products/:id/defects/:did`           | Defect Detail      | Tabbed detail page                                        |
 | `/products/:id/defects/:did/edit`      | Edit Defect        | Form                                                      |
+| `/products/:id/tasks`                  | Tasks List         | Table view; work that is neither requirement nor defect   |
+| `/products/:id/tasks/new`              | Create Task        | Form (no definition of done)                              |
+| `/products/:id/tasks/:tid`             | Task Detail        | Tabbed detail page (see below)                            |
+| `/products/:id/tasks/:tid/edit`        | Edit Task          | Form                                                      |
 | `/products/:id/constraints`            | Constraints List   | Table with category filter                                |
 | `/products/:id/constraints/new`        | Create Constraint  | Form                                                      |
 | `/products/:id/constraints/:cid`       | Constraint Detail  | Tabbed detail page                                        |
@@ -116,6 +120,18 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Comments    | Comment thread                                                         |
 | Attachments | File list + upload                                                     |
 | History     | Audit trail                                                            |
+
+**Task Detail tabs:**
+
+Tasks deliberately have no Capabilities, Test Cases or Defects tab: they make no
+statement about the product, so there is nothing to trace or acceptance-test.
+
+| Tab         | Content                                                  |
+|-------------|----------------------------------------------------------|
+| Overview    | Fields, status, assignments, parent, child tasks         |
+| Comments    | Comment thread                                           |
+| Attachments | File list + upload                                       |
+| History     | Audit trail                                              |
 
 **Defect Detail tabs:**
 

@@ -28,6 +28,7 @@ func (c *BacklogController) ListRequirements(w http.ResponseWriter, r *http.Requ
 	productID := r.PathValue("productId")
 
 	filter := store.RequirementFilter{
+		Kind:       r.URL.Query().Get("kind"),
 		CategoryID: r.URL.Query().Get("category_id"),
 		StatusID:   r.URL.Query().Get("status_id"),
 		SprintID:   r.URL.Query().Get("sprint_id"),
@@ -52,6 +53,7 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 	productID := r.PathValue("productId")
 
 	var req struct {
+		Kind             string `json:"kind"`
 		ParentID         string `json:"parent_id"`
 		CategoryID       string `json:"category_id"`
 		Title            string `json:"title"`
@@ -70,6 +72,7 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 
 	item, err := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
 		ProductID:        productID,
+		Kind:             req.Kind,
 		ParentID:         req.ParentID,
 		CategoryID:       req.CategoryID,
 		Title:            req.Title,
@@ -484,6 +487,7 @@ func requirementToJSON(r *model.Requirement) map[string]any {
 	return map[string]any{
 		"id":                 r.ID,
 		"product_id":         r.ProductID,
+		"kind":               r.Kind,
 		"parent_id":          r.ParentID,
 		"category_id":        r.CategoryID,
 		"title":              r.Title,

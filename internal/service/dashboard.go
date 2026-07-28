@@ -123,7 +123,9 @@ func (s *DashboardService) closedStatusIDs(ctx context.Context, productID string
 }
 
 func (s *DashboardService) countOpenRequirements(ctx context.Context, productID string, closed map[string]bool) int {
-	reqs, err := s.requirements.ListByProductID(ctx, productID, store.RequirementFilter{})
+	reqs, err := s.requirements.ListByProductID(ctx, productID, store.RequirementFilter{
+		Kind: model.RequirementKindRequirement,
+	})
 	if err != nil {
 		return 0
 	}

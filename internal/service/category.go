@@ -48,8 +48,8 @@ func (s *CategoryService) CreateCategory(ctx context.Context, user *model.User, 
 	if input.Prefix == "" {
 		return nil, errors.New("category prefix is required")
 	}
-	if input.EntityType != "requirement" && input.EntityType != "constraint" {
-		return nil, errors.New("entity_type must be 'requirement' or 'constraint'")
+	if input.EntityType != "requirement" && input.EntityType != "task" && input.EntityType != "constraint" {
+		return nil, errors.New("entity_type must be 'requirement', 'task' or 'constraint'")
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)

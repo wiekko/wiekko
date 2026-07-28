@@ -226,12 +226,31 @@ func MakeStatus(overrides ...func(*model.Status)) *model.Status {
 	return s
 }
 
+// MakeCategory returns a category with sensible defaults.
+func MakeCategory(overrides ...func(*model.Category)) *model.Category {
+	now := time.Now().UTC().Format(time.RFC3339)
+	c := &model.Category{
+		ID:         "cat-001",
+		ProductID:  "product-001",
+		EntityType: model.RequirementKindRequirement,
+		Name:       "Functionality",
+		Prefix:     "FR",
+		Position:   1,
+		CreatedAt:  now,
+	}
+	for _, fn := range overrides {
+		fn(c)
+	}
+	return c
+}
+
 // MakeRequirement returns a requirement with sensible defaults.
 func MakeRequirement(overrides ...func(*model.Requirement)) *model.Requirement {
 	now := time.Now().UTC().Format(time.RFC3339)
 	r := &model.Requirement{
 		ID:         "req-001",
 		ProductID:  "product-001",
+		Kind:       model.RequirementKindRequirement,
 		CategoryID: "cat-001",
 		Title:      "Test Requirement",
 		CreatedAt:  now,
@@ -241,6 +260,20 @@ func MakeRequirement(overrides ...func(*model.Requirement)) *model.Requirement {
 		fn(r)
 	}
 	return r
+}
+
+// MakeTask returns a task (a backlog item of kind "task") with sensible defaults.
+func MakeTask(overrides ...func(*model.Requirement)) *model.Requirement {
+	t := MakeRequirement(func(r *model.Requirement) {
+		r.ID = "task-001"
+		r.Kind = model.RequirementKindTask
+		r.CategoryID = "taskcat-001"
+		r.Title = "Test Task"
+	})
+	for _, fn := range overrides {
+		fn(t)
+	}
+	return t
 }
 
 // MakeConstraint returns a constraint with sensible defaults.

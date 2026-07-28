@@ -39,7 +39,9 @@ func (c *PageProductController) Board(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load statuses", http.StatusInternalServerError)
 		return
 	}
-	requirements, err := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	// Requirements and tasks share the requirement status set, so they share
+	// the board columns too; an empty kind filter returns both.
+	backlogItems, err := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
 	if err != nil {
 		http.Error(w, "failed to load requirements", http.StatusInternalServerError)
 		return
@@ -50,7 +52,7 @@ func (c *PageProductController) Board(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	prefixes := c.buildBacklogPrefixMap(r, user, productID)
 
 	props := productpage.BoardPageProps{
 		Meta: templates.PageMeta{
@@ -63,9 +65,10 @@ func (c *PageProductController) Board(w http.ResponseWriter, r *http.Request) {
 		CanMove:     canMoveCards(user, role),
 	}
 
-	reqCards, strandedReq := buildRequirementCards(productID, requirements, prefixes)
+	reqCards, strandedReq, strandedTask := buildBacklogCards(productID, backlogItems, prefixes)
 	defCards, strandedDef := buildDefectCards(productID, defects)
 	props.StrandedReq = strandedReq
+	props.StrandedTask = strandedTask
 	props.StrandedDef = strandedDef
 
 	if p.StatusSync {
@@ -99,6 +102,25 @@ func (c *PageProductController) BoardRequirementStatus(w http.ResponseWriter, r 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// BoardTaskStatus handles PATCH /products/{id}/board/tasks/{taskId}/status.
+// Tasks live in the requirements table and use the requirement status set, so
+// this is the requirement move with a URL that reads honestly.
+func (c *PageProductController) BoardTaskStatus(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	taskID := r.PathValue("taskId")
+
+	statusID := strings.TrimSpace(r.FormValue("status_id"))
+	_, err := c.backlog.UpdateRequirement(r.Context(), user, productID, taskID, service.UpdateRequirementInput{
+		StatusID: &statusID,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // BoardDefectStatus handles PATCH /products/{id}/board/defects/{defectId}/status.
 func (c *PageProductController) BoardDefectStatus(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -123,24 +145,35 @@ func canMoveCards(user *model.User, role string) bool {
 	return role == model.RoleDeveloper || role == model.RoleOwner
 }
 
-func buildRequirementCards(productID string, reqs []*model.Requirement, prefixes map[string]string) (byStatus map[string][]productpage.BoardCard, stranded []productpage.BoardCard) {
+// buildBacklogCards turns requirements and tasks into board cards. Both kinds
+// carry requirement status IDs, so they land in one map and share the columns;
+// the card's EntityType is what tells them apart on screen.
+func buildBacklogCards(productID string, items []*model.Requirement, prefixes map[string]string) (byStatus map[string][]productpage.BoardCard, strandedReq, strandedTask []productpage.BoardCard) {
 	byStatus = make(map[string][]productpage.BoardCard)
-	for _, req := range reqs {
-		card := productpage.BoardCard{
-			EntityType: "requirement",
-			ID:         req.ID,
-			Identifier: model.EntityIdentifier(categoryPrefix(prefixes, req.CategoryID), req.SequenceNumber),
-			Title:      req.Title,
-			Priority:   req.Priority,
-			MoveURL:    "/products/" + productID + "/board/requirements/" + req.ID + "/status",
+	for _, item := range items {
+		segment := "requirements"
+		if item.Kind == model.RequirementKindTask {
+			segment = "tasks"
 		}
-		if req.StatusID == "" {
-			stranded = append(stranded, card)
+		card := productpage.BoardCard{
+			EntityType: item.Kind,
+			ID:         item.ID,
+			Identifier: model.EntityIdentifier(categoryPrefix(prefixes, item.CategoryID), item.SequenceNumber),
+			Title:      item.Title,
+			Priority:   item.Priority,
+			MoveURL:    "/products/" + productID + "/board/" + segment + "/" + item.ID + "/status",
+		}
+		if item.StatusID == "" {
+			if item.Kind == model.RequirementKindTask {
+				strandedTask = append(strandedTask, card)
+			} else {
+				strandedReq = append(strandedReq, card)
+			}
 			continue
 		}
-		byStatus[req.StatusID] = append(byStatus[req.StatusID], card)
+		byStatus[item.StatusID] = append(byStatus[item.StatusID], card)
 	}
-	return byStatus, stranded
+	return byStatus, strandedReq, strandedTask
 }
 
 func buildDefectCards(productID string, defects []*model.Defect) (byStatus map[string][]productpage.BoardCard, stranded []productpage.BoardCard) {

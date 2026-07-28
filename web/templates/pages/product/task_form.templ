@@ -1,0 +1,205 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TaskFormProps holds data for the task create/edit form.
+//
+// There is no Definition of Done field: a task carries no acceptance criteria
+// because it makes no statement about the product. Parents is the full backlog
+// (requirements and tasks), since a task may hang off either.
+type TaskFormProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Task             *model.Requirement   // nil for create
+	Parents          []*model.Requirement // requirements and tasks, for the parent select
+	Categories       []*model.Category    // task categories for dropdown
+	CategoryPrefixes map[string]string    // category ID → prefix, merged across kinds
+	Statuses         []*model.Status
+	Milestones       []*model.Milestone
+	Sprints          []*model.Sprint
+	IsEdit           bool
+	Error            string
+	ReturnTo         string // "list" to return to list after save; empty = detail
+	// Form values (preserved on validation error).
+	Title       string
+	Description string
+	CategoryID  string
+	ParentID    string
+	StatusID    string
+	MilestoneID string
+	SprintID    string
+	Estimation  string
+	Priority    string
+	IsCoarse    bool
+}
+
+templ TaskFormPage(props TaskFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "tasks",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(taskFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Task
+				} else {
+					New Task
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@TaskFormBody(props)
+		</div>
+	}
+}
+
+// TaskFormBody renders the inner form (Card + form fields) without page chrome.
+templ TaskFormBody(props TaskFormProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			<form
+				method="post"
+				action={ templ.SafeURL(taskFormAction(props)) }
+				class="space-y-6"
+			>
+				<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.ReturnTo != "" {
+					<input type="hidden" name="return" value={ props.ReturnTo }/>
+				}
+				if props.IsEdit {
+					@ui.TextInput(ui.InputProps{
+						ID:       "identifier",
+						Name:     "identifier",
+						Label:    "Identifier",
+						Value:    model.EntityIdentifier(formCategoryPrefix(props.Categories, props.Task.CategoryID), props.Task.SequenceNumber),
+						Disabled: true,
+					})
+				}
+				@ui.TextInput(ui.InputProps{
+					ID:          "title",
+					Name:        "title",
+					Label:       "Title",
+					Value:       props.Title,
+					Placeholder: "e.g. Upgrade Go toolchain to 1.25",
+					Required:    true,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:      "category_id",
+					Name:    "category_id",
+					Label:   "Category",
+					Value:   props.CategoryID,
+					Options: dynamicCategorySelectOptions(props.Categories, props.CategoryID),
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "parent_id",
+					Name:     "parent_id",
+					Label:    "Parent",
+					Value:    props.ParentID,
+					Options:  parentSelectOptions(props.Parents, props.CategoryPrefixes, taskSelfID(props)),
+					HelpText: "Optional. A task can hang off a requirement or another task.",
+				})
+				@ui.TextArea(ui.TextAreaProps{
+					ID:          "description",
+					Name:        "description",
+					Label:       "Description",
+					Value:       props.Description,
+					Placeholder: "Describe this task... (Markdown supported)",
+					Rows:        6,
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "status_id",
+					Name:     "status_id",
+					Label:    "Status",
+					Value:    props.StatusID,
+					Options:  statusSelectOptions(props.Statuses),
+					HelpText: "Optional. Tasks use the same workflow statuses as requirements.",
+				})
+				@ui.Select(ui.SelectProps{
+					ID:       "milestone_id",
+					Name:     "milestone_id",
+					Label:    "Milestone",
+					Value:    props.MilestoneID,
+					Options:  milestoneSelectOptions(props.Milestones),
+					HelpText: "Optional. Link to a milestone.",
+				})
+				if props.Product.WorkflowMode == model.WorkflowModeScrum {
+					@ui.Select(ui.SelectProps{
+						ID:       "sprint_id",
+						Name:     "sprint_id",
+						Label:    "Sprint",
+						Value:    props.SprintID,
+						Options:  sprintSelectOptions(props.Sprints),
+						HelpText: "Optional. Assign to a sprint.",
+					})
+				}
+				@EstimationInput(EstimationInputProps{
+					EstimationMode: props.Product.EstimationMode,
+					Value:          props.Estimation,
+				})
+				@ui.TextInput(ui.InputProps{
+					ID:          "priority",
+					Name:        "priority",
+					Label:       "Priority",
+					Value:       props.Priority,
+					Type:        "number",
+					Placeholder: "0",
+					HelpText:    "Lower numbers indicate higher priority.",
+				})
+				@ui.Checkbox("is_coarse", "is_coarse", "Needs refinement (coarse task)", props.IsCoarse, false)
+				@patterns.FormActions(taskSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/tasks")
+			</form>
+		}
+	}
+}
+
+func taskFormBreadcrumbs(props TaskFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Tasks", Href: "/products/" + props.Product.ID + "/tasks"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: model.EntityIdentifier(formCategoryPrefix(props.Categories, props.Task.CategoryID), props.Task.SequenceNumber), Href: "/products/" + props.Product.ID + "/tasks/" + props.Task.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func taskFormAction(props TaskFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/tasks/" + props.Task.ID
+	}
+	return "/products/" + props.Product.ID + "/tasks"
+}
+
+func taskSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Task"
+}
+
+func taskSelfID(props TaskFormProps) string {
+	if props.IsEdit && props.Task != nil {
+		return props.Task.ID
+	}
+	return ""
+}

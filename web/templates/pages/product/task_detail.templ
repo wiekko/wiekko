@@ -1,0 +1,213 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// TaskDetailProps holds data for the task detail page.
+//
+// There are no capability, test case or defect tabs: tasks are not traced to
+// the product specification and are not acceptance-tested.
+type TaskDetailProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Task             *model.Requirement
+	CategoryPrefixes map[string]string // task category ID → prefix
+	CategoryNames    map[string]string // task category ID → name
+	StatusName       string
+	MilestoneName    string
+	SprintName       string
+	ParentName       string // display name of the parent backlog item
+	ParentIdentifier string // e.g. "FR-1" or "MT-3"
+	ParentPath       string // detail URL of the parent, whichever kind it is
+	Children         []*model.Requirement
+	CanEdit          bool
+}
+
+templ TaskDetailPage(props TaskDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "tasks",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Tasks", Href: "/products/" + props.Product.ID + "/tasks"},
+					{Label: taskIdentifier(props)},
+				},
+				props.Task.Title,
+				taskIdentifier(props),
+				taskEditHref(props),
+				taskDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@ui.Badge(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), "emerald")
+			}
+			<!-- Tabs -->
+			@ui.TabGroup(taskDetailTabs(props.Product.ID, props.Task.ID))
+			<!-- Tab panels -->
+			@ui.TabPanel("overview") {
+				@TaskOverviewTabContent(props)
+			}
+			@ui.TabPanelHidden("comments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("attachments") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+templ TaskOverviewTabContent(props TaskDetailProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			@patterns.DetailGrid() {
+				@patterns.DetailField("Identifier", taskIdentifier(props))
+				@patterns.DetailField("Category", requirementCategoryName(props.CategoryNames, props.Task.CategoryID))
+				if props.Task.ParentID != "" && props.ParentName != "" {
+					@requirementLinkedField("Parent", props.ParentIdentifier+" — "+props.ParentName, props.ParentPath)
+				} else {
+					@patterns.DetailField("Parent", "")
+				}
+				@patterns.DetailField("Status", props.StatusName)
+				if props.Task.MilestoneID != "" && props.MilestoneName != "" {
+					@requirementLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Task.MilestoneID))
+				} else {
+					@patterns.DetailField("Milestone", "")
+				}
+				if props.Product.WorkflowMode == model.WorkflowModeScrum {
+					@patterns.DetailField("Sprint", props.SprintName)
+				}
+				if props.Product.EstimationMode != model.EstimationModeDisabled {
+					@patterns.DetailField("Estimation", formatEstimation(props.Product.EstimationMode, props.Task.Estimation))
+				}
+				@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Task.Priority))
+				@patterns.DetailField("Coarse", boolDisplay(props.Task.IsCoarse))
+				@patterns.DetailField("Active", boolDisplay(props.Task.IsActive))
+				@patterns.DetailField("Created", formatDate(props.Task.CreatedAt))
+				@patterns.DetailField("Last Updated", formatDate(props.Task.UpdatedAt))
+			}
+			@patterns.DetailDescription(props.Task.Description)
+		}
+	}
+	if len(props.Children) > 0 {
+		@ui.Card() {
+			@ui.CardBody() {
+				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Child Tasks</h3>
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Category
+						}
+					}
+					@ui.TableBody("") {
+						for _, child := range props.Children {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, child.CategoryID), child.SequenceNumber) }
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/tasks/%s", props.Product.ID, child.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ child.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@ui.Badge(requirementPrefix(props.CategoryPrefixes, child.CategoryID), "emerald")
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ TaskHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this task will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// TaskDeleteConfirmation renders the delete confirmation for a task.
+templ TaskDeleteConfirmation(name, productID, taskID, csrfToken string) {
+	@patterns.DeleteConfirmation("task", name, fmt.Sprintf("/products/%s/tasks/%s", productID, taskID), csrfToken)
+}
+
+func taskDetailTabs(productID, taskID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/tasks/%s/tabs", productID, taskID)
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+// backlogChildHref links a child backlog item to the page for its own kind: a
+// requirement can be refined into child tasks, which live under /tasks.
+func backlogChildHref(productID string, child *model.Requirement) string {
+	if child.Kind == model.RequirementKindTask {
+		return fmt.Sprintf("/products/%s/tasks/%s", productID, child.ID)
+	}
+	return fmt.Sprintf("/products/%s/requirements/%s", productID, child.ID)
+}
+
+// backlogKindBadgeColor keeps the board's colour language on detail pages:
+// blue for requirements, emerald for tasks.
+func backlogKindBadgeColor(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "emerald"
+	}
+	return "blue"
+}
+
+func taskIdentifier(props TaskDetailProps) string {
+	return model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), props.Task.SequenceNumber)
+}
+
+func taskEditHref(props TaskDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/tasks/" + props.Task.ID + "/edit"
+	}
+	return ""
+}
+
+func taskDeleteURL(props TaskDetailProps) string {
+	if props.CanEdit {
+		return "/products/" + props.Product.ID + "/tasks/" + props.Task.ID
+	}
+	return ""
+}

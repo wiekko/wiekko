@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"nexmap.net/internal/auth"
@@ -539,7 +540,10 @@ func (m *MockRequirementStore) Create(ctx context.Context, r *model.Requirement)
 	return m.CreateFunc(ctx, r)
 }
 func (m *MockRequirementStore) GetByID(ctx context.Context, id string) (*model.Requirement, error) {
-	return m.GetByIDFunc(ctx, id)
+	if m.GetByIDFunc != nil {
+		return m.GetByIDFunc(ctx, id)
+	}
+	return nil, errors.New("requirement not found: " + id)
 }
 func (m *MockRequirementStore) Update(ctx context.Context, r *model.Requirement) error {
 	return m.UpdateFunc(ctx, r)
@@ -907,7 +911,10 @@ func (m *MockCategoryStore) Create(ctx context.Context, cat *model.Category) err
 	return m.CreateFunc(ctx, cat)
 }
 func (m *MockCategoryStore) GetByID(ctx context.Context, id string) (*model.Category, error) {
-	return m.GetByIDFunc(ctx, id)
+	if m.GetByIDFunc != nil {
+		return m.GetByIDFunc(ctx, id)
+	}
+	return nil, errors.New("category not found: " + id)
 }
 func (m *MockCategoryStore) Update(ctx context.Context, cat *model.Category) error {
 	return m.UpdateFunc(ctx, cat)
