@@ -51,6 +51,7 @@ func (c *PageLoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := c.auth.Login(r.Context(), username, password, ip, r.UserAgent())
 	if err != nil {
+		logFailedLogin(r, username, ip, err)
 		c.renderLoginError(w, r, "Invalid username or password")
 		return
 	}

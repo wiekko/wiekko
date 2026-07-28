@@ -1,12 +1,27 @@
 package controller
 
 import (
+	"log/slog"
 	"net/http"
 
 	"nexmap.net/internal/httputil"
+	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
 )
+
+// logFailedLogin records a rejected login attempt. The access log alone does not
+// identify these: the page form answers with 200 so htmx swaps the error back
+// into the page, and neither log line carries the username or the reason.
+func logFailedLogin(r *http.Request, username, ip string, err error) {
+	slog.Warn("failed login",
+		"username", username,
+		"ip", ip,
+		"user_agent", r.UserAgent(),
+		"reason", err.Error(),
+		"request_id", middleware.RequestIDFromContext(r.Context()),
+	)
+}
 
 // AuthController handles authentication endpoints.
 type AuthController struct {
@@ -41,6 +56,7 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := c.auth.Login(r.Context(), req.Username, req.Password, ip, r.UserAgent())
 	if err != nil {
+		logFailedLogin(r, req.Username, ip, err)
 		httputil.Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password")
 		return
 	}
