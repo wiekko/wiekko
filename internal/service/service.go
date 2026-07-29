@@ -107,9 +107,11 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			authz:         authz,
 		},
 		Category: &CategoryService{
-			categories: st.Category,
-			audit:      st.Audit,
-			authz:      authz,
+			categories:   st.Category,
+			requirements: st.Requirement,
+			constraints:  st.Constraint,
+			audit:        st.Audit,
+			authz:        authz,
 		},
 		Backlog: &BacklogService{
 			requirements: st.Requirement,

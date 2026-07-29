@@ -283,6 +283,7 @@ type MockConstraintStore struct {
 	ListByProductIDFunc              func(ctx context.Context, productID string, filter store.ConstraintFilter) ([]*model.Constraint, error)
 	ListByMilestoneIDFunc            func(ctx context.Context, milestoneID string) ([]*model.Constraint, error)
 	NextSequenceNumberFunc           func(ctx context.Context, productID string) (int, error)
+	CountByCategoryIDFunc            func(ctx context.Context, categoryID string) (int, error)
 	LinkCapabilityFunc               func(ctx context.Context, link *model.ConstraintCapability) error
 	UnlinkCapabilityFunc             func(ctx context.Context, constraintID, capabilityID string) error
 	ListCapabilitiesByConstraintFunc func(ctx context.Context, constraintID string) ([]*model.ConstraintCapability, error)
@@ -315,6 +316,12 @@ func (m *MockConstraintStore) NextSequenceNumber(ctx context.Context, productID 
 		return 1, nil
 	}
 	return m.NextSequenceNumberFunc(ctx, productID)
+}
+func (m *MockConstraintStore) CountByCategoryID(ctx context.Context, categoryID string) (int, error) {
+	if m.CountByCategoryIDFunc == nil {
+		return 0, nil
+	}
+	return m.CountByCategoryIDFunc(ctx, categoryID)
 }
 func (m *MockConstraintStore) LinkCapability(ctx context.Context, link *model.ConstraintCapability) error {
 	return m.LinkCapabilityFunc(ctx, link)
@@ -531,6 +538,7 @@ type MockRequirementStore struct {
 	ListBySprintIDFunc     func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneIDFunc  func(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumberFunc func(ctx context.Context, productID string) (int, error)
+	CountByCategoryIDFunc  func(ctx context.Context, categoryID string) (int, error)
 	AssignFunc             func(ctx context.Context, a *model.Assignment) error
 	UnassignFunc           func(ctx context.Context, requirementID, userID string) error
 	ListAssigneesFunc      func(ctx context.Context, requirementID string) ([]*model.Assignment, error)
@@ -571,6 +579,12 @@ func (m *MockRequirementStore) NextSequenceNumber(ctx context.Context, productID
 		return m.NextSequenceNumberFunc(ctx, productID)
 	}
 	return 1, nil
+}
+func (m *MockRequirementStore) CountByCategoryID(ctx context.Context, categoryID string) (int, error) {
+	if m.CountByCategoryIDFunc == nil {
+		return 0, nil
+	}
+	return m.CountByCategoryIDFunc(ctx, categoryID)
 }
 func (m *MockRequirementStore) Assign(ctx context.Context, a *model.Assignment) error {
 	return m.AssignFunc(ctx, a)
@@ -904,7 +918,7 @@ type MockCategoryStore struct {
 	DeleteFunc                func(ctx context.Context, id string) error
 	ListByProductIDFunc       func(ctx context.Context, productID, entityType string) ([]*model.Category, error)
 	GetByProductAndNameFunc   func(ctx context.Context, productID, entityType, name string) (*model.Category, error)
-	GetByProductAndPrefixFunc func(ctx context.Context, productID, entityType, prefix string) (*model.Category, error)
+	GetByProductAndPrefixFunc func(ctx context.Context, productID, prefix string) (*model.Category, error)
 }
 
 func (m *MockCategoryStore) Create(ctx context.Context, cat *model.Category) error {
@@ -928,9 +942,17 @@ func (m *MockCategoryStore) ListByProductID(ctx context.Context, productID, enti
 	}
 	return nil, nil
 }
+// GetByProductAndName and GetByProductAndPrefix default to "not found" so tests
+// that do not care about uniqueness checks need not stub them.
 func (m *MockCategoryStore) GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Category, error) {
-	return m.GetByProductAndNameFunc(ctx, productID, entityType, name)
+	if m.GetByProductAndNameFunc != nil {
+		return m.GetByProductAndNameFunc(ctx, productID, entityType, name)
+	}
+	return nil, errors.New("category not found: " + name)
 }
-func (m *MockCategoryStore) GetByProductAndPrefix(ctx context.Context, productID, entityType, prefix string) (*model.Category, error) {
-	return m.GetByProductAndPrefixFunc(ctx, productID, entityType, prefix)
+func (m *MockCategoryStore) GetByProductAndPrefix(ctx context.Context, productID, prefix string) (*model.Category, error) {
+	if m.GetByProductAndPrefixFunc != nil {
+		return m.GetByProductAndPrefixFunc(ctx, productID, prefix)
+	}
+	return nil, errors.New("category not found: " + prefix)
 }

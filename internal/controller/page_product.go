@@ -424,6 +424,218 @@ func (c *PageProductController) MoveStatus(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// SettingsCategories renders the Categories tab content fragment.
+func (c *PageProductController) SettingsCategories(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+
+	// Listing categories only needs viewer, so gate the tab on owner here the way
+	// the Settings page handler does — everything on it is owner-only.
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !user.IsAdmin && role != model.RoleOwner {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	reqCats, err := c.category.ListCategories(r.Context(), user, productID, model.RequirementKindRequirement)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	taskCats, err := c.category.ListCategories(r.Context(), user, productID, model.RequirementKindTask)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	conCats, err := c.category.ListCategories(r.Context(), user, productID, "constraint")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	usage, err := c.categoryUsage(r, user, productID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CategoriesTabContent(productID, reqCats, taskCats, conCats, usage).Render(r.Context(), w)
+}
+
+// CreateCategory handles POST /products/{id}/settings/categories.
+func (c *PageProductController) CreateCategory(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	entityType := r.FormValue("entity_type")
+	name := r.FormValue("name")
+	prefix := r.FormValue("prefix")
+
+	if name == "" || prefix == "" || entityType == "" {
+		http.Error(w, "name, prefix and entity_type are required", http.StatusBadRequest)
+		return
+	}
+
+	// Append to the end of the list.
+	existing, _ := c.category.ListCategories(r.Context(), user, productID, entityType)
+	position := len(existing) + 1
+
+	_, err := c.category.CreateCategory(r.Context(), user, service.CreateCategoryInput{
+		ProductID:  productID,
+		EntityType: entityType,
+		Name:       name,
+		Prefix:     prefix,
+		Position:   position,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderCategoryList(w, r, user, productID, entityType)
+}
+
+// UpdateCategory handles PATCH /products/{id}/settings/categories/{categoryId}.
+func (c *PageProductController) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	categoryID := r.PathValue("categoryId")
+
+	// Get the category first to know its entity type for re-rendering.
+	cat, err := c.category.GetCategory(r.Context(), user, productID, categoryID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	input := service.UpdateCategoryInput{}
+	if v := r.FormValue("name"); v != "" {
+		input.Name = &v
+	}
+	if v := r.FormValue("prefix"); v != "" {
+		input.Prefix = &v
+	}
+
+	if _, err := c.category.UpdateCategory(r.Context(), user, productID, categoryID, input); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderCategoryList(w, r, user, productID, cat.EntityType)
+}
+
+// DeleteCategory handles DELETE /products/{id}/settings/categories/{categoryId}.
+func (c *PageProductController) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	categoryID := r.PathValue("categoryId")
+
+	cat, err := c.category.GetCategory(r.Context(), user, productID, categoryID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if err := c.category.DeleteCategory(r.Context(), user, productID, categoryID); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	c.renderCategoryList(w, r, user, productID, cat.EntityType)
+}
+
+// MoveCategory handles POST /products/{id}/settings/categories/{categoryId}/move.
+// Swaps the category with its neighbor based on form field `direction` ("up" or "down").
+func (c *PageProductController) MoveCategory(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	categoryID := r.PathValue("categoryId")
+	direction := r.FormValue("direction")
+
+	cat, err := c.category.GetCategory(r.Context(), user, productID, categoryID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	cats, err := c.category.ListCategories(r.Context(), user, productID, cat.EntityType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	idx := -1
+	for i, x := range cats {
+		if x.ID == categoryID {
+			idx = i
+			break
+		}
+	}
+
+	neighborIdx := -1
+	switch direction {
+	case "up":
+		if idx > 0 {
+			neighborIdx = idx - 1
+		}
+	case "down":
+		if idx >= 0 && idx < len(cats)-1 {
+			neighborIdx = idx + 1
+		}
+	}
+
+	if neighborIdx >= 0 {
+		target := cats[idx]
+		neighbor := cats[neighborIdx]
+		if _, err := c.category.UpdateCategory(r.Context(), user, productID, target.ID, service.UpdateCategoryInput{Position: &neighbor.Position}); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if _, err := c.category.UpdateCategory(r.Context(), user, productID, neighbor.ID, service.UpdateCategoryInput{Position: &target.Position}); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+	}
+
+	c.renderCategoryList(w, r, user, productID, cat.EntityType)
+}
+
+// renderCategoryList re-renders the category list fragment for a given entity type.
+func (c *PageProductController) renderCategoryList(w http.ResponseWriter, r *http.Request, user *model.User, productID, entityType string) {
+	cats, err := c.category.ListCategories(r.Context(), user, productID, entityType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	usage, err := c.category.UsageCounts(r.Context(), user, productID, entityType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.CategoryListFragment(productID, entityType, cats, usage).Render(r.Context(), w)
+}
+
+// categoryUsage merges the item counts of all three category sets into one map,
+// which is what the tab template expects.
+func (c *PageProductController) categoryUsage(r *http.Request, user *model.User, productID string) (map[string]int, error) {
+	merged := map[string]int{}
+	for _, entityType := range []string{model.RequirementKindRequirement, model.RequirementKindTask, "constraint"} {
+		counts, err := c.category.UsageCounts(r.Context(), user, productID, entityType)
+		if err != nil {
+			return nil, err
+		}
+		for id, n := range counts {
+			merged[id] = n
+		}
+	}
+	return merged, nil
+}
+
 // renderStatusList re-renders the status list fragment for a given entity type.
 func (c *PageProductController) renderStatusList(w http.ResponseWriter, r *http.Request, user *model.User, productID, entityType string) {
 	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, entityType)

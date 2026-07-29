@@ -78,6 +78,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | Tab            | Content                                                          |
 |----------------|------------------------------------------------------------------|
 | General        | Name, description, estimation mode, workflow mode (kanban/scrum) |
+| Categories     | Requirement, task and constraint categories: name, identifier prefix, order |
 | Statuses       | Requirement and defect status columns (drag to reorder)          |
 | Environments   | Runtime environment labels for test matrix                       |
 | Pyramid Levels | Test pyramid configuration (hierarchical, max depth 2)           |

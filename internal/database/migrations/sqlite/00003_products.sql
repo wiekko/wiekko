@@ -90,7 +90,11 @@ CREATE TABLE IF NOT EXISTS categories (
     position    INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     UNIQUE(product_id, entity_type, name),
-    UNIQUE(product_id, entity_type, prefix)
+    -- Prefixes are product-wide unique, not per entity type: requirements and
+    -- tasks share a sequence counter but constraints have their own, so two
+    -- categories of different types sharing a prefix would render two different
+    -- items as the same identifier (e.g. FR-1).
+    UNIQUE(product_id, prefix)
 );
 CREATE INDEX IF NOT EXISTS idx_categories_product_id ON categories(product_id, entity_type);
 

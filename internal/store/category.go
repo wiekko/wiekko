@@ -17,7 +17,9 @@ type CategoryStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID, entityType string) ([]*model.Category, error)
 	GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Category, error)
-	GetByProductAndPrefix(ctx context.Context, productID, entityType, prefix string) (*model.Category, error)
+	// GetByProductAndPrefix looks a prefix up across every entity type, matching
+	// the product-wide UNIQUE(product_id, prefix) index.
+	GetByProductAndPrefix(ctx context.Context, productID, prefix string) (*model.Category, error)
 }
 
 type categoryStore struct {
@@ -90,11 +92,11 @@ func (s *categoryStore) GetByProductAndName(ctx context.Context, productID, enti
 	return cat, err
 }
 
-func (s *categoryStore) GetByProductAndPrefix(ctx context.Context, productID, entityType, prefix string) (*model.Category, error) {
+func (s *categoryStore) GetByProductAndPrefix(ctx context.Context, productID, prefix string) (*model.Category, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, product_id, entity_type, name, prefix, position, created_at
-		 FROM categories WHERE product_id = ? AND entity_type = ? AND prefix = ?`,
-		productID, entityType, prefix)
+		 FROM categories WHERE product_id = ? AND prefix = ?`,
+		productID, prefix)
 	cat, err := scanCategory(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("category not found: %w", err)

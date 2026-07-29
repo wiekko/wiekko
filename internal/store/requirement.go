@@ -28,6 +28,7 @@ type RequirementStore interface {
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
+	CountByCategoryID(ctx context.Context, categoryID string) (int, error)
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, requirementID, userID string) error
 	ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error)
@@ -191,6 +192,14 @@ func (s *requirementStore) NextSequenceNumber(ctx context.Context, productID str
 		return int(maxSeq.Int64) + 1, nil
 	}
 	return 1, nil
+}
+
+func (s *requirementStore) CountByCategoryID(ctx context.Context, categoryID string) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM requirements WHERE category_id = ?`,
+		categoryID).Scan(&count)
+	return count, err
 }
 
 const requirementColumns = `id, product_id, kind, parent_id, category_id, sequence_number, title, description,

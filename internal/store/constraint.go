@@ -23,6 +23,7 @@ type ConstraintStore interface {
 	ListByProductID(ctx context.Context, productID string, filter ConstraintFilter) ([]*model.Constraint, error)
 	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Constraint, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
+	CountByCategoryID(ctx context.Context, categoryID string) (int, error)
 	LinkCapability(ctx context.Context, link *model.ConstraintCapability) error
 	UnlinkCapability(ctx context.Context, constraintID, capabilityID string) error
 	ListCapabilitiesByConstraint(ctx context.Context, constraintID string) ([]*model.ConstraintCapability, error)
@@ -130,6 +131,14 @@ func (s *constraintStore) NextSequenceNumber(ctx context.Context, productID stri
 		return int(maxSeq.Int64) + 1, nil
 	}
 	return 1, nil
+}
+
+func (s *constraintStore) CountByCategoryID(ctx context.Context, categoryID string) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM constraints WHERE category_id = ?`,
+		categoryID).Scan(&count)
+	return count, err
 }
 
 func (s *constraintStore) LinkCapability(ctx context.Context, link *model.ConstraintCapability) error {

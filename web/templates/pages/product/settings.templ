@@ -1,6 +1,8 @@
 package product
 
 import (
+	"fmt"
+
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
@@ -37,12 +39,15 @@ templ SettingsPage(props SettingsProps) {
 			</div>
 			@ui.TabGroup([]templates.TabDef{
 				{ID: "general", Label: "General", HxGet: "/products/" + props.Product.ID + "/settings/general", Active: true},
+				{ID: "categories", Label: "Categories", HxGet: "/products/" + props.Product.ID + "/settings/categories"},
 				{ID: "statuses", Label: "Statuses", HxGet: "/products/" + props.Product.ID + "/settings/statuses"},
 				{ID: "environments", Label: "Environments", HxGet: "/products/" + props.Product.ID + "/settings/environments"},
 				{ID: "pyramid", Label: "Pyramid Levels", HxGet: "/products/" + props.Product.ID + "/settings/pyramid"},
 			})
 			@ui.TabPanel("general") {
 				@GeneralTabContent(props.Product)
+			}
+			@ui.TabPanelHidden("categories") {
 			}
 			@ui.TabPanelHidden("statuses") {
 			}
@@ -95,6 +100,191 @@ templ StubTabContent(name string) {
 		</div>
 		<p class="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">{ name } configuration coming soon.</p>
 	</div>
+}
+
+// --- Categories Tab ---
+
+// CategoriesTabContent renders the Categories settings tab. Requirements, tasks
+// and constraints each keep their own set.
+templ CategoriesTabContent(productID string, reqCats, taskCats, conCats []*model.Category, usage map[string]int) {
+	<div class="space-y-8">
+		<div>
+			<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Requirement Categories</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">The prefix forms the identifier of every requirement in the category (e.g. FR-12). Prefixes must be unique across the whole product.</p>
+			<div class="mt-4">
+				@CategoryListFragment(productID, model.RequirementKindRequirement, reqCats, usage)
+			</div>
+		</div>
+		<div>
+			<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Task Categories</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Tasks carry no product statement, so they use their own prefixes (e.g. MT-18).</p>
+			<div class="mt-4">
+				@CategoryListFragment(productID, model.RequirementKindTask, taskCats, usage)
+			</div>
+		</div>
+		<div>
+			<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Constraint Categories</h3>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Constraints are ongoing rules rather than work items, and number independently (e.g. AC-42).</p>
+			<div class="mt-4">
+				@CategoryListFragment(productID, "constraint", conCats, usage)
+			</div>
+		</div>
+	</div>
+}
+
+// CategoryListFragment renders the category list for a single entity type.
+templ CategoryListFragment(productID, entityType string, cats []*model.Category, usage map[string]int) {
+	<div id={ "category-list-" + entityType } hx-target="this" hx-swap="outerHTML">
+		@ui.Card() {
+			if len(cats) > 0 {
+				<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+					for i, c := range cats {
+						@categoryRow(productID, c, "category-list-"+entityType, usage[c.ID], i == 0, i == len(cats)-1, len(cats) == 1)
+					}
+				</ul>
+			} else {
+				<div class="px-6 py-8 text-center">
+					<div class="text-gray-400 dark:text-gray-500">
+						@ui.Icon("tags", "lg")
+					</div>
+					<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No { entityType } categories defined yet.</p>
+				</div>
+			}
+			<div class="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+				<form class="flex items-center gap-3" hx-post={ "/products/" + productID + "/settings/categories" } hx-target={ "#category-list-" + entityType } hx-swap="outerHTML">
+					<input type="hidden" name="entity_type" value={ entityType }/>
+					<input
+						type="text"
+						name="name"
+						placeholder="New category name"
+						required
+						class="block flex-1 rounded-md border-0 px-3 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+					/>
+					<input
+						type="text"
+						name="prefix"
+						placeholder="Prefix"
+						required
+						maxlength="6"
+						pattern="[A-Za-z][A-Za-z0-9]{0,5}"
+						title="1-6 letters or digits, starting with a letter"
+						class="block w-24 rounded-md border-0 px-3 py-2 text-sm uppercase text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 placeholder:normal-case focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+					/>
+					<button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+						@ui.Icon("plus", "sm")
+						Add
+					</button>
+				</form>
+			</div>
+		}
+	</div>
+}
+
+templ categoryRow(productID string, c *model.Category, targetID string, count int, isFirst, isLast, isOnly bool) {
+	<li class="flex items-center gap-3 px-6 py-3">
+		<input
+			type="text"
+			name="name"
+			value={ c.Name }
+			class="block flex-1 rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings/categories/" + c.ID }
+			hx-target={ "#" + targetID }
+			hx-swap="outerHTML"
+			hx-trigger="change"
+		/>
+		<input
+			type="text"
+			name="prefix"
+			value={ c.Prefix }
+			maxlength="6"
+			pattern="[A-Za-z][A-Za-z0-9]{0,5}"
+			title="1-6 letters or digits, starting with a letter"
+			class="block w-24 rounded-md border-0 px-3 py-1.5 text-sm uppercase text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			hx-patch={ "/products/" + productID + "/settings/categories/" + c.ID }
+			hx-target={ "#" + targetID }
+			hx-swap="outerHTML"
+			hx-trigger="change"
+			if count > 0 {
+				hx-confirm={ prefixRenameWarning(c, count) }
+			}
+		/>
+		<span class="w-20 shrink-0 text-right text-xs text-gray-500 dark:text-gray-400">{ categoryUsageLabel(count) }</span>
+		<div class="flex items-center gap-0.5">
+			<button
+				type="button"
+				class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+				disabled?={ isFirst }
+				aria-label="Move up"
+				title="Move up"
+				hx-post={ "/products/" + productID + "/settings/categories/" + c.ID + "/move" }
+				hx-vals='{"direction":"up"}'
+				hx-target={ "#" + targetID }
+				hx-swap="outerHTML"
+			>
+				@ui.Icon("chevron-up", "sm")
+			</button>
+			<button
+				type="button"
+				class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+				disabled?={ isLast }
+				aria-label="Move down"
+				title="Move down"
+				hx-post={ "/products/" + productID + "/settings/categories/" + c.ID + "/move" }
+				hx-vals='{"direction":"down"}'
+				hx-target={ "#" + targetID }
+				hx-swap="outerHTML"
+			>
+				@ui.Icon("chevron-down", "sm")
+			</button>
+		</div>
+		<button
+			type="button"
+			class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+			disabled?={ count > 0 || isOnly }
+			title={ categoryDeleteHint(c, count, isOnly) }
+			hx-delete={ "/products/" + productID + "/settings/categories/" + c.ID }
+			hx-target={ "#" + targetID }
+			hx-swap="outerHTML"
+			hx-confirm={ "Delete category \"" + c.Name + "\"?" }
+		>
+			@ui.Icon("trash", "sm")
+		</button>
+	</li>
+}
+
+// prefixRenameWarning explains what a prefix change does to items that already
+// exist. Identifiers are rendered from the category's current prefix, so a rename
+// relabels every item retroactively.
+func prefixRenameWarning(c *model.Category, count int) string {
+	return fmt.Sprintf(
+		"Renaming this prefix relabels %s: every identifier currently starting with %s- changes to the new prefix. "+
+			"References to the old identifiers in commit messages, specifications and exports will no longer match. Continue?",
+		pluralItems(count), c.Prefix)
+}
+
+func categoryUsageLabel(count int) string {
+	if count == 0 {
+		return "unused"
+	}
+	return pluralItems(count)
+}
+
+func categoryDeleteHint(c *model.Category, count int, isOnly bool) string {
+	switch {
+	case count > 0:
+		return fmt.Sprintf("Cannot delete: %s still assigned to this category", pluralItems(count))
+	case isOnly:
+		return fmt.Sprintf("Cannot delete the last %s category", c.EntityType)
+	default:
+		return "Delete category"
+	}
+}
+
+func pluralItems(count int) string {
+	if count == 1 {
+		return "1 item"
+	}
+	return fmt.Sprintf("%d items", count)
 }
 
 // --- Statuses Tab ---
