@@ -2,8 +2,10 @@ package patterns
 
 import "nexmap.net/web/templates/ui"
 
-// SidebarNav renders the left navigation panel.
-templ SidebarNav(activeSection, productID, productName, workflowMode string, isAdmin bool) {
+// SidebarNav renders the left navigation panel. Everything below the Dashboard
+// link is scoped to one product; instance administration lives in the header's
+// user menu, not here.
+templ SidebarNav(activeSection, productID, productName, workflowMode string) {
 	<aside class="flex h-full w-64 flex-col overflow-y-auto border-r border-gray-200 bg-white scrollbar-thin dark:border-gray-700 dark:bg-gray-900">
 		<!-- Mobile close button -->
 		<div class="flex items-center justify-end border-b border-gray-200 px-3 py-2 md:hidden dark:border-gray-700">
@@ -21,10 +23,14 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string, isA
 			}
 			@SidebarLink("Dashboard", "/", "home", activeSection == "dashboard", "")
 			if productID != "" {
-				@SidebarSection("Product", activeSection == "overview" || activeSection == "settings" || activeSection == "team") {
-					@SidebarLink("Overview", "/products/"+productID, "layout-dashboard", activeSection == "overview", "")
-					@SidebarLink("Settings", "/products/"+productID+"/settings", "settings", activeSection == "settings", "")
-					@SidebarLink("Team", "/products/"+productID+"/team", "users", activeSection == "team", "")
+				<!-- Product landing page: peer of Dashboard, not a group member -->
+				@SidebarLink("Overview", "/products/"+productID, "layout-dashboard", activeSection == "overview", "")
+				<!-- Groups read top to bottom as the product lifecycle: define, deliver, verify, configure -->
+				@SidebarSection("Definition", activeSection == "components" || activeSection == "capabilities" || activeSection == "constraints" || activeSection == "milestones") {
+					@SidebarLink("Components", "/products/"+productID+"/components", "component", activeSection == "components", "")
+					@SidebarLink("Capabilities", "/products/"+productID+"/capabilities", "layers", activeSection == "capabilities", "")
+					@SidebarLink("Constraints", "/products/"+productID+"/constraints", "shield-check", activeSection == "constraints", "")
+					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
 				}
 				@SidebarSection("Backlog", activeSection == "requirements" || activeSection == "defects" || activeSection == "tasks" || activeSection == "sprints" || activeSection == "board") {
 					@SidebarLink("Requirements", "/products/"+productID+"/requirements", "clipboard-list", activeSection == "requirements", "")
@@ -36,18 +42,9 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string, isA
 					@SidebarLink("Test Cases", "/products/"+productID+"/test-cases", "beaker", activeSection == "test-cases", "")
 					@SidebarLink("Campaigns", "/products/"+productID+"/campaigns", "flag", activeSection == "campaigns", "")
 				}
-				@SidebarSection("Structure", activeSection == "components" || activeSection == "capabilities" || activeSection == "constraints" || activeSection == "milestones") {
-					@SidebarLink("Components", "/products/"+productID+"/components", "component", activeSection == "components", "")
-					@SidebarLink("Capabilities", "/products/"+productID+"/capabilities", "layers", activeSection == "capabilities", "")
-					@SidebarLink("Constraints", "/products/"+productID+"/constraints", "shield-check", activeSection == "constraints", "")
-					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
-				}
-			}
-			if isAdmin {
-				@SidebarSection("Admin", activeSection == "admin-users" || activeSection == "admin-settings" || activeSection == "admin-invitations") {
-					@SidebarLink("Users", "/admin/users", "users", activeSection == "admin-users", "")
-					@SidebarLink("Settings", "/admin/settings", "settings", activeSection == "admin-settings", "")
-					@SidebarLink("Invitations", "/admin/invitations", "link", activeSection == "admin-invitations", "")
+				@SidebarSection("Setup", activeSection == "team" || activeSection == "settings") {
+					@SidebarLink("Team", "/products/"+productID+"/team", "users", activeSection == "team", "")
+					@SidebarLink("Settings", "/products/"+productID+"/settings", "settings", activeSection == "settings", "")
 				}
 			}
 		</nav>

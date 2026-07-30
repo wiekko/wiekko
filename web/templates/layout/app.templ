@@ -36,7 +36,7 @@ templ AppLayout(props AppLayoutProps) {
 				<div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-gray-900/50" onclick="closeSidebar()"></div>
 				<!-- Sidebar: hidden on mobile, always visible on md+ -->
 				<div id="sidebar" class="fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200 ease-in-out md:static md:translate-x-0">
-					@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.WorkflowMode, props.IsAdmin)
+					@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.WorkflowMode)
 				</div>
 				<!-- Main content -->
 				<main id="main-content" class="flex-1 overflow-y-auto scrollbar-thin p-6">

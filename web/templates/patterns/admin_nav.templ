@@ -1,0 +1,31 @@
+package patterns
+
+import "nexmap.net/web/templates/ui"
+
+// AdminNav renders the navigation for the instance administration area.
+// Admin is not product-scoped, so it is absent from the sidebar; this is how
+// the admin pages link to one another. Pills rather than underlined tabs,
+// because pages below carry their own underlined filter bars.
+templ AdminNav(activeSection string) {
+	<nav class="flex flex-wrap gap-1 border-b border-gray-200 pb-3 dark:border-gray-700" aria-label="Administration">
+		@adminNavLink("Users", "/admin/users", "users", activeSection == "admin-users")
+		@adminNavLink("Settings", "/admin/settings", "settings", activeSection == "admin-settings")
+		@adminNavLink("Invitations", "/admin/invitations", "link", activeSection == "admin-invitations")
+	</nav>
+}
+
+templ adminNavLink(label, href, icon string, active bool) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ "group flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+			sidebarLinkClass(active) }
+		if active {
+			aria-current="page"
+		}
+	>
+		<span class={ sidebarIconClass(active) }>
+			@ui.Icon(icon, "sm")
+		</span>
+		{ label }
+	</a>
+}
