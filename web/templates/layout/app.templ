@@ -29,7 +29,7 @@ templ AppLayout(props AppLayoutProps) {
 			}
 		>
 			<!-- Full-width header -->
-			@patterns.AppHeader(props.DisplayName, props.Meta.CSRFToken, props.ProductName, props.IsAdmin)
+			@patterns.AppHeader(props.DisplayName, props.Meta.CSRFToken, props.ProductID, props.ProductName, props.ActiveSection, props.IsAdmin)
 			<!-- Content area: sidebar + main -->
 			<div class="flex flex-1 overflow-hidden">
 				<!-- Mobile sidebar backdrop -->
@@ -49,6 +49,7 @@ templ AppLayout(props AppLayoutProps) {
 		<!-- Modal container -->
 		@ui.ModalContainer()
 		@sidebarScript()
+		<script src="/static/js/product-switcher.js" defer></script>
 	}
 }
 

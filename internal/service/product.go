@@ -292,26 +292,66 @@ func (s *ProductService) Delete(ctx context.Context, user *model.User, productID
 	return nil
 }
 
+// ProductWithRole pairs a product with the requesting user's role in it.
+type ProductWithRole struct {
+	Product *model.Product
+	Role    string // "admin" when an admin has no explicit membership
+}
+
 // List returns all products the user has access to. Admins see all.
 func (s *ProductService) List(ctx context.Context, user *model.User) ([]*model.Product, error) {
-	if user.IsAdmin {
-		return s.products.List(ctx)
-	}
-
-	roles, err := s.productRoles.ListByUserID(ctx, user.ID)
+	withRoles, err := s.ListWithRoles(ctx, user)
 	if err != nil {
 		return nil, err
 	}
 
 	var products []*model.Product
+	for _, pr := range withRoles {
+		products = append(products, pr.Product)
+	}
+	return products, nil
+}
+
+// ListWithRoles returns the products the user can access along with their role
+// in each. It resolves all roles from a single query rather than one lookup per
+// product, which keeps it cheap enough for the product switcher.
+func (s *ProductService) ListWithRoles(ctx context.Context, user *model.User) ([]ProductWithRole, error) {
+	roles, err := s.productRoles.ListByUserID(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	roleByProduct := make(map[string]string, len(roles))
+	for _, role := range roles {
+		roleByProduct[role.ProductID] = role.Role
+	}
+
+	// Admins see every product; an explicit membership still wins over the bypass.
+	if user.IsAdmin {
+		products, err := s.products.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]ProductWithRole, 0, len(products))
+		for _, p := range products {
+			role := roleByProduct[p.ID]
+			if role == "" {
+				role = "admin"
+			}
+			result = append(result, ProductWithRole{Product: p, Role: role})
+		}
+		return result, nil
+	}
+
+	var result []ProductWithRole
 	for _, role := range roles {
 		p, err := s.products.GetByID(ctx, role.ProductID)
 		if err != nil {
 			continue
 		}
-		products = append(products, p)
+		result = append(result, ProductWithRole{Product: p, Role: role.Role})
 	}
-	return products, nil
+	return result, nil
 }
 
 // AddMember adds a user to a product with the given role (FR-304).

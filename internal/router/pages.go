@@ -34,6 +34,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("DELETE /user/tokens/{id}", pageAuthed(http.HandlerFunc(userCtrl.RevokeToken)))
 
 	// Product pages.
+	mux.Handle("GET /products/switcher", pageAuthed(http.HandlerFunc(productCtrl.ProductSwitcher)))
 	mux.Handle("GET /products/new", pageAuthed(http.HandlerFunc(productCtrl.CreateForm)))
 	mux.Handle("POST /products/new", pageAuthed(http.HandlerFunc(productCtrl.Create)))
 	mux.Handle("GET /products/{id}", pageAuthed(http.HandlerFunc(productCtrl.Overview)))

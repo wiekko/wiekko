@@ -272,7 +272,14 @@ func TestProductList(t *testing.T) {
 			&testutil.MockProductStore{
 				ListFunc: func(_ context.Context) ([]*model.Product, error) { return products, nil },
 			},
-			nil, nil, nil,
+			// Admins still get their memberships read, so an explicit role can
+			// win over the admin bypass when resolving roles.
+			&testutil.MockProductRoleStore{
+				ListByUserIDFunc: func(_ context.Context, _ string) ([]*model.ProductRole, error) {
+					return nil, nil
+				},
+			},
+			nil, nil,
 		)
 
 		admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
@@ -306,6 +313,80 @@ func TestProductList(t *testing.T) {
 		}
 		if len(result) != 1 {
 			t.Fatalf("len(result) = %d, want 1", len(result))
+		}
+	})
+}
+
+func TestProductListWithRoles(t *testing.T) {
+	productStore := func() *testutil.MockProductStore {
+		return &testutil.MockProductStore{
+			ListFunc: func(_ context.Context) ([]*model.Product, error) {
+				return []*model.Product{testutil.MakeProduct()}, nil
+			},
+			GetByIDFunc: func(_ context.Context, id string) (*model.Product, error) {
+				return testutil.MakeProduct(func(p *model.Product) { p.ID = id }), nil
+			},
+		}
+	}
+
+	rolesReturning := func(roles ...*model.ProductRole) *testutil.MockProductRoleStore {
+		return &testutil.MockProductRoleStore{
+			ListByUserIDFunc: func(_ context.Context, _ string) ([]*model.ProductRole, error) {
+				return roles, nil
+			},
+		}
+	}
+
+	t.Run("member gets their own role", func(t *testing.T) {
+		svc := newProductService(productStore(), rolesReturning(testutil.MakeProductRole()), nil, nil)
+
+		result, err := svc.ListWithRoles(context.Background(), testutil.MakeUser())
+		if err != nil {
+			t.Fatalf("ListWithRoles: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("len(result) = %d, want 1", len(result))
+		}
+		if result[0].Role != model.RoleOwner {
+			t.Errorf("Role = %q, want %q", result[0].Role, model.RoleOwner)
+		}
+	})
+
+	t.Run("admin without membership falls back to admin", func(t *testing.T) {
+		svc := newProductService(productStore(), rolesReturning(), nil, nil)
+
+		admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
+		result, err := svc.ListWithRoles(context.Background(), admin)
+		if err != nil {
+			t.Fatalf("ListWithRoles: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("len(result) = %d, want 1", len(result))
+		}
+		if result[0].Role != "admin" {
+			t.Errorf("Role = %q, want \"admin\"", result[0].Role)
+		}
+	})
+
+	// The dashboard shows an admin's explicit role rather than the bypass, so the
+	// switcher must agree with it.
+	t.Run("admin membership wins over bypass", func(t *testing.T) {
+		membership := testutil.MakeProductRole(func(pr *model.ProductRole) {
+			pr.ProductID = testutil.MakeProduct().ID
+			pr.Role = model.RoleTester
+		})
+		svc := newProductService(productStore(), rolesReturning(membership), nil, nil)
+
+		admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
+		result, err := svc.ListWithRoles(context.Background(), admin)
+		if err != nil {
+			t.Fatalf("ListWithRoles: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("len(result) = %d, want 1", len(result))
+		}
+		if result[0].Role != model.RoleTester {
+			t.Errorf("Role = %q, want %q", result[0].Role, model.RoleTester)
 		}
 	})
 }

@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -41,6 +42,35 @@ type PageProductController struct {
 // NewPageProduct creates a PageProductController.
 func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, discussion *service.DiscussionService, audit *service.AuditService, maxUploadBytes int64) *PageProductController {
 	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, discussion: discussion, audit: audit, maxUploadBytes: maxUploadBytes}
+}
+
+// ProductSwitcher renders GET /products/switcher, the header/sidebar product
+// switcher panel. It is fetched lazily on first open, so ordinary page renders
+// never pay for the product list.
+//
+// The section query parameter is the caller's ActiveSection; SwitchTargetURL
+// resolves it against each target product so switching preserves the user's
+// place. Unrecognised sections fall back to the product overview there.
+func (c *PageProductController) ProductSwitcher(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+
+	products, err := c.product.ListWithRoles(r.Context(), user)
+	if err != nil {
+		http.Error(w, "failed to load products", http.StatusInternalServerError)
+		return
+	}
+
+	sort.Slice(products, func(i, j int) bool {
+		return strings.ToLower(products[i].Product.Name) < strings.ToLower(products[j].Product.Name)
+	})
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = patterns.ProductSwitcherPanel(patterns.ProductSwitcherProps{
+		Products:  products,
+		CurrentID: r.URL.Query().Get("current"),
+		Section:   r.URL.Query().Get("section"),
+		CanCreate: c.canCreateProduct(r, user),
+	}).Render(r.Context(), w)
 }
 
 // CreateForm renders GET /products/new.

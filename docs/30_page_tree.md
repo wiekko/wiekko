@@ -18,14 +18,16 @@ The sidebar is visible on all authenticated pages. Its contents adapt to context
 
 - **Always visible**: Dashboard link, Admin section (admin-only)
 - **Product context active**: Backlog, Testing, and Structure sections appear
-- **Product switcher**: clicking the logo or product name navigates back to `/` (the dashboard), which doubles as the product selector
+- **Product switcher**: mounted at the top of the sidebar below `md` only, where the sidebar is the mobile drawer. From `sm` up the header carries it instead.
 
 ### Header
 
 The header bar contains:
 
-- **Left**: breadcrumbs (injected per page)
+- **Left**: logo, then the product switcher when a product is in context (hidden below `sm`)
 - **Right**: theme toggle (quick access), user dropdown (profile, API tokens, admin link, sign out)
+
+Breadcrumbs are injected per page into the content area, not the header.
 
 ### Breadcrumbs
 
@@ -277,9 +279,21 @@ current milestone; linking reassigns them.
 
 ## Decisions
 
-### Product switcher via dashboard (not dropdown)
+### Product switcher dropdown with section preservation
 
-Navigating back to `/` to switch products keeps the UI simple. A dropdown switcher would require loading the product list into every page and adds complexity for a low-frequency action. The logo/product name in the sidebar links back to the dashboard.
+This supersedes an earlier decision to switch products via the dashboard only. That decision rested on two premises that did not hold: that a dropdown means loading the product list into every page, and that switching is a low-frequency action. The panel is fetched lazily over htmx on first open (`GET /products/switcher`), so ordinary page renders cost nothing; and for a QC/Jira replacement, someone covering several products switches many times a day.
+
+The switcher **preserves the current section**: from `/products/A/defects`, picking product B lands on `/products/B/defects`, not B's overview. This is the capability the dashboard route cannot offer, and it is what justifies the dropdown. `patterns.SwitchTargetURL` resolves the layout's `ActiveSection` against the target product:
+
+- 11 sections map straight onto `/products/{id}/<section>`
+- Detail and form pages set the same `ActiveSection` as their list page, so they degrade to the list — the entity id is meaningless in another product
+- `overview`, non-product sections (`dashboard`, `admin-*`) and unrecognised input fall back to the target's overview
+- `board`/`sprints` resolve against the **target's** workflow mode. Scrum targets currently fall back to the overview because no `/products/{id}/sprints` page route exists yet (`page_board.go` redirects there and 404s); once it lands, that branch returns the `/sprints` URL
+- Query parameters are dropped, so `/milestones?view=timeline` resets to the default table view
+
+The section arrives as a query parameter, so the URL is always built from a whitelisted section name rather than from the raw input.
+
+The dashboard remains a product selector, reachable as **All products** in the panel.
 
 ### Tabs on detail pages (not separate routes)
 

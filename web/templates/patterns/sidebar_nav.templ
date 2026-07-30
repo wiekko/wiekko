@@ -13,6 +13,12 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string, isA
 		</div>
 		<!-- Navigation -->
 		<nav class="flex-1 space-y-1 px-3 py-4">
+			<!-- Product switcher: shown below md, where this sidebar is the mobile drawer -->
+			if productID != "" {
+				<div class="mb-2 border-b border-gray-200 pb-3 md:hidden dark:border-gray-700">
+					@ProductSwitcher("sidebar", productID, productName, activeSection, true)
+				</div>
+			}
 			@SidebarLink("Dashboard", "/", "home", activeSection == "dashboard", "")
 			if productID != "" {
 				@SidebarSection("Product", activeSection == "overview" || activeSection == "settings" || activeSection == "team") {

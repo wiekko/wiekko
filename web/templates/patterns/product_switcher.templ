@@ -1,0 +1,144 @@
+package patterns
+
+import (
+	"nexmap.net/internal/service"
+	"nexmap.net/web/templates/ui"
+)
+
+// switcherFilterThreshold is the product count above which the panel offers a
+// filter box. Below it the list is short enough to scan.
+const switcherFilterThreshold = 8
+
+// ProductSwitcherProps holds the data for the lazily-loaded switcher panel.
+type ProductSwitcherProps struct {
+	Products  []service.ProductWithRole
+	CurrentID string
+	Section   string // the ActiveSection to preserve across the switch
+	CanCreate bool
+}
+
+// ProductSwitcher renders the current product as the trigger for a dropdown that
+// loads the user's product list on first open. instanceID distinguishes the
+// header and sidebar mounts so their DOM ids do not collide.
+//
+// Set fullWidth for the sidebar mount: the sidebar is overflow-y-auto, which per
+// CSS also clips the x-axis, so a fixed-width panel would be cut off there.
+templ ProductSwitcher(instanceID, productID, productName, activeSection string, fullWidth bool) {
+	<div
+		id={ "product-switcher-" + instanceID }
+		class={ "group relative text-left", switcherRootClass(fullWidth) }
+		data-product-switcher
+	>
+		<div class="peer">
+			<button
+				type="button"
+				class={ "flex max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-gray-300 dark:hover:bg-gray-800",
+					switcherTriggerClass(fullWidth) }
+				aria-haspopup="menu"
+				aria-label="Switch product"
+				hx-get={ "/products/switcher?section=" + activeSection + "&current=" + productID }
+				hx-target={ "#product-switcher-body-" + instanceID }
+				hx-swap="innerHTML"
+				hx-trigger="click once, focus once"
+			>
+				<span class="max-w-48 truncate">{ productName }</span>
+				<span class="shrink-0 text-gray-400 dark:text-gray-500">
+					@ui.Icon("chevron-down", "sm")
+				</span>
+			</button>
+		</div>
+		// z-45 clears the sidebar (z-40 in app.templ, which applies even at
+		// md:static because a flex item honours z-index) while staying below
+		// modals and toasts (z-50). The header establishes no stacking context,
+		// so this panel competes at the root level.
+		<div
+			class={ "invisible absolute left-0 z-45 mt-2 origin-top-left rounded-md bg-white opacity-0 shadow-lg ring-1 ring-black/5 transition-all duration-100 group-focus-within:visible group-focus-within:opacity-100 dark:bg-gray-800 dark:ring-white/10",
+				switcherPanelClass(fullWidth) }
+		>
+			<div id={ "product-switcher-body-" + instanceID } role="menu" aria-orientation="vertical">
+				<div class="flex justify-center py-6">
+					@ui.LoadingSpinner("sm")
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+func switcherRootClass(fullWidth bool) string {
+	if fullWidth {
+		return "block w-full"
+	}
+	return "inline-block"
+}
+
+func switcherTriggerClass(fullWidth bool) string {
+	if fullWidth {
+		return "w-full justify-between"
+	}
+	return ""
+}
+
+func switcherPanelClass(fullWidth bool) string {
+	if fullWidth {
+		return "w-full"
+	}
+	return "w-72"
+}
+
+// ProductSwitcherPanel renders the switcher contents. Served as an htmx fragment
+// by GET /products/switcher.
+templ ProductSwitcherPanel(props ProductSwitcherProps) {
+	// A lone product means there is nothing to switch to — show only the footer.
+	if len(props.Products) > 1 {
+		if len(props.Products) > switcherFilterThreshold {
+			<div class="border-b border-gray-100 p-2 dark:border-gray-700">
+				<input
+					type="text"
+					placeholder="Filter products"
+					autocomplete="off"
+					class="block w-full rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					data-switcher-filter
+				/>
+			</div>
+		}
+		<div class="max-h-72 overflow-y-auto py-1 scrollbar-thin">
+			for _, p := range props.Products {
+				@productSwitcherRow(p, props.CurrentID, props.Section)
+			}
+			<p class="hidden px-4 py-3 text-sm text-gray-500 dark:text-gray-400" data-switcher-empty>
+				No matching products.
+			</p>
+		</div>
+		@ui.DropdownDivider()
+	}
+	<div class="py-1">
+		@ui.DropdownItem("All products", "/", "home", false)
+		if props.CanCreate {
+			@ui.DropdownItem("New product", "/products/new", "plus", false)
+		}
+	</div>
+}
+
+// productSwitcherRow renders one product, linking to the equivalent page in it.
+templ productSwitcherRow(p service.ProductWithRole, currentID, section string) {
+	<a
+		href={ templ.SafeURL(SwitchTargetURL(p.Product.ID, p.Product.WorkflowMode, section)) }
+		class="flex items-center justify-between gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+		role="menuitem"
+		data-switcher-row
+		data-product-name={ p.Product.Name }
+		if p.Product.ID == currentID {
+			aria-current="true"
+		}
+	>
+		<span class="flex min-w-0 items-center gap-2">
+			<span class="w-4 shrink-0 text-indigo-500 dark:text-indigo-400">
+				if p.Product.ID == currentID {
+					@ui.Icon("check", "sm")
+				}
+			</span>
+			<span class="truncate">{ p.Product.Name }</span>
+		</span>
+		@ui.RoleBadge(p.Role)
+	</a>
+}

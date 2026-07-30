@@ -8,6 +8,23 @@ templ Badge(text, color string) {
 	</span>
 }
 
+// RoleBadge renders a product role as a colored pill. Renders nothing for an
+// unknown or empty role.
+templ RoleBadge(role string) {
+	switch role {
+		case "owner":
+			@Badge("Owner", "indigo")
+		case "developer":
+			@Badge("Developer", "blue")
+		case "tester":
+			@Badge("Tester", "green")
+		case "viewer":
+			@Badge("Viewer", "gray")
+		case "admin":
+			@Badge("Admin", "amber")
+	}
+}
+
 func badgeColor(color string) string {
 	switch color {
 	case "green":
