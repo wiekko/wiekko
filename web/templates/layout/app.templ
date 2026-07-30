@@ -32,12 +32,15 @@ templ AppLayout(props AppLayoutProps) {
 			@patterns.AppHeader(props.DisplayName, props.Meta.CSRFToken, props.ProductID, props.ProductName, props.ActiveSection, props.IsAdmin)
 			<!-- Content area: sidebar + main -->
 			<div class="flex flex-1 overflow-hidden">
-				<!-- Mobile sidebar backdrop -->
-				<div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-gray-900/50" onclick="closeSidebar()"></div>
-				<!-- Sidebar: hidden on mobile, always visible on md+ -->
-				<div id="sidebar" class="fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200 ease-in-out md:static md:translate-x-0">
-					@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.WorkflowMode)
-				</div>
+				<!-- Omitted outside the product, admin and account contexts, where it would be empty -->
+				if patterns.HasSidebar(props.ActiveSection, props.ProductID) {
+					<!-- Mobile sidebar backdrop -->
+					<div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-gray-900/50" onclick="closeSidebar()"></div>
+					<!-- Sidebar: hidden on mobile, always visible on md+ -->
+					<div id="sidebar" class="fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200 ease-in-out md:static md:translate-x-0">
+						@patterns.SidebarNav(props.ActiveSection, props.ProductID, props.ProductName, props.WorkflowMode)
+					</div>
+				}
 				<!-- Main content -->
 				<main id="main-content" class="flex-1 overflow-y-auto scrollbar-thin p-6">
 					{ children... }
@@ -55,13 +58,21 @@ templ AppLayout(props AppLayoutProps) {
 
 templ sidebarScript() {
 	<script>
+		// The sidebar is absent on pages belonging to no context, so both
+		// elements may be missing.
 		function openSidebar() {
-			document.getElementById('sidebar').classList.remove('-translate-x-full');
-			document.getElementById('sidebar-backdrop').classList.remove('hidden');
+			var sidebar = document.getElementById('sidebar');
+			var backdrop = document.getElementById('sidebar-backdrop');
+			if (!sidebar || !backdrop) return;
+			sidebar.classList.remove('-translate-x-full');
+			backdrop.classList.remove('hidden');
 		}
 		function closeSidebar() {
-			document.getElementById('sidebar').classList.add('-translate-x-full');
-			document.getElementById('sidebar-backdrop').classList.add('hidden');
+			var sidebar = document.getElementById('sidebar');
+			var backdrop = document.getElementById('sidebar-backdrop');
+			if (!sidebar || !backdrop) return;
+			sidebar.classList.add('-translate-x-full');
+			backdrop.classList.add('hidden');
 		}
 	</script>
 }

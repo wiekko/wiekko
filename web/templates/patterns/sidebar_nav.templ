@@ -2,9 +2,13 @@ package patterns
 
 import "nexmap.net/web/templates/ui"
 
-// SidebarNav renders the left navigation panel. Everything below the Dashboard
-// link is scoped to one product; instance administration lives in the header's
-// user menu, not here.
+// SidebarNav renders the left navigation panel for the caller's current context:
+// a product, instance administration, or the signed-in user's own account. The
+// contexts are mutually exclusive, so nothing is ever shown as a peer of a group
+// from another scope.
+//
+// Callers must gate this on HasSidebar: outside those three contexts it renders
+// an empty panel.
 templ SidebarNav(activeSection, productID, productName, workflowMode string) {
 	<aside class="flex h-full w-64 flex-col overflow-y-auto border-r border-gray-200 bg-white scrollbar-thin dark:border-gray-700 dark:bg-gray-900">
 		<!-- Mobile close button -->
@@ -15,15 +19,21 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string) {
 		</div>
 		<!-- Navigation -->
 		<nav class="flex-1 space-y-1 px-3 py-4">
-			<!-- Product switcher: shown below md, where this sidebar is the mobile drawer -->
-			if productID != "" {
+			if isAdminSection(activeSection) {
+				@SidebarHeading("Administration")
+				@SidebarLink("Users", "/admin/users", "users", activeSection == "admin-users", "")
+				@SidebarLink("Settings", "/admin/settings", "settings", activeSection == "admin-settings", "")
+				@SidebarLink("Invitations", "/admin/invitations", "link", activeSection == "admin-invitations", "")
+			} else if isAccountSection(activeSection) {
+				@SidebarHeading("Account")
+				@SidebarLink("Profile", "/user/profile", "user", activeSection == "user-profile", "")
+				@SidebarLink("API Tokens", "/user/tokens", "key-round", activeSection == "user-tokens", "")
+			} else if productID != "" {
+				<!-- Product switcher: shown below md, where this sidebar is the mobile drawer -->
 				<div class="mb-2 border-b border-gray-200 pb-3 md:hidden dark:border-gray-700">
 					@ProductSwitcher("sidebar", productID, productName, activeSection, true)
 				</div>
-			}
-			@SidebarLink("Dashboard", "/", "home", activeSection == "dashboard", "")
-			if productID != "" {
-				<!-- Product landing page: peer of Dashboard, not a group member -->
+				<!-- Product landing page: a page in its own right, not a group member -->
 				@SidebarLink("Overview", "/products/"+productID, "layout-dashboard", activeSection == "overview", "")
 				<!-- Groups read top to bottom as the product lifecycle: define, deliver, verify, configure -->
 				@SidebarSection("Definition", activeSection == "components" || activeSection == "capabilities" || activeSection == "constraints" || activeSection == "milestones") {
@@ -49,6 +59,16 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string) {
 			}
 		</nav>
 	</aside>
+}
+
+// SidebarHeading renders a group label that does not collapse. Used by the
+// administration and account contexts, where the group is the only one in the
+// panel: a collapsible group there could be folded away to an empty sidebar, and
+// the label's job is to explain why the panel looks different, not to fold.
+templ SidebarHeading(title string) {
+	<p class="px-3 pt-1 pb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+		{ title }
+	</p>
 }
 
 // SidebarSection renders a collapsible group of nav links with a heading.

@@ -6,10 +6,12 @@ import "nexmap.net/web/templates/ui"
 templ AppHeader(displayName, csrfToken, productID, productName, activeSection string, isAdmin bool) {
 	<header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 dark:border-gray-700 dark:bg-gray-900">
 		<div class="flex items-center gap-3">
-			<!-- Mobile menu toggle -->
-			<button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 md:hidden dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200" onclick="openSidebar()" aria-label="Open menu">
-				@ui.Icon("menu", "md")
-			</button>
+			<!-- Mobile menu toggle: only where there is a sidebar to open -->
+			if HasSidebar(activeSection, productID) {
+				<button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 md:hidden dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200" onclick="openSidebar()" aria-label="Open menu">
+					@ui.Icon("menu", "md")
+				</button>
+			}
 			<!-- Logo -->
 			<a href="/" class="flex items-center gap-2">
 				<img src="/static/img/logo-icon.svg" alt="Nexmap" class="h-8 w-8"/>
@@ -36,8 +38,8 @@ templ AppHeader(displayName, csrfToken, productID, productName, activeSection st
 					</button>
 				}
 				@ui.DropdownContent() {
-					@ui.DropdownItem("Profile", "/user/profile", "settings", false)
-					@ui.DropdownItem("API Tokens", "/user/tokens", "link", false)
+					@ui.DropdownItem("Profile", "/user/profile", "user", false)
+					@ui.DropdownItem("API Tokens", "/user/tokens", "key-round", false)
 					if isAdmin {
 						@ui.DropdownDivider()
 						@ui.DropdownItem("Admin", "/admin/users", "users", false)

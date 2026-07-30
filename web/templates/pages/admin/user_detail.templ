@@ -3,7 +3,6 @@ package admin
 import (
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
-	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 	"nexmap.net/internal/model"
 )
@@ -25,7 +24,6 @@ templ UserDetailPage(props UserDetailProps) {
 		ActiveSection: "admin-users",
 	}) {
 		<div class="space-y-6">
-			@patterns.AdminNav("admin-users")
 			<!-- Breadcrumb -->
 			<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
 				<a href="/admin/users" class="hover:text-gray-700 dark:hover:text-gray-300">Users</a>

@@ -23,7 +23,7 @@ var productSections = map[string]bool{
 // SwitchTargetURL returns where the given section should land in the target
 // product, so that switching product preserves the user's place.
 //
-// Sections that do not exist under a product (dashboard, admin-*, empty) and
+// Sections that do not exist under a product (dashboard, admin-*, user-*, empty) and
 // unrecognised input fall back to the target's overview. The section string
 // reaches us as a query parameter, so the URL is always built from the matched
 // map key rather than from the raw input.
