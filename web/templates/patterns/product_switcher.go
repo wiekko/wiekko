@@ -37,11 +37,10 @@ func SwitchTargetURL(productID, workflowMode, section string) string {
 		return overview + "/" + section
 
 	case section == "board" || section == "sprints":
-		// Scrum products belong on /sprints, but that page route does not exist
-		// yet (page_board.go redirects to it and 404s). Fall back to the
-		// overview until it lands, then return overview+"/sprints" here.
+		// The workflow surface is one page or the other, so resolve against
+		// the target product's mode rather than the source's.
 		if workflowMode == model.WorkflowModeScrum {
-			return overview
+			return overview + "/sprints"
 		}
 		return overview + "/board"
 

@@ -210,14 +210,15 @@ func TestCreateSprint(t *testing.T) {
 			nil, nil, nil, nil, noopAudit(), ownerRoles(),
 		)
 
-		result, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), CreateSprintInput{
-			ProductID: "product-001", Name: "Sprint 1",
-		})
+		result, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), sprintInput("Sprint 1"))
 		if err != nil {
 			t.Fatalf("CreateSprint: %v", err)
 		}
 		if result.Name != "Sprint 1" {
 			t.Fatalf("Name = %q, want %q", result.Name, "Sprint 1")
+		}
+		if result.Status != model.SprintStatusPlanned {
+			t.Fatalf("Status = %q, want %q", result.Status, model.SprintStatusPlanned)
 		}
 		if created == nil {
 			t.Fatal("sprint was not created")
@@ -232,9 +233,166 @@ func TestCreateSprint(t *testing.T) {
 		}
 	})
 
+	t.Run("missing dates", func(t *testing.T) {
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
+		_, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), CreateSprintInput{
+			ProductID: "product-001", Name: "Sprint 1",
+		})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("end before start", func(t *testing.T) {
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, ownerRoles())
+		input := sprintInput("Sprint 1")
+		input.StartDate, input.EndDate = input.EndDate, input.StartDate
+		_, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), input)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
 	t.Run("forbidden", func(t *testing.T) {
 		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
-		_, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), CreateSprintInput{ProductID: "product-001", Name: "X"})
+		_, err := svc.CreateSprint(context.Background(), testutil.MakeUser(), sprintInput("X"))
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+// sprintInput returns a valid CreateSprintInput; dates are required, so every
+// success case needs them.
+func sprintInput(name string) CreateSprintInput {
+	sp := testutil.MakeSprint()
+	return CreateSprintInput{
+		ProductID: "product-001",
+		Name:      name,
+		StartDate: sp.StartDate,
+		EndDate:   sp.EndDate,
+	}
+}
+
+func TestSetSprintStatus(t *testing.T) {
+	t.Run("starts a planned sprint", func(t *testing.T) {
+		sprint := testutil.MakeSprint()
+		var updated *model.Sprint
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				GetByIDFunc:   func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+				UpdateFunc:    func(_ context.Context, s *model.Sprint) error { updated = s; return nil },
+				GetActiveFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return nil, nil },
+			},
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+		)
+
+		result, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", model.SprintStatusActive)
+		if err != nil {
+			t.Fatalf("SetSprintStatus: %v", err)
+		}
+		if result.Status != model.SprintStatusActive {
+			t.Fatalf("Status = %q, want %q", result.Status, model.SprintStatusActive)
+		}
+		if updated == nil {
+			t.Fatal("sprint was not persisted")
+		}
+	})
+
+	t.Run("rejects a second active sprint", func(t *testing.T) {
+		sprint := testutil.MakeSprint()
+		other := testutil.MakeSprint(func(s *model.Sprint) {
+			s.ID = "sprint-002"
+			s.Name = "Sprint 2"
+			s.Status = model.SprintStatusActive
+		})
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				GetByIDFunc:   func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+				UpdateFunc:    func(_ context.Context, _ *model.Sprint) error { t.Fatal("must not persist"); return nil },
+				GetActiveFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return other, nil },
+			},
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", model.SprintStatusActive)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("re-activating the same sprint is not a conflict", func(t *testing.T) {
+		sprint := testutil.MakeSprint(func(s *model.Sprint) { s.Status = model.SprintStatusActive })
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				GetByIDFunc:   func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+				UpdateFunc:    func(_ context.Context, _ *model.Sprint) error { return nil },
+				GetActiveFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+			},
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+		)
+
+		if _, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", model.SprintStatusActive); err != nil {
+			t.Fatalf("SetSprintStatus: %v", err)
+		}
+	})
+
+	t.Run("closing needs no active check", func(t *testing.T) {
+		sprint := testutil.MakeSprint(func(s *model.Sprint) { s.Status = model.SprintStatusActive })
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+				UpdateFunc:  func(_ context.Context, _ *model.Sprint) error { return nil },
+				GetActiveFunc: func(_ context.Context, _ string) (*model.Sprint, error) {
+					t.Fatal("must not check for an active sprint when closing")
+					return nil, nil
+				},
+			},
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+		)
+
+		result, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", model.SprintStatusCompleted)
+		if err != nil {
+			t.Fatalf("SetSprintStatus: %v", err)
+		}
+		if result.Status != model.SprintStatusCompleted {
+			t.Fatalf("Status = %q, want %q", result.Status, model.SprintStatusCompleted)
+		}
+	})
+
+	t.Run("rejects unknown status", func(t *testing.T) {
+		sprint := testutil.MakeSprint()
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+			},
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", "paused")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("rejects a sprint from another product", func(t *testing.T) {
+		sprint := testutil.MakeSprint(func(s *model.Sprint) { s.ProductID = "product-002" })
+		svc := newMilestoneService(nil,
+			&testutil.MockSprintStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Sprint, error) { return sprint, nil },
+			},
+			nil, nil, nil, nil, noopAudit(), ownerRoles(),
+		)
+
+		_, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", model.SprintStatusActive)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newMilestoneService(nil, nil, nil, nil, nil, nil, nil, forbiddenRoles())
+		_, err := svc.SetSprintStatus(context.Background(), testutil.MakeUser(), "product-001", "sprint-001", model.SprintStatusActive)
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
 		}

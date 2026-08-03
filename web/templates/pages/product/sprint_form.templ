@@ -1,0 +1,141 @@
+package product
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// SprintFormProps holds data for the sprint create/edit form.
+type SprintFormProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Sprint      *model.Sprint // nil for create
+	Milestones  []*model.Milestone
+	IsEdit      bool
+	Error       string
+	ReturnTo    string // "list" to return to list after save; empty = detail
+	// Form values (preserved on validation error).
+	Name        string
+	MilestoneID string
+	StartDate   string
+	EndDate     string
+}
+
+templ SprintFormPage(props SprintFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "sprints",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-2xl space-y-6">
+			@ui.Breadcrumb(sprintFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Sprint
+				} else {
+					New Sprint
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(sprintFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						if props.ReturnTo != "" {
+							<input type="hidden" name="return" value={ props.ReturnTo }/>
+						}
+						@ui.TextInput(ui.InputProps{
+							ID:          "name",
+							Name:        "name",
+							Label:       "Name",
+							Value:       props.Name,
+							Placeholder: "e.g. Sprint 14",
+							Required:    true,
+						})
+						@ui.DateInput(ui.InputProps{
+							ID:       "start_date",
+							Name:     "start_date",
+							Label:    "Start Date",
+							Value:    props.StartDate,
+							Required: true,
+						})
+						@ui.DateInput(ui.InputProps{
+							ID:       "end_date",
+							Name:     "end_date",
+							Label:    "End Date",
+							Value:    props.EndDate,
+							Required: true,
+						})
+						@ui.Select(ui.SelectProps{
+							ID:       "milestone_id",
+							Name:     "milestone_id",
+							Label:    "Milestone",
+							Value:    props.MilestoneID,
+							Options:  sprintMilestoneOptions(props.Milestones),
+							HelpText: "Optional. The milestone this sprint leads towards.",
+						})
+						@patterns.FormActions(sprintSubmitLabel(props.IsEdit), sprintFormCancelHref(props))
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func sprintFormBreadcrumbs(props SprintFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Sprints", Href: "/products/" + props.Product.ID + "/sprints"},
+	}
+	if props.IsEdit {
+		crumbs = append(crumbs,
+			templates.BreadcrumbItem{Label: props.Sprint.Name, Href: "/products/" + props.Product.ID + "/sprints/" + props.Sprint.ID},
+			templates.BreadcrumbItem{Label: "Edit"},
+		)
+	} else {
+		crumbs = append(crumbs, templates.BreadcrumbItem{Label: "New"})
+	}
+	return crumbs
+}
+
+func sprintFormAction(props SprintFormProps) string {
+	if props.IsEdit {
+		return "/products/" + props.Product.ID + "/sprints/" + props.Sprint.ID
+	}
+	return "/products/" + props.Product.ID + "/sprints"
+}
+
+// sprintFormCancelHref returns to wherever the form was opened from: the list
+// when editing from the list, the sprint itself otherwise.
+func sprintFormCancelHref(props SprintFormProps) string {
+	if props.IsEdit && props.ReturnTo != "list" {
+		return "/products/" + props.Product.ID + "/sprints/" + props.Sprint.ID
+	}
+	return "/products/" + props.Product.ID + "/sprints"
+}
+
+func sprintMilestoneOptions(milestones []*model.Milestone) []templates.SelectOption {
+	options := make([]templates.SelectOption, 0, len(milestones)+1)
+	options = append(options, templates.SelectOption{Value: "", Label: "None"})
+	for _, m := range milestones {
+		options = append(options, templates.SelectOption{Value: m.ID, Label: m.Name})
+	}
+	return options
+}
+
+func sprintSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Sprint"
+}

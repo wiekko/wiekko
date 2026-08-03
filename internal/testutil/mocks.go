@@ -421,6 +421,7 @@ type MockSprintStore struct {
 	DeleteFunc            func(ctx context.Context, id string) error
 	ListByProductIDFunc   func(ctx context.Context, productID string) ([]*model.Sprint, error)
 	ListByMilestoneIDFunc func(ctx context.Context, milestoneID string) ([]*model.Sprint, error)
+	GetActiveFunc         func(ctx context.Context, productID string) (*model.Sprint, error)
 }
 
 func (m *MockSprintStore) Create(ctx context.Context, sprint *model.Sprint) error {
@@ -443,6 +444,12 @@ func (m *MockSprintStore) ListByMilestoneID(ctx context.Context, milestoneID str
 		return nil, nil
 	}
 	return m.ListByMilestoneIDFunc(ctx, milestoneID)
+}
+func (m *MockSprintStore) GetActiveByProductID(ctx context.Context, productID string) (*model.Sprint, error) {
+	if m.GetActiveFunc == nil {
+		return nil, nil
+	}
+	return m.GetActiveFunc(ctx, productID)
 }
 
 // MockStatusStore implements store.StatusStore with configurable function fields.

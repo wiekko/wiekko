@@ -1,0 +1,249 @@
+package patterns
+
+import (
+	"fmt"
+
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// BoardSurface renders a board body — columns, cards and the stranded list —
+// without page chrome, so the product board, the defects board and the sprint
+// detail's board tab all share one implementation.
+templ BoardSurface(props templates.BoardSurfaceProps) {
+	if props.Split {
+		@boardSplitTabs(props)
+	} else {
+		@boardSingle(props)
+	}
+	@boardStranded(props)
+}
+
+// BoardLegend explains the card colours. Pages place it themselves, since it
+// belongs next to the page title rather than above the columns.
+templ BoardLegend() {
+	<div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+		<span class="inline-flex items-center gap-1.5">
+			<span class="h-2.5 w-2.5 rounded-sm bg-blue-500"></span> Requirement
+		</span>
+		<span class="inline-flex items-center gap-1.5">
+			<span class="h-2.5 w-2.5 rounded-sm bg-red-500"></span> Defect
+		</span>
+		<span class="inline-flex items-center gap-1.5">
+			<span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span> Task
+		</span>
+	</div>
+}
+
+templ boardSingle(props templates.BoardSurfaceProps) {
+	<div data-board class="overflow-x-auto">
+		<div class="flex gap-4 pb-2">
+			for _, col := range props.Columns {
+				@BoardColumnView(props.ProductID, col, props.CanMove, boardGroup(props.GroupPrefix, "shared"))
+			}
+		</div>
+	</div>
+}
+
+templ boardSplitTabs(props templates.BoardSurfaceProps) {
+	<div id="board-tabs" class="space-y-4">
+		<div class="border-b border-gray-200 dark:border-gray-700">
+			<nav class="-mb-px flex space-x-8" aria-label="Tabs">
+				<button type="button" data-board-tab="req" onclick="switchBoardTab(this)" class="board-tab-btn whitespace-nowrap border-b-2 border-indigo-500 px-1 py-3 text-sm font-medium text-indigo-600 dark:border-indigo-400 dark:text-indigo-400" aria-current="page">
+					Requirements &amp; Tasks
+				</button>
+				<button type="button" data-board-tab="def" onclick="switchBoardTab(this)" class="board-tab-btn whitespace-nowrap border-b-2 border-transparent px-1 py-3 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200">
+					Defects
+				</button>
+			</nav>
+		</div>
+		<div data-board-panel="req">
+			<div data-board class="overflow-x-auto">
+				<div class="flex gap-4 pb-2">
+					for _, col := range props.ReqColumns {
+						@BoardColumnView(props.ProductID, col, props.CanMove, boardGroup(props.GroupPrefix, "req"))
+					}
+				</div>
+			</div>
+		</div>
+		<div data-board-panel="def" class="hidden">
+			<div data-board class="overflow-x-auto">
+				<div class="flex gap-4 pb-2">
+					for _, col := range props.DefColumns {
+						@BoardColumnView(props.ProductID, col, props.CanMove, boardGroup(props.GroupPrefix, "def"))
+					}
+				</div>
+			</div>
+		</div>
+		@boardTabScript()
+	</div>
+}
+
+templ boardTabScript() {
+	<script>
+		function switchBoardTab(btn) {
+			var root = btn.closest('#board-tabs');
+			var target = btn.getAttribute('data-board-tab');
+			var active = ['border-indigo-500','text-indigo-600','dark:border-indigo-400','dark:text-indigo-400'];
+			var inactive = ['border-transparent','text-gray-500','hover:border-gray-300','hover:text-gray-700','dark:text-gray-400','dark:hover:border-gray-600','dark:hover:text-gray-200'];
+			root.querySelectorAll('.board-tab-btn').forEach(function(b){
+				active.forEach(function(c){ b.classList.remove(c); });
+				inactive.forEach(function(c){ b.classList.add(c); });
+				b.removeAttribute('aria-current');
+			});
+			inactive.forEach(function(c){ btn.classList.remove(c); });
+			active.forEach(function(c){ btn.classList.add(c); });
+			btn.setAttribute('aria-current','page');
+			root.querySelectorAll('[data-board-panel]').forEach(function(p){
+				if (p.getAttribute('data-board-panel') === target) {
+					p.classList.remove('hidden');
+				} else {
+					p.classList.add('hidden');
+				}
+			});
+		}
+	</script>
+}
+
+// BoardColumnView renders one drop target. The data attributes are the contract
+// with board.js: a column that omits them is simply not draggable-into, which
+// is how the read-only view is enforced client-side.
+templ BoardColumnView(productID string, col templates.BoardColumn, canMove bool, group string) {
+	<div class="flex w-72 shrink-0 flex-col rounded-lg bg-gray-100 dark:bg-gray-800">
+		<div class="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+			<div class="flex items-center gap-2">
+				<h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">{ col.Name }</h2>
+				if col.IsClosed {
+					@ui.Icon("check-circle", "sm")
+				}
+			</div>
+			<span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+				{ fmt.Sprintf("%d", len(col.Cards)) }
+			</span>
+		</div>
+		<div
+			class="flex flex-1 flex-col gap-2 p-2 min-h-24"
+			if canMove {
+				data-board-column
+				data-group={ group }
+				data-move-field="status_id"
+				if col.ReqStatusID != "" {
+					data-req-move-value={ col.ReqStatusID }
+				}
+				if col.DefectStatusID != "" {
+					data-def-move-value={ col.DefectStatusID }
+				}
+			}
+		>
+			for _, card := range col.Cards {
+				@BoardCardView(productID, card, canMove)
+			}
+		</div>
+	</div>
+}
+
+// BoardCardView renders a draggable card linking to its entity.
+templ BoardCardView(productID string, card templates.BoardCard, canMove bool) {
+	<a
+		href={ templ.SafeURL(BoardCardHref(productID, card)) }
+		class={ "block rounded-md border-l-4 bg-white p-3 shadow-sm hover:shadow-md dark:bg-gray-900", boardCardBorderClass(card.EntityType), boardCardCursorClass(canMove) }
+		data-entity-type={ card.EntityType }
+		if canMove {
+			data-move-url={ card.MoveURL }
+		}
+	>
+		<div class="flex items-start justify-between gap-2">
+			<div class="flex items-center gap-1.5">
+				@BoardEntityBadge(card.EntityType)
+				if card.Identifier != "" {
+					<span class="font-mono text-xs text-gray-500 dark:text-gray-400">{ card.Identifier }</span>
+				}
+			</div>
+			@PriorityBadge(card.Priority)
+		</div>
+		<p class="mt-1.5 text-sm text-gray-900 dark:text-gray-100">{ card.Title }</p>
+	</a>
+}
+
+templ BoardEntityBadge(entityType string) {
+	switch entityType {
+		case "defect":
+			@ui.Badge("DEF", "red")
+		case "task":
+			@ui.Badge("TSK", "emerald")
+		default:
+			@ui.Badge("REQ", "blue")
+	}
+}
+
+templ boardStranded(props templates.BoardSurfaceProps) {
+	if len(props.StrandedReq) > 0 || len(props.StrandedTask) > 0 || len(props.StrandedDef) > 0 {
+		@ui.Card() {
+			@ui.CardBody() {
+				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Without status</h3>
+				<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">These cards have no status assigned and cannot sit in a column. Open them to assign one.</p>
+				<ul class="mt-3 space-y-1">
+					for _, card := range props.StrandedReq {
+						@boardStrandedItem(props.ProductID, card)
+					}
+					for _, card := range props.StrandedTask {
+						@boardStrandedItem(props.ProductID, card)
+					}
+					for _, card := range props.StrandedDef {
+						@boardStrandedItem(props.ProductID, card)
+					}
+				</ul>
+			}
+		}
+	}
+}
+
+templ boardStrandedItem(productID string, card templates.BoardCard) {
+	<li>
+		<a href={ templ.SafeURL(BoardCardHref(productID, card)) } class="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+			@BoardEntityBadge(card.EntityType)
+			if card.Identifier != "" {
+				<span class="font-mono text-xs text-gray-500 dark:text-gray-400">{ card.Identifier }</span>
+			}
+			<span>{ card.Title }</span>
+		</a>
+	</li>
+}
+
+// BoardCardHref resolves a card to its entity detail page.
+func BoardCardHref(productID string, card templates.BoardCard) string {
+	switch card.EntityType {
+	case "defect":
+		return fmt.Sprintf("/products/%s/defects/%s", productID, card.ID)
+	case "task":
+		return fmt.Sprintf("/products/%s/tasks/%s", productID, card.ID)
+	default:
+		return fmt.Sprintf("/products/%s/requirements/%s", productID, card.ID)
+	}
+}
+
+// boardGroup namespaces a Sortable group so boards on the same page stay apart.
+func boardGroup(prefix, name string) string {
+	if prefix == "" {
+		return name
+	}
+	return prefix + "-" + name
+}
+
+func boardCardBorderClass(entityType string) string {
+	switch entityType {
+	case "defect":
+		return "border-red-500"
+	case "task":
+		return "border-emerald-500"
+	default:
+		return "border-blue-500"
+	}
+}
+
+func boardCardCursorClass(canMove bool) string {
+	if canMove {
+		return "cursor-grab active:cursor-grabbing"
+	}
+	return ""
+}

@@ -153,6 +153,12 @@ func (s *DashboardService) countActiveDefects(ctx context.Context, productID str
 }
 
 func (s *DashboardService) currentSprintName(ctx context.Context, productID string) string {
+	// An explicitly started sprint is the answer whenever there is one; the
+	// date range is only a fallback for sprints nobody has started yet.
+	if active, err := s.sprints.GetActiveByProductID(ctx, productID); err == nil && active != nil {
+		return active.Name
+	}
+
 	sprints, err := s.sprints.ListByProductID(ctx, productID)
 	if err != nil {
 		return ""

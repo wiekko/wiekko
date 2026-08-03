@@ -202,6 +202,7 @@ func (c *PlanningController) UpdateSprint(w http.ResponseWriter, r *http.Request
 	var req struct {
 		Name        *string `json:"name"`
 		MilestoneID *string `json:"milestone_id"`
+		Status      *string `json:"status"`
 		StartDate   *string `json:"start_date"`
 		EndDate     *string `json:"end_date"`
 	}
@@ -212,6 +213,7 @@ func (c *PlanningController) UpdateSprint(w http.ResponseWriter, r *http.Request
 	item, err := c.milestone.UpdateSprint(r.Context(), user, productID, id, service.UpdateSprintInput{
 		Name:        req.Name,
 		MilestoneID: req.MilestoneID,
+		Status:      req.Status,
 		StartDate:   req.StartDate,
 		EndDate:     req.EndDate,
 	})
@@ -526,6 +528,7 @@ func sprintToJSON(s *model.Sprint) map[string]any {
 		"product_id":   s.ProductID,
 		"name":         s.Name,
 		"milestone_id": s.MilestoneID,
+		"status":       s.Status,
 		"start_date":   s.StartDate,
 		"end_date":     s.EndDate,
 		"created_at":   s.CreatedAt,

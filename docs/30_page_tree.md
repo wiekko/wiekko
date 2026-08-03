@@ -106,10 +106,10 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/constraints/new`        | Create Constraint  | Form                                                      |
 | `/products/:id/constraints/:cid`       | Constraint Detail  | Tabbed detail page                                        |
 | `/products/:id/constraints/:cid/edit`  | Edit Constraint    | Form                                                      |
-| `/products/:id/board`                  | Backlog Board      | Kanban/sprint board view (UR-101..102)                    |
+| `/products/:id/board`                  | Backlog Board      | Kanban board view (only in kanban mode) (UR-101..102)     |
 | `/products/:id/sprints`                | Sprints List       | Table (only in scrum mode)                                |
 | `/products/:id/sprints/new`            | Create Sprint      | Form                                                      |
-| `/products/:id/sprints/:sid`           | Sprint Detail      | Board view (kanban columns = statuses) + summary          |
+| `/products/:id/sprints/:sid`           | Sprint Detail      | Tabbed detail page, board first (see below)               |
 | `/products/:id/sprints/:sid/edit`      | Edit Sprint        | Form                                                      |
 
 **Requirement Detail tabs:**
@@ -255,12 +255,16 @@ current milestone; linking reassigns them.
 
 **Sprint Detail tabs:**
 
-| Tab     | Content                                                          |
-|---------|------------------------------------------------------------------|
-| Board   | Kanban view (columns = statuses, cards = requirements + defects) |
-| Backlog | Items assigned to this sprint, not yet started                   |
-| Summary | Velocity, burndown, completion stats                             |
-| History | Audit trail                                                      |
+| Tab      | Content                                                                        |
+|----------|--------------------------------------------------------------------------------|
+| Board    | Kanban view (columns = statuses, cards = this sprint's requirements, tasks and defects) |
+| Planning | Two lists — product backlog and sprint contents — with drag to assign           |
+| Summary  | Completion stats: item counts by status, progress, estimation totals            |
+| History  | Audit trail                                                                    |
+
+The Summary tab reports completion only. Velocity and burndown are **not** implemented:
+neither has a data source yet, since nothing records work remaining over time. A burndown
+would need per-day snapshots persisted alongside the sprint.
 
 ### Administration (admin-only)
 
@@ -288,7 +292,7 @@ The switcher **preserves the current section**: from `/products/A/defects`, pick
 - 11 sections map straight onto `/products/{id}/<section>`
 - Detail and form pages set the same `ActiveSection` as their list page, so they degrade to the list — the entity id is meaningless in another product
 - `overview`, non-product sections (`dashboard`, `admin-*`) and unrecognised input fall back to the target's overview
-- `board`/`sprints` resolve against the **target's** workflow mode. Scrum targets currently fall back to the overview because no `/products/{id}/sprints` page route exists yet (`page_board.go` redirects there and 404s); once it lands, that branch returns the `/sprints` URL
+- `board`/`sprints` resolve against the **target's** workflow mode, so the two map onto each other: a scrum target lands on `/sprints`, a kanban target on `/board`
 - Query parameters are dropped, so `/milestones?view=timeline` resets to the default table view
 
 The section arrives as a query parameter, so the URL is always built from a whitelisted section name rather than from the raw input.
@@ -319,6 +323,36 @@ The theme toggle in the header provides quick access for in-session switching (p
 ### Sprint board as sprint detail
 
 The sprint detail page defaults to the board tab (kanban view of items in that sprint). This avoids a separate top-level "Board" nav entry and makes it clear which sprint's board the user is looking at.
+
+Because it is the default tab, the board is rendered server-side with the page; the other three
+tabs load lazily over htmx like every other detail page.
+
+### Sprint lifecycle: planned → active → completed
+
+A sprint carries an explicit `status` rather than deriving its state from its dates. Dates say when
+a sprint is *scheduled*; status says whether the team has actually started it, and real sprints slip.
+Owners move a sprint with the **Start Sprint** / **Close Sprint** actions on the detail page.
+
+**At most one sprint per product may be active**, mirroring the single-active-campaign rule
+(FR-322). Starting a second one fails and names the sprint already running. The dashboard's
+"current sprint" prefers the active sprint and only falls back to the date range when none is started.
+
+### One board implementation, three surfaces
+
+The product board, the defects board and the sprint board tab all render `patterns.BoardSurface`
+over `templates.BoardSurfaceProps`, built by `buildBoardSurface` in `internal/controller/board_view.go`.
+They differ only in what they load: everything, defects only, or the items assigned to one sprint.
+
+Card moves always PATCH the product-level `/products/{id}/board/…/status` endpoints, whichever
+board they came from — a status change is the same operation regardless of the surface. The sprint
+planning lists reuse the same drag machinery with `data-move-field="sprint_id"`, so `board.js`
+stays one implementation.
+
+### Sprint planning requires owner role
+
+Assigning an item to a sprint is a full requirement update, which the service layer restricts to
+owners (developers may only change status and activation, FR-407). The Planning tab therefore gates
+drag on owner-or-admin, unlike the board, which developers can also use.
 
 ### Settings pages use auto-save (UR-006)
 

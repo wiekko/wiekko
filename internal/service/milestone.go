@@ -175,8 +175,21 @@ type CreateSprintInput struct {
 type UpdateSprintInput struct {
 	Name        *string
 	MilestoneID *string
+	Status      *string
 	StartDate   *string
 	EndDate     *string
+}
+
+// validateSprintDates checks that both dates are present and ordered. Both are
+// RFC 3339, so lexical comparison is chronological.
+func validateSprintDates(startDate, endDate string) error {
+	if startDate == "" || endDate == "" {
+		return errors.New("sprint start and end date are required")
+	}
+	if endDate < startDate {
+		return errors.New("sprint end date must not precede its start date")
+	}
+	return nil
 }
 
 // CreateSprint creates a new sprint. Requires owner role.
@@ -188,6 +201,9 @@ func (s *MilestoneService) CreateSprint(ctx context.Context, user *model.User, i
 	if input.Name == "" {
 		return nil, errors.New("sprint name is required")
 	}
+	if err := validateSprintDates(input.StartDate, input.EndDate); err != nil {
+		return nil, err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	sprint := &model.Sprint{
@@ -195,6 +211,7 @@ func (s *MilestoneService) CreateSprint(ctx context.Context, user *model.User, i
 		ProductID:   input.ProductID,
 		Name:        input.Name,
 		MilestoneID: input.MilestoneID,
+		Status:      model.SprintStatusPlanned,
 		StartDate:   input.StartDate,
 		EndDate:     input.EndDate,
 		CreatedAt:   now,
@@ -244,6 +261,16 @@ func (s *MilestoneService) UpdateSprint(ctx context.Context, user *model.User, p
 	if input.EndDate != nil {
 		sprint.EndDate = *input.EndDate
 	}
+	if err := validateSprintDates(sprint.StartDate, sprint.EndDate); err != nil {
+		return nil, err
+	}
+	if input.Status != nil && *input.Status != sprint.Status {
+		// Status carries its own rules (one active sprint per product), so it
+		// goes through the same path as the start/close actions.
+		if err := s.applySprintStatus(ctx, sprint, *input.Status); err != nil {
+			return nil, err
+		}
+	}
 	sprint.UpdatedAt = now
 
 	if err := s.sprints.Update(ctx, sprint); err != nil {
@@ -256,6 +283,80 @@ func (s *MilestoneService) UpdateSprint(ctx context.Context, user *model.User, p
 	})
 
 	return sprint, nil
+}
+
+// applySprintStatus validates a status change and writes it onto sprint. It
+// does not persist — the caller does, so a status change can ride along with
+// other edits in a single UPDATE.
+func (s *MilestoneService) applySprintStatus(ctx context.Context, sprint *model.Sprint, status string) error {
+	if !model.ValidSprintStatus(status) {
+		return fmt.Errorf("unknown sprint status %q", status)
+	}
+	if status == model.SprintStatusActive {
+		active, err := s.sprints.GetActiveByProductID(ctx, sprint.ProductID)
+		if err != nil {
+			return fmt.Errorf("check active sprint: %w", err)
+		}
+		if active != nil && active.ID != sprint.ID {
+			return fmt.Errorf("sprint %q is already active; close it first", active.Name)
+		}
+	}
+	sprint.Status = status
+	return nil
+}
+
+// SetSprintStatus moves a sprint through planned -> active -> completed.
+// At most one sprint per product may be active at a time. Requires owner role.
+// The audit action mirrors the transition ("start" / "close"), so the sprint's
+// history reads as a lifecycle rather than a series of anonymous updates.
+func (s *MilestoneService) SetSprintStatus(ctx context.Context, user *model.User, productID, id, status string) (*model.Sprint, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+
+	sprint, err := s.sprints.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if sprint.ProductID != productID {
+		return nil, errors.New("sprint not found")
+	}
+	if err := s.applySprintStatus(ctx, sprint, status); err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	sprint.UpdatedAt = now
+	if err := s.sprints.Update(ctx, sprint); err != nil {
+		return nil, fmt.Errorf("update sprint status: %w", err)
+	}
+
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+		UserID: user.ID, Action: sprintStatusAction(status), CreatedAt: now,
+	})
+
+	return sprint, nil
+}
+
+func sprintStatusAction(status string) string {
+	switch status {
+	case model.SprintStatusActive:
+		return "start"
+	case model.SprintStatusCompleted:
+		return "close"
+	default:
+		return "reopen"
+	}
+}
+
+// GetActiveSprint returns the product's active sprint, or nil when none is
+// active. Requires viewer role.
+func (s *MilestoneService) GetActiveSprint(ctx context.Context, user *model.User, productID string) (*model.Sprint, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.sprints.GetActiveByProductID(ctx, productID)
 }
 
 // DeleteSprint removes a sprint. Requires owner role.

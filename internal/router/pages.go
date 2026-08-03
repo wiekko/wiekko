@@ -70,11 +70,30 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("DELETE /products/{id}", pageCSRF(http.HandlerFunc(productCtrl.DeleteProduct)))
 	mux.Handle("GET /products/{id}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.DeleteProductConfirm)))
 
-	// Kanban board.
+	// Kanban board. The status moves are shared by every board surface
+	// (product board, defects board, sprint board) — a status change is the
+	// same product-scoped operation whichever one triggered it.
 	mux.Handle("GET /products/{id}/board", pageAuthed(http.HandlerFunc(productCtrl.Board)))
 	mux.Handle("PATCH /products/{id}/board/requirements/{reqId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardRequirementStatus)))
 	mux.Handle("PATCH /products/{id}/board/tasks/{taskId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardTaskStatus)))
 	mux.Handle("PATCH /products/{id}/board/defects/{defectId}/status", pageAuthed(http.HandlerFunc(productCtrl.BoardDefectStatus)))
+
+	// Sprint pages (scrum mode).
+	mux.Handle("GET /products/{id}/sprints", pageAuthed(http.HandlerFunc(productCtrl.Sprints)))
+	mux.Handle("GET /products/{id}/sprints/new", pageAuthed(http.HandlerFunc(productCtrl.SprintCreateForm)))
+	mux.Handle("POST /products/{id}/sprints", pageAuthed(http.HandlerFunc(productCtrl.SprintCreate)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}", pageAuthed(http.HandlerFunc(productCtrl.SprintDetail)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}/edit", pageAuthed(http.HandlerFunc(productCtrl.SprintEditForm)))
+	mux.Handle("POST /products/{id}/sprints/{sprintId}", pageAuthed(http.HandlerFunc(productCtrl.SprintUpdate)))
+	mux.Handle("DELETE /products/{id}/sprints/{sprintId}", pageCSRF(http.HandlerFunc(productCtrl.SprintDelete)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.SprintDeleteConfirm)))
+	mux.Handle("POST /products/{id}/sprints/{sprintId}/start", pageCSRF(http.HandlerFunc(productCtrl.SprintStart)))
+	mux.Handle("POST /products/{id}/sprints/{sprintId}/close", pageCSRF(http.HandlerFunc(productCtrl.SprintClose)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}/tabs/board", pageAuthed(http.HandlerFunc(productCtrl.SprintBoardTab)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}/tabs/planning", pageAuthed(http.HandlerFunc(productCtrl.SprintPlanningTab)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}/tabs/summary", pageAuthed(http.HandlerFunc(productCtrl.SprintSummaryTab)))
+	mux.Handle("GET /products/{id}/sprints/{sprintId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.SprintHistoryTab)))
+	mux.Handle("PATCH /products/{id}/sprints/{sprintId}/items/{itemId}", pageCSRF(http.HandlerFunc(productCtrl.SprintItemMove)))
 
 	// Milestone pages.
 	mux.Handle("GET /products/{id}/milestones", pageAuthed(http.HandlerFunc(productCtrl.Milestones)))
@@ -308,6 +327,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 
 	// Defect pages.
 	mux.Handle("GET /products/{id}/defects", pageAuthed(http.HandlerFunc(productCtrl.Defects)))
+	mux.Handle("GET /products/{id}/defects/board", pageAuthed(http.HandlerFunc(productCtrl.DefectsBoard)))
 	mux.Handle("GET /products/{id}/defects/new", pageAuthed(http.HandlerFunc(productCtrl.DefectCreateForm)))
 	mux.Handle("POST /products/{id}/defects", pageAuthed(http.HandlerFunc(productCtrl.DefectCreate)))
 	mux.Handle("GET /products/{id}/defects/{defectId}", pageAuthed(http.HandlerFunc(productCtrl.DefectDetail)))

@@ -1,0 +1,157 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// SprintRow is a display-ready sprint with its resolved milestone and item count.
+type SprintRow struct {
+	Sprint        *model.Sprint
+	MilestoneName string
+	ItemCount     int
+}
+
+// SprintsProps holds data for the sprints list page.
+type SprintsProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Sprints        []SprintRow
+	IsOwnerOrAdmin bool
+}
+
+templ SprintsPage(props SprintsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "sprints",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Sprints"},
+			})
+			if len(props.Sprints) == 0 {
+				@patterns.ListPageHeader("Sprints", "", "", -1)
+				@ui.Card() {
+					if props.IsOwnerOrAdmin {
+						@ui.EmptyState("clock", "No sprints yet", "Create your first sprint to start planning iterations.", "New Sprint", "/products/"+props.Product.ID+"/sprints/new")
+					} else {
+						@ui.EmptyState("clock", "No sprints yet", "No sprints have been scheduled for this product.", "", "")
+					}
+				}
+			} else {
+				@patterns.ListPageHeader("Sprints", sprintsCreateHref(props), "New Sprint", len(props.Sprints))
+				@sprintsTable(props)
+			}
+		</div>
+	}
+}
+
+templ sprintsTable(props SprintsProps) {
+	@ui.Card() {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.TableHeader() {
+					Name
+				}
+				@ui.TableHeader() {
+					Status
+				}
+				@ui.TableHeader() {
+					Dates
+				}
+				@ui.TableHeader() {
+					Milestone
+				}
+				@ui.TableHeader() {
+					Items
+				}
+				if props.IsOwnerOrAdmin {
+					@ui.TableHeader() {
+						<span class="sr-only">Actions</span>
+					}
+				}
+			}
+			@ui.TableBody("") {
+				for _, row := range props.Sprints {
+					@ui.TableRow("") {
+						@ui.TableCell() {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/products/%s/sprints/%s", props.Product.ID, row.Sprint.ID)) }
+								class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+							>
+								{ row.Sprint.Name }
+							</a>
+						}
+						@ui.TableCell() {
+							@SprintStatusBadge(row.Sprint.Status)
+						}
+						@ui.TableCellMuted() {
+							{ SprintDateRange(row.Sprint) }
+						}
+						@ui.TableCellMuted() {
+							if row.MilestoneName != "" {
+								{ row.MilestoneName }
+							} else {
+								<span class="text-gray-400 dark:text-gray-500">Not linked</span>
+							}
+						}
+						@ui.TableCellMuted() {
+							{ fmt.Sprintf("%d", row.ItemCount) }
+						}
+						if props.IsOwnerOrAdmin {
+							@ui.TableCell() {
+								@patterns.RowActions(
+									fmt.Sprintf("/products/%s/sprints/%s/edit?return=list", props.Product.ID, row.Sprint.ID),
+									fmt.Sprintf("/products/%s/sprints/%s", props.Product.ID, row.Sprint.ID),
+									props.Meta.CSRFToken,
+								)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// SprintStatusBadge renders a sprint's lifecycle state.
+templ SprintStatusBadge(status string) {
+	switch status {
+		case model.SprintStatusActive:
+			@ui.Badge("Active", "green")
+		case model.SprintStatusCompleted:
+			@ui.Badge("Completed", "indigo")
+		default:
+			@ui.Badge("Planned", "gray")
+	}
+}
+
+// SprintDateRange formats a sprint's start and end dates for display.
+func SprintDateRange(s *model.Sprint) string {
+	start, end := formatDate(s.StartDate), formatDate(s.EndDate)
+	if start == "" && end == "" {
+		return ""
+	}
+	return start + " – " + end
+}
+
+func sprintsCreateHref(props SprintsProps) string {
+	if props.IsOwnerOrAdmin {
+		return "/products/" + props.Product.ID + "/sprints/new"
+	}
+	return ""
+}

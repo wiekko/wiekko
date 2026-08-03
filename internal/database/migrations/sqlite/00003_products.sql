@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS sprints (
     product_id   TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     name         TEXT NOT NULL,
     milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+    status       TEXT NOT NULL DEFAULT 'planned',
     start_date   TEXT NOT NULL,
     end_date     TEXT NOT NULL,
     created_at   TEXT NOT NULL,

@@ -32,11 +32,12 @@ func TestSwitchTargetURL(t *testing.T) {
 		// Overview is the product root, not a segment.
 		{"overview", "overview", model.WorkflowModeKanban, "/products/p2"},
 
-		// Workflow-dependent: board only survives into a kanban product.
+		// Workflow-dependent: the workflow surface resolves against the
+		// target's mode, so board and sprints map onto each other.
 		{"board into kanban target", "board", model.WorkflowModeKanban, "/products/p2/board"},
-		{"board into scrum target", "board", model.WorkflowModeScrum, "/products/p2"},
+		{"board into scrum target", "board", model.WorkflowModeScrum, "/products/p2/sprints"},
 		{"sprints into kanban target", "sprints", model.WorkflowModeKanban, "/products/p2/board"},
-		{"sprints into scrum target", "sprints", model.WorkflowModeScrum, "/products/p2"},
+		{"sprints into scrum target", "sprints", model.WorkflowModeScrum, "/products/p2/sprints"},
 
 		// Not product-scoped.
 		{"dashboard", "dashboard", model.WorkflowModeKanban, "/products/p2"},

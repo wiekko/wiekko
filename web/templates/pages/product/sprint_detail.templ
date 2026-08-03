@@ -1,0 +1,268 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// SprintDetailProps holds data for the sprint detail page.
+type SprintDetailProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Sprint         *model.Sprint
+	MilestoneName  string
+	IsOwnerOrAdmin bool
+	// Board is rendered server-side: it is the default tab, so it has to be
+	// present at first paint rather than arriving over htmx.
+	Board templates.BoardSurfaceProps
+}
+
+templ SprintDetailPage(props SprintDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "sprints",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Sprints", Href: "/products/" + props.Product.ID + "/sprints"},
+					{Label: props.Sprint.Name},
+				},
+				props.Sprint.Name,
+				sprintDetailSubtitle(props),
+				sprintEditHref(props),
+				sprintDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@SprintStatusBadge(props.Sprint.Status)
+				@sprintLifecycleActions(props)
+			}
+			@ui.TabGroup(sprintDetailTabs(props.Product.ID, props.Sprint.ID))
+			@ui.TabPanel("board") {
+				@patterns.BoardSurface(props.Board)
+			}
+			@ui.TabPanelHidden("planning") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("summary") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("history") {
+				@ui.LoadingSpinner("md")
+			}
+		</div>
+	}
+}
+
+// sprintLifecycleActions renders the Start / Close buttons. Only one applies at
+// a time, and only owners see either.
+templ sprintLifecycleActions(props SprintDetailProps) {
+	if props.IsOwnerOrAdmin {
+		switch props.Sprint.Status {
+			case model.SprintStatusPlanned:
+				@ui.Button(ui.ButtonProps{
+					Label:   "Start Sprint",
+					Variant: "primary",
+					Size:    "md",
+					HxPost:  fmt.Sprintf("/products/%s/sprints/%s/start", props.Product.ID, props.Sprint.ID),
+					HxSwap:  "none",
+				}) {
+					@ui.Icon("play", "sm")
+				}
+			case model.SprintStatusActive:
+				@ui.Button(ui.ButtonProps{
+					Label:   "Close Sprint",
+					Variant: "secondary",
+					Size:    "md",
+					HxPost:  fmt.Sprintf("/products/%s/sprints/%s/close", props.Product.ID, props.Sprint.ID),
+					HxSwap:  "none",
+				}) {
+					@ui.Icon("check-circle", "sm")
+				}
+		}
+	}
+}
+
+func sprintDetailTabs(productID, sprintID string) []templates.TabDef {
+	base := fmt.Sprintf("/products/%s/sprints/%s/tabs", productID, sprintID)
+	return []templates.TabDef{
+		{ID: "board", Label: "Board", HxGet: base + "/board", Active: true},
+		{ID: "planning", Label: "Planning", HxGet: base + "/planning"},
+		{ID: "summary", Label: "Summary", HxGet: base + "/summary"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func sprintDetailSubtitle(props SprintDetailProps) string {
+	subtitle := SprintDateRange(props.Sprint)
+	if props.MilestoneName != "" {
+		subtitle += " · towards " + props.MilestoneName
+	}
+	return subtitle
+}
+
+func sprintEditHref(props SprintDetailProps) string {
+	if !props.IsOwnerOrAdmin {
+		return ""
+	}
+	return fmt.Sprintf("/products/%s/sprints/%s/edit", props.Product.ID, props.Sprint.ID)
+}
+
+func sprintDeleteURL(props SprintDetailProps) string {
+	if !props.IsOwnerOrAdmin {
+		return ""
+	}
+	return fmt.Sprintf("/products/%s/sprints/%s", props.Product.ID, props.Sprint.ID)
+}
+
+// SprintDeleteConfirmation renders the delete confirmation for a sprint.
+templ SprintDeleteConfirmation(name, productID, sprintID, csrfToken string) {
+	@patterns.DeleteConfirmation("sprint", name, fmt.Sprintf("/products/%s/sprints/%s", productID, sprintID), csrfToken)
+}
+
+// --- Board tab ---
+
+// SprintBoardTabContent renders the board tab body for lazy reloads.
+templ SprintBoardTabContent(surface templates.BoardSurfaceProps) {
+	@patterns.BoardSurface(surface)
+}
+
+// --- Planning tab ---
+
+// SprintPlanningTabProps holds the two lists of the planning surface.
+type SprintPlanningTabProps struct {
+	ProductID string
+	SprintID  string
+	CanPlan   bool
+	Backlog   []templates.BoardCard // unassigned, still open
+	InSprint  []templates.BoardCard
+}
+
+templ SprintPlanningTabContent(props SprintPlanningTabProps) {
+	<div class="space-y-4">
+		<p class="text-sm text-gray-500 dark:text-gray-400">
+			if props.CanPlan {
+				Drag items between the product backlog and this sprint.
+			} else {
+				Read-only view. Only owners can plan a sprint.
+			}
+		</p>
+		<div data-board class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			@sprintPlanningColumn("Product Backlog", "", props)
+			@sprintPlanningColumn("In Sprint", props.SprintID, props)
+		</div>
+	</div>
+}
+
+// sprintPlanningColumn renders one drop target. moveValue is the sprint id the
+// column assigns — empty on the backlog side, which is what removes an item
+// from the sprint.
+templ sprintPlanningColumn(title, moveValue string, props SprintPlanningTabProps) {
+	<div class="flex flex-col rounded-lg bg-gray-100 dark:bg-gray-800">
+		<div class="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+			<h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">{ title }</h2>
+			<span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+				{ fmt.Sprintf("%d", len(sprintPlanningCards(props, moveValue))) }
+			</span>
+		</div>
+		<div
+			class="flex flex-1 flex-col gap-2 p-2 min-h-24"
+			if props.CanPlan {
+				data-board-column
+				data-group="sprint-plan"
+				data-move-field="sprint_id"
+				data-req-move-value={ moveValue }
+				data-def-move-value={ moveValue }
+			}
+		>
+			for _, card := range sprintPlanningCards(props, moveValue) {
+				@patterns.BoardCardView(props.ProductID, card, props.CanPlan)
+			}
+		</div>
+	</div>
+}
+
+// sprintPlanningCards picks the list belonging to a column: the sprint side when
+// the column assigns a sprint id, the backlog side when it clears one.
+func sprintPlanningCards(props SprintPlanningTabProps, moveValue string) []templates.BoardCard {
+	if moveValue == "" {
+		return props.Backlog
+	}
+	return props.InSprint
+}
+
+// --- Summary tab ---
+
+// SprintStatusCount is one row of the per-status breakdown.
+type SprintStatusCount struct {
+	Name     string
+	IsClosed bool
+	Count    int
+}
+
+// SprintSummaryTabProps holds the completion stats for a sprint.
+type SprintSummaryTabProps struct {
+	TotalItems     int
+	CompletedItems int
+	Percent        int
+	Statuses       []SprintStatusCount
+	// Estimation totals are shown only for numeric estimation modes; the
+	// label carries the unit ("points" / "hours").
+	ShowEstimation     bool
+	EstimationLabel    string
+	TotalEstimation    string
+	CompletedEstimation string
+}
+
+templ SprintSummaryTabContent(props SprintSummaryTabProps) {
+	@ui.Card() {
+		@ui.CardBody() {
+			if props.TotalItems == 0 {
+				@ui.EmptyState("clipboard-list", "Nothing planned yet", "Assign requirements, tasks or defects on the Planning tab to see progress here.", "", "")
+			} else {
+				<div class="space-y-6">
+					@patterns.DetailGrid() {
+						@patterns.DetailField("Committed", fmt.Sprintf("%d items", props.TotalItems))
+						@patterns.DetailField("Completed", fmt.Sprintf("%d items", props.CompletedItems))
+						if props.ShowEstimation {
+							@patterns.DetailField("Committed "+props.EstimationLabel, props.TotalEstimation)
+							@patterns.DetailField("Completed "+props.EstimationLabel, props.CompletedEstimation)
+						}
+					}
+					@ui.ProgressBar(props.Percent, "green", "Completion")
+					<div>
+						<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">By status</h3>
+						<ul class="mt-2 flex flex-wrap items-center gap-3">
+							for _, s := range props.Statuses {
+								<li class="inline-flex items-center gap-2">
+									@patterns.StatusBadge(s.Name, s.IsClosed)
+									<span class="text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d", s.Count) }</span>
+								</li>
+							}
+						</ul>
+					</div>
+				</div>
+			}
+		}
+	}
+}
+
+// --- History tab ---
+
+templ SprintHistoryTabContent(entries []templates.AuditEntryView) {
+	@patterns.AuditTimeline(entries)
+}

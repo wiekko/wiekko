@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"nexmap.net/internal/model"
-	productpage "nexmap.net/web/templates/pages/product"
+	"nexmap.net/web/templates"
 )
 
 func TestCanMoveCards(t *testing.T) {
@@ -118,10 +118,10 @@ func TestMergedBoardColumns_PairsByPosition(t *testing.T) {
 		{ID: "def-todo", Name: "To Do", Position: 1},
 		{ID: "def-done", Name: "Done", Position: 2, IsClosed: true},
 	}
-	reqCards := map[string][]productpage.BoardCard{
+	reqCards := map[string][]templates.BoardCard{
 		"req-todo": {{ID: "r1", EntityType: "requirement"}},
 	}
-	defCards := map[string][]productpage.BoardCard{
+	defCards := map[string][]templates.BoardCard{
 		"def-done": {{ID: "d1", EntityType: "defect"}},
 	}
 
@@ -170,7 +170,7 @@ func TestEntityBoardColumns_SplitMode(t *testing.T) {
 		{ID: "s1", Name: "Open", Position: 1},
 		{ID: "s2", Name: "Closed", Position: 2, IsClosed: true},
 	}
-	cards := map[string][]productpage.BoardCard{
+	cards := map[string][]templates.BoardCard{
 		"s1": {{ID: "r1", EntityType: "requirement"}},
 	}
 
@@ -189,4 +189,61 @@ func TestEntityBoardColumns_SplitMode(t *testing.T) {
 	if defCols[0].DefectStatusID != "s1" || defCols[0].ReqStatusID != "" {
 		t.Errorf("defect column should carry only DefectStatusID, got %+v", defCols[0])
 	}
+}
+
+func TestBuildBoardSurface(t *testing.T) {
+	reqStatuses := []*model.Status{{ID: "req-todo", Name: "To Do", Position: 1}}
+	defStatuses := []*model.Status{{ID: "def-todo", Name: "To Do", Position: 1}}
+	items := []*model.Requirement{
+		{ID: "r1", Kind: model.RequirementKindRequirement, Title: "Req", StatusID: "req-todo"},
+	}
+	defects := []*model.Defect{{ID: "d1", Title: "Defect", StatusID: "def-todo"}}
+
+	t.Run("sync mode merges both entity types into one column set", func(t *testing.T) {
+		p := &model.Product{ID: "p1", StatusSync: true}
+		surface := buildBoardSurface("p1", p, true, reqStatuses, defStatuses, items, defects, nil, "")
+
+		if surface.Split {
+			t.Fatal("Split should be false when StatusSync is on")
+		}
+		if len(surface.Columns) != 1 {
+			t.Fatalf("expected 1 column, got %d", len(surface.Columns))
+		}
+		if len(surface.Columns[0].Cards) != 2 {
+			t.Errorf("expected requirement and defect in one column, got %+v", surface.Columns[0].Cards)
+		}
+		if len(surface.ReqColumns) != 0 || len(surface.DefColumns) != 0 {
+			t.Error("per-entity column sets should be empty in sync mode")
+		}
+	})
+
+	t.Run("split mode keeps the entity types apart", func(t *testing.T) {
+		p := &model.Product{ID: "p1", StatusSync: false}
+		surface := buildBoardSurface("p1", p, true, reqStatuses, defStatuses, items, defects, nil, "sprint")
+
+		if !surface.Split {
+			t.Fatal("Split should be true when StatusSync is off")
+		}
+		if len(surface.ReqColumns) != 1 || len(surface.ReqColumns[0].Cards) != 1 {
+			t.Errorf("unexpected requirement columns: %+v", surface.ReqColumns)
+		}
+		if len(surface.DefColumns) != 1 || len(surface.DefColumns[0].Cards) != 1 {
+			t.Errorf("unexpected defect columns: %+v", surface.DefColumns)
+		}
+		if surface.GroupPrefix != "sprint" {
+			t.Errorf("GroupPrefix = %q, want %q", surface.GroupPrefix, "sprint")
+		}
+	})
+
+	t.Run("stranded cards surface regardless of mode", func(t *testing.T) {
+		p := &model.Product{ID: "p1", StatusSync: true}
+		stray := []*model.Requirement{
+			{ID: "r9", Kind: model.RequirementKindTask, Title: "No status"},
+		}
+		surface := buildBoardSurface("p1", p, true, reqStatuses, defStatuses, stray, nil, nil, "")
+
+		if len(surface.StrandedTask) != 1 || surface.StrandedTask[0].ID != "r9" {
+			t.Errorf("expected r9 in stranded tasks, got %+v", surface.StrandedTask)
+		}
+	})
 }

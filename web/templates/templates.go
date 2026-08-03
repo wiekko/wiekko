@@ -99,3 +99,49 @@ type StatusView struct {
 	Name     string
 	IsClosed bool
 }
+
+// BoardSurfaceProps renders a board body without any page chrome, so the same
+// markup serves the product board, the defects board and the sprint board tab.
+type BoardSurfaceProps struct {
+	ProductID string
+	CanMove   bool
+
+	// Split indicates separate status sets per entity type (StatusSync=false).
+	// When false, Columns covers both entity types in one board.
+	// When true, ReqColumns and DefColumns hold per-entity column sets.
+	Split      bool
+	Columns    []BoardColumn // populated when !Split
+	ReqColumns []BoardColumn // populated when Split
+	DefColumns []BoardColumn // populated when Split
+
+	// Stranded cards lack a status and can't sit in any column. Shown as a
+	// separate list below the board so users can still open & fix them.
+	StrandedReq  []BoardCard
+	StrandedTask []BoardCard
+	StrandedDef  []BoardCard
+
+	// GroupPrefix namespaces the Sortable drag groups, so two boards on one
+	// page (board tab and planning tab) never accept each other's cards.
+	GroupPrefix string
+}
+
+// BoardColumn represents one board column.
+// ReqStatusID and DefectStatusID hold the per-entity-type status ids for the
+// column. In sync mode both are set; in split mode only the relevant one.
+type BoardColumn struct {
+	Name           string
+	ReqStatusID    string
+	DefectStatusID string
+	IsClosed       bool
+	Cards          []BoardCard
+}
+
+// BoardCard carries the minimum info needed to display and move a card.
+type BoardCard struct {
+	EntityType string // "requirement", "task" or "defect"
+	ID         string
+	Identifier string // e.g. "FR-12" for requirements; "" for defects (no prefixed ID)
+	Title      string
+	Priority   int
+	MoveURL    string
+}

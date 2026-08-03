@@ -197,6 +197,7 @@ func MakeSprint(overrides ...func(*model.Sprint)) *model.Sprint {
 		ID:        "sprint-001",
 		ProductID: "product-001",
 		Name:      "Test Sprint",
+		Status:    model.SprintStatusPlanned,
 		StartDate: now,
 		EndDate:   FutureRFC3339(14 * 24 * time.Hour),
 		CreatedAt: now,
