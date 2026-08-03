@@ -212,9 +212,7 @@ templ campaignScopePicker(props CampaignFormProps) {
 									/>
 									<div class="min-w-0">
 										<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ opt.TestCase.Title }</p>
-										<p class="text-xs text-gray-500 dark:text-gray-400">
-											{ campaignScopeSubtitle(opt) }
-										</p>
+										@campaignScopeMeta(opt)
 									</div>
 								</label>
 							</li>
@@ -233,28 +231,34 @@ templ campaignScopePicker(props CampaignFormProps) {
 	</div>
 }
 
-func campaignScopeSubtitle(opt CampaignTestCaseOption) string {
-	parts := make([]string, 0, 3)
+// campaignScopeMeta renders a row's second line as two tiers: where the test
+// case sits in the product (plain text) and what kind of test it is (badges).
+// The picker can filter on all four, so all four have to be visible.
+templ campaignScopeMeta(opt CampaignTestCaseOption) {
+	<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+		<span class="text-xs text-gray-500 dark:text-gray-400">{ campaignScopeLocation(opt) }</span>
+		if opt.PyramidName != "" {
+			@ui.Badge(opt.PyramidName, "indigo")
+		}
+		@executionModeBadge(opt.TestCase.ExecutionMode)
+	</div>
+}
+
+// campaignScopeLocation names where the test case sits. Component and capability
+// are independent optional fields, so both are shown when both are set —
+// "Product level" describes the pair being empty and never accompanies a name.
+func campaignScopeLocation(opt CampaignTestCaseOption) string {
+	parts := make([]string, 0, 2)
 	if opt.ComponentName != "" {
 		parts = append(parts, opt.ComponentName)
-	} else if opt.CapabilityName != "" {
+	}
+	if opt.CapabilityName != "" {
 		parts = append(parts, opt.CapabilityName)
-	} else {
-		parts = append(parts, "Product level")
 	}
-	if opt.PyramidName != "" {
-		parts = append(parts, opt.PyramidName)
+	if len(parts) == 0 {
+		return "Product level"
 	}
-	parts = append(parts, opt.TestCase.ExecutionMode)
-
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += " · "
-		}
-		out += p
-	}
-	return out
+	return strings.Join(parts, " · ")
 }
 
 func campaignPickerComponentOptions(components []*model.Component) []templates.SelectOption {
