@@ -28,7 +28,9 @@
           return;
         }
 
-        var values = {};
+        // The status endpoints name the entity type in their URL, but the
+        // sprint endpoint is one URL for all three types, so send it along.
+        var values = { entity_type: entity };
         values[field] = value;
 
         card.classList.add("opacity-60");

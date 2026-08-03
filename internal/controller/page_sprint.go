@@ -432,7 +432,7 @@ func (c *PageProductController) SprintItemMove(w http.ResponseWriter, r *http.Re
 			SprintID: &sprintID,
 		})
 	default:
-		http.Error(w, "unknown entity type", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("unknown entity type %q", entityType), http.StatusBadRequest)
 		return
 	}
 	if err != nil {
