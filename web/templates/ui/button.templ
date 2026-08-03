@@ -13,6 +13,11 @@ type ButtonProps struct {
 	HxDelete string
 	HxTarget string
 	HxSwap   string
+	// Attrs carries anything the fields above don't cover — data-* hooks for
+	// page scripts, aria-*, and so on. It is written after the fixed attributes
+	// and HTML keeps the first of a duplicate pair, so class and type cannot be
+	// overridden through it; use Variant, Size and Type instead.
+	Attrs templ.Attributes
 }
 
 // Button renders a styled button. Children are rendered inside, after the label.
@@ -41,6 +46,7 @@ templ Button(props ButtonProps) {
 		if props.HxSwap != "" {
 			hx-swap={ props.HxSwap }
 		}
+		{ props.Attrs... }
 	>
 		if props.Label != "" {
 			{ props.Label }

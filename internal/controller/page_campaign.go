@@ -112,17 +112,21 @@ func (c *PageProductController) CampaignCreateForm(w http.ResponseWriter, r *htt
 		return
 	}
 
+	scope := c.buildScopeData(r, user, productID, nil)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.CampaignFormPage(productpage.CampaignFormProps{
 		Meta: templates.PageMeta{
 			Title:     "New Campaign",
 			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		TestCases:   c.buildScopeOptions(r, user, productID, nil),
-		Components:  c.listComponents(r, user, productID),
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		TestCases:     scope.TestCases,
+		Components:    scope.Components,
+		Capabilities:  scope.Capabilities,
+		PyramidLevels: scope.PyramidLevels,
 	}).Render(r.Context(), w)
 }
 
@@ -157,22 +161,26 @@ func (c *PageProductController) CampaignCreate(w http.ResponseWriter, r *http.Re
 
 	campaign, err := c.testing.CreateCampaign(r.Context(), user, input)
 	if err != nil {
+		scope := c.buildScopeData(r, user, productID, selected)
+
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.CampaignFormPage(productpage.CampaignFormProps{
 			Meta: templates.PageMeta{
 				Title:     "New Campaign",
 				CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
 			},
-			DisplayName: user.DisplayName,
-			IsAdmin:     user.IsAdmin,
-			Product:     p,
-			Error:       err.Error(),
-			TestCases:   c.buildScopeOptions(r, user, productID, selected),
-			Components:  c.listComponents(r, user, productID),
-			Name:        input.Name,
-			Description: input.Description,
-			StartsAt:    input.StartsAt,
-			EndsAt:      input.EndsAt,
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Error:         err.Error(),
+			TestCases:     scope.TestCases,
+			Components:    scope.Components,
+			Capabilities:  scope.Capabilities,
+			PyramidLevels: scope.PyramidLevels,
+			Name:          input.Name,
+			Description:   input.Description,
+			StartsAt:      input.StartsAt,
+			EndsAt:        input.EndsAt,
 		}).Render(r.Context(), w)
 		return
 	}
@@ -655,17 +663,33 @@ func (c *PageProductController) buildEnvironmentMap(r *http.Request, user *model
 	return m
 }
 
-func (c *PageProductController) listComponents(r *http.Request, user *model.User, productID string) []*model.Component {
-	components, _ := c.component.ListComponents(r.Context(), user, productID)
-	return components
+// campaignScopeData is everything the scope picker needs: the selectable rows
+// plus the lists its filter dropdowns are built from.
+type campaignScopeData struct {
+	TestCases     []productpage.CampaignTestCaseOption
+	Components    []*model.Component
+	Capabilities  []*model.Capability
+	PyramidLevels []*model.PyramidLevel
 }
 
-// buildScopeOptions lists every test case as a scope candidate, pre-checking
-// the ones already selected so a failed submission keeps the user's picks.
-func (c *PageProductController) buildScopeOptions(r *http.Request, user *model.User, productID string, selected []string) []productpage.CampaignTestCaseOption {
+// buildScopeData lists every test case as a scope candidate, pre-checking the
+// ones already selected so a failed submission keeps the user's picks. Each
+// lookup list is fetched once and serves double duty: resolving ID → name for
+// the row subtitles, and populating the matching filter dropdown.
+func (c *PageProductController) buildScopeData(r *http.Request, user *model.User, productID string, selected []string) campaignScopeData {
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	levels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+
+	data := campaignScopeData{
+		Components:    components,
+		Capabilities:  capabilities,
+		PyramidLevels: levels,
+	}
+
 	testCases, err := c.testing.ListTestCases(r.Context(), user, productID)
 	if err != nil {
-		return nil
+		return data
 	}
 
 	chosen := make(map[string]bool, len(selected))
@@ -673,21 +697,30 @@ func (c *PageProductController) buildScopeOptions(r *http.Request, user *model.U
 		chosen[id] = true
 	}
 
-	components := c.buildComponentMap(r, user, productID)
-	capabilities := c.buildCapabilityMap(r, user, productID)
-	pyramids := c.buildPyramidLevelMap(r, user, productID)
+	componentNames := make(map[string]string, len(components))
+	for _, x := range components {
+		componentNames[x.ID] = x.Name
+	}
+	capabilityNames := make(map[string]string, len(capabilities))
+	for _, x := range capabilities {
+		capabilityNames[x.ID] = x.Name
+	}
+	levelNames := make(map[string]string, len(levels))
+	for _, x := range levels {
+		levelNames[x.ID] = x.Name
+	}
 
-	opts := make([]productpage.CampaignTestCaseOption, 0, len(testCases))
+	data.TestCases = make([]productpage.CampaignTestCaseOption, 0, len(testCases))
 	for _, tc := range testCases {
-		opts = append(opts, productpage.CampaignTestCaseOption{
+		data.TestCases = append(data.TestCases, productpage.CampaignTestCaseOption{
 			TestCase:       tc,
-			ComponentName:  components[tc.ComponentID],
-			CapabilityName: capabilities[tc.CapabilityID],
-			PyramidName:    pyramids[tc.PyramidLevelID],
+			ComponentName:  componentNames[tc.ComponentID],
+			CapabilityName: capabilityNames[tc.CapabilityID],
+			PyramidName:    levelNames[tc.PyramidLevelID],
 			Selected:       chosen[tc.ID],
 		})
 	}
-	return opts
+	return data
 }
 
 // matrixGrouping reads the requested matrix grouping, which reaches the server
