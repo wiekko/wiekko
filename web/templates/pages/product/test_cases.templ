@@ -15,11 +15,12 @@ type TestCasesProps struct {
 	Meta            templates.PageMeta
 	DisplayName     string
 	IsAdmin         bool
-	Product         *model.Product
-	TestCases       []*model.TestCase
-	Components      map[string]string // component ID → name
-	PyramidLevels   map[string]string // pyramid level ID → name
-	CanEdit         bool              // developer, owner, or admin
+	Product       *model.Product
+	TestCases     []*model.TestCase
+	Components    map[string]string // component ID → name
+	Capabilities  map[string]string // capability ID → name
+	PyramidLevels map[string]string // pyramid level ID → name
+	CanEdit       bool              // developer, owner, or admin
 }
 
 templ TestCasesPage(props TestCasesProps) {
@@ -60,13 +61,16 @@ templ TestCasesPage(props TestCasesProps) {
 								Title
 							}
 							@ui.TableHeader() {
-								Mode
-							}
-							@ui.TableHeader() {
 								Component
 							}
 							@ui.TableHeader() {
+								Capability
+							}
+							@ui.TableHeader() {
 								Pyramid Level
+							}
+							@ui.TableHeader() {
+								Mode
 							}
 							@ui.TableHeader() {
 								Created
@@ -89,9 +93,6 @@ templ TestCasesPage(props TestCasesProps) {
 										</a>
 									}
 									@ui.TableCellMuted() {
-										@executionModeBadge(tc.ExecutionMode)
-									}
-									@ui.TableCellMuted() {
 										if tc.ComponentID != "" {
 											if name, ok := props.Components[tc.ComponentID]; ok {
 												<a
@@ -104,19 +105,38 @@ templ TestCasesPage(props TestCasesProps) {
 												{ tc.ComponentID }
 											}
 										} else {
-											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+											@testCaseCellEmpty()
+										}
+									}
+									@ui.TableCellMuted() {
+										if tc.CapabilityID != "" {
+											if name, ok := props.Capabilities[tc.CapabilityID]; ok {
+												<a
+													href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", props.Product.ID, tc.CapabilityID)) }
+													class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+												>
+													{ name }
+												</a>
+											} else {
+												{ tc.CapabilityID }
+											}
+										} else {
+											@testCaseCellEmpty()
 										}
 									}
 									@ui.TableCellMuted() {
 										if tc.PyramidLevelID != "" {
 											if name, ok := props.PyramidLevels[tc.PyramidLevelID]; ok {
-												{ name }
+												@ui.Badge(name, "indigo")
 											} else {
-												{ tc.PyramidLevelID }
+												@ui.Badge(tc.PyramidLevelID, "indigo")
 											}
 										} else {
-											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+											@testCaseCellEmpty()
 										}
+									}
+									@ui.TableCellMuted() {
+										@executionModeBadge(tc.ExecutionMode)
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(tc.CreatedAt) }
@@ -138,6 +158,11 @@ templ TestCasesPage(props TestCasesProps) {
 			}
 		</div>
 	}
+}
+
+// testCaseCellEmpty is the placeholder for an unset optional column.
+templ testCaseCellEmpty() {
+	<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
 }
 
 templ executionModeBadge(mode string) {

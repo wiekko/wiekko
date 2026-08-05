@@ -4119,19 +4119,21 @@ func (c *PageProductController) CapabilityDefectCreateModal(w http.ResponseWrite
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectFormModal(productpage.DefectFormProps{
-		Meta:        templates.PageMeta{CSRFToken: csrfToken},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Statuses:    statuses,
-		Milestones:  milestones,
-		Sprints:     sprints,
-		LinkTo:      "capability:" + capabilityID,
-		Criticality: "medium",
-		StatusID:    defaultStatusID(statuses),
+		Meta:         templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Statuses:     statuses,
+		Milestones:   milestones,
+		Sprints:      sprints,
+		Environments: environments,
+		LinkTo:       "capability:" + capabilityID,
+		Criticality:  "medium",
+		StatusID:     defaultStatusID(statuses),
 	}).Render(r.Context(), w)
 }
 
@@ -4153,6 +4155,7 @@ func (c *PageProductController) CapabilityDefectCreateAndLink(w http.ResponseWri
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
 	sprintID := r.FormValue("sprint_id")
+	environmentID := r.FormValue("environment_id")
 	estimation := r.FormValue("estimation")
 	priorityStr := r.FormValue("priority")
 	priority, _ := strconv.Atoi(priorityStr)
@@ -4161,38 +4164,42 @@ func (c *PageProductController) CapabilityDefectCreateAndLink(w http.ResponseWri
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.DefectFormModal(productpage.DefectFormProps{
-			Meta:        templates.PageMeta{CSRFToken: csrfToken},
-			DisplayName: user.DisplayName,
-			IsAdmin:     user.IsAdmin,
-			Product:     p,
-			Statuses:    statuses,
-			Milestones:  milestones,
-			Sprints:     sprints,
-			LinkTo:      "capability:" + capabilityID,
-			Title:       title,
-			Description: description,
-			Criticality: criticality,
-			StatusID:    statusID,
-			MilestoneID: milestoneID,
-			SprintID:    sprintID,
-			Estimation:  estimation,
-			Priority:    priorityStr,
-			Error:       errMsg,
+			Meta:          templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Statuses:      statuses,
+			Milestones:    milestones,
+			Sprints:       sprints,
+			Environments:  environments,
+			LinkTo:        "capability:" + capabilityID,
+			Title:         title,
+			Description:   description,
+			Criticality:   criticality,
+			StatusID:      statusID,
+			MilestoneID:   milestoneID,
+			SprintID:      sprintID,
+			EnvironmentID: environmentID,
+			Estimation:    estimation,
+			Priority:      priorityStr,
+			Error:         errMsg,
 		}).Render(r.Context(), w)
 	}
 
 	d, err := c.backlog.CreateDefect(r.Context(), user, service.CreateDefectInput{
-		ProductID:   productID,
-		Title:       title,
-		Description: description,
-		Criticality: criticality,
-		StatusID:    statusID,
-		MilestoneID: milestoneID,
-		SprintID:    sprintID,
-		Estimation:  estimation,
-		Priority:    priority,
+		ProductID:     productID,
+		Title:         title,
+		Description:   description,
+		Criticality:   criticality,
+		StatusID:      statusID,
+		MilestoneID:   milestoneID,
+		SprintID:      sprintID,
+		EnvironmentID: environmentID,
+		Estimation:    estimation,
+		Priority:      priority,
 	})
 	if err != nil {
 		rerenderForm(err.Error())
@@ -4374,6 +4381,7 @@ func (c *PageProductController) TestCases(w http.ResponseWriter, r *http.Request
 		Product:       p,
 		TestCases:     testCases,
 		Components:    c.buildComponentMap(r, user, productID),
+		Capabilities:  c.buildCapabilityMap(r, user, productID),
 		PyramidLevels: c.buildPyramidLevelMap(r, user, productID),
 		CanEdit:       c.canEditTestCases(user, role),
 	}).Render(r.Context(), w)
@@ -4411,8 +4419,33 @@ func (c *PageProductController) TestCaseDetail(w http.ResponseWriter, r *http.Re
 		ComponentName:    c.resolveComponentName(r, user, productID, tc.ComponentID),
 		CapabilityName:   c.resolveCapabilityName(r, user, productID, tc.CapabilityID),
 		PyramidLevelName: c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID),
+		EnvironmentNames: c.resolveTestCaseEnvironmentNames(r, user, productID, testCaseID),
 		CanEdit:          c.canEditTestCases(user, role),
 	}).Render(r.Context(), w)
+}
+
+// resolveTestCaseEnvironmentNames names a test case's linked environments. It
+// walks the product's environment list rather than the link list so the result
+// comes out in the same order the pickers and matrix columns use.
+func (c *PageProductController) resolveTestCaseEnvironmentNames(r *http.Request, user *model.User, productID, testCaseID string) []string {
+	linked, err := c.testing.ListTestCaseEnvironments(r.Context(), user, productID, testCaseID)
+	if err != nil || len(linked) == 0 {
+		return nil
+	}
+
+	isLinked := make(map[string]bool, len(linked))
+	for _, id := range linked {
+		isLinked[id] = true
+	}
+
+	envs, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
+	names := make([]string, 0, len(linked))
+	for _, env := range envs {
+		if isLinked[env.ID] {
+			names = append(names, env.Name)
+		}
+	}
+	return names
 }
 
 // TestCaseCreateForm renders GET /products/{id}/test-cases/new.
@@ -4430,6 +4463,7 @@ func (c *PageProductController) TestCaseCreateForm(w http.ResponseWriter, r *htt
 	components, _ := c.component.ListComponents(r.Context(), user, productID)
 	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
@@ -4443,6 +4477,7 @@ func (c *PageProductController) TestCaseCreateForm(w http.ResponseWriter, r *htt
 		Components:    components,
 		Capabilities:  capabilities,
 		PyramidLevels: pyramidLevels,
+		Environments:  environments,
 		ExecutionMode: "manual",
 	}).Render(r.Context(), w)
 }
@@ -4459,6 +4494,13 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// The environment picker submits repeated values, which needs the parsed form
+	// rather than FormValue.
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
 	title := r.FormValue("title")
 	description := r.FormValue("description")
 	executionMode := r.FormValue("execution_mode")
@@ -4466,21 +4508,13 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 	componentID := r.FormValue("component_id")
 	capabilityID := r.FormValue("capability_id")
 	pyramidLevelID := r.FormValue("pyramid_level_id")
+	environmentIDs := r.Form["environment_ids"]
 
-	_, err = c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
-		ProductID:      productID,
-		ComponentID:    componentID,
-		CapabilityID:   capabilityID,
-		Title:          title,
-		Description:    description,
-		ExecutionMode:  executionMode,
-		TestIdentifier: testIdentifier,
-		PyramidLevelID: pyramidLevelID,
-	})
-	if err != nil {
+	rerender := func(message string) {
 		components, _ := c.component.ListComponents(r.Context(), user, productID)
 		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
@@ -4494,7 +4528,8 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 			Components:     components,
 			Capabilities:   capabilities,
 			PyramidLevels:  pyramidLevels,
-			Error:          err.Error(),
+			Environments:   environments,
+			Error:          message,
 			Title:          title,
 			Description:    description,
 			ExecutionMode:  executionMode,
@@ -4502,11 +4537,68 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 			ComponentID:    componentID,
 			CapabilityID:   capabilityID,
 			PyramidLevelID: pyramidLevelID,
+			EnvironmentIDs: environmentIDs,
 		}).Render(r.Context(), w)
+	}
+
+	tc, err := c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
+		ProductID:      productID,
+		ComponentID:    componentID,
+		CapabilityID:   capabilityID,
+		Title:          title,
+		Description:    description,
+		ExecutionMode:  executionMode,
+		TestIdentifier: testIdentifier,
+		PyramidLevelID: pyramidLevelID,
+	})
+	if err != nil {
+		rerender(err.Error())
+		return
+	}
+
+	if err := c.syncTestCaseEnvironments(r, user, productID, tc.ID, environmentIDs); err != nil {
+		rerender("created the test case but failed to link its environments: " + err.Error())
 		return
 	}
 
 	http.Redirect(w, r, "/products/"+productID+"/test-cases", http.StatusSeeOther)
+}
+
+// syncTestCaseEnvironments reconciles a test case's environment links with the
+// submitted selection, adding and removing only what changed. The links decide
+// how many matrix columns a campaign seeds for this test case (FR-019).
+func (c *PageProductController) syncTestCaseEnvironments(r *http.Request, user *model.User, productID, testCaseID string, want []string) error {
+	current, err := c.testing.ListTestCaseEnvironments(r.Context(), user, productID, testCaseID)
+	if err != nil {
+		return err
+	}
+
+	wanted := make(map[string]bool, len(want))
+	for _, id := range want {
+		wanted[id] = true
+	}
+	existing := make(map[string]bool, len(current))
+	for _, id := range current {
+		existing[id] = true
+	}
+
+	for id := range wanted {
+		if existing[id] {
+			continue
+		}
+		if err := c.testing.AddTestCaseEnvironment(r.Context(), user, productID, testCaseID, id); err != nil {
+			return err
+		}
+	}
+	for id := range existing {
+		if wanted[id] {
+			continue
+		}
+		if err := c.testing.RemoveTestCaseEnvironment(r.Context(), user, productID, testCaseID, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TestCaseEditForm renders GET /products/{id}/test-cases/{testCaseId}/edit.
@@ -4531,6 +4623,8 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 	components, _ := c.component.ListComponents(r.Context(), user, productID)
 	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
+	environmentIDs, _ := c.testing.ListTestCaseEnvironments(r.Context(), user, productID, testCaseID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
@@ -4545,6 +4639,7 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 		Components:     components,
 		Capabilities:   capabilities,
 		PyramidLevels:  pyramidLevels,
+		Environments:   environments,
 		IsEdit:         true,
 		ReturnTo:       editReturnTarget(r),
 		Title:          tc.Title,
@@ -4554,6 +4649,7 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 		ComponentID:    tc.ComponentID,
 		CapabilityID:   tc.CapabilityID,
 		PyramidLevelID: tc.PyramidLevelID,
+		EnvironmentIDs: environmentIDs,
 	}).Render(r.Context(), w)
 }
 
@@ -4576,6 +4672,13 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// The environment picker submits repeated values, which needs the parsed form
+	// rather than FormValue.
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
 	title := r.FormValue("title")
 	description := r.FormValue("description")
 	executionMode := r.FormValue("execution_mode")
@@ -4583,20 +4686,13 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 	componentID := r.FormValue("component_id")
 	capabilityID := r.FormValue("capability_id")
 	pyramidLevelID := r.FormValue("pyramid_level_id")
+	environmentIDs := r.Form["environment_ids"]
 
-	_, err = c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
-		Title:          &title,
-		Description:    &description,
-		ExecutionMode:  &executionMode,
-		TestIdentifier: &testIdentifier,
-		ComponentID:    &componentID,
-		CapabilityID:   &capabilityID,
-		PyramidLevelID: &pyramidLevelID,
-	})
-	if err != nil {
+	rerender := func(message string) {
 		components, _ := c.component.ListComponents(r.Context(), user, productID)
 		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
 		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.TestCaseFormPage(productpage.TestCaseFormProps{
@@ -4611,9 +4707,10 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 			Components:     components,
 			Capabilities:   capabilities,
 			PyramidLevels:  pyramidLevels,
+			Environments:   environments,
 			IsEdit:         true,
 			ReturnTo:       r.FormValue("return"),
-			Error:          err.Error(),
+			Error:          message,
 			Title:          title,
 			Description:    description,
 			ExecutionMode:  executionMode,
@@ -4621,7 +4718,26 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 			ComponentID:    componentID,
 			CapabilityID:   capabilityID,
 			PyramidLevelID: pyramidLevelID,
+			EnvironmentIDs: environmentIDs,
 		}).Render(r.Context(), w)
+	}
+
+	_, err = c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		Title:          &title,
+		Description:    &description,
+		ExecutionMode:  &executionMode,
+		TestIdentifier: &testIdentifier,
+		ComponentID:    &componentID,
+		CapabilityID:   &capabilityID,
+		PyramidLevelID: &pyramidLevelID,
+	})
+	if err != nil {
+		rerender(err.Error())
+		return
+	}
+
+	if err := c.syncTestCaseEnvironments(r, user, productID, testCaseID, environmentIDs); err != nil {
+		rerender("saved the test case but failed to update its environments: " + err.Error())
 		return
 	}
 
@@ -4674,9 +4790,11 @@ func (c *PageProductController) TestCaseOverviewTab(w http.ResponseWriter, r *ht
 	componentName := c.resolveComponentName(r, user, productID, tc.ComponentID)
 	capabilityName := c.resolveCapabilityName(r, user, productID, tc.CapabilityID)
 	pyramidLevelName := c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID)
+	environmentNames := c.resolveTestCaseEnvironmentNames(r, user, productID, testCaseID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, capabilityName, pyramidLevelName).Render(r.Context(), w)
+	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, capabilityName,
+		pyramidLevelName, environmentNames).Render(r.Context(), w)
 }
 
 // TestCaseRequirementsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/requirements.
@@ -6250,19 +6368,21 @@ func (c *PageProductController) RequirementDefectCreateModal(w http.ResponseWrit
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectFormModal(productpage.DefectFormProps{
-		Meta:        templates.PageMeta{CSRFToken: csrfToken},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Statuses:    statuses,
-		Milestones:  milestones,
-		Sprints:     sprints,
-		LinkTo:      "requirement:" + requirementID,
-		Criticality: "medium",
-		StatusID:    defaultStatusID(statuses),
+		Meta:         templates.PageMeta{CSRFToken: csrfToken},
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Statuses:     statuses,
+		Milestones:   milestones,
+		Sprints:      sprints,
+		Environments: environments,
+		LinkTo:       "requirement:" + requirementID,
+		Criticality:  "medium",
+		StatusID:     defaultStatusID(statuses),
 	}).Render(r.Context(), w)
 }
 
@@ -6285,6 +6405,7 @@ func (c *PageProductController) RequirementDefectCreateAndLink(w http.ResponseWr
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
 	sprintID := r.FormValue("sprint_id")
+	environmentID := r.FormValue("environment_id")
 	estimation := r.FormValue("estimation")
 	priorityStr := r.FormValue("priority")
 	priority, _ := strconv.Atoi(priorityStr)
@@ -6293,38 +6414,42 @@ func (c *PageProductController) RequirementDefectCreateAndLink(w http.ResponseWr
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.DefectFormModal(productpage.DefectFormProps{
-			Meta:        templates.PageMeta{CSRFToken: csrfToken},
-			DisplayName: user.DisplayName,
-			IsAdmin:     user.IsAdmin,
-			Product:     p,
-			Statuses:    statuses,
-			Milestones:  milestones,
-			Sprints:     sprints,
-			LinkTo:      "requirement:" + requirementID,
-			Title:       title,
-			Description: description,
-			Criticality: criticality,
-			StatusID:    statusID,
-			MilestoneID: milestoneID,
-			SprintID:    sprintID,
-			Estimation:  estimation,
-			Priority:    priorityStr,
-			Error:       errMsg,
+			Meta:          templates.PageMeta{CSRFToken: csrfToken},
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Statuses:      statuses,
+			Milestones:    milestones,
+			Sprints:       sprints,
+			Environments:  environments,
+			LinkTo:        "requirement:" + requirementID,
+			Title:         title,
+			Description:   description,
+			Criticality:   criticality,
+			StatusID:      statusID,
+			MilestoneID:   milestoneID,
+			SprintID:      sprintID,
+			EnvironmentID: environmentID,
+			Estimation:    estimation,
+			Priority:      priorityStr,
+			Error:         errMsg,
 		}).Render(r.Context(), w)
 	}
 
 	d, err := c.backlog.CreateDefect(r.Context(), user, service.CreateDefectInput{
-		ProductID:   productID,
-		Title:       title,
-		Description: description,
-		Criticality: criticality,
-		StatusID:    statusID,
-		MilestoneID: milestoneID,
-		SprintID:    sprintID,
-		Estimation:  estimation,
-		Priority:    priority,
+		ProductID:     productID,
+		Title:         title,
+		Description:   description,
+		Criticality:   criticality,
+		StatusID:      statusID,
+		MilestoneID:   milestoneID,
+		SprintID:      sprintID,
+		EnvironmentID: environmentID,
+		Estimation:    estimation,
+		Priority:      priority,
 	})
 	if err != nil {
 		rerenderForm(err.Error())
@@ -6444,13 +6569,14 @@ func (c *PageProductController) Defects(w http.ResponseWriter, r *http.Request) 
 			Title:     p.Name + " - Defects",
 			CSRFToken: csrfToken,
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Defects:     defects,
-		Statuses:    c.buildStatusMap(r, user, productID, "defect"),
-		CanCreate:   c.canCreateDefects(user, role),
-		CanEdit:     c.canEditDefects(user, role),
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Defects:      defects,
+		Statuses:     c.buildStatusMap(r, user, productID, "defect"),
+		Environments: c.buildEnvironmentMap(r, user, productID),
+		CanCreate:    c.canCreateDefects(user, role),
+		CanEdit:      c.canEditDefects(user, role),
 	}).Render(r.Context(), w)
 }
 
@@ -6479,14 +6605,15 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 			Title:     p.Name + " - " + d.Title,
 			CSRFToken: csrfToken,
 		},
-		DisplayName:   user.DisplayName,
-		IsAdmin:       user.IsAdmin,
-		Product:       p,
-		Defect:        d,
-		StatusName:    c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
-		MilestoneName: c.resolveMilestoneName(r, user, productID, d.MilestoneID),
-		SprintName:    c.resolveSprintName(r, user, productID, d.SprintID),
-		CanEdit:       c.canEditDefects(user, role),
+		DisplayName:     user.DisplayName,
+		IsAdmin:         user.IsAdmin,
+		Product:         p,
+		Defect:          d,
+		StatusName:      c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
+		MilestoneName:   c.resolveMilestoneName(r, user, productID, d.MilestoneID),
+		SprintName:      c.resolveSprintName(r, user, productID, d.SprintID),
+		EnvironmentName: c.buildEnvironmentMap(r, user, productID)[d.EnvironmentID],
+		CanEdit:         c.canEditDefects(user, role),
 	}).Render(r.Context(), w)
 }
 
@@ -6505,6 +6632,7 @@ func (c *PageProductController) DefectCreateForm(w http.ResponseWriter, r *http.
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectFormPage(productpage.DefectFormProps{
@@ -6512,15 +6640,16 @@ func (c *PageProductController) DefectCreateForm(w http.ResponseWriter, r *http.
 			Title:     p.Name + " - New Defect",
 			CSRFToken: csrfToken,
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Statuses:    statuses,
-		Milestones:  milestones,
-		Sprints:     sprints,
-		Criticality: "medium",
-		StatusID:    defaultStatusID(statuses),
-		Priority:    "0",
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Statuses:     statuses,
+		Milestones:   milestones,
+		Sprints:      sprints,
+		Environments: environments,
+		Criticality:  "medium",
+		StatusID:     defaultStatusID(statuses),
+		Priority:     "0",
 	}).Render(r.Context(), w)
 }
 
@@ -6542,25 +6671,28 @@ func (c *PageProductController) DefectCreate(w http.ResponseWriter, r *http.Requ
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
 	sprintID := r.FormValue("sprint_id")
+	environmentID := r.FormValue("environment_id")
 	estimation := strings.TrimSpace(r.FormValue("estimation"))
 	priorityStr := r.FormValue("priority")
 	priority, _ := strconv.Atoi(priorityStr)
 
 	_, createErr := c.backlog.CreateDefect(r.Context(), user, service.CreateDefectInput{
-		ProductID:   productID,
-		Title:       title,
-		Description: description,
-		Criticality: criticality,
-		StatusID:    statusID,
-		MilestoneID: milestoneID,
-		SprintID:    sprintID,
-		Estimation:  estimation,
-		Priority:    priority,
+		ProductID:     productID,
+		Title:         title,
+		Description:   description,
+		Criticality:   criticality,
+		StatusID:      statusID,
+		MilestoneID:   milestoneID,
+		SprintID:      sprintID,
+		EnvironmentID: environmentID,
+		Estimation:    estimation,
+		Priority:      priority,
 	})
 	if createErr != nil {
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.DefectFormPage(productpage.DefectFormProps{
@@ -6568,21 +6700,23 @@ func (c *PageProductController) DefectCreate(w http.ResponseWriter, r *http.Requ
 				Title:     p.Name + " - New Defect",
 				CSRFToken: csrfToken,
 			},
-			DisplayName: user.DisplayName,
-			IsAdmin:     user.IsAdmin,
-			Product:     p,
-			Statuses:    statuses,
-			Milestones:  milestones,
-			Sprints:     sprints,
-			Error:       createErr.Error(),
-			Title:       title,
-			Description: description,
-			Criticality: criticality,
-			StatusID:    statusID,
-			MilestoneID: milestoneID,
-			SprintID:    sprintID,
-			Estimation:  estimation,
-			Priority:    priorityStr,
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Statuses:      statuses,
+			Milestones:    milestones,
+			Sprints:       sprints,
+			Environments:  environments,
+			Error:         createErr.Error(),
+			Title:         title,
+			Description:   description,
+			Criticality:   criticality,
+			StatusID:      statusID,
+			MilestoneID:   milestoneID,
+			SprintID:      sprintID,
+			EnvironmentID: environmentID,
+			Estimation:    estimation,
+			Priority:      priorityStr,
 		}).Render(r.Context(), w)
 		return
 	}
@@ -6612,6 +6746,7 @@ func (c *PageProductController) DefectEditForm(w http.ResponseWriter, r *http.Re
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectFormPage(productpage.DefectFormProps{
@@ -6619,23 +6754,25 @@ func (c *PageProductController) DefectEditForm(w http.ResponseWriter, r *http.Re
 			Title:     p.Name + " - Edit " + d.Title,
 			CSRFToken: csrfToken,
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Defect:      d,
-		Statuses:    statuses,
-		Milestones:  milestones,
-		Sprints:     sprints,
-		IsEdit:      true,
-		ReturnTo:    editReturnTarget(r),
-		Title:       d.Title,
-		Description: d.Description,
-		Criticality: d.Criticality,
-		StatusID:    d.StatusID,
-		MilestoneID: d.MilestoneID,
-		SprintID:    d.SprintID,
-		Estimation:  d.Estimation,
-		Priority:    fmt.Sprintf("%d", d.Priority),
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Defect:        d,
+		Statuses:      statuses,
+		Milestones:    milestones,
+		Sprints:       sprints,
+		Environments:  environments,
+		IsEdit:        true,
+		ReturnTo:      editReturnTarget(r),
+		Title:         d.Title,
+		Description:   d.Description,
+		Criticality:   d.Criticality,
+		StatusID:      d.StatusID,
+		MilestoneID:   d.MilestoneID,
+		SprintID:      d.SprintID,
+		EnvironmentID: d.EnvironmentID,
+		Estimation:    d.Estimation,
+		Priority:      fmt.Sprintf("%d", d.Priority),
 	}).Render(r.Context(), w)
 }
 
@@ -6664,24 +6801,27 @@ func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Requ
 	statusID := r.FormValue("status_id")
 	milestoneID := r.FormValue("milestone_id")
 	sprintID := r.FormValue("sprint_id")
+	environmentID := r.FormValue("environment_id")
 	estimation := strings.TrimSpace(r.FormValue("estimation"))
 	priorityStr := r.FormValue("priority")
 	priority, _ := strconv.Atoi(priorityStr)
 
 	_, updateErr := c.backlog.UpdateDefect(r.Context(), user, productID, defectID, service.UpdateDefectInput{
-		Title:       &title,
-		Description: &description,
-		Criticality: &criticality,
-		StatusID:    &statusID,
-		MilestoneID: &milestoneID,
-		SprintID:    &sprintID,
-		Estimation:  &estimation,
-		Priority:    &priority,
+		Title:         &title,
+		Description:   &description,
+		Criticality:   &criticality,
+		StatusID:      &statusID,
+		MilestoneID:   &milestoneID,
+		SprintID:      &sprintID,
+		EnvironmentID: &environmentID,
+		Estimation:    &estimation,
+		Priority:      &priority,
 	})
 	if updateErr != nil {
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.DefectFormPage(productpage.DefectFormProps{
@@ -6689,24 +6829,26 @@ func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Requ
 				Title:     p.Name + " - Edit " + d.Title,
 				CSRFToken: csrfToken,
 			},
-			DisplayName: user.DisplayName,
-			IsAdmin:     user.IsAdmin,
-			Product:     p,
-			Defect:      d,
-			Statuses:    statuses,
-			Milestones:  milestones,
-			Sprints:     sprints,
-			IsEdit:      true,
-			ReturnTo:    r.FormValue("return"),
-			Error:       updateErr.Error(),
-			Title:       title,
-			Description: description,
-			Criticality: criticality,
-			StatusID:    statusID,
-			MilestoneID: milestoneID,
-			SprintID:    sprintID,
-			Estimation:  estimation,
-			Priority:    priorityStr,
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Defect:        d,
+			Statuses:      statuses,
+			Milestones:    milestones,
+			Sprints:       sprints,
+			Environments:  environments,
+			IsEdit:        true,
+			ReturnTo:      r.FormValue("return"),
+			Error:         updateErr.Error(),
+			Title:         title,
+			Description:   description,
+			Criticality:   criticality,
+			StatusID:      statusID,
+			MilestoneID:   milestoneID,
+			SprintID:      sprintID,
+			EnvironmentID: environmentID,
+			Estimation:    estimation,
+			Priority:      priorityStr,
 		}).Render(r.Context(), w)
 		return
 	}
@@ -6771,6 +6913,7 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 		c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
 		c.resolveMilestoneName(r, user, productID, d.MilestoneID),
 		c.resolveSprintName(r, user, productID, d.SprintID),
+		c.buildEnvironmentMap(r, user, productID)[d.EnvironmentID],
 	).Render(r.Context(), w)
 }
 

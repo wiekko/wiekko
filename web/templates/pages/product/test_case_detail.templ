@@ -20,6 +20,7 @@ type TestCaseDetailProps struct {
 	ComponentName     string
 	CapabilityName    string
 	PyramidLevelName  string
+	EnvironmentNames  []string
 	CanEdit           bool // developer, owner, or admin
 }
 
@@ -53,7 +54,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 			@ui.TabGroup(testCaseDetailTabs(props.Product.ID, props.TestCase.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName)
+				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName, props.EnvironmentNames)
 			}
 			@ui.TabPanelHidden("requirements") {
 				@ui.LoadingSpinner("md")
@@ -74,7 +75,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 	}
 }
 
-templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string) {
+templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string, environmentNames []string) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -91,12 +92,32 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 					@patterns.DetailField("Capability", "")
 				}
 				@patterns.DetailField("Pyramid Level", pyramidLevelName)
+				@testCaseEnvironmentsField(environmentNames)
 				@patterns.DetailField("Created", formatDate(tc.CreatedAt))
 				@patterns.DetailField("Last Updated", formatDate(tc.UpdatedAt))
 			}
 			@patterns.DetailDescription(tc.Description)
 		}
 	}
+}
+
+// testCaseEnvironmentsField lists the runtime environments the test case runs
+// in. Each one becomes a column of the campaign matrix (FR-019).
+templ testCaseEnvironmentsField(names []string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Environments</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			if len(names) == 0 {
+				<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+			} else {
+				<div class="flex flex-wrap gap-1">
+					for _, name := range names {
+						@ui.Badge(name, "gray")
+					}
+				</div>
+			}
+		</dd>
+	</div>
 }
 
 templ testCaseLinkedField(label, name, href string) {

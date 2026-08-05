@@ -143,26 +143,42 @@ CREATE INDEX IF NOT EXISTS idx_requirements_milestone_id ON requirements(milesto
 CREATE INDEX IF NOT EXISTS idx_requirements_sprint_id ON requirements(sprint_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_requirements_product_seq ON requirements(product_id, sequence_number);
 
+-- Runtime environments: freely definable labels (FR-019, FR-020).
+-- Defined before defects, which reference an environment.
+CREATE TABLE IF NOT EXISTS runtime_environments (
+    id         TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(product_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_runtime_environments_product_id ON runtime_environments(product_id);
+
 -- Defects: bugs and issues (FR-022..FR-025)
+-- environment_id records where the defect was observed ("login fails in Firefox").
+-- Unlike campaign_results it clears rather than cascades: a defect outlives the
+-- environment label it was found in.
 CREATE TABLE IF NOT EXISTS defects (
-    id           TEXT PRIMARY KEY,
-    product_id   TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    title        TEXT NOT NULL,
-    description  TEXT NOT NULL DEFAULT '',
-    criticality  TEXT NOT NULL DEFAULT 'medium',
-    status_id    TEXT REFERENCES statuses(id) ON DELETE SET NULL,
-    milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
-    sprint_id    TEXT REFERENCES sprints(id) ON DELETE SET NULL,
-    estimation   TEXT,
-    priority     INTEGER NOT NULL DEFAULT 0,
-    is_active    INTEGER NOT NULL DEFAULT 0,
-    created_at   TEXT NOT NULL,
-    updated_at   TEXT NOT NULL
+    id             TEXT PRIMARY KEY,
+    product_id     TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    title          TEXT NOT NULL,
+    description    TEXT NOT NULL DEFAULT '',
+    criticality    TEXT NOT NULL DEFAULT 'medium',
+    status_id      TEXT REFERENCES statuses(id) ON DELETE SET NULL,
+    milestone_id   TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+    sprint_id      TEXT REFERENCES sprints(id) ON DELETE SET NULL,
+    environment_id TEXT REFERENCES runtime_environments(id) ON DELETE SET NULL,
+    estimation     TEXT,
+    priority       INTEGER NOT NULL DEFAULT 0,
+    is_active      INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_defects_product_id ON defects(product_id);
 CREATE INDEX IF NOT EXISTS idx_defects_status_id ON defects(status_id);
 CREATE INDEX IF NOT EXISTS idx_defects_milestone_id ON defects(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_defects_sprint_id ON defects(sprint_id);
+CREATE INDEX IF NOT EXISTS idx_defects_environment_id ON defects(environment_id);
 
 -- Constraints: non-functional requirements (architecture, security, UX rules)
 CREATE TABLE IF NOT EXISTS constraints (
@@ -211,16 +227,6 @@ CREATE TABLE IF NOT EXISTS test_cases (
 );
 CREATE INDEX IF NOT EXISTS idx_test_cases_product_id ON test_cases(product_id);
 CREATE INDEX IF NOT EXISTS idx_test_cases_pyramid_level_id ON test_cases(pyramid_level_id);
-
--- Runtime environments: freely definable labels (FR-019, FR-020)
-CREATE TABLE IF NOT EXISTS runtime_environments (
-    id         TEXT PRIMARY KEY,
-    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    UNIQUE(product_id, name)
-);
-CREATE INDEX IF NOT EXISTS idx_runtime_environments_product_id ON runtime_environments(product_id);
 
 -- Test case environment matrix (FR-019)
 CREATE TABLE IF NOT EXISTS test_case_environments (
@@ -408,11 +414,11 @@ DROP TABLE IF EXISTS campaign_result_events;
 DROP TABLE IF EXISTS campaign_results;
 DROP TABLE IF EXISTS testing_campaigns;
 DROP TABLE IF EXISTS test_case_environments;
-DROP TABLE IF EXISTS runtime_environments;
 DROP TABLE IF EXISTS test_cases;
 DROP TABLE IF EXISTS pyramid_levels;
 DROP TABLE IF EXISTS constraints;
 DROP TABLE IF EXISTS defects;
+DROP TABLE IF EXISTS runtime_environments;
 DROP TABLE IF EXISTS requirements;
 DROP TABLE IF EXISTS sprints;
 DROP TABLE IF EXISTS categories;

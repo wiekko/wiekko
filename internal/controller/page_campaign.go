@@ -831,22 +831,27 @@ func (c *PageProductController) CampaignResultDefectModal(w http.ResponseWriter,
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 	milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectFormModal(productpage.DefectFormProps{
 		Meta: templates.PageMeta{
 			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Statuses:    statuses,
-		Milestones:  milestones,
-		Sprints:     sprints,
-		LinkTo:      fmt.Sprintf("campaign-result:%s:%s:%s", campaignID, result.ID, matrixGrouping(r)),
-		Title:       fmt.Sprintf("%s failed", tc.Title),
-		Criticality: model.DefectCriticalityMedium,
-		StatusID:    defaultStatusID(statuses),
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		Product:      p,
+		Statuses:     statuses,
+		Milestones:   milestones,
+		Sprints:      sprints,
+		Environments: environments,
+		LinkTo:       fmt.Sprintf("campaign-result:%s:%s:%s", campaignID, result.ID, matrixGrouping(r)),
+		Title:        fmt.Sprintf("%s failed", tc.Title),
+		Criticality:  model.DefectCriticalityMedium,
+		StatusID:     defaultStatusID(statuses),
+		// The cell already says which environment broke, so carry it over rather
+		// than making the tester pick it again.
+		EnvironmentID: result.EnvironmentID,
 	}).Render(r.Context(), w)
 }
 
@@ -881,43 +886,47 @@ func (c *PageProductController) CampaignResultFailWithDefect(w http.ResponseWrit
 
 	priority, _ := strconv.Atoi(r.FormValue("priority"))
 	input := service.CreateDefectInput{
-		ProductID:   productID,
-		Title:       r.FormValue("title"),
-		Description: r.FormValue("description"),
-		Criticality: r.FormValue("criticality"),
-		StatusID:    r.FormValue("status_id"),
-		MilestoneID: r.FormValue("milestone_id"),
-		SprintID:    r.FormValue("sprint_id"),
-		Estimation:  r.FormValue("estimation"),
-		Priority:    priority,
+		ProductID:     productID,
+		Title:         r.FormValue("title"),
+		Description:   r.FormValue("description"),
+		Criticality:   r.FormValue("criticality"),
+		StatusID:      r.FormValue("status_id"),
+		MilestoneID:   r.FormValue("milestone_id"),
+		SprintID:      r.FormValue("sprint_id"),
+		EnvironmentID: r.FormValue("environment_id"),
+		Estimation:    r.FormValue("estimation"),
+		Priority:      priority,
 	}
 
 	rerender := func(message string) {
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 		milestones, _ := c.milestone.ListMilestones(r.Context(), user, productID)
 		sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+		environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.DefectFormModal(productpage.DefectFormProps{
 			Meta: templates.PageMeta{
 				CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
 			},
-			DisplayName: user.DisplayName,
-			IsAdmin:     user.IsAdmin,
-			Product:     p,
-			Statuses:    statuses,
-			Milestones:  milestones,
-			Sprints:     sprints,
-			Error:       message,
-			LinkTo:      fmt.Sprintf("campaign-result:%s:%s:%s", campaignID, result.ID, matrixGrouping(r)),
-			Title:       input.Title,
-			Description: input.Description,
-			Criticality: input.Criticality,
-			StatusID:    input.StatusID,
-			MilestoneID: input.MilestoneID,
-			SprintID:    input.SprintID,
-			Estimation:  input.Estimation,
-			Priority:    r.FormValue("priority"),
+			DisplayName:   user.DisplayName,
+			IsAdmin:       user.IsAdmin,
+			Product:       p,
+			Statuses:      statuses,
+			Milestones:    milestones,
+			Sprints:       sprints,
+			Environments:  environments,
+			Error:         message,
+			LinkTo:        fmt.Sprintf("campaign-result:%s:%s:%s", campaignID, result.ID, matrixGrouping(r)),
+			Title:         input.Title,
+			Description:   input.Description,
+			Criticality:   input.Criticality,
+			StatusID:      input.StatusID,
+			MilestoneID:   input.MilestoneID,
+			SprintID:      input.SprintID,
+			EnvironmentID: input.EnvironmentID,
+			Estimation:    input.Estimation,
+			Priority:      r.FormValue("priority"),
 		}).Render(r.Context(), w)
 	}
 

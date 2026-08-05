@@ -41,11 +41,12 @@ type defectStore struct {
 func (s *defectStore) Create(ctx context.Context, d *model.Defect) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO defects (id, product_id, title, description, criticality,
-		 status_id, milestone_id, sprint_id, estimation, priority, is_active, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 status_id, milestone_id, sprint_id, environment_id, estimation, priority, is_active,
+		 created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.ID, d.ProductID, d.Title, d.Description, d.Criticality,
 		nullableText(d.StatusID), nullableText(d.MilestoneID), nullableText(d.SprintID),
-		nullableText(d.Estimation), d.Priority, boolToInt(d.IsActive),
+		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, boolToInt(d.IsActive),
 		d.CreatedAt, d.UpdatedAt,
 	)
 	return err
@@ -63,12 +64,12 @@ func (s *defectStore) GetByID(ctx context.Context, id string) (*model.Defect, er
 func (s *defectStore) Update(ctx context.Context, d *model.Defect) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE defects SET title = ?, description = ?, criticality = ?,
-		 status_id = ?, milestone_id = ?, sprint_id = ?,
+		 status_id = ?, milestone_id = ?, sprint_id = ?, environment_id = ?,
 		 estimation = ?, priority = ?, is_active = ?, updated_at = ?
 		 WHERE id = ?`,
 		d.Title, d.Description, d.Criticality,
 		nullableText(d.StatusID), nullableText(d.MilestoneID), nullableText(d.SprintID),
-		nullableText(d.Estimation), d.Priority, boolToInt(d.IsActive),
+		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, boolToInt(d.IsActive),
 		d.UpdatedAt, d.ID,
 	)
 	return err
@@ -222,14 +223,15 @@ func (s *defectStore) listDefects(ctx context.Context, query string, args ...any
 }
 
 const defectColumns = `id, product_id, title, description, criticality,
-	status_id, milestone_id, sprint_id, estimation, priority, is_active, created_at, updated_at`
+	status_id, milestone_id, sprint_id, environment_id, estimation, priority, is_active,
+	created_at, updated_at`
 
 func scanDefect(sc scanner) (*model.Defect, error) {
 	var d model.Defect
-	var statusID, milestoneID, sprintID, estimation sql.NullString
+	var statusID, milestoneID, sprintID, environmentID, estimation sql.NullString
 	var isActive int
 	err := sc.Scan(&d.ID, &d.ProductID, &d.Title, &d.Description, &d.Criticality,
-		&statusID, &milestoneID, &sprintID, &estimation, &d.Priority,
+		&statusID, &milestoneID, &sprintID, &environmentID, &estimation, &d.Priority,
 		&isActive, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -237,6 +239,7 @@ func scanDefect(sc scanner) (*model.Defect, error) {
 	d.StatusID = statusID.String
 	d.MilestoneID = milestoneID.String
 	d.SprintID = sprintID.String
+	d.EnvironmentID = environmentID.String
 	d.Estimation = estimation.String
 	d.IsActive = isActive != 0
 	return &d, nil

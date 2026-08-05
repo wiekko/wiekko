@@ -272,29 +272,31 @@ func (c *BacklogController) CreateDefect(w http.ResponseWriter, r *http.Request)
 	productID := r.PathValue("productId")
 
 	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Criticality string `json:"criticality"`
-		StatusID    string `json:"status_id"`
-		MilestoneID string `json:"milestone_id"`
-		SprintID    string `json:"sprint_id"`
-		Estimation  string `json:"estimation"`
-		Priority    int    `json:"priority"`
+		Title         string `json:"title"`
+		Description   string `json:"description"`
+		Criticality   string `json:"criticality"`
+		StatusID      string `json:"status_id"`
+		MilestoneID   string `json:"milestone_id"`
+		SprintID      string `json:"sprint_id"`
+		EnvironmentID string `json:"environment_id"`
+		Estimation    string `json:"estimation"`
+		Priority      int    `json:"priority"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	item, err := c.backlog.CreateDefect(r.Context(), user, service.CreateDefectInput{
-		ProductID:   productID,
-		Title:       req.Title,
-		Description: req.Description,
-		Criticality: req.Criticality,
-		StatusID:    req.StatusID,
-		MilestoneID: req.MilestoneID,
-		SprintID:    req.SprintID,
-		Estimation:  req.Estimation,
-		Priority:    req.Priority,
+		ProductID:     productID,
+		Title:         req.Title,
+		Description:   req.Description,
+		Criticality:   req.Criticality,
+		StatusID:      req.StatusID,
+		MilestoneID:   req.MilestoneID,
+		SprintID:      req.SprintID,
+		EnvironmentID: req.EnvironmentID,
+		Estimation:    req.Estimation,
+		Priority:      req.Priority,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -326,30 +328,32 @@ func (c *BacklogController) UpdateDefect(w http.ResponseWriter, r *http.Request)
 	id := r.PathValue("id")
 
 	var req struct {
-		Title       *string `json:"title"`
-		Description *string `json:"description"`
-		Criticality *string `json:"criticality"`
-		StatusID    *string `json:"status_id"`
-		MilestoneID *string `json:"milestone_id"`
-		SprintID    *string `json:"sprint_id"`
-		Estimation  *string `json:"estimation"`
-		Priority    *int    `json:"priority"`
-		IsActive    *bool   `json:"is_active"`
+		Title         *string `json:"title"`
+		Description   *string `json:"description"`
+		Criticality   *string `json:"criticality"`
+		StatusID      *string `json:"status_id"`
+		MilestoneID   *string `json:"milestone_id"`
+		SprintID      *string `json:"sprint_id"`
+		EnvironmentID *string `json:"environment_id"`
+		Estimation    *string `json:"estimation"`
+		Priority      *int    `json:"priority"`
+		IsActive      *bool   `json:"is_active"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	item, err := c.backlog.UpdateDefect(r.Context(), user, productID, id, service.UpdateDefectInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Criticality: req.Criticality,
-		StatusID:    req.StatusID,
-		MilestoneID: req.MilestoneID,
-		SprintID:    req.SprintID,
-		Estimation:  req.Estimation,
-		Priority:    req.Priority,
-		IsActive:    req.IsActive,
+		Title:         req.Title,
+		Description:   req.Description,
+		Criticality:   req.Criticality,
+		StatusID:      req.StatusID,
+		MilestoneID:   req.MilestoneID,
+		SprintID:      req.SprintID,
+		EnvironmentID: req.EnvironmentID,
+		Estimation:    req.Estimation,
+		Priority:      req.Priority,
+		IsActive:      req.IsActive,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -507,19 +511,20 @@ func requirementToJSON(r *model.Requirement) map[string]any {
 
 func defectToJSON(d *model.Defect) map[string]any {
 	return map[string]any{
-		"id":           d.ID,
-		"product_id":   d.ProductID,
-		"title":        d.Title,
-		"description":  d.Description,
-		"criticality":  d.Criticality,
-		"status_id":    d.StatusID,
-		"milestone_id": d.MilestoneID,
-		"sprint_id":    d.SprintID,
-		"estimation":   d.Estimation,
-		"priority":     d.Priority,
-		"is_active":    d.IsActive,
-		"created_at":   d.CreatedAt,
-		"updated_at":   d.UpdatedAt,
+		"id":             d.ID,
+		"product_id":     d.ProductID,
+		"title":          d.Title,
+		"description":    d.Description,
+		"criticality":    d.Criticality,
+		"status_id":      d.StatusID,
+		"milestone_id":   d.MilestoneID,
+		"sprint_id":      d.SprintID,
+		"environment_id": d.EnvironmentID,
+		"estimation":     d.Estimation,
+		"priority":       d.Priority,
+		"is_active":      d.IsActive,
+		"created_at":     d.CreatedAt,
+		"updated_at":     d.UpdatedAt,
 	}
 }
 

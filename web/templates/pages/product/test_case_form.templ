@@ -1,6 +1,7 @@
 package product
 
 import (
+	"slices"
 	"strings"
 
 	"nexmap.net/internal/model"
@@ -20,8 +21,11 @@ type TestCaseFormProps struct {
 	Components    []*model.Component
 	Capabilities  []*model.Capability
 	PyramidLevels []*model.PyramidLevel
-	IsEdit        bool
-	Error         string
+	// Environments is the product's runtime environment list. Empty hides the
+	// picker entirely, which is also how the create-and-link modals render.
+	Environments []*model.RuntimeEnvironment
+	IsEdit       bool
+	Error        string
 	ReturnTo      string // "list" to return to list after save; empty = detail
 	// LinkTo, when non-empty, switches the form into modal/htmx mode.
 	// Format: "<entity>:<id>", e.g. "requirement:abc-123".
@@ -34,6 +38,7 @@ type TestCaseFormProps struct {
 	ComponentID    string
 	CapabilityID   string
 	PyramidLevelID string
+	EnvironmentIDs []string
 }
 
 templ TestCaseFormPage(props TestCaseFormProps) {
@@ -147,6 +152,9 @@ templ TestCaseFormBody(props TestCaseFormProps) {
 					Options:  pyramidLevelSelectOptions(props.PyramidLevels),
 					HelpText: "Optional. Categorize by test pyramid level.",
 				})
+				if len(props.Environments) > 0 {
+					@testCaseEnvironmentPicker(props)
+				}
 				if props.LinkTo != "" {
 					@testCaseModalActions(testCaseSubmitLabel(props.IsEdit))
 				} else {
@@ -155,6 +163,31 @@ templ TestCaseFormBody(props TestCaseFormProps) {
 			</form>
 		}
 	}
+}
+
+// testCaseEnvironmentPicker selects the runtime environments a test case runs
+// in. Each one becomes a column of the campaign matrix (FR-019).
+templ testCaseEnvironmentPicker(props TestCaseFormProps) {
+	<div>
+		<span class="block text-sm font-medium text-gray-700 dark:text-gray-300">Runtime Environments</span>
+		<div class="mt-1 flex flex-wrap gap-x-6 gap-y-2 rounded-md px-3 py-2 ring-1 ring-gray-300 ring-inset dark:ring-gray-600">
+			for _, env := range props.Environments {
+				<label class="flex cursor-pointer items-center gap-2">
+					<input
+						type="checkbox"
+						name="environment_ids"
+						value={ env.ID }
+						checked?={ testCaseEnvSelected(props, env.ID) }
+						class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 dark:border-gray-600 dark:bg-gray-800"
+					/>
+					<span class="text-sm text-gray-700 dark:text-gray-300">{ env.Name }</span>
+				</label>
+			}
+		</div>
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+			Optional. The test case is executed once per selected environment, each of which becomes a column in the campaign matrix.
+		</p>
+	</div>
 }
 
 templ testCaseModalActions(submitLabel string) {
@@ -203,6 +236,10 @@ func testCaseFormAction(props TestCaseFormProps) string {
 		return "/products/" + props.Product.ID + "/defects/" + defectID + "/test-cases"
 	}
 	return "/products/" + props.Product.ID + "/test-cases"
+}
+
+func testCaseEnvSelected(props TestCaseFormProps, envID string) bool {
+	return slices.Contains(props.EnvironmentIDs, envID)
 }
 
 func testCaseSubmitLabel(isEdit bool) string {

@@ -396,28 +396,30 @@ func (s *BacklogService) ListRequirementAssignees(ctx context.Context, user *mod
 
 // CreateDefectInput contains the fields required to create a defect.
 type CreateDefectInput struct {
-	ProductID   string
-	Title       string
-	Description string
-	Criticality string
-	StatusID    string
-	MilestoneID string
-	SprintID    string
-	Estimation  string
-	Priority    int
+	ProductID     string
+	Title         string
+	Description   string
+	Criticality   string
+	StatusID      string
+	MilestoneID   string
+	SprintID      string
+	EnvironmentID string
+	Estimation    string
+	Priority      int
 }
 
 // UpdateDefectInput contains the fields that can be updated on a defect.
 type UpdateDefectInput struct {
-	Title       *string
-	Description *string
-	Criticality *string
-	StatusID    *string
-	MilestoneID *string
-	SprintID    *string
-	Estimation  *string
-	Priority    *int
-	IsActive    *bool
+	Title         *string
+	Description   *string
+	Criticality   *string
+	StatusID      *string
+	MilestoneID   *string
+	SprintID      *string
+	EnvironmentID *string
+	Estimation    *string
+	Priority      *int
+	IsActive      *bool
 }
 
 // CreateDefect creates a new defect. Requires tester role.
@@ -435,18 +437,19 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	d := &model.Defect{
-		ID:          uuid.New().String(),
-		ProductID:   input.ProductID,
-		Title:       input.Title,
-		Description: input.Description,
-		Criticality: input.Criticality,
-		StatusID:    input.StatusID,
-		MilestoneID: input.MilestoneID,
-		SprintID:    input.SprintID,
-		Estimation:  input.Estimation,
-		Priority:    input.Priority,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:            uuid.New().String(),
+		ProductID:     input.ProductID,
+		Title:         input.Title,
+		Description:   input.Description,
+		Criticality:   input.Criticality,
+		StatusID:      input.StatusID,
+		MilestoneID:   input.MilestoneID,
+		SprintID:      input.SprintID,
+		EnvironmentID: input.EnvironmentID,
+		Estimation:    input.Estimation,
+		Priority:      input.Priority,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := s.defects.Create(ctx, d); err != nil {
 		return nil, fmt.Errorf("create defect: %w", err)
@@ -494,7 +497,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 
 	// Fields that require owner role.
 	if input.Title != nil || input.Description != nil || input.Criticality != nil ||
-		input.MilestoneID != nil || input.SprintID != nil ||
+		input.MilestoneID != nil || input.SprintID != nil || input.EnvironmentID != nil ||
 		input.Estimation != nil || input.Priority != nil {
 		if isDeveloper {
 			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
@@ -513,6 +516,9 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 		}
 		if input.SprintID != nil {
 			d.SprintID = *input.SprintID
+		}
+		if input.EnvironmentID != nil {
+			d.EnvironmentID = *input.EnvironmentID
 		}
 		if input.Estimation != nil {
 			d.Estimation = *input.Estimation

@@ -20,8 +20,11 @@ type DefectFormProps struct {
 	Statuses    []*model.Status
 	Milestones  []*model.Milestone
 	Sprints     []*model.Sprint
-	IsEdit      bool
-	Error       string
+	// Environments is the product's runtime environment list. Empty hides the
+	// picker, so products that never defined one see no extra field.
+	Environments []*model.RuntimeEnvironment
+	IsEdit       bool
+	Error        string
 	ReturnTo    string // "list" to return to list after save; empty = detail
 	// LinkTo, when non-empty, switches the form into modal/htmx mode and
 	// makes the POST handler create-and-link via DefectLink.
@@ -31,11 +34,12 @@ type DefectFormProps struct {
 	Title       string
 	Description string
 	Criticality string
-	StatusID    string
-	MilestoneID string
-	SprintID    string
-	Estimation  string
-	Priority    string
+	StatusID      string
+	MilestoneID   string
+	SprintID      string
+	EnvironmentID string
+	Estimation    string
+	Priority      string
 }
 
 templ DefectFormPage(props DefectFormProps) {
@@ -142,6 +146,16 @@ templ DefectFormBody(props DefectFormProps) {
 						HelpText: "Optional. Assign to a sprint.",
 					})
 				}
+				if len(props.Environments) > 0 {
+					@ui.Select(ui.SelectProps{
+						ID:       "environment_id",
+						Name:     "environment_id",
+						Label:    "Environment",
+						Value:    props.EnvironmentID,
+						Options:  environmentSelectOptions(props.Environments),
+						HelpText: "Optional. The runtime environment the defect was observed in.",
+					})
+				}
 				@EstimationInput(EstimationInputProps{
 					EstimationMode: props.Product.EstimationMode,
 					Value:          props.Estimation,
@@ -232,6 +246,17 @@ func defectModalTitle(props DefectFormProps) string {
 		return "Edit Defect"
 	}
 	return "Report Defect"
+}
+
+// environmentSelectOptions builds select options from runtime environments with
+// an empty "None" option for defects that are not environment specific.
+func environmentSelectOptions(envs []*model.RuntimeEnvironment) []templates.SelectOption {
+	opts := make([]templates.SelectOption, 0, len(envs)+1)
+	opts = append(opts, templates.SelectOption{Value: "", Label: "None"})
+	for _, env := range envs {
+		opts = append(opts, templates.SelectOption{Value: env.ID, Label: env.Name})
+	}
+	return opts
 }
 
 func criticalitySelectOptions(current string) []templates.SelectOption {

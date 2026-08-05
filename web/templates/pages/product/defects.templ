@@ -18,8 +18,11 @@ type DefectsProps struct {
 	Product     *model.Product
 	Defects     []*model.Defect
 	Statuses    map[string]string // status ID → name
-	CanCreate   bool              // tester+ can create
-	CanEdit     bool              // owner or admin
+	// Environments maps environment ID → name. Empty for products that never
+	// defined one, which also hides the column.
+	Environments map[string]string
+	CanCreate    bool // tester+ can create
+	CanEdit      bool // owner or admin
 }
 
 templ DefectsPage(props DefectsProps) {
@@ -74,6 +77,11 @@ templ DefectsPage(props DefectsProps) {
 							@ui.TableHeader() {
 								Status
 							}
+							if len(props.Environments) > 0 {
+								@ui.TableHeader() {
+									Environment
+								}
+							}
 							@ui.TableHeader() {
 								Priority
 							}
@@ -109,6 +117,15 @@ templ DefectsPage(props DefectsProps) {
 											}
 										} else {
 											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+									if len(props.Environments) > 0 {
+										@ui.TableCellMuted() {
+											if name, ok := props.Environments[d.EnvironmentID]; ok && name != "" {
+												{ name }
+											} else {
+												<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+											}
 										}
 									}
 									@ui.TableCellMuted() {
