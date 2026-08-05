@@ -17,6 +17,7 @@ import (
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/crypto"
 	"nexmap.net/internal/database"
+	"nexmap.net/internal/devseed"
 	"nexmap.net/internal/logging"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/router"
@@ -94,9 +95,16 @@ func main() {
 	svc := service.New(st, provider, cfg, blobs)
 
 	// Bootstrap admin account if no users exist.
-	if err := bootstrapAdmin(st, provider, cfg.InitialAdminUser, cfg.InitialAdminPass); err != nil {
+	admin, err := bootstrapAdmin(st, provider, cfg.InitialAdminUser, cfg.InitialAdminPass)
+	if err != nil {
 		slog.Error("failed to bootstrap admin", "err", err)
 		os.Exit(1)
+	}
+
+	// Populate demo data, but only in dev mode and only into a database that
+	// was just created — a non-nil admin here means there were no users before.
+	if cfg.DevMode && admin != nil {
+		seedDevData(svc, st, provider, admin)
 	}
 
 	// Set up signal-based context for graceful shutdown.
@@ -116,16 +124,19 @@ func main() {
 	slog.Info("server stopped")
 }
 
-func bootstrapAdmin(st *store.Store, provider *builtin.Provider, user string, password string) error {
+// bootstrapAdmin creates the initial admin account when the database holds no
+// users. It returns the created admin, or nil when users already existed — the
+// caller uses that as its "this database is brand new" signal.
+func bootstrapAdmin(st *store.Store, provider *builtin.Provider, user string, password string) (*model.User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	count, err := st.User.Count(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if count > 0 {
-		return nil
+		return nil, nil
 	}
 
 	logUser := false
@@ -139,14 +150,14 @@ func bootstrapAdmin(st *store.Store, provider *builtin.Provider, user string, pa
 	if password == "" {
 		password, err = generateBootstrapPassword()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		logPassword = true
 	}
 
 	hash, err := provider.HashPassword(password)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -162,7 +173,7 @@ func bootstrapAdmin(st *store.Store, provider *builtin.Provider, user string, pa
 		UpdatedAt:    now,
 	}
 	if err := st.User.Create(ctx, admin); err != nil {
-		return err
+		return nil, err
 	}
 
 	if !logUser {
@@ -172,7 +183,27 @@ func bootstrapAdmin(st *store.Store, provider *builtin.Provider, user string, pa
 		password = "as provided by ENV"
 	}
 	slog.Info("default admin account created", "username", user, "password", password)
-	return nil
+	return admin, nil
+}
+
+// seedDevData populates a fresh dev-mode database with demo products. A failure
+// here is logged rather than fatal: a broken fixture must not make the app
+// unbootable, and the log points at the step that failed. The result is a
+// partially seeded database, which deleting the DB file resets.
+func seedDevData(svc *service.Services, st *store.Store, provider *builtin.Provider, admin *model.User) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	slog.Warn("dev mode: seeding demo data into the new database",
+		"products", "Aviary, Finch Tracker",
+		"demo_users", "ada, bo, cy",
+		"demo_password", devseed.DemoPassword)
+
+	if err := devseed.Seed(ctx, svc, st, provider, admin); err != nil {
+		slog.Error("dev seed failed; database may be partially seeded", "err", err)
+		return
+	}
+	slog.Info("dev demo data seeded")
 }
 
 func generateBootstrapPassword() (string, error) {
