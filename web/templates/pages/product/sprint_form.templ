@@ -61,20 +61,22 @@ templ SprintFormPage(props SprintFormProps) {
 							Placeholder: "e.g. Sprint 14",
 							Required:    true,
 						})
-						@ui.DateInput(ui.InputProps{
-							ID:       "start_date",
-							Name:     "start_date",
-							Label:    "Start Date",
-							Value:    props.StartDate,
-							Required: true,
-						})
-						@ui.DateInput(ui.InputProps{
-							ID:       "end_date",
-							Name:     "end_date",
-							Label:    "End Date",
-							Value:    props.EndDate,
-							Required: true,
-						})
+						<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+							@ui.DateInput(ui.InputProps{
+								ID:       "start_date",
+								Name:     "start_date",
+								Label:    "Start Date",
+								Value:    props.StartDate,
+								Required: true,
+							})
+							@ui.DateInput(ui.InputProps{
+								ID:       "end_date",
+								Name:     "end_date",
+								Label:    "End Date",
+								Value:    props.EndDate,
+								Required: true,
+							})
+						</div>
 						@ui.Select(ui.SelectProps{
 							ID:       "milestone_id",
 							Name:     "milestone_id",

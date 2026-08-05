@@ -51,3 +51,29 @@
 .dark .scrollbar-thin {
   scrollbar-color: rgb(71 85 105 / 0.5) transparent;
 }
+
+/* Tell the browser which theme is active so it renders native widgets
+   (date picker popup, calendar glyph, checkboxes, scrollbars) to match. */
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Make the native calendar button a discoverable, comfortably sized target. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 0.25rem;
+  margin-right: -0.25rem;
+  border-radius: 0.25rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background-color: rgb(0 0 0 / 0.06);
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background-color: rgb(255 255 255 / 0.1);
+}
