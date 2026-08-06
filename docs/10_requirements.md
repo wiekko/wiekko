@@ -122,6 +122,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **UC-104**: All table views shall support dynamic filtering and sorting by any column
 * **UC-104a**: Table filtering shall combine a single search box matching across the text columns with per-column facet filters for the enumerable ones. Columns holding numbers or dates shall be sortable but not searchable, since a substring match on them does not mean what the user sees
 * **UC-104b**: Sorting shall follow a column's meaning rather than its stored value, so severities sort by severity and workflow statuses by their configured column order
+* **UC-104c**: A sortable column shall cycle ascending → descending → unsorted, so the default order stays reachable, and the active search and filters shall be offered a single reset control
 * **UC-105**: All table views shall support multi-select for bulk operations
 * **UC-106**: Table views shall paginate server-side, with the page, sort order, search and filters all reflected in the URL
 * **UC-107**: An empty table shall distinguish "nothing exists yet", which invites creating the first entity, from "nothing matches the current filter", which offers a way to clear it

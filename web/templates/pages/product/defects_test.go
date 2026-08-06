@@ -2,6 +2,7 @@ package product
 
 import (
 	"context"
+	html2 "html"
 	"strings"
 	"testing"
 
@@ -78,6 +79,95 @@ func TestDefectsTableSearchBoxKeepsItsValue(t *testing.T) {
 	}
 }
 
+func TestDefectsSearchInputHasAStableID(t *testing.T) {
+	html := renderDefectsTable(t, defectsTestProps())
+
+	// Each keystroke swaps this input away and renders a new one. htmx only
+	// restores focus and the caret position if the replaced element can be
+	// found again by id, so without one the box loses focus mid-word.
+	if !strings.Contains(html, `id="defect-search"`) {
+		t.Error("the search box has no id, so htmx cannot restore focus across swaps")
+	}
+}
+
+func TestDefectsFacetPanelIsASiblingOfTheControlRow(t *testing.T) {
+	props := defectsTestProps()
+	props.State.Filters = map[string]string{"status_id": "s1"}
+
+	html := renderDefectsTable(t, props)
+
+	// Inside <details> the panel inherited that element's box: in flow it grew
+	// the flex item and shifted the search box; positioned out of flow it
+	// covered the table header. It has to be a full-width sibling, revealed by
+	// the group-has variant, so that opening it pushes the table down.
+	panel := strings.Index(html, `id="defect-filter-panel"`)
+	if panel < 0 {
+		t.Fatal("no facet panel rendered")
+	}
+	if !strings.Contains(html, "group-has-[details[open]]:grid") {
+		t.Error("the panel is not tied to the drawer's open state")
+	}
+	if strings.Contains(html, "absolute inset-x-0 top-full") {
+		t.Error("the panel is positioned out of flow; opening it will cover the table")
+	}
+
+	// A panel nested in the toggle would appear before </details>.
+	if closing := strings.Index(html, "</details>"); closing > panel {
+		t.Error("the panel is still inside <details>, so it will carry that element's box")
+	}
+}
+
+func TestDefectsClearButtonAppearsOnlyWhenFiltered(t *testing.T) {
+	props := defectsTestProps()
+	if html := renderDefectsTable(t, props); strings.Contains(html, "Clear all") {
+		t.Error("the clear control rendered with nothing to clear")
+	}
+
+	t.Run("a search alone is enough to show it", func(t *testing.T) {
+		props := defectsTestProps()
+		props.State.Search = "gps"
+		if !strings.Contains(renderDefectsTable(t, props), "Clear all") {
+			t.Error("no clear control offered for an active search")
+		}
+	})
+
+	t.Run("a facet alone is enough to show it", func(t *testing.T) {
+		props := defectsTestProps()
+		props.State.Filters = map[string]string{"status_id": "s1"}
+		if !strings.Contains(renderDefectsTable(t, props), "Clear all") {
+			t.Error("no clear control offered for an active facet")
+		}
+	})
+}
+
+func TestDefectsClearButtonResetsEverythingButTheSort(t *testing.T) {
+	props := defectsTestProps()
+	props.State.Sort = "criticality"
+	props.State.Dir = ui.SortDesc
+	props.State.Search = "gps"
+	props.State.Page = 3
+	props.State.Filters = map[string]string{"status_id": "s1", "criticality": "high"}
+
+	html := renderDefectsTable(t, props)
+
+	target := props.State.ClearURL()
+	// templ escapes & as &amp; in the rendered href, so the link is matched in
+	// its escaped form while the query itself is asserted below.
+	if !strings.Contains(html, html2.EscapeString(target)) {
+		t.Fatalf("clear control does not link to %q", target)
+	}
+	// Re-sorting is not something the user asked to undo, so the sort survives
+	// while the search, the facets and the page do not.
+	if !strings.Contains(target, "sort=criticality") || !strings.Contains(target, "dir=desc") {
+		t.Errorf("clearing dropped the sort order: %q", target)
+	}
+	for _, param := range []string{"q=", "status_id=", "criticality=high", "page="} {
+		if strings.Contains(target, param) {
+			t.Errorf("clearing left %q behind in %q", param, target)
+		}
+	}
+}
+
 func TestDefectsTableCarriesSortAsHiddenInputs(t *testing.T) {
 	props := defectsTestProps()
 	props.State.Sort = "criticality"
@@ -138,6 +228,15 @@ func TestDefectsTableFacetDrawerOpensWhenFiltered(t *testing.T) {
 	html = renderDefectsTable(t, props)
 	if !strings.Contains(html, expanded) {
 		t.Error("the filter drawer should be open when a facet is active")
+	}
+
+	// A search is not a facet. Every keystroke re-renders these controls, so
+	// opening the drawer for a non-empty search made it spring open by itself
+	// as soon as the user started typing.
+	searching := defectsTestProps()
+	searching.State.Search = "gps"
+	if html := renderDefectsTable(t, searching); !strings.Contains(html, collapsed) {
+		t.Error("typing in the search box should not open the filter drawer")
 	}
 	// A filter hidden inside a collapsed drawer would be invisible, so the
 	// count is badged on the summary.

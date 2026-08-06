@@ -80,21 +80,69 @@ func TestListStateSortURLResetsPage(t *testing.T) {
 	}
 }
 
-func TestListStateSortURLTogglesDirection(t *testing.T) {
-	state := ListState{BaseURL: "/x", Sort: "title", Dir: SortAsc}
+func TestListStateSortURLCyclesThroughUnsorted(t *testing.T) {
+	// Repeatedly clicking one column walks asc → desc → unsorted → asc. The
+	// third step is what makes the default order reachable again; without it a
+	// table can never be un-sorted once it has been sorted.
+	state := ListState{BaseURL: "/x"}
 
-	if got := parseQuery(t, state.SortURL("title")).Get("dir"); got != SortDesc {
-		t.Errorf("re-clicking the sorted column gave dir = %q, want desc", got)
+	first := parseQuery(t, state.SortURL("title"))
+	if first.Get("sort") != "title" || first.Get("dir") != SortAsc {
+		t.Fatalf("first click gave sort=%q dir=%q, want title/asc", first.Get("sort"), first.Get("dir"))
+	}
+
+	state.Sort, state.Dir = "title", SortAsc
+	second := parseQuery(t, state.SortURL("title"))
+	if second.Get("dir") != SortDesc {
+		t.Fatalf("second click gave dir = %q, want desc", second.Get("dir"))
 	}
 
 	state.Dir = SortDesc
-	if got := parseQuery(t, state.SortURL("title")).Get("dir"); got != SortAsc {
-		t.Errorf("clicking a descending column gave dir = %q, want asc", got)
+	third := parseQuery(t, state.SortURL("title"))
+	if third.Has("sort") || third.Has("dir") {
+		t.Fatalf("third click left sort=%q dir=%q, want the sort dropped entirely",
+			third.Get("sort"), third.Get("dir"))
 	}
 
-	// A different column starts ascending regardless of the current direction.
-	if got := parseQuery(t, state.SortURL("priority")).Get("dir"); got != SortAsc {
-		t.Errorf("clicking a new column gave dir = %q, want asc", got)
+	// And back to the start.
+	state.Sort, state.Dir = "", ""
+	fourth := parseQuery(t, state.SortURL("title"))
+	if fourth.Get("sort") != "title" || fourth.Get("dir") != SortAsc {
+		t.Errorf("fourth click gave sort=%q dir=%q, want title/asc", fourth.Get("sort"), fourth.Get("dir"))
+	}
+}
+
+func TestListStateSortURLOtherColumnStartsAscending(t *testing.T) {
+	// Switching columns must not inherit the previous column's direction, nor
+	// land on the unsorted step of its cycle.
+	for _, dir := range []string{SortAsc, SortDesc} {
+		state := ListState{BaseURL: "/x", Sort: "title", Dir: dir}
+		q := parseQuery(t, state.SortURL("priority"))
+
+		if q.Get("sort") != "priority" {
+			t.Errorf("from dir=%s, sort = %q, want priority", dir, q.Get("sort"))
+		}
+		if q.Get("dir") != SortAsc {
+			t.Errorf("from dir=%s, new column started at %q, want asc", dir, q.Get("dir"))
+		}
+	}
+}
+
+func TestListStateClearingTheSortKeepsSearchAndFilters(t *testing.T) {
+	// The third click undoes the sort, not the filtering.
+	state := fullState()
+	state.Sort, state.Dir = "title", SortDesc
+
+	q := parseQuery(t, state.SortURL("title"))
+
+	if q.Has("sort") {
+		t.Errorf("sort survived the unsort step: %q", q.Get("sort"))
+	}
+	if got := q.Get("q"); got != "gps" {
+		t.Errorf("unsorting dropped the search: q = %q", got)
+	}
+	if got := q.Get("status_id"); got != "s1" {
+		t.Errorf("unsorting dropped a filter: status_id = %q", got)
 	}
 }
 

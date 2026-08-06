@@ -323,6 +323,13 @@ parameter set: `sort`, `dir`, `q`, the facet names, and `page`. The rules are:
 
 - Changing the sort or a filter resets to page 1 — the row that was 51st under
   the old order has nothing to do with the row that is 51st under the new one.
+- A column header cycles ascending → descending → unsorted. The third step is
+  what makes the default order reachable again; a two-state toggle leaves a
+  table permanently sorted once it has been sorted at all. Clicking a different
+  column always starts it ascending.
+- Clearing the sort clears only the sort. A single control clears the search and
+  every facet in one step while leaving the sort order alone, since re-sorting
+  is not what the user is undoing.
 - Changing the page preserves everything else.
 - Sorting follows a column's meaning, not its stored value: severities sort by
   severity, and workflow statuses by the column order the product owner

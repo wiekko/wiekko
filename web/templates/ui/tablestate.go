@@ -70,18 +70,30 @@ func (s ListState) URL() string {
 	return s.BaseURL
 }
 
-// SortURL returns the link for clicking the given column's header. Clicking the
-// active column flips its direction; clicking any other column starts it
-// ascending. Either way the view returns to page 1, because row 51 of the old
-// order has nothing to do with row 51 of the new one.
+// SortURL returns the link for clicking the given column's header.
+//
+// A column cycles ascending → descending → unsorted, so a third click undoes
+// the sort and returns the list to its natural order. Without that step there
+// is no way back: once any column is sorted the default order becomes
+// unreachable short of editing the URL. Clicking a different column always
+// starts it ascending.
+//
+// Every step returns to page 1, because row 51 of the old order has nothing to
+// do with row 51 of the new one.
 func (s ListState) SortURL(field string) string {
 	next := s
-	next.Sort = field
-	next.Dir = SortAsc
-	if s.Sort == field && s.direction() == SortAsc {
-		next.Dir = SortDesc
-	}
 	next.Page = 1
+
+	switch {
+	case s.Sort != field:
+		next.Sort = field
+		next.Dir = SortAsc
+	case s.direction() == SortAsc:
+		next.Dir = SortDesc
+	default:
+		next.Sort = ""
+		next.Dir = ""
+	}
 	return next.URL()
 }
 

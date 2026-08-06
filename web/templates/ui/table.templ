@@ -40,6 +40,7 @@ templ SortHeader(label, sortField string, state ListState, hxTarget string) {
 	>
 		<a
 			href={ templ.SafeURL(state.SortURL(sortField)) }
+			title={ sortActionLabel(active, dir) }
 			class="group inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
 			hx-get={ state.SortURL(sortField) }
 			hx-target={ hxTarget }
@@ -118,4 +119,18 @@ func ariaSort(dir string) string {
 		return "descending"
 	}
 	return "ascending"
+}
+
+// sortActionLabel names what the next click will do. A column cycles through
+// three states, and the third — dropping the sort — is not something a chevron
+// can express, so it needs saying.
+func sortActionLabel(active bool, dir string) string {
+	switch {
+	case !active:
+		return "Sort ascending"
+	case dir == SortAsc:
+		return "Sort descending"
+	default:
+		return "Remove sorting"
+	}
 }

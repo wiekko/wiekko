@@ -191,13 +191,27 @@ templ DefectsTableContent(props DefectsProps) {
 // result set has to return to page 1, since the page the user was on may no
 // longer exist.
 templ defectsControls(props DefectsProps) {
-	<div id="defects-controls" class="space-y-3">
+	// The panel is a sibling of the row rather than a child of <details>, and
+	// the group-has-* variant below is what ties the two together. Inside the
+	// <details> it inherited that element's box: in flow it grew the flex item,
+	// pushing the vertically-centred search box down and starting the panel at
+	// the toggle's left edge instead of the row's; taken out of flow to fix
+	// that, it then covered the table header. Out here it is a full-width block
+	// that pushes the table down, which is the only arrangement that does none
+	// of the three.
+	<div id="defects-controls" class="group space-y-3">
 		<div class="flex items-center gap-3">
 			<div class="max-w-sm flex-1">
 				@defectsSearchInput(props)
 			</div>
-			<details class="group/filters" open?={ props.State.Filtered() }>
-				<summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset select-none hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800 [&::-webkit-details-marker]:hidden">
+			// Open reflects the facets only, not the search. Basing it on
+			// "anything is narrowing the list" made the drawer spring open by
+			// itself as soon as the user typed into the search box.
+			<details class="group/filters" open?={ activeDefectFilters(props.State) > 0 }>
+				<summary
+					aria-controls="defect-filter-panel"
+					class="inline-flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset select-none hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800 [&::-webkit-details-marker]:hidden"
+				>
 					@ui.Icon("filter", "sm")
 					Filters
 					if n := activeDefectFilters(props.State); n > 0 {
@@ -209,17 +223,29 @@ templ defectsControls(props DefectsProps) {
 						@ui.Icon("chevron-right", "sm")
 					</span>
 				</summary>
-				<div class="mt-3 grid grid-cols-1 gap-4 rounded-lg bg-gray-50 p-4 sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-800">
-					@defectsFacet(props, "status_id", "Status", defectStatusOptions(props))
-					@defectsFacet(props, "criticality", "Criticality", defectCriticalityOptions())
-					if len(props.EnvOptions) > 0 {
-						@defectsFacet(props, "environment_id", "Environment", defectEnvironmentOptions(props))
-					}
-					if len(props.SprintOptions) > 0 {
-						@defectsFacet(props, "sprint_id", "Sprint", defectSprintOptions(props))
-					}
-				</div>
 			</details>
+			// Only rendered when something is actually narrowing the list: a
+			// permanent control that does nothing most of the time is noise, and
+			// its appearance doubles as the signal that a filter is on.
+			if props.State.Filtered() {
+				@defectsClearButton(props)
+			}
+		</div>
+		// The ring matches ui.Card's rather than the search box's: the panel
+		// stacks directly on top of the table, so its padded fill needs the same
+		// edge the table has to read as a surface rather than as a stray gap.
+		<div
+			id="defect-filter-panel"
+			class="hidden grid-cols-1 gap-4 rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200 ring-inset group-has-[details[open]]:grid sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-800 dark:ring-gray-700"
+		>
+			@defectsFacet(props, "status_id", "Status", defectStatusOptions(props))
+			@defectsFacet(props, "criticality", "Criticality", defectCriticalityOptions())
+			if len(props.EnvOptions) > 0 {
+				@defectsFacet(props, "environment_id", "Environment", defectEnvironmentOptions(props))
+			}
+			if len(props.SprintOptions) > 0 {
+				@defectsFacet(props, "sprint_id", "Sprint", defectSprintOptions(props))
+			}
 		</div>
 		// The sort order rides along as hidden fields. htmx sends only the
 		// inputs it is told to include, so without these a filter change would
@@ -230,12 +256,37 @@ templ defectsControls(props DefectsProps) {
 	</div>
 }
 
+// defectsClearButton resets the search and every facet in one step, keeping the
+// sort order — re-sorting is not something the user asked to undo.
+//
+// It sits in the control row rather than inside the drawer because it clears
+// the search too, and a control that reaches outside the panel it lives in
+// would be lying about its scope.
+templ defectsClearButton(props DefectsProps) {
+	<a
+		href={ templ.SafeURL(props.State.ClearURL()) }
+		aria-label="Clear search and filters"
+		hx-get={ props.State.ClearURL() }
+		hx-target={ defectsTableTarget }
+		hx-swap="innerHTML"
+		hx-push-url="true"
+		class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800"
+	>
+		@ui.Icon("x", "sm")
+		Clear all
+	</a>
+}
+
 templ defectsSearchInput(props DefectsProps) {
 	<div class="relative">
 		<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
 			@ui.Icon("search", "sm")
 		</div>
+		// The id is load-bearing, not decoration: each keystroke swaps this
+		// input's own container away, and htmx only restores focus and the
+		// caret position to the replaced element if it can find it again by id.
 		<input
+			id="defect-search"
 			type="search"
 			name="q"
 			value={ props.State.Search }
