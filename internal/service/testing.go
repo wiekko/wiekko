@@ -647,6 +647,81 @@ func (s *TestingService) ListResultEvents(ctx context.Context, user *model.User,
 	return s.campaignEvents.ListByCampaignID(ctx, campaignID)
 }
 
+// ListEventsForResult returns the status change log for a single result, oldest
+// first, so a tester can see who set the current verdict before changing it.
+// Requires viewer role (FR-042).
+func (s *TestingService) ListEventsForResult(ctx context.Context, user *model.User, productID, campaignID, resultID string) ([]*model.CampaignResultEvent, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	c, err := s.campaigns.GetByID(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	if c.ProductID != productID {
+		return nil, ErrNotFound
+	}
+
+	result, err := s.campaignResults.GetByID(ctx, resultID)
+	if err != nil {
+		return nil, err
+	}
+	if result.CampaignID != campaignID {
+		return nil, ErrNotFound
+	}
+
+	return s.campaignEvents.ListByResultID(ctx, resultID)
+}
+
+// ResultChurn returns how many times each result in the campaign has been set,
+// keyed by result id. A count above one means the verdict was changed after it
+// was first recorded. Requires viewer role.
+func (s *TestingService) ResultChurn(ctx context.Context, user *model.User, productID, campaignID string) (map[string]int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.campaignEvents.CountsByCampaignID(ctx, campaignID)
+}
+
+// ListVerificationEvents returns the full result history behind a defect: every
+// change to every result the defect ever failed, including the later pass that
+// verifies the fix. Requires viewer role, matching every other defect read.
+//
+// The defect itself belongs to the backlog, which this service cannot read, so
+// the product scope is enforced on the way out: events whose campaign is not
+// part of this product are dropped rather than trusted.
+func (s *TestingService) ListVerificationEvents(ctx context.Context, user *model.User, productID, defectID string) ([]*model.CampaignResultEvent, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	events, err := s.campaignEvents.ListByDefectTrail(ctx, defectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, nil
+	}
+
+	campaigns, err := s.campaigns.ListByProductID(ctx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list campaigns for verification scope: %w", err)
+	}
+	inProduct := make(map[string]bool, len(campaigns))
+	for _, c := range campaigns {
+		inProduct[c.ID] = true
+	}
+
+	scoped := make([]*model.CampaignResultEvent, 0, len(events))
+	for _, ev := range events {
+		if inProduct[ev.CampaignID] {
+			scoped = append(scoped, ev)
+		}
+	}
+	return scoped, nil
+}
+
 // CampaignProgress returns result counts keyed by status for one campaign.
 // Requires viewer role.
 func (s *TestingService) CampaignProgress(ctx context.Context, user *model.User, productID, campaignID string) (map[string]int, error) {

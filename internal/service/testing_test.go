@@ -1096,3 +1096,164 @@ func TestMarkResultsForRetest(t *testing.T) {
 		}
 	})
 }
+
+// --- Result event reads ---
+
+func TestListEventsForResult(t *testing.T) {
+	campaignResults := func() *testutil.MockCampaignResultStore {
+		return &testutil.MockCampaignResultStore{
+			GetByIDFunc: func(_ context.Context, id string) (*model.CampaignResult, error) {
+				return testutil.MakeCampaignResult(func(cr *model.CampaignResult) { cr.ID = id }), nil
+			},
+		}
+	}
+
+	t.Run("success", func(t *testing.T) {
+		svc := newTestingService(nil, activeCampaign(), campaignResults(), nil, viewerRoles())
+		svc.campaignEvents = &testutil.MockCampaignResultEventStore{
+			ListByResultIDFunc: func(_ context.Context, resultID string) ([]*model.CampaignResultEvent, error) {
+				return []*model.CampaignResultEvent{
+					testutil.MakeCampaignResultEvent(func(ev *model.CampaignResultEvent) { ev.ResultID = resultID }),
+				}, nil
+			},
+		}
+
+		events, err := svc.ListEventsForResult(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001")
+		if err != nil {
+			t.Fatalf("ListEventsForResult: %v", err)
+		}
+		if len(events) != 1 {
+			t.Fatalf("len(events) = %d, want 1", len(events))
+		}
+	})
+
+	t.Run("result from another campaign is not found", func(t *testing.T) {
+		svc := newTestingService(nil, activeCampaign(), &testutil.MockCampaignResultStore{
+			GetByIDFunc: func(_ context.Context, id string) (*model.CampaignResult, error) {
+				return testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+					cr.ID = id
+					cr.CampaignID = "campaign-999"
+				}), nil
+			},
+		}, nil, viewerRoles())
+
+		_, err := svc.ListEventsForResult(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001")
+		if !errors.Is(err, ErrNotFound) {
+			t.Fatalf("err = %v, want ErrNotFound", err)
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListEventsForResult(context.Background(), testutil.MakeUser(),
+			"product-001", "campaign-001", "cr-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestResultChurn(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, viewerRoles())
+		svc.campaignEvents = &testutil.MockCampaignResultEventStore{
+			CountsByCampaignIDFunc: func(_ context.Context, _ string) (map[string]int, error) {
+				return map[string]int{"cr-001": 3}, nil
+			},
+		}
+
+		counts, err := svc.ResultChurn(context.Background(), testutil.MakeUser(), "product-001", "campaign-001")
+		if err != nil {
+			t.Fatalf("ResultChurn: %v", err)
+		}
+		if counts["cr-001"] != 3 {
+			t.Fatalf("counts[cr-001] = %d, want 3", counts["cr-001"])
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, forbiddenRoles())
+		_, err := svc.ResultChurn(context.Background(), testutil.MakeUser(), "product-001", "campaign-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+func TestListVerificationEvents(t *testing.T) {
+	productCampaigns := func() *testutil.MockTestingCampaignStore {
+		return &testutil.MockTestingCampaignStore{
+			ListByProductIDFunc: func(_ context.Context, productID string) ([]*model.TestingCampaign, error) {
+				return []*model.TestingCampaign{
+					testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+						c.ID = "campaign-001"
+						c.ProductID = productID
+					}),
+				}, nil
+			},
+		}
+	}
+
+	t.Run("success returns the trail including the pass that clears the defect", func(t *testing.T) {
+		svc := newTestingService(nil, productCampaigns(), nil, nil, viewerRoles())
+		svc.campaignEvents = &testutil.MockCampaignResultEventStore{
+			ListByDefectTrailFunc: func(_ context.Context, _ string) ([]*model.CampaignResultEvent, error) {
+				return []*model.CampaignResultEvent{
+					testutil.MakeCampaignResultEvent(func(ev *model.CampaignResultEvent) {
+						ev.ToStatus = model.CampaignResultStatusFailed
+						ev.DefectID = "defect-001"
+					}),
+					testutil.MakeCampaignResultEvent(func(ev *model.CampaignResultEvent) {
+						ev.ToStatus = model.CampaignResultStatusPassed
+						ev.DefectID = ""
+					}),
+				}, nil
+			},
+		}
+
+		events, err := svc.ListVerificationEvents(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001")
+		if err != nil {
+			t.Fatalf("ListVerificationEvents: %v", err)
+		}
+		if len(events) != 2 {
+			t.Fatalf("len(events) = %d, want 2", len(events))
+		}
+		if events[1].ToStatus != model.CampaignResultStatusPassed || events[1].DefectID != "" {
+			t.Fatalf("closing event = %+v, want a pass carrying no defect", events[1])
+		}
+	})
+
+	t.Run("events from another product are dropped", func(t *testing.T) {
+		svc := newTestingService(nil, productCampaigns(), nil, nil, viewerRoles())
+		svc.campaignEvents = &testutil.MockCampaignResultEventStore{
+			ListByDefectTrailFunc: func(_ context.Context, _ string) ([]*model.CampaignResultEvent, error) {
+				return []*model.CampaignResultEvent{
+					testutil.MakeCampaignResultEvent(func(ev *model.CampaignResultEvent) {
+						ev.CampaignID = "campaign-of-another-product"
+					}),
+				}, nil
+			},
+		}
+
+		events, err := svc.ListVerificationEvents(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001")
+		if err != nil {
+			t.Fatalf("ListVerificationEvents: %v", err)
+		}
+		if len(events) != 0 {
+			t.Fatalf("len(events) = %d, want 0", len(events))
+		}
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		svc := newTestingService(nil, nil, nil, nil, forbiddenRoles())
+		_, err := svc.ListVerificationEvents(context.Background(), testutil.MakeUser(),
+			"product-001", "defect-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}

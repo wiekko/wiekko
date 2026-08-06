@@ -893,9 +893,11 @@ func (m *MockCampaignResultStore) CountsByProductID(ctx context.Context, product
 
 // MockCampaignResultEventStore implements store.CampaignResultEventStore with configurable function fields.
 type MockCampaignResultEventStore struct {
-	CreateFunc           func(ctx context.Context, ev *model.CampaignResultEvent) error
-	ListByResultIDFunc   func(ctx context.Context, resultID string) ([]*model.CampaignResultEvent, error)
-	ListByCampaignIDFunc func(ctx context.Context, campaignID string) ([]*model.CampaignResultEvent, error)
+	CreateFunc             func(ctx context.Context, ev *model.CampaignResultEvent) error
+	ListByResultIDFunc     func(ctx context.Context, resultID string) ([]*model.CampaignResultEvent, error)
+	ListByCampaignIDFunc   func(ctx context.Context, campaignID string) ([]*model.CampaignResultEvent, error)
+	ListByDefectTrailFunc  func(ctx context.Context, defectID string) ([]*model.CampaignResultEvent, error)
+	CountsByCampaignIDFunc func(ctx context.Context, campaignID string) (map[string]int, error)
 }
 
 func (m *MockCampaignResultEventStore) Create(ctx context.Context, ev *model.CampaignResultEvent) error {
@@ -915,6 +917,18 @@ func (m *MockCampaignResultEventStore) ListByCampaignID(ctx context.Context, cam
 		return nil, nil
 	}
 	return m.ListByCampaignIDFunc(ctx, campaignID)
+}
+func (m *MockCampaignResultEventStore) ListByDefectTrail(ctx context.Context, defectID string) ([]*model.CampaignResultEvent, error) {
+	if m.ListByDefectTrailFunc == nil {
+		return nil, nil
+	}
+	return m.ListByDefectTrailFunc(ctx, defectID)
+}
+func (m *MockCampaignResultEventStore) CountsByCampaignID(ctx context.Context, campaignID string) (map[string]int, error) {
+	if m.CountsByCampaignIDFunc == nil {
+		return nil, nil
+	}
+	return m.CountsByCampaignIDFunc(ctx, campaignID)
 }
 
 // MockCategoryStore implements store.CategoryStore with configurable function fields.

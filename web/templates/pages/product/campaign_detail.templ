@@ -150,6 +150,9 @@ type CampaignMatrixProps struct {
 	Groups     []CampaignMatrixGroup
 	// CanExecute is false for viewers and for any campaign that is not active.
 	CanExecute bool
+	// Churn counts recorded changes per result id. Above one means the verdict
+	// was revisited after it was first set.
+	Churn map[string]int
 }
 
 templ CampaignMatrixTabContent(props CampaignMatrixProps) {
@@ -214,25 +217,48 @@ templ CampaignMatrixTabContent(props CampaignMatrixProps) {
 	</div>
 }
 
-// campaignMatrixCell renders one result. While the campaign is active a tester
-// can click it to pick a new status; otherwise it is a plain indicator (FR-505).
+// campaignMatrixCell renders one result. Every recorded result opens a panel:
+// testers get the status picker plus the change log, everyone else gets the log
+// on its own, so a closed campaign can still be read back (FR-505, FR-042).
 templ campaignMatrixCell(props CampaignMatrixProps, result *model.CampaignResult) {
 	if result == nil {
 		@campaignResultIcon("")
-	} else if props.CanExecute {
+	} else {
 		<button
 			type="button"
-			class="rounded-md p-1 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:hover:bg-gray-700"
-			aria-label={ "Set status, currently " + campaignResultLabel(result.Status) }
+			class="relative rounded-md p-1 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:hover:bg-gray-700"
+			aria-label={ campaignCellLabel(props, result) }
 			hx-get={ fmt.Sprintf("/products/%s/campaigns/%s/results/%s/status-menu?group=%s", props.ProductID, props.CampaignID, result.ID, props.GroupBy) }
 			hx-target="#modal"
 			hx-swap="innerHTML"
 		>
 			@campaignResultIcon(result.Status)
+			if props.Churn[result.ID] > 1 {
+				@campaignChurnDot()
+			}
 		</button>
-	} else {
-		@campaignResultIcon(result.Status)
 	}
+}
+
+// campaignChurnDot marks a result whose verdict was changed after it was first
+// recorded, so the matrix shows where results are being revisited.
+templ campaignChurnDot() {
+	<span
+		class="absolute top-0 right-0 block size-1.5 rounded-full bg-amber-500 ring-1 ring-white dark:bg-amber-400 dark:ring-gray-800"
+		aria-hidden="true"
+	></span>
+}
+
+func campaignCellLabel(props CampaignMatrixProps, result *model.CampaignResult) string {
+	action := "View result history"
+	if props.CanExecute {
+		action = "Set status"
+	}
+	label := action + ", currently " + campaignResultLabel(result.Status)
+	if props.Churn[result.ID] > 1 {
+		label += ", changed since first recorded"
+	}
+	return label
 }
 
 templ campaignGroupToggle(props CampaignMatrixProps) {
@@ -270,12 +296,32 @@ templ campaignMatrixLegend() {
 				{ campaignResultLabel(status) }
 			</span>
 		}
+		<span class="inline-flex items-center gap-1">
+			<span class="relative inline-block size-4">
+				@campaignChurnDot()
+			</span>
+			Changed since first recorded
+		</span>
 	</div>
 }
 
-// --- Result status menu ---
+// --- Result detail modal ---
 
-// CampaignResultMenuProps holds the status picker for one matrix cell.
+// ResultEventView is one recorded change to a campaign result, ready to render.
+type ResultEventView struct {
+	UserName    string
+	FromStatus  string // empty for the first recorded change
+	ToStatus    string
+	DefectID    string
+	DefectTitle string
+	At          string // pre-formatted
+	// IsOverride marks a change that revised another person's verdict. It is
+	// context, not a complaint: a re-test by a second tester is normal.
+	IsOverride bool
+}
+
+// CampaignResultMenuProps holds one matrix cell's detail panel: the status
+// picker for testers, and the change log for everyone (UC-201, FR-042).
 type CampaignResultMenuProps struct {
 	ProductID   string
 	CampaignID  string
@@ -286,25 +332,86 @@ type CampaignResultMenuProps struct {
 	// tester was looking at.
 	GroupBy   string
 	CSRFToken string
+	// CanExecute gates the status picker. False leaves a read-only panel.
+	CanExecute bool
+	Events     []ResultEventView
 }
 
 templ CampaignResultStatusMenu(props CampaignResultMenuProps) {
-	@ui.Modal("result-status-modal", "Set result", "sm") {
-		<p class="text-sm text-gray-500 dark:text-gray-400">
-			{ props.TestCase.Title }
-			if props.Environment != "" {
-				<span class="text-gray-400 dark:text-gray-500">&nbsp;·&nbsp;{ props.Environment }</span>
-			}
-		</p>
-		<div class="mt-4 space-y-1">
-			for _, status := range campaignResultStatuses() {
-				@campaignResultStatusOption(props, status)
-			}
-		</div>
-		<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-			Failing a test case requires a defect. You can link an existing one or create it in the next step.
-		</p>
+	@ui.Modal("result-status-modal", props.TestCase.Title, "md") {
+		if props.Environment != "" {
+			<p class="text-sm text-gray-500 dark:text-gray-400">{ props.Environment }</p>
+		}
+		if props.CanExecute {
+			<div class="mt-4 space-y-1">
+				for _, status := range campaignResultStatuses() {
+					@campaignResultStatusOption(props, status)
+				}
+			</div>
+			<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+				Failing a test case requires a defect. You can link an existing one or create it in the next step.
+			</p>
+		}
+		@campaignResultHistory(props)
 	}
+}
+
+// campaignResultHistory shows who set this result and when. Placed under the
+// picker on purpose: a tester about to change a verdict sees whose it was first.
+templ campaignResultHistory(props CampaignResultMenuProps) {
+	<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+		<h4 class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+			History
+		</h4>
+		if len(props.Events) == 0 {
+			<p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+				This result has not been set yet.
+			</p>
+		} else {
+			<ol class="mt-3 space-y-3">
+				for _, ev := range props.Events {
+					<li class="flex items-start gap-3 text-sm">
+						<span class="w-28 shrink-0 pt-0.5 text-xs text-gray-500 dark:text-gray-400">
+							{ ev.At }
+						</span>
+						<span class="min-w-0 flex-1">
+							<span class="flex flex-wrap items-center gap-1.5">
+								if ev.FromStatus != "" {
+									@campaignResultIcon(ev.FromStatus)
+									<span class="text-gray-500 dark:text-gray-400">{ campaignResultLabel(ev.FromStatus) }</span>
+									@ui.Icon("arrow-right", "sm")
+								}
+								@campaignResultIcon(ev.ToStatus)
+								<span class="font-medium text-gray-900 dark:text-gray-100">{ campaignResultLabel(ev.ToStatus) }</span>
+							</span>
+							<span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+								{ campaignEventActor(ev) }
+								if ev.DefectTitle != "" {
+									&nbsp;·&nbsp;
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, ev.DefectID)) }
+										class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ ev.DefectTitle }
+									</a>
+								}
+							</span>
+						</span>
+					</li>
+				}
+			</ol>
+		}
+	</div>
+}
+
+// campaignEventActor phrases an event neutrally. An override is described as a
+// change to a previous verdict, never as a conflict: the log exists for
+// traceability, and blame-shaped wording would just discourage corrections.
+func campaignEventActor(ev ResultEventView) string {
+	if ev.IsOverride {
+		return "Changed by " + ev.UserName
+	}
+	return "Set by " + ev.UserName
 }
 
 templ campaignResultStatusOption(props CampaignResultMenuProps, status string) {
@@ -401,13 +508,196 @@ templ CampaignProgressTabContent(props CampaignProgressProps) {
 	</div>
 }
 
-templ CampaignHistoryTabContent(entries []templates.AuditEntryView) {
-	if len(entries) == 0 {
-		@ui.Card() {
-			@ui.EmptyState("history", "No history", "Changes to this campaign will be recorded here.", "", "")
+// --- History tab ---
+
+// Campaign history filters. "all" is the default.
+const (
+	CampaignHistoryFilterAll       = "all"
+	CampaignHistoryFilterOverrides = "overrides"
+	CampaignHistoryFilterRetests   = "retests"
+	CampaignHistoryFilterFailures  = "failures"
+)
+
+// CampaignHistoryEntry is one row of the campaign history: either a lifecycle
+// audit entry or a result status change. Both answer "what happened here", so
+// they share one feed rather than two tabs.
+type CampaignHistoryEntry struct {
+	Kind     string // "audit" or "result"
+	At       string // pre-formatted
+	RawAt    string // RFC 3339, for sorting before render
+	UserName string
+
+	// Audit is set when Kind is "audit".
+	Audit *templates.AuditEntryView
+
+	// Result fields, set when Kind is "result".
+	TestCase    string
+	Environment string
+	FromStatus  string
+	ToStatus    string
+	DefectID    string
+	DefectTitle string
+	IsOverride  bool
+	IsRetest    bool
+}
+
+// CampaignHistoryProps holds the merged campaign history feed (FR-042, UC-207).
+type CampaignHistoryProps struct {
+	ProductID  string
+	CampaignID string
+	Filter     string
+	Entries    []CampaignHistoryEntry
+}
+
+templ CampaignHistoryTabContent(props CampaignHistoryProps) {
+	<div class="space-y-4">
+		@campaignHistoryFilter(props)
+		if len(props.Entries) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("history", "No history", campaignHistoryEmptyMessage(props.Filter), "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.CardBody() {
+					@campaignHistoryTimeline(props)
+				}
+			}
 		}
-	} else {
-		@patterns.AuditTimeline(entries)
+	</div>
+}
+
+templ campaignHistoryFilter(props CampaignHistoryProps) {
+	<div class="inline-flex rounded-md shadow-sm" role="group">
+		@campaignHistoryFilterButton(props, CampaignHistoryFilterAll, "All")
+		@campaignHistoryFilterButton(props, CampaignHistoryFilterOverrides, "Changed verdicts")
+		@campaignHistoryFilterButton(props, CampaignHistoryFilterRetests, "Re-tests")
+		@campaignHistoryFilterButton(props, CampaignHistoryFilterFailures, "Failures")
+	</div>
+}
+
+templ campaignHistoryFilterButton(props CampaignHistoryProps, value, label string) {
+	<button
+		type="button"
+		class={ "px-3 py-2 text-sm font-medium ring-1 ring-gray-300 ring-inset first:rounded-l-md last:rounded-r-md dark:ring-gray-600",
+			campaignGroupToggleClass(props.Filter == value) }
+		hx-get={ fmt.Sprintf("/products/%s/campaigns/%s/tabs/history?filter=%s", props.ProductID, props.CampaignID, value) }
+		hx-target="#tab-panel-history"
+		hx-swap="innerHTML"
+	>
+		{ label }
+	</button>
+}
+
+// campaignHistoryTimeline mirrors patterns.AuditTimeline, but result events
+// carry a from/to status pair and a defect link that AuditEntryView has no room
+// for, and their icons come from this package.
+templ campaignHistoryTimeline(props CampaignHistoryProps) {
+	<div class="flow-root">
+		<ul class="-mb-8">
+			for i, entry := range props.Entries {
+				<li>
+					<div class="relative pb-8">
+						if i < len(props.Entries)-1 {
+							<span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700"></span>
+						}
+						<div class="relative flex items-start space-x-3">
+							<div class={ "flex h-8 w-8 items-center justify-center rounded-full ring-8 ring-white dark:ring-gray-950",
+								campaignHistoryIconBg(entry) }>
+								@ui.Icon(campaignHistoryIcon(entry), "sm")
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="text-sm font-medium text-gray-900 dark:text-gray-100">{ entry.UserName }</span>
+									<span class="text-xs text-gray-500 dark:text-gray-400">{ entry.At }</span>
+								</div>
+								if entry.Kind == "result" {
+									@campaignHistoryResultBody(props, entry)
+								} else {
+									<p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+										{ patterns.AuditDescription(entry.Audit) }
+									</p>
+								}
+							</div>
+						</div>
+					</div>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+templ campaignHistoryResultBody(props CampaignHistoryProps, entry CampaignHistoryEntry) {
+	<p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+		{ campaignHistoryVerb(entry) }
+		<span class="font-medium text-gray-700 dark:text-gray-300">{ entry.TestCase }</span>
+		if entry.Environment != "" {
+			<span class="text-gray-400 dark:text-gray-500">&nbsp;·&nbsp;{ entry.Environment }</span>
+		}
+	</p>
+	<span class="mt-1 flex flex-wrap items-center gap-1.5 text-sm">
+		if entry.FromStatus != "" {
+			@campaignResultIcon(entry.FromStatus)
+			<span class="text-gray-500 dark:text-gray-400">{ campaignResultLabel(entry.FromStatus) }</span>
+			@ui.Icon("arrow-right", "sm")
+		}
+		@campaignResultIcon(entry.ToStatus)
+		<span class="font-medium text-gray-900 dark:text-gray-100">{ campaignResultLabel(entry.ToStatus) }</span>
+		if entry.DefectTitle != "" {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, entry.DefectID)) }
+				class="text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+			>
+				{ entry.DefectTitle }
+			</a>
+		}
+	</span>
+}
+
+// campaignHistoryVerb keeps the wording neutral. A changed verdict is reported
+// as a change, not as a conflict.
+func campaignHistoryVerb(entry CampaignHistoryEntry) string {
+	if entry.IsOverride {
+		return "Changed the result of "
+	}
+	return "Recorded a result for "
+}
+
+func campaignHistoryIcon(entry CampaignHistoryEntry) string {
+	if entry.Kind != "result" {
+		return patterns.AuditIcon(entry.Audit)
+	}
+	if entry.IsRetest {
+		return "refresh-cw"
+	}
+	return campaignResultIconName(entry.ToStatus)
+}
+
+func campaignHistoryIconBg(entry CampaignHistoryEntry) string {
+	if entry.Kind != "result" {
+		return "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+	}
+	switch entry.ToStatus {
+	case model.CampaignResultStatusPassed:
+		return "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+	case model.CampaignResultStatusFailed:
+		return "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+	case model.CampaignResultStatusRetest:
+		return "bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+	default:
+		return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+	}
+}
+
+func campaignHistoryEmptyMessage(filter string) string {
+	switch filter {
+	case CampaignHistoryFilterOverrides:
+		return "No result has been changed after it was first recorded."
+	case CampaignHistoryFilterRetests:
+		return "No result has been sent back for re-testing."
+	case CampaignHistoryFilterFailures:
+		return "No result has been marked as failed."
+	default:
+		return "Changes to this campaign will be recorded here."
 	}
 }
 

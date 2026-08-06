@@ -288,6 +288,8 @@ CREATE TABLE IF NOT EXISTS campaign_result_events (
 );
 CREATE INDEX IF NOT EXISTS idx_campaign_result_events_result_id ON campaign_result_events(result_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_result_events_campaign ON campaign_result_events(campaign_id, created_at);
+-- Serves the defect verification trail: find the results a defect ever touched.
+CREATE INDEX IF NOT EXISTS idx_campaign_result_events_defect_id ON campaign_result_events(defect_id);
 
 -- Requirement assignments: users assigned to requirements (FR-009)
 CREATE TABLE IF NOT EXISTS requirement_assignments (

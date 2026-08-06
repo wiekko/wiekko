@@ -379,6 +379,24 @@ func MakeCampaignResult(overrides ...func(*model.CampaignResult)) *model.Campaig
 	return cr
 }
 
+// MakeCampaignResultEvent returns a result status change with sensible defaults.
+func MakeCampaignResultEvent(overrides ...func(*model.CampaignResultEvent)) *model.CampaignResultEvent {
+	now := time.Now().UTC().Format(time.RFC3339)
+	ev := &model.CampaignResultEvent{
+		ID:         "cre-001",
+		ResultID:   "cr-001",
+		CampaignID: "campaign-001",
+		UserID:     "user-001",
+		FromStatus: model.CampaignResultStatusPending,
+		ToStatus:   model.CampaignResultStatusPassed,
+		CreatedAt:  now,
+	}
+	for _, fn := range overrides {
+		fn(ev)
+	}
+	return ev
+}
+
 // MakeRuntimeEnvironment returns a runtime environment with sensible defaults.
 func MakeRuntimeEnvironment(overrides ...func(*model.RuntimeEnvironment)) *model.RuntimeEnvironment {
 	now := time.Now().UTC().Format(time.RFC3339)

@@ -40,6 +40,22 @@ templ AuditTimeline(entries []templates.AuditEntryView) {
 	}
 }
 
+// AuditIcon and AuditDescription expose the timeline's phrasing to pages that
+// render audit entries in a feed of their own, so the wording stays in one place.
+func AuditIcon(entry *templates.AuditEntryView) string {
+	if entry == nil {
+		return "edit"
+	}
+	return auditActionIcon(entry.Action)
+}
+
+func AuditDescription(entry *templates.AuditEntryView) string {
+	if entry == nil {
+		return ""
+	}
+	return auditDescription(*entry)
+}
+
 func auditActionIcon(action string) string {
 	switch action {
 	case "create":

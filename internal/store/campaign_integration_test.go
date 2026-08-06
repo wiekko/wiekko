@@ -396,3 +396,130 @@ func TestCampaignResultStoreDeleteByCampaignAndTestCase(t *testing.T) {
 		t.Fatalf("remaining = %+v, want only the bare test case", remaining)
 	}
 }
+
+// The defect trail must survive the fact that a passing verdict clears the
+// result's defect: the closing event carries no defect_id, and a plain column
+// filter would drop exactly the row that proves the fix worked.
+func TestCampaignResultEventStoreDefectTrail(t *testing.T) {
+	db := newTestDB(t)
+	f := seedCampaignFixture(t, db)
+	campaigns := &testingCampaignStore{db: db}
+	results := &campaignResultStore{db: db}
+	events := &campaignResultEventStore{db: db}
+	ctx := context.Background()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	defectID := uuid.New().String()
+	if _, err := db.Exec(`INSERT INTO defects (id, product_id, title, description, criticality, priority, is_active, created_at, updated_at)
+	                      VALUES (?, ?, 'Login is broken', '', 'high', 0, 0, ?, ?)`, defectID, f.productID, now, now); err != nil {
+		t.Fatalf("seed defect: %v", err)
+	}
+
+	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+
+	// The verified result, and a second one that never touched the defect.
+	verified := uuid.New().String()
+	unrelated := uuid.New().String()
+	for _, id := range []string{verified, unrelated} {
+		if err := results.Create(ctx, &model.CampaignResult{
+			ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
+			Status: model.CampaignResultStatusPending, UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("Create result: %v", err)
+		}
+	}
+
+	record := func(resultID, from, to, defect, at string) {
+		t.Helper()
+		if err := events.Create(ctx, &model.CampaignResultEvent{
+			ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
+			FromStatus: from, ToStatus: to, DefectID: defect, CreatedAt: at,
+		}); err != nil {
+			t.Fatalf("event Create: %v", err)
+		}
+	}
+
+	// The full loop: failed with the defect, reopened for re-test, then passed.
+	// The pass clears the defect, so its event names no defect at all.
+	record(verified, model.CampaignResultStatusPending, model.CampaignResultStatusFailed, defectID, "2026-08-01T10:00:00Z")
+	record(verified, model.CampaignResultStatusFailed, model.CampaignResultStatusRetest, defectID, "2026-08-02T10:00:00Z")
+	record(verified, model.CampaignResultStatusRetest, model.CampaignResultStatusPassed, "", "2026-08-03T10:00:00Z")
+	record(unrelated, model.CampaignResultStatusPending, model.CampaignResultStatusPassed, "", "2026-08-03T11:00:00Z")
+
+	trail, err := events.ListByDefectTrail(ctx, defectID)
+	if err != nil {
+		t.Fatalf("ListByDefectTrail: %v", err)
+	}
+	if len(trail) != 3 {
+		t.Fatalf("len(trail) = %d, want 3 (the unrelated result must not appear)", len(trail))
+	}
+	for i, want := range []string{
+		model.CampaignResultStatusFailed,
+		model.CampaignResultStatusRetest,
+		model.CampaignResultStatusPassed,
+	} {
+		if trail[i].ToStatus != want {
+			t.Fatalf("trail[%d].ToStatus = %q, want %q", i, trail[i].ToStatus, want)
+		}
+		if trail[i].ResultID != verified {
+			t.Fatalf("trail[%d].ResultID = %q, want the verified result", i, trail[i].ResultID)
+		}
+	}
+	// The row that matters carries no defect_id and is only reachable through
+	// the result, which is the whole reason for the subquery.
+	if trail[2].DefectID != "" {
+		t.Fatalf("closing event DefectID = %q, want empty", trail[2].DefectID)
+	}
+}
+
+func TestCampaignResultEventStoreCountsByCampaignID(t *testing.T) {
+	db := newTestDB(t)
+	f := seedCampaignFixture(t, db)
+	campaigns := &testingCampaignStore{db: db}
+	results := &campaignResultStore{db: db}
+	events := &campaignResultEventStore{db: db}
+	ctx := context.Background()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+
+	changed := uuid.New().String()
+	setOnce := uuid.New().String()
+	untouched := uuid.New().String()
+	for _, id := range []string{changed, setOnce, untouched} {
+		if err := results.Create(ctx, &model.CampaignResult{
+			ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
+			Status: model.CampaignResultStatusPending, UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("Create result: %v", err)
+		}
+	}
+
+	record := func(resultID, to string) {
+		t.Helper()
+		if err := events.Create(ctx, &model.CampaignResultEvent{
+			ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
+			ToStatus: to, CreatedAt: now,
+		}); err != nil {
+			t.Fatalf("event Create: %v", err)
+		}
+	}
+	record(changed, model.CampaignResultStatusPassed)
+	record(changed, model.CampaignResultStatusFailed)
+	record(setOnce, model.CampaignResultStatusPassed)
+
+	counts, err := events.CountsByCampaignID(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("CountsByCampaignID: %v", err)
+	}
+	if counts[changed] != 2 {
+		t.Fatalf("counts[changed] = %d, want 2", counts[changed])
+	}
+	if counts[setOnce] != 1 {
+		t.Fatalf("counts[setOnce] = %d, want 1", counts[setOnce])
+	}
+	// A result nobody ever set has no events and simply does not appear.
+	if _, ok := counts[untouched]; ok {
+		t.Fatalf("counts[untouched] = %d, want no entry", counts[untouched])
+	}
+}

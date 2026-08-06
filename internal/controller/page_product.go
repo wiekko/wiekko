@@ -6609,16 +6609,108 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 			Title:     p.Name + " - " + d.Title,
 			CSRFToken: csrfToken,
 		},
-		DisplayName:     user.DisplayName,
-		IsAdmin:         user.IsAdmin,
-		Product:         p,
-		Defect:          d,
-		Status:          c.resolveStatus(r, user, productID, d.StatusID, "defect"),
-		MilestoneName:   c.resolveMilestoneName(r, user, productID, d.MilestoneID),
-		SprintName:      c.resolveSprintName(r, user, productID, d.SprintID),
-		EnvironmentName: c.buildEnvironmentMap(r, user, productID)[d.EnvironmentID],
-		CanEdit:         c.canEditDefects(user, role),
+		DisplayName: user.DisplayName,
+		IsAdmin:     user.IsAdmin,
+		Product:     p,
+		Defect:      d,
+		Overview:    c.buildDefectOverview(r, user, p, d),
+		CanEdit:     c.canEditDefects(user, role),
 	}).Render(r.Context(), w)
+}
+
+// buildDefectOverview assembles the defect overview, including the campaign
+// result trail that shows whether the fix was re-tested.
+func (c *PageProductController) buildDefectOverview(r *http.Request, user *model.User, p *model.Product, d *model.Defect) productpage.DefectOverviewProps {
+	return productpage.DefectOverviewProps{
+		ProductID:       p.ID,
+		EstimationMode:  p.EstimationMode,
+		WorkflowMode:    p.WorkflowMode,
+		Defect:          d,
+		Status:          c.resolveStatus(r, user, p.ID, d.StatusID, "defect"),
+		MilestoneName:   c.resolveMilestoneName(r, user, p.ID, d.MilestoneID),
+		SprintName:      c.resolveSprintName(r, user, p.ID, d.SprintID),
+		EnvironmentName: c.buildEnvironmentMap(r, user, p.ID)[d.EnvironmentID],
+		Verification:    c.buildDefectVerification(r, user, p.ID, d.ID),
+	}
+}
+
+// buildDefectVerification groups the defect's result trail by result, so each
+// block reads as one test case's journey: the failure that raised the defect,
+// the re-test once it was closed, and the verdict that followed.
+//
+// The trail deliberately includes events that no longer name the defect — a
+// passing verdict clears the link, and that pass is the whole point of the
+// section.
+func (c *PageProductController) buildDefectVerification(r *http.Request, user *model.User, productID, defectID string) []productpage.DefectVerificationGroup {
+	events, _ := c.testing.ListVerificationEvents(r.Context(), user, productID, defectID)
+	if len(events) == 0 {
+		return nil
+	}
+
+	names := c.displayNames(r, user)
+	envs := c.buildEnvironmentMap(r, user, productID)
+	campaignNames := make(map[string]string)
+	for _, campaign := range c.listCampaignsQuietly(r, user, productID) {
+		campaignNames[campaign.ID] = campaign.Name
+	}
+	testCases, _ := c.testing.ListTestCases(r.Context(), user, productID)
+	titles := make(map[string]string, len(testCases))
+	for _, tc := range testCases {
+		titles[tc.ID] = tc.Title
+	}
+
+	// Events arrive oldest first; keep that order within each group and keep the
+	// groups in the order their first event appeared.
+	order := make([]string, 0)
+	byResult := make(map[string][]*model.CampaignResultEvent)
+	seenCampaign := make(map[string]bool)
+	results := make(map[string]*model.CampaignResult)
+	for _, ev := range events {
+		if _, seen := byResult[ev.ResultID]; !seen {
+			order = append(order, ev.ResultID)
+		}
+		byResult[ev.ResultID] = append(byResult[ev.ResultID], ev)
+
+		// A defect usually spans one campaign, so fetch each campaign's results
+		// once rather than looking up each result on its own.
+		if !seenCampaign[ev.CampaignID] {
+			seenCampaign[ev.CampaignID] = true
+			campaignResults, _ := c.testing.ListCampaignResults(r.Context(), user, productID, ev.CampaignID)
+			for _, result := range campaignResults {
+				results[result.ID] = result
+			}
+		}
+	}
+
+	groups := make([]productpage.DefectVerificationGroup, 0, len(order))
+	for _, resultID := range order {
+		resultEvents := byResult[resultID]
+		group := productpage.DefectVerificationGroup{
+			CampaignName: campaignNames[resultEvents[0].CampaignID],
+			Verified:     resultEvents[len(resultEvents)-1].ToStatus == model.CampaignResultStatusPassed,
+		}
+		if result, ok := results[resultID]; ok {
+			group.TestCase = titles[result.TestCaseID]
+			group.Environment = envs[result.EnvironmentID]
+		}
+		if group.TestCase == "" {
+			group.TestCase = "Deleted test case"
+		}
+
+		previousUser := ""
+		for _, ev := range resultEvents {
+			group.Events = append(group.Events, productpage.ResultEventView{
+				UserName:   eventActorName(names, ev.UserID),
+				FromStatus: ev.FromStatus,
+				ToStatus:   ev.ToStatus,
+				At:         formatTimestamp(ev.CreatedAt),
+				IsOverride: isOverride(previousUser, ev.UserID),
+			})
+			previousUser = ev.UserID
+		}
+		groups = append(groups, group)
+	}
+	return groups
 }
 
 // DefectCreateForm renders GET /products/{id}/defects/new.
@@ -6909,16 +7001,7 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DefectOverviewTabContent(
-		productID,
-		p.EstimationMode,
-		p.WorkflowMode,
-		d,
-		c.resolveStatus(r, user, productID, d.StatusID, "defect"),
-		c.resolveMilestoneName(r, user, productID, d.MilestoneID),
-		c.resolveSprintName(r, user, productID, d.SprintID),
-		c.buildEnvironmentMap(r, user, productID)[d.EnvironmentID],
-	).Render(r.Context(), w)
+	_ = productpage.DefectOverviewTabContent(c.buildDefectOverview(r, user, p, d)).Render(r.Context(), w)
 }
 
 // --- Defect link tabs (FR-023, FR-501) ---

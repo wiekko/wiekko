@@ -12,16 +12,13 @@ import (
 
 // DefectDetailProps holds data for the defect detail page.
 type DefectDetailProps struct {
-	Meta          templates.PageMeta
-	DisplayName   string
-	IsAdmin       bool
-	Product       *model.Product
-	Defect        *model.Defect
-	Status          *model.Status
-	MilestoneName   string
-	SprintName      string
-	EnvironmentName string
-	CanEdit         bool
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Defect      *model.Defect
+	Overview    DefectOverviewProps
+	CanEdit     bool
 }
 
 templ DefectDetailPage(props DefectDetailProps) {
@@ -54,7 +51,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 			@ui.TabGroup(defectDetailTabs(props.Product.ID, props.Defect.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@DefectOverviewTabContent(props.Product.ID, props.Product.EstimationMode, props.Product.WorkflowMode, props.Defect, props.Status, props.MilestoneName, props.SprintName, props.EnvironmentName)
+				@DefectOverviewTabContent(props.Overview)
 			}
 			@ui.TabPanelHidden("components") {
 				@ui.LoadingSpinner("md")
@@ -81,30 +78,114 @@ templ DefectDetailPage(props DefectDetailProps) {
 	}
 }
 
-templ DefectOverviewTabContent(productID string, estimationMode string, workflowMode string, d *model.Defect, status *model.Status, milestoneName, sprintName, environmentName string) {
-	@ui.Card() {
-		@ui.CardBody() {
-			@patterns.DetailGrid() {
-				@patterns.DetailField("Criticality", defectCriticalityDisplay(d.Criticality))
-				@workflowStatusField(status)
-				if d.MilestoneID != "" && milestoneName != "" {
-					@defectLinkedField("Milestone", milestoneName, fmt.Sprintf("/products/%s/milestones/%s", productID, d.MilestoneID))
-				} else {
-					@patterns.DetailField("Milestone", "")
+// DefectOverviewProps holds the defect overview tab.
+type DefectOverviewProps struct {
+	ProductID       string
+	EstimationMode  string
+	WorkflowMode    string
+	Defect          *model.Defect
+	Status          *model.Status
+	MilestoneName   string
+	SprintName      string
+	EnvironmentName string
+	// Verification is the campaign result trail behind this defect, one entry
+	// per result it ever failed (FR-042, FR-504).
+	Verification []DefectVerificationGroup
+}
+
+// DefectVerificationGroup is one campaign result's journey through this defect:
+// the failure that raised it, the re-test after it was closed, and the verdict
+// that followed.
+type DefectVerificationGroup struct {
+	TestCase     string
+	Environment  string
+	CampaignName string
+	Events       []ResultEventView
+	// Verified is true when the latest recorded verdict is a pass.
+	Verified bool
+}
+
+templ DefectOverviewTabContent(props DefectOverviewProps) {
+	<div class="space-y-6">
+		@ui.Card() {
+			@ui.CardBody() {
+				@patterns.DetailGrid() {
+					@patterns.DetailField("Criticality", defectCriticalityDisplay(props.Defect.Criticality))
+					@workflowStatusField(props.Status)
+					if props.Defect.MilestoneID != "" && props.MilestoneName != "" {
+						@defectLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.ProductID, props.Defect.MilestoneID))
+					} else {
+						@patterns.DetailField("Milestone", "")
+					}
+					if props.WorkflowMode == model.WorkflowModeScrum {
+						@patterns.DetailField("Sprint", props.SprintName)
+					}
+					@patterns.DetailField("Environment", props.EnvironmentName)
+					if props.EstimationMode != model.EstimationModeDisabled {
+						@patterns.DetailField("Estimation", formatEstimation(props.EstimationMode, props.Defect.Estimation))
+					}
+					@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Defect.Priority))
+					@patterns.DetailField("Active", boolDisplay(props.Defect.IsActive))
+					@patterns.DetailField("Created", formatDate(props.Defect.CreatedAt))
+					@patterns.DetailField("Last Updated", formatDate(props.Defect.UpdatedAt))
 				}
-				if workflowMode == model.WorkflowModeScrum {
-					@patterns.DetailField("Sprint", sprintName)
-				}
-				@patterns.DetailField("Environment", environmentName)
-				if estimationMode != model.EstimationModeDisabled {
-					@patterns.DetailField("Estimation", formatEstimation(estimationMode, d.Estimation))
-				}
-				@patterns.DetailField("Priority", fmt.Sprintf("%d", d.Priority))
-				@patterns.DetailField("Active", boolDisplay(d.IsActive))
-				@patterns.DetailField("Created", formatDate(d.CreatedAt))
-				@patterns.DetailField("Last Updated", formatDate(d.UpdatedAt))
+				@patterns.DetailDescription(props.Defect.Description)
 			}
-			@patterns.DetailDescription(d.Description)
+		}
+		@defectVerification(props)
+	</div>
+}
+
+// defectVerification shows whether the fix was actually re-tested and by whom.
+// Kept on the overview rather than behind a tab: it is the evidence a product
+// owner needs before treating a defect as done.
+templ defectVerification(props DefectOverviewProps) {
+	@ui.Card() {
+		@ui.CardHeader("Verification")
+		@ui.CardBody() {
+			if len(props.Verification) == 0 {
+				@ui.EmptyState("beaker", "No verification",
+					"No campaign result has been linked to this defect.", "", "")
+			} else {
+				<div class="space-y-6">
+					for _, group := range props.Verification {
+						<div>
+							<div class="flex flex-wrap items-center gap-2">
+								<span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+									{ group.TestCase }
+								</span>
+								if group.Environment != "" {
+									<span class="text-sm text-gray-400 dark:text-gray-500">·&nbsp;{ group.Environment }</span>
+								}
+								if group.CampaignName != "" {
+									<span class="text-xs text-gray-500 dark:text-gray-400">{ group.CampaignName }</span>
+								}
+								if group.Verified {
+									@ui.Badge("Verified", "green")
+								}
+							</div>
+							<ol class="mt-2 space-y-2">
+								for _, ev := range group.Events {
+									<li class="flex items-start gap-3 text-sm">
+										<span class="w-36 shrink-0 pt-0.5 text-xs text-gray-500 dark:text-gray-400">
+											{ ev.At }
+										</span>
+										<span class="flex flex-wrap items-center gap-1.5">
+											@campaignResultIcon(ev.ToStatus)
+											<span class="font-medium text-gray-900 dark:text-gray-100">
+												{ campaignResultLabel(ev.ToStatus) }
+											</span>
+											<span class="text-xs text-gray-500 dark:text-gray-400">
+												{ campaignEventActor(ev) }
+											</span>
+										</span>
+									</li>
+								}
+							</ol>
+						</div>
+					}
+				</div>
+			}
 		}
 	}
 }

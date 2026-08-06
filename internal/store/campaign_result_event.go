@@ -13,6 +13,8 @@ type CampaignResultEventStore interface {
 	Create(ctx context.Context, ev *model.CampaignResultEvent) error
 	ListByResultID(ctx context.Context, resultID string) ([]*model.CampaignResultEvent, error)
 	ListByCampaignID(ctx context.Context, campaignID string) ([]*model.CampaignResultEvent, error)
+	ListByDefectTrail(ctx context.Context, defectID string) ([]*model.CampaignResultEvent, error)
+	CountsByCampaignID(ctx context.Context, campaignID string) (map[string]int, error)
 }
 
 type campaignResultEventStore struct {
@@ -44,10 +46,13 @@ func (s *campaignResultEventStore) Create(ctx context.Context, ev *model.Campaig
 	return err
 }
 
+// listBy runs one indexed scan of the log. Timestamps are second-precision and a
+// batch retest stamps every event it writes with the same instant, so id breaks
+// ties to keep the order stable between calls.
 func (s *campaignResultEventStore) listBy(ctx context.Context, where, arg string) ([]*model.CampaignResultEvent, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+campaignResultEventColumns+` FROM campaign_result_events
-		 WHERE `+where+` ORDER BY created_at`, arg)
+		 WHERE `+where+` ORDER BY created_at, id`, arg)
 	if err != nil {
 		return nil, err
 	}
@@ -70,4 +75,42 @@ func (s *campaignResultEventStore) ListByResultID(ctx context.Context, resultID 
 
 func (s *campaignResultEventStore) ListByCampaignID(ctx context.Context, campaignID string) ([]*model.CampaignResultEvent, error) {
 	return s.listBy(ctx, "campaign_id = ?", campaignID)
+}
+
+// ListByDefectTrail returns the complete history of every result the defect ever
+// touched, not just the events that name it.
+//
+// A passing verdict clears the result's defect, so the event that closes a
+// verification loop carries no defect_id at all. Filtering on the column alone
+// would return the failure and the re-test but drop the pass that proves the fix
+// worked, which is the one row worth showing. Selecting the results first and
+// then taking their whole history reconstructs the loop end to end.
+func (s *campaignResultEventStore) ListByDefectTrail(ctx context.Context, defectID string) ([]*model.CampaignResultEvent, error) {
+	return s.listBy(ctx,
+		`result_id IN (SELECT result_id FROM campaign_result_events WHERE defect_id = ?)`,
+		defectID)
+}
+
+// CountsByCampaignID returns how many events each result in the campaign has
+// accumulated, keyed by result id. A result that was set once has exactly one
+// event, so a count above one means the verdict was changed afterwards.
+func (s *campaignResultEventStore) CountsByCampaignID(ctx context.Context, campaignID string) (map[string]int, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT result_id, COUNT(*) FROM campaign_result_events
+		 WHERE campaign_id = ? GROUP BY result_id`, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var resultID string
+		var n int
+		if err := rows.Scan(&resultID, &n); err != nil {
+			return nil, err
+		}
+		counts[resultID] = n
+	}
+	return counts, rows.Err()
 }

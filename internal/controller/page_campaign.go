@@ -480,14 +480,139 @@ func (c *PageProductController) CampaignHistoryTab(w http.ResponseWriter, r *htt
 	productID := r.PathValue("id")
 	campaignID := r.PathValue("campaignId")
 
-	entries := c.buildAuditViews(r, user, productID, "testing_campaign", campaignID)
+	filter := campaignHistoryFilter(r)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CampaignHistoryTabContent(entries).Render(r.Context(), w)
+	_ = productpage.CampaignHistoryTabContent(productpage.CampaignHistoryProps{
+		ProductID:  productID,
+		CampaignID: campaignID,
+		Filter:     filter,
+		Entries:    c.buildCampaignHistory(r, user, productID, campaignID, filter),
+	}).Render(r.Context(), w)
+}
+
+// campaignHistoryFilter reads the feed filter, defaulting to the full history.
+func campaignHistoryFilter(r *http.Request) string {
+	switch f := r.URL.Query().Get("filter"); f {
+	case productpage.CampaignHistoryFilterOverrides,
+		productpage.CampaignHistoryFilterRetests,
+		productpage.CampaignHistoryFilterFailures:
+		return f
+	default:
+		return productpage.CampaignHistoryFilterAll
+	}
+}
+
+// buildCampaignHistory merges the campaign's lifecycle audit trail with its
+// result change log into one feed, newest first. Both answer the same question,
+// so they belong in one place rather than in two tabs.
+func (c *PageProductController) buildCampaignHistory(r *http.Request, user *model.User, productID, campaignID, filter string) []productpage.CampaignHistoryEntry {
+	audits := c.buildAuditViews(r, user, productID, "testing_campaign", campaignID)
+	events, _ := c.testing.ListResultEvents(r.Context(), user, productID, campaignID)
+
+	entries := make([]productpage.CampaignHistoryEntry, 0, len(audits)+len(events))
+	for i := range audits {
+		entry := audits[i]
+		entries = append(entries, productpage.CampaignHistoryEntry{
+			Kind:     "audit",
+			At:       formatTimestamp(entry.CreatedAt),
+			RawAt:    entry.CreatedAt,
+			UserName: entry.UserName,
+			Audit:    &entry,
+		})
+	}
+	entries = append(entries, c.buildResultHistory(r, user, productID, campaignID, events)...)
+
+	// Newest first. Ties keep the store's order, which is already deterministic.
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].RawAt > entries[j].RawAt })
+
+	if filter == productpage.CampaignHistoryFilterAll {
+		return entries
+	}
+	kept := make([]productpage.CampaignHistoryEntry, 0, len(entries))
+	for _, entry := range entries {
+		if matchesHistoryFilter(entry, filter) {
+			kept = append(kept, entry)
+		}
+	}
+	return kept
+}
+
+// buildResultHistory turns result events into feed rows. Overrides are detected
+// by walking each result's own events in order, so a batch re-test — which
+// stamps many results at one instant — never reads as one tester overriding
+// another.
+func (c *PageProductController) buildResultHistory(r *http.Request, user *model.User, productID, campaignID string, events []*model.CampaignResultEvent) []productpage.CampaignHistoryEntry {
+	if len(events) == 0 {
+		return nil
+	}
+
+	names := c.displayNames(r, user)
+	defects := c.defectTitleMap(r, user, productID, events)
+	envs := c.buildEnvironmentMap(r, user, productID)
+
+	results, _ := c.testing.ListCampaignResults(r.Context(), user, productID, campaignID)
+	byResult := make(map[string]*model.CampaignResult, len(results))
+	for _, result := range results {
+		byResult[result.ID] = result
+	}
+	testCases, _ := c.testing.ListTestCases(r.Context(), user, productID)
+	titles := make(map[string]string, len(testCases))
+	for _, tc := range testCases {
+		titles[tc.ID] = tc.Title
+	}
+
+	previousUser := make(map[string]string, len(byResult))
+	entries := make([]productpage.CampaignHistoryEntry, 0, len(events))
+	for _, ev := range events {
+		entry := productpage.CampaignHistoryEntry{
+			Kind:        "result",
+			At:          formatTimestamp(ev.CreatedAt),
+			RawAt:       ev.CreatedAt,
+			UserName:    eventActorName(names, ev.UserID),
+			FromStatus:  ev.FromStatus,
+			ToStatus:    ev.ToStatus,
+			DefectID:    ev.DefectID,
+			DefectTitle: defects[ev.DefectID],
+			IsOverride:  isOverride(previousUser[ev.ResultID], ev.UserID),
+			IsRetest: ev.ToStatus == model.CampaignResultStatusRetest ||
+				ev.FromStatus == model.CampaignResultStatusRetest,
+		}
+		if result, ok := byResult[ev.ResultID]; ok {
+			entry.TestCase = titles[result.TestCaseID]
+			entry.Environment = envs[result.EnvironmentID]
+		}
+		if entry.TestCase == "" {
+			entry.TestCase = "Deleted test case"
+		}
+		entries = append(entries, entry)
+		previousUser[ev.ResultID] = ev.UserID
+	}
+	return entries
+}
+
+func matchesHistoryFilter(entry productpage.CampaignHistoryEntry, filter string) bool {
+	if entry.Kind != "result" {
+		return false
+	}
+	switch filter {
+	case productpage.CampaignHistoryFilterOverrides:
+		return entry.IsOverride
+	case productpage.CampaignHistoryFilterRetests:
+		return entry.IsRetest
+	case productpage.CampaignHistoryFilterFailures:
+		return entry.ToStatus == model.CampaignResultStatusFailed
+	default:
+		return true
+	}
 }
 
 // buildProgressTimeline replays the event log into a cumulative count of
-// settled results, one point per recorded change (UC-207).
+// settled results (UC-207).
+//
+// One point per event turns a real campaign into hundreds of near-identical
+// bars, so the series is bucketed to the last state of each day. The individual
+// changes are not lost — they are the campaign's History tab.
 func buildProgressTimeline(events []*model.CampaignResultEvent, total int) []productpage.CampaignProgressPoint {
 	if total == 0 || len(events) == 0 {
 		return nil
@@ -498,8 +623,14 @@ func buildProgressTimeline(events []*model.CampaignResultEvent, total int) []pro
 	current := make(map[string]string, total)
 	points := make([]productpage.CampaignProgressPoint, 0, len(events))
 
-	for _, ev := range events {
+	for i, ev := range events {
 		current[ev.ResultID] = ev.ToStatus
+
+		// Keep the day's final state, and always the most recent event so the
+		// series ends where the campaign actually stands.
+		if i < len(events)-1 && eventDay(events[i+1].CreatedAt) == eventDay(ev.CreatedAt) {
+			continue
+		}
 
 		settled := 0
 		for _, status := range current {
@@ -514,6 +645,14 @@ func buildProgressTimeline(events []*model.CampaignResultEvent, total int) []pro
 		})
 	}
 	return points
+}
+
+// eventDay is the date part of an RFC 3339 timestamp.
+func eventDay(ts string) string {
+	if len(ts) < 10 {
+		return ts
+	}
+	return ts[:10]
 }
 
 func countResults(results []*model.CampaignResult) map[string]int {
@@ -624,6 +763,10 @@ func (c *PageProductController) loadMatrixProps(r *http.Request, user *model.Use
 		groups = append(groups, productpage.CampaignMatrixGroup{Label: label, Rows: rows})
 	}
 
+	// A missing churn map only costs the cells their dot, so a failure here must
+	// not take the whole matrix down with it.
+	churn, _ := c.testing.ResultChurn(r.Context(), user, productID, campaign.ID)
+
 	return productpage.CampaignMatrixProps{
 		ProductID:  productID,
 		CampaignID: campaign.ID,
@@ -633,6 +776,7 @@ func (c *PageProductController) loadMatrixProps(r *http.Request, user *model.Use
 		Groups:     groups,
 		// Results are writable only while the campaign is active (FR-505).
 		CanExecute: campaign.Status == model.CampaignStatusActive && c.canExecuteTests(user, role),
+		Churn:      churn,
 	}, results, nil
 }
 
@@ -758,8 +902,10 @@ func (c *PageProductController) CampaignResultStatusMenu(w http.ResponseWriter, 
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	if !c.canExecuteTests(user, role) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+
+	campaign, err := c.testing.GetCampaign(r.Context(), user, productID, campaignID)
+	if err != nil || campaign.ProductID != productID {
+		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
@@ -768,6 +914,13 @@ func (c *PageProductController) CampaignResultStatusMenu(w http.ResponseWriter, 
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+
+	// The panel is readable at viewer level so a closed campaign can still be
+	// traced back; only the status picker is gated (FR-505). The write itself is
+	// authorized again in SetResultStatus.
+	canExecute := campaign.Status == model.CampaignStatusActive && c.canExecuteTests(user, role)
+
+	events, _ := c.testing.ListEventsForResult(r.Context(), user, productID, campaignID, resultID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.CampaignResultStatusMenu(productpage.CampaignResultMenuProps{
@@ -778,7 +931,73 @@ func (c *PageProductController) CampaignResultStatusMenu(w http.ResponseWriter, 
 		Environment: c.buildEnvironmentMap(r, user, productID)[result.EnvironmentID],
 		GroupBy:     matrixGrouping(r),
 		CSRFToken:   middleware.CSRFTokenFromContext(r.Context()),
+		CanExecute:  canExecute,
+		Events:      c.buildResultEventViews(r, user, productID, events),
 	}).Render(r.Context(), w)
+}
+
+// buildResultEventViews turns the raw change log into display rows, resolving
+// actor names and defect titles. Events arrive oldest first and stay that way:
+// a single result's history reads as a story.
+func (c *PageProductController) buildResultEventViews(r *http.Request, user *model.User, productID string, events []*model.CampaignResultEvent) []productpage.ResultEventView {
+	if len(events) == 0 {
+		return nil
+	}
+
+	names := c.displayNames(r, user)
+	defects := c.defectTitleMap(r, user, productID, events)
+
+	views := make([]productpage.ResultEventView, 0, len(events))
+	previousUser := ""
+	for _, ev := range events {
+		views = append(views, productpage.ResultEventView{
+			UserName:   eventActorName(names, ev.UserID),
+			FromStatus: ev.FromStatus,
+			ToStatus:   ev.ToStatus,
+			DefectID:   ev.DefectID,
+			// A defect that has since been deleted leaves no title, and the row
+			// simply drops the link rather than showing a bare id.
+			DefectTitle: defects[ev.DefectID],
+			At:          formatTimestamp(ev.CreatedAt),
+			IsOverride:  isOverride(previousUser, ev.UserID),
+		})
+		previousUser = ev.UserID
+	}
+	return views
+}
+
+// isOverride reports whether an event revised someone else's verdict. The very
+// first change on a result overrides nothing, and neither does a person
+// re-testing their own result.
+func isOverride(previousUser, currentUser string) bool {
+	return previousUser != "" && currentUser != "" && previousUser != currentUser
+}
+
+// eventActorName labels the actor behind an event. An empty user id means the
+// change came from the system — a defect closing reopens results for re-test
+// without anyone touching them — or that the account has since been deleted.
+func eventActorName(names map[string]string, userID string) string {
+	if userID == "" {
+		return "System"
+	}
+	if name, ok := names[userID]; ok && name != "" {
+		return name
+	}
+	return "Unknown user"
+}
+
+// defectTitleMap resolves only the defects the given events actually reference.
+func (c *PageProductController) defectTitleMap(r *http.Request, user *model.User, productID string, events []*model.CampaignResultEvent) map[string]string {
+	titles := make(map[string]string)
+	for _, ev := range events {
+		if ev.DefectID == "" || titles[ev.DefectID] != "" {
+			continue
+		}
+		if d, err := c.backlog.GetDefect(r.Context(), user, productID, ev.DefectID); err == nil {
+			titles[ev.DefectID] = d.Title
+		}
+	}
+	return titles
 }
 
 // CampaignResultSetStatus handles POST .../results/{resultId}/status.
