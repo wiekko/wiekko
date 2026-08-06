@@ -600,6 +600,39 @@ func (s *BacklogService) ListDefects(ctx context.Context, user *model.User, prod
 	return s.defects.ListByProductID(ctx, productID, filter)
 }
 
+// ListDefectsPage returns one page of defects along with the number of defects
+// the filter matches overall, which the caller needs to size its pagination.
+// Requires viewer role.
+//
+// The count is taken from the same filter as the page rather than from
+// len(items): items is capped by params.Limit and says nothing about how many
+// rows lie beyond it.
+func (s *BacklogService) ListDefectsPage(ctx context.Context, user *model.User, productID string, filter store.DefectFilter, params store.ListParams) ([]*model.Defect, int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, 0, err
+	}
+	total, err := s.defects.CountByProductID(ctx, productID, filter, params.Search)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := s.defects.ListPageByProductID(ctx, productID, filter, params)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// CountDefects reports how many defects a product has in total, ignoring any
+// filter. The list page uses it to tell "this product has no defects yet" apart
+// from "no defect matches the current filter", which need different empty states.
+// Requires viewer role.
+func (s *BacklogService) CountDefects(ctx context.Context, user *model.User, productID string) (int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return 0, err
+	}
+	return s.defects.CountByProductID(ctx, productID, store.DefectFilter{}, "")
+}
+
 // ListDefectsByMilestone returns the defects assigned to a milestone.
 // Rows belonging to another product are skipped. Requires viewer role.
 func (s *BacklogService) ListDefectsByMilestone(ctx context.Context, user *model.User, productID, milestoneID string) ([]*model.Defect, error) {

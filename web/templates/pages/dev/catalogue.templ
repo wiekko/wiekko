@@ -186,8 +186,8 @@ templ CataloguePage() {
 			@section("Table") {
 				@ui.Table() {
 					@ui.TableHead() {
-						@ui.SortHeader("Name", "name", "name", "asc", "#", "#table-body")
-						@ui.SortHeader("Status", "status", "name", "", "#", "#table-body")
+						@ui.SortHeader("Name", "name", catalogueListState, "#table-body")
+						@ui.SortHeader("Status", "status", catalogueListState, "#table-body")
 						@ui.TableHeader() {
 							Priority
 						}
@@ -257,7 +257,7 @@ templ CataloguePage() {
 
 			<!-- Pagination -->
 			@section("Pagination") {
-				@ui.Pagination(3, 10, "#", "#main")
+				@ui.Pagination(ui.ListState{BaseURL: "#", Page: 3}, 10, "#main")
 			}
 
 			<!-- Avatars -->
@@ -539,6 +539,15 @@ templ section(title string) {
 		<h2 class="border-b border-gray-200 pb-2 text-xl font-bold text-gray-900 dark:border-gray-700 dark:text-gray-100">{ title }</h2>
 		{ children... }
 	</div>
+}
+
+// catalogueListState is a fixed list state so the showcase renders a sorted
+// column and a mid-range page without needing a live query behind it.
+var catalogueListState = ui.ListState{
+	BaseURL: "#",
+	Sort:    "name",
+	Dir:     ui.SortAsc,
+	Page:    3,
 }
 
 func iconNames() []string {

@@ -489,6 +489,89 @@ func (p *productSeed) setDefectStatus(handle, status string) {
 	p.s.fail("move defect "+handle+" to "+status, err)
 }
 
+// fillerDefectAreas and fillerDefectSymptoms are combined into generated titles.
+// Two lists rather than one so titles share words across defects, which is what
+// makes a substring search return a partial result rather than everything or
+// nothing.
+var (
+	fillerDefectAreas = []string{
+		"Sighting sync", "Species search", "Photo upload", "Map rendering",
+		"Offline cache", "CSV export", "Push notification", "Sign-in",
+		"Species catalogue", "Field notes", "Checklist", "Location fix",
+	}
+	fillerDefectSymptoms = []string{
+		"drops the last entry", "times out on slow networks",
+		"renders stale data", "loses focus after submit",
+		"double-counts repeated entries", "ignores the selected filter",
+		"crashes when the device rotates", "shows the wrong timestamp",
+		"returns results in the wrong order", "silently discards edits",
+	}
+	fillerDefectCriticalities = []string{
+		model.DefectCriticalityCritical,
+		model.DefectCriticalityHigh,
+		model.DefectCriticalityMedium,
+		model.DefectCriticalityLow,
+	}
+)
+
+// fillerDefects appends n generated defects so the list view has enough rows to
+// page, sort and filter against. The curated defects above stay first and
+// unchanged; these exist purely to give the table volume and variety.
+//
+// They are written straight to the store rather than through
+// Backlog.CreateDefect, which is the same carve-out the demo accounts use: the
+// service stamps its own CreatedAt, so every defect would share one timestamp
+// and sorting or paging by creation date would be meaningless. Going through
+// the store is what lets the fixture spread them across four months.
+//
+// Everything cycles on the index rather than on a random source, so the same
+// database always comes out the same way and a failing case can be reproduced.
+func (p *productSeed) fillerDefects(n int, statuses, envs, sprints []string) {
+	if p.s.stopped() {
+		return
+	}
+
+	for i := range n {
+		area := fillerDefectAreas[i%len(fillerDefectAreas)]
+		symptom := fillerDefectSymptoms[(i/len(fillerDefectAreas))%len(fillerDefectSymptoms)]
+
+		// Two days apart, oldest first, so created_at is strictly increasing
+		// and a date sort has a defined order to produce.
+		created := day(-2 * (n - i))
+
+		d := &model.Defect{
+			ID:          uuid.NewString(),
+			ProductID:   p.id,
+			Title:       fmt.Sprintf("%s %s (#%d)", area, symptom, i+1),
+			Description: fmt.Sprintf("Reported during triage sweep %d. Reproduced on the affected build; see the linked notes.", i+1),
+			Criticality: fillerDefectCriticalities[i%len(fillerDefectCriticalities)],
+			StatusID:    p.statuses["defect"][statuses[i%len(statuses)]],
+			// Every third defect has no environment and every fourth none of a
+			// sprint, so "unset" is represented too — a facet that only ever
+			// sees populated rows proves nothing.
+			EnvironmentID: p.envs[cycleOrEmpty(envs, i, 3)],
+			SprintID:      p.sprints[cycleOrEmpty(sprints, i, 4)],
+			Priority:      i%5 + 1,
+			IsActive:      i%3 == 0,
+			CreatedAt:     created,
+			UpdatedAt:     created,
+		}
+		if err := p.s.st.Defect.Create(p.s.ctx, d); err != nil {
+			p.s.fail(fmt.Sprintf("create filler defect %d", i+1), err)
+			return
+		}
+	}
+}
+
+// cycleOrEmpty picks the i-th entry of values, or "" on every everyNth index so
+// the generated data includes rows with the field unset.
+func cycleOrEmpty(values []string, i, everyNth int) string {
+	if len(values) == 0 || i%everyNth == 0 {
+		return ""
+	}
+	return values[i%len(values)]
+}
+
 // --- Constraints ---
 
 type constraintSpec struct {

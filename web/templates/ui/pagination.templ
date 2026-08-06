@@ -3,81 +3,50 @@ package ui
 import "fmt"
 
 // Pagination renders page navigation with prev/next and page numbers.
-templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
+//
+// Every link comes from state.PageURL, so changing page carries the active
+// sort, search and filters along instead of resetting the view.
+templ Pagination(state ListState, totalPages int, hxTarget string) {
 	if totalPages > 1 {
+		{{ current := clampPage(state.Page, totalPages) }}
 		<nav aria-label="Pagination" class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 dark:border-gray-700">
 			<div class="flex flex-1 justify-between sm:hidden">
-				if currentPage > 1 {
-					<a
-						href={ templ.SafeURL(pageURL(baseURL, currentPage-1)) }
-						hx-get={ pageURL(baseURL, currentPage-1) }
-						hx-target={ hxTarget }
-						hx-swap="innerHTML"
-						hx-push-url="true"
-						class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-					>
+				if current > 1 {
+					@pageLink(state, current-1, hxTarget, "relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800", "Previous page") {
 						Previous
-					</a>
+					}
 				}
-				if currentPage < totalPages {
-					<a
-						href={ templ.SafeURL(pageURL(baseURL, currentPage+1)) }
-						hx-get={ pageURL(baseURL, currentPage+1) }
-						hx-target={ hxTarget }
-						hx-swap="innerHTML"
-						hx-push-url="true"
-						class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-					>
+				if current < totalPages {
+					@pageLink(state, current+1, hxTarget, "relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800", "Next page") {
 						Next
-					</a>
+					}
 				}
 			</div>
 			<div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
 				<p class="text-sm text-gray-700 dark:text-gray-300">
-					Page <span class="font-medium">{ fmt.Sprintf("%d", currentPage) }</span> of <span class="font-medium">{ fmt.Sprintf("%d", totalPages) }</span>
+					Page <span class="font-medium">{ fmt.Sprintf("%d", current) }</span> of <span class="font-medium">{ fmt.Sprintf("%d", totalPages) }</span>
 				</p>
 				<div class="flex gap-1">
-					if currentPage > 1 {
-						<a
-							href={ templ.SafeURL(pageURL(baseURL, currentPage-1)) }
-							hx-get={ pageURL(baseURL, currentPage-1) }
-							hx-target={ hxTarget }
-							hx-swap="innerHTML"
-							hx-push-url="true"
-							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-500 dark:ring-gray-600 dark:hover:bg-gray-800"
-						>
+					if current > 1 {
+						@pageLink(state, current-1, hxTarget, "relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-500 dark:ring-gray-600 dark:hover:bg-gray-800", "Previous page") {
 							@Icon("chevron-left", "sm")
-						</a>
+						}
 					}
-					for _, page := range pageRange(currentPage, totalPages) {
-						if page == currentPage {
-							<span class="relative z-10 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">
+					for _, page := range pageRange(current, totalPages) {
+						if page == current {
+							<span aria-current="page" class="relative z-10 inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">
 								{ fmt.Sprintf("%d", page) }
 							</span>
 						} else {
-							<a
-								href={ templ.SafeURL(pageURL(baseURL, page)) }
-								hx-get={ pageURL(baseURL, page) }
-								hx-target={ hxTarget }
-								hx-swap="innerHTML"
-								hx-push-url="true"
-								class="relative inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-800"
-							>
+							@pageLink(state, page, hxTarget, "relative inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-800", fmt.Sprintf("Page %d", page)) {
 								{ fmt.Sprintf("%d", page) }
-							</a>
+							}
 						}
 					}
-					if currentPage < totalPages {
-						<a
-							href={ templ.SafeURL(pageURL(baseURL, currentPage+1)) }
-							hx-get={ pageURL(baseURL, currentPage+1) }
-							hx-target={ hxTarget }
-							hx-swap="innerHTML"
-							hx-push-url="true"
-							class="relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-500 dark:ring-gray-600 dark:hover:bg-gray-800"
-						>
+					if current < totalPages {
+						@pageLink(state, current+1, hxTarget, "relative inline-flex items-center rounded-md px-2 py-2 text-gray-400 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-500 dark:ring-gray-600 dark:hover:bg-gray-800", "Next page") {
 							@Icon("chevron-right", "sm")
-						</a>
+						}
 					}
 				</div>
 			</div>
@@ -85,15 +54,32 @@ templ Pagination(currentPage, totalPages int, baseURL, hxTarget string) {
 	}
 }
 
-func pageURL(base string, page int) string {
-	sep := "?"
-	for _, c := range base {
-		if c == '?' {
-			sep = "&"
-			break
-		}
+// pageLink is the one place a page URL is built, so prev/next and the numbered
+// links cannot drift apart in how they carry the rest of the list state.
+templ pageLink(state ListState, page int, hxTarget, class, label string) {
+	<a
+		href={ templ.SafeURL(state.PageURL(page)) }
+		aria-label={ label }
+		hx-get={ state.PageURL(page) }
+		hx-target={ hxTarget }
+		hx-swap="innerHTML"
+		hx-push-url="true"
+		class={ class }
+	>
+		{ children... }
+	</a>
+}
+
+// clampPage keeps a hand-edited or stale ?page= from rendering a nav that
+// points nowhere.
+func clampPage(page, total int) int {
+	if page < 1 {
+		return 1
 	}
-	return base + sep + "page=" + fmt.Sprintf("%d", page)
+	if total > 0 && page > total {
+		return total
+	}
+	return page
 }
 
 func pageRange(current, total int) []int {

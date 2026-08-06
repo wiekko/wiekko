@@ -605,20 +605,22 @@ func (m *MockRequirementStore) ListAssignees(ctx context.Context, requirementID 
 
 // MockDefectStore implements store.DefectStore with configurable function fields.
 type MockDefectStore struct {
-	CreateFunc            func(ctx context.Context, d *model.Defect) error
-	GetByIDFunc           func(ctx context.Context, id string) (*model.Defect, error)
-	UpdateFunc            func(ctx context.Context, d *model.Defect) error
-	DeleteFunc            func(ctx context.Context, id string) error
-	ListByProductIDFunc   func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
-	ListBySprintIDFunc    func(ctx context.Context, sprintID string) ([]*model.Defect, error)
-	ListByMilestoneIDFunc func(ctx context.Context, milestoneID string) ([]*model.Defect, error)
-	AssignFunc            func(ctx context.Context, a *model.Assignment) error
-	UnassignFunc          func(ctx context.Context, defectID, userID string) error
-	ListAssigneesFunc     func(ctx context.Context, defectID string) ([]*model.Assignment, error)
-	AddLinkFunc           func(ctx context.Context, link *model.DefectLink) error
-	RemoveLinkFunc        func(ctx context.Context, id string) error
-	ListLinksFunc         func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
-	ListLinksByTargetFunc func(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
+	CreateFunc              func(ctx context.Context, d *model.Defect) error
+	GetByIDFunc             func(ctx context.Context, id string) (*model.Defect, error)
+	UpdateFunc              func(ctx context.Context, d *model.Defect) error
+	DeleteFunc              func(ctx context.Context, id string) error
+	ListByProductIDFunc     func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
+	ListPageByProductIDFunc func(ctx context.Context, productID string, filter store.DefectFilter, params store.ListParams) ([]*model.Defect, error)
+	CountByProductIDFunc    func(ctx context.Context, productID string, filter store.DefectFilter, search string) (int, error)
+	ListBySprintIDFunc      func(ctx context.Context, sprintID string) ([]*model.Defect, error)
+	ListByMilestoneIDFunc   func(ctx context.Context, milestoneID string) ([]*model.Defect, error)
+	AssignFunc              func(ctx context.Context, a *model.Assignment) error
+	UnassignFunc            func(ctx context.Context, defectID, userID string) error
+	ListAssigneesFunc       func(ctx context.Context, defectID string) ([]*model.Assignment, error)
+	AddLinkFunc             func(ctx context.Context, link *model.DefectLink) error
+	RemoveLinkFunc          func(ctx context.Context, id string) error
+	ListLinksFunc           func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
+	ListLinksByTargetFunc   func(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
 }
 
 func (m *MockDefectStore) Create(ctx context.Context, d *model.Defect) error {
@@ -635,6 +637,23 @@ func (m *MockDefectStore) Delete(ctx context.Context, id string) error {
 }
 func (m *MockDefectStore) ListByProductID(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error) {
 	return m.ListByProductIDFunc(ctx, productID, filter)
+}
+
+// ListPageByProductID and CountByProductID fall back to the unpaged mock when
+// no dedicated stub is set, so tests that only care about the filter reaching
+// the store need not restate the paged variant.
+func (m *MockDefectStore) ListPageByProductID(ctx context.Context, productID string, filter store.DefectFilter, params store.ListParams) ([]*model.Defect, error) {
+	if m.ListPageByProductIDFunc == nil {
+		return m.ListByProductIDFunc(ctx, productID, filter)
+	}
+	return m.ListPageByProductIDFunc(ctx, productID, filter, params)
+}
+func (m *MockDefectStore) CountByProductID(ctx context.Context, productID string, filter store.DefectFilter, search string) (int, error) {
+	if m.CountByProductIDFunc == nil {
+		items, err := m.ListByProductIDFunc(ctx, productID, filter)
+		return len(items), err
+	}
+	return m.CountByProductIDFunc(ctx, productID, filter, search)
 }
 func (m *MockDefectStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error) {
 	return m.ListBySprintIDFunc(ctx, sprintID)
@@ -963,6 +982,7 @@ func (m *MockCategoryStore) ListByProductID(ctx context.Context, productID, enti
 	}
 	return nil, nil
 }
+
 // GetByProductAndName and GetByProductAndPrefix default to "not found" so tests
 // that do not care about uniqueness checks need not stub them.
 func (m *MockCategoryStore) GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Category, error) {

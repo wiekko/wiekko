@@ -135,8 +135,20 @@ func TestSeed(t *testing.T) {
 		if err != nil {
 			t.Fatalf("list defects: %v", err)
 		}
-		if len(defects) < 5 {
-			t.Errorf("expected at least 5 Aviary defects, got %d", len(defects))
+		// Aviary must stay over one page so a fresh dev database exercises
+		// pagination without anyone having to click 50 defects into existence.
+		if len(defects) <= 50 {
+			t.Errorf("expected more than 50 Aviary defects so the list pages, got %d", len(defects))
+		}
+
+		// Creation dates have to differ, or sorting by Created has no defined
+		// order and paging through it can repeat rows.
+		seen := map[string]bool{}
+		for _, d := range defects {
+			seen[d.CreatedAt] = true
+		}
+		if len(seen) < 10 {
+			t.Errorf("expected Aviary defects spread over many creation dates, got %d distinct", len(seen))
 		}
 	})
 

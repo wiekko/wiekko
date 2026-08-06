@@ -10,6 +10,10 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
+// defectsTableTarget is the element the search box, filters, sort headers and
+// pagination all swap. Declared once so the controls cannot disagree.
+const defectsTableTarget = "#defects-table"
+
 // DefectsProps holds data for the defects list page.
 type DefectsProps struct {
 	Meta        templates.PageMeta
@@ -23,6 +27,21 @@ type DefectsProps struct {
 	Environments map[string]string
 	CanCreate    bool // tester+ can create
 	CanEdit      bool // owner or admin
+
+	// State is the sort/search/filter/page state of the view, and the source of
+	// every URL the table's controls link to.
+	State ui.ListState
+	// Total counts the defects matching the current filter; ProductTotal counts
+	// them all. They differ only when a filter is active, which is how an empty
+	// result tells "nothing matches" from "nothing exists yet".
+	Total        int
+	ProductTotal int
+	TotalPages   int
+
+	// Facet options, in display order.
+	StatusOptions []*model.Status
+	EnvOptions    []*model.RuntimeEnvironment
+	SprintOptions []*model.Sprint
 }
 
 templ DefectsPage(props DefectsProps) {
@@ -41,7 +60,7 @@ templ DefectsPage(props DefectsProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Defects"},
 			})
-			if len(props.Defects) == 0 {
+			if props.ProductTotal == 0 {
 				@patterns.ListPageHeader("Defects", "", "", -1)
 				@ui.Card() {
 					if props.CanCreate {
@@ -54,7 +73,7 @@ templ DefectsPage(props DefectsProps) {
 				<div class="flex items-center justify-between">
 					<div>
 						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Defects</h1>
-						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d items", len(props.Defects)) }</p>
+						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ defectsCountLabel(props) }</p>
 					</div>
 					<div class="flex items-center gap-3">
 						@defectsViewToggle(props.Product.ID, false)
@@ -65,84 +84,191 @@ templ DefectsPage(props DefectsProps) {
 						}
 					</div>
 				</div>
-				@ui.Card() {
-					@ui.Table() {
-						@ui.TableHead() {
+				<div id="defects-table">
+					@DefectsTableContent(props)
+				</div>
+			}
+		</div>
+	}
+}
+
+// DefectsTableContent renders the controls, table and pagination. It is what
+// the htmx request for this page returns, so it must carry everything that
+// changes when the user sorts, searches, filters or pages.
+templ DefectsTableContent(props DefectsProps) {
+	<div class="space-y-4">
+		@defectsControls(props)
+		@ui.Card() {
+			if len(props.Defects) == 0 {
+				@ui.EmptyState("search", "No matching defects",
+					"No defect matches the current search and filters.", "", "")
+				<div class="pb-6 text-center">
+					<a
+						href={ templ.SafeURL(props.State.ClearURL()) }
+						hx-get={ props.State.ClearURL() }
+						hx-target={ defectsTableTarget }
+						hx-swap="innerHTML"
+						hx-push-url="true"
+						class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+					>
+						Clear search and filters
+					</a>
+				</div>
+			} else {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.SortHeader("Title", "title", props.State, defectsTableTarget)
+						@ui.SortHeader("Criticality", "criticality", props.State, defectsTableTarget)
+						@ui.SortHeader("Status", "status", props.State, defectsTableTarget)
+						if len(props.Environments) > 0 {
+							@ui.SortHeader("Environment", "environment", props.State, defectsTableTarget)
+						}
+						@ui.SortHeader("Priority", "priority", props.State, defectsTableTarget)
+						@ui.SortHeader("Created", "created", props.State, defectsTableTarget)
+						if props.CanEdit {
 							@ui.TableHeader() {
-								Title
-							}
-							@ui.TableHeader() {
-								Criticality
-							}
-							@ui.TableHeader() {
-								Status
-							}
-							if len(props.Environments) > 0 {
-								@ui.TableHeader() {
-									Environment
-								}
-							}
-							@ui.TableHeader() {
-								Priority
-							}
-							@ui.TableHeader() {
-								Created
-							}
-							if props.CanEdit {
-								@ui.TableHeader() {
-									<span class="sr-only">Actions</span>
-								}
+								<span class="sr-only">Actions</span>
 							}
 						}
-						@ui.TableBody("") {
-							for _, d := range props.Defects {
-								@ui.TableRow("") {
+					}
+					@ui.TableBody("") {
+						for _, d := range props.Defects {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ d.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@defectCriticalityBadge(d.Criticality)
+								}
+								@ui.TableCellMuted() {
+									@workflowStatusCell(props.Statuses, d.StatusID)
+								}
+								if len(props.Environments) > 0 {
+									@ui.TableCellMuted() {
+										if name, ok := props.Environments[d.EnvironmentID]; ok && name != "" {
+											{ name }
+										} else {
+											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+										}
+									}
+								}
+								@ui.TableCellMuted() {
+									{ fmt.Sprintf("%d", d.Priority) }
+								}
+								@ui.TableCellMuted() {
+									{ formatDate(d.CreatedAt) }
+								}
+								if props.CanEdit {
 									@ui.TableCell() {
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID)) }
-											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-										>
-											{ d.Title }
-										</a>
-									}
-									@ui.TableCellMuted() {
-										@defectCriticalityBadge(d.Criticality)
-									}
-									@ui.TableCellMuted() {
-										@workflowStatusCell(props.Statuses, d.StatusID)
-									}
-									if len(props.Environments) > 0 {
-										@ui.TableCellMuted() {
-											if name, ok := props.Environments[d.EnvironmentID]; ok && name != "" {
-												{ name }
-											} else {
-												<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
-											}
-										}
-									}
-									@ui.TableCellMuted() {
-										{ fmt.Sprintf("%d", d.Priority) }
-									}
-									@ui.TableCellMuted() {
-										{ formatDate(d.CreatedAt) }
-									}
-									if props.CanEdit {
-										@ui.TableCell() {
-											@patterns.RowActions(
-												fmt.Sprintf("/products/%s/defects/%s/edit?return=list", props.Product.ID, d.ID),
-												fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID),
-												props.Meta.CSRFToken,
-											)
-										}
+										@patterns.RowActions(
+											fmt.Sprintf("/products/%s/defects/%s/edit?return=list", props.Product.ID, d.ID),
+											fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID),
+											props.Meta.CSRFToken,
+										)
 									}
 								}
 							}
 						}
 					}
 				}
+				@ui.Pagination(props.State, props.TotalPages, defectsTableTarget)
 			}
+		}
+	</div>
+}
+
+// defectsControls renders the search box and the collapsible facet drawer.
+//
+// Everything the server needs to rebuild the view lives inside #defects-controls
+// as a named input, and every control includes that whole subtree: typing in the
+// search box must not drop the active facets, and changing a facet must not drop
+// the search or the sort order. Page is deliberately absent — narrowing the
+// result set has to return to page 1, since the page the user was on may no
+// longer exist.
+templ defectsControls(props DefectsProps) {
+	<div id="defects-controls" class="space-y-3">
+		<div class="flex items-center gap-3">
+			<div class="max-w-sm flex-1">
+				@defectsSearchInput(props)
+			</div>
+			<details class="group/filters" open?={ props.State.Filtered() }>
+				<summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset select-none hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800 [&::-webkit-details-marker]:hidden">
+					@ui.Icon("filter", "sm")
+					Filters
+					if n := activeDefectFilters(props.State); n > 0 {
+						<span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+							{ fmt.Sprintf("%d", n) }
+						</span>
+					}
+					<span class="transition-transform duration-200 group-open/filters:rotate-90">
+						@ui.Icon("chevron-right", "sm")
+					</span>
+				</summary>
+				<div class="mt-3 grid grid-cols-1 gap-4 rounded-lg bg-gray-50 p-4 sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-800">
+					@defectsFacet(props, "status_id", "Status", defectStatusOptions(props))
+					@defectsFacet(props, "criticality", "Criticality", defectCriticalityOptions())
+					if len(props.EnvOptions) > 0 {
+						@defectsFacet(props, "environment_id", "Environment", defectEnvironmentOptions(props))
+					}
+					if len(props.SprintOptions) > 0 {
+						@defectsFacet(props, "sprint_id", "Sprint", defectSprintOptions(props))
+					}
+				</div>
+			</details>
 		</div>
-	}
+		// The sort order rides along as hidden fields. htmx sends only the
+		// inputs it is told to include, so without these a filter change would
+		// silently reset the table to its default order.
+		for name, value := range props.State.HiddenInputs() {
+			<input type="hidden" name={ name } value={ value }/>
+		}
+	</div>
+}
+
+templ defectsSearchInput(props DefectsProps) {
+	<div class="relative">
+		<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+			@ui.Icon("search", "sm")
+		</div>
+		<input
+			type="search"
+			name="q"
+			value={ props.State.Search }
+			placeholder="Search defects…"
+			aria-label="Search defects"
+			class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+			hx-get={ props.State.BaseURL }
+			hx-target={ defectsTableTarget }
+			hx-swap="innerHTML"
+			hx-trigger="keyup changed delay:300ms, search"
+			hx-include="#defects-controls [name]"
+			hx-push-url="true"
+		/>
+	</div>
+}
+
+templ defectsFacet(props DefectsProps, name, label string, options []templates.SelectOption) {
+	<div
+		hx-get={ props.State.BaseURL }
+		hx-target={ defectsTableTarget }
+		hx-swap="innerHTML"
+		hx-trigger="change"
+		hx-include="#defects-controls [name]"
+		hx-push-url="true"
+	>
+		@ui.Select(ui.SelectProps{
+			ID:      "defect-filter-" + name,
+			Name:    name,
+			Label:   label,
+			Value:   props.State.Filters[name],
+			Options: options,
+		})
+	</div>
 }
 
 templ defectCriticalityBadge(criticality string) {
@@ -156,4 +282,64 @@ templ defectCriticalityBadge(criticality string) {
 		default:
 			@ui.Badge("Low", "gray")
 	}
+}
+
+// defectsCountLabel states how many defects are shown. Under an active filter
+// it names both numbers, so a narrowed list never reads as if defects had gone
+// missing.
+func defectsCountLabel(props DefectsProps) string {
+	if props.State.Filtered() {
+		return fmt.Sprintf("%d of %d items", props.Total, props.ProductTotal)
+	}
+	return fmt.Sprintf("%d items", props.Total)
+}
+
+// activeDefectFilters counts the facets currently narrowing the list, for the
+// badge on the collapsed drawer — otherwise a filter hidden inside it would be
+// invisible.
+func activeDefectFilters(state ui.ListState) int {
+	n := 0
+	for _, v := range state.Filters {
+		if v != "" {
+			n++
+		}
+	}
+	return n
+}
+
+func defectStatusOptions(props DefectsProps) []templates.SelectOption {
+	options := make([]templates.SelectOption, 0, len(props.StatusOptions)+1)
+	options = append(options, templates.SelectOption{Value: "", Label: "All statuses"})
+	for _, s := range props.StatusOptions {
+		options = append(options, templates.SelectOption{Value: s.ID, Label: s.Name})
+	}
+	return options
+}
+
+func defectCriticalityOptions() []templates.SelectOption {
+	return []templates.SelectOption{
+		{Value: "", Label: "All criticalities"},
+		{Value: model.DefectCriticalityCritical, Label: "Critical"},
+		{Value: model.DefectCriticalityHigh, Label: "High"},
+		{Value: model.DefectCriticalityMedium, Label: "Medium"},
+		{Value: model.DefectCriticalityLow, Label: "Low"},
+	}
+}
+
+func defectEnvironmentOptions(props DefectsProps) []templates.SelectOption {
+	options := make([]templates.SelectOption, 0, len(props.EnvOptions)+1)
+	options = append(options, templates.SelectOption{Value: "", Label: "All environments"})
+	for _, e := range props.EnvOptions {
+		options = append(options, templates.SelectOption{Value: e.ID, Label: e.Name})
+	}
+	return options
+}
+
+func defectSprintOptions(props DefectsProps) []templates.SelectOption {
+	options := make([]templates.SelectOption, 0, len(props.SprintOptions)+1)
+	options = append(options, templates.SelectOption{Value: "", Label: "All sprints"})
+	for _, s := range props.SprintOptions {
+		options = append(options, templates.SelectOption{Value: s.ID, Label: s.Name})
+	}
+	return options
 }

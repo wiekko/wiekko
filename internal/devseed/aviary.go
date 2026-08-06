@@ -472,6 +472,15 @@ func (s *seeder) aviaryDefects(p *productSeed) {
 		linkReqs:    []string{"sighting-species"},
 		linkComps:   []string{"Field Logging"},
 	})
+
+	// Aviary carries the bulk data: it is the product with enough statuses,
+	// sprints and environments for every facet and sort key on the defects list
+	// to have something to bite on. 60 filler rows put it over the 50-row page
+	// size, so pagination is exercised on a fresh dev database.
+	p.fillerDefects(60,
+		[]string{"New", "In Progress", "In Review", "Done"},
+		[]string{"iOS 17", "Android 14", "Web (Chrome)"},
+		[]string{"Sprint 12", "Sprint 13", "Sprint 14"})
 }
 
 func (s *seeder) aviaryTestCases(p *productSeed) {

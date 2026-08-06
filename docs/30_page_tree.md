@@ -93,7 +93,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/requirements/new`       | Create Requirement | Form                                                      |
 | `/products/:id/requirements/:rid`      | Requirement Detail | Tabbed detail page (see below)                            |
 | `/products/:id/requirements/:rid/edit` | Edit Requirement   | Form                                                      |
-| `/products/:id/defects`                | Defects List       | Table view with filters, sort, multi-select               |
+| `/products/:id/defects`                | Defects List       | Table view with search, facet filters, sort, pagination (UC-104..107); returns the table fragment for htmx requests |
 | `/products/:id/defects/board`          | Defects Board      | Kanban board view                                         |
 | `/products/:id/defects/new`            | Create Defect      | Form                                                      |
 | `/products/:id/defects/:did`           | Defect Detail      | Tabbed detail page                                        |
@@ -315,6 +315,28 @@ Requirements and defects have both a table view (`/requirements`) and a board vi
 - They represent fundamentally different interaction patterns
 - The sidebar link can indicate which view is active
 - Users can bookmark their preferred view
+
+### List state lives in the URL, on the list's own route
+
+Sortable, filterable tables (UC-104..107) keep their whole state in one canonical
+parameter set: `sort`, `dir`, `q`, the facet names, and `page`. The rules are:
+
+- Changing the sort or a filter resets to page 1 — the row that was 51st under
+  the old order has nothing to do with the row that is 51st under the new one.
+- Changing the page preserves everything else.
+- Sorting follows a column's meaning, not its stored value: severities sort by
+  severity, and workflow statuses by the column order the product owner
+  configured. Sort keys are resolved against a per-entity allowlist, so an
+  unknown or stale key renders the default order rather than an error.
+- Server-side paging needs a unique tiebreaker in the ORDER BY. Without one,
+  rows that tie on the sort key have no defined order between them and paging
+  can show the same row twice while never showing another.
+
+Unlike the tab fragments, a list does **not** get a separate fragment route. Its
+controls push their request URL into the address bar, so that URL has to be the
+page's own; and the search box cannot precompute a page URL to push instead,
+because its URL depends on what has been typed. The list route therefore serves
+the full page normally and just the table fragment when `HX-Request` is set.
 
 ### Theme preference on user profile
 

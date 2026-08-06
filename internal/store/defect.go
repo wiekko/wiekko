@@ -11,10 +11,40 @@ import (
 
 // DefectFilter controls which defects are returned by ListByProductID.
 type DefectFilter struct {
-	Criticality string // empty = all
-	StatusID    string // empty = all
-	SprintID    string // empty = all
+	Criticality   string // empty = all
+	StatusID      string // empty = all
+	SprintID      string // empty = all
+	EnvironmentID string // empty = all
+	MilestoneID   string // empty = all
 }
+
+// DefectSortColumns maps the sort keys the UI and API may ask for onto SQL
+// expressions. Keys absent from this map fall back to the default order, so
+// nothing a caller sends can reach the ORDER BY clause verbatim.
+//
+// criticality and status cannot sort on their stored values: criticality is a
+// text enum whose alphabetical order (critical, high, low, medium) is not its
+// severity order, and a defect's status is a foreign key whose meaningful order
+// lives in statuses.position.
+var DefectSortColumns = map[string]string{
+	"title":       `LOWER(d.title)`,
+	"criticality": `CASE d.criticality WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`,
+	"status":      `COALESCE(s.position, 9999)`,
+	"environment": `LOWER(COALESCE(e.name, ''))`,
+	"priority":    `d.priority`,
+	"created":     `d.created_at`,
+}
+
+// defectDefaultOrder preserves the ordering this list had before it became
+// sortable, so an unsorted view looks unchanged.
+const defectDefaultOrder = `d.priority DESC, d.created_at`
+
+// defectListFrom joins the tables whose values are sortable or searchable but
+// not stored on the defect itself. Both joins are outer: status and environment
+// are optional, and a defect missing one must not drop out of the list.
+const defectListFrom = ` FROM defects d
+	LEFT JOIN statuses s ON d.status_id = s.id
+	LEFT JOIN runtime_environments e ON d.environment_id = e.id`
 
 // DefectStore defines data access operations for defects.
 type DefectStore interface {
@@ -23,6 +53,8 @@ type DefectStore interface {
 	Update(ctx context.Context, d *model.Defect) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter DefectFilter) ([]*model.Defect, error)
+	ListPageByProductID(ctx context.Context, productID string, filter DefectFilter, params ListParams) ([]*model.Defect, error)
+	CountByProductID(ctx context.Context, productID string, filter DefectFilter, search string) (int, error)
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error)
 	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Defect, error)
 	Assign(ctx context.Context, a *model.Assignment) error
@@ -80,23 +112,68 @@ func (s *defectStore) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *defectStore) ListByProductID(ctx context.Context, productID string, filter DefectFilter) ([]*model.Defect, error) {
-	query := `SELECT ` + defectColumns + ` FROM defects WHERE product_id = ?`
+// defectListWhere builds the WHERE clause shared by ListByProductID and
+// CountByProductID. Keeping it in one place is what stops the page query and
+// the count that sizes its pagination from drifting apart.
+func defectListWhere(productID string, filter DefectFilter, search string) (string, []any) {
+	where := ` WHERE d.product_id = ?`
 	args := []any{productID}
 	if filter.Criticality != "" {
-		query += ` AND criticality = ?`
+		where += ` AND d.criticality = ?`
 		args = append(args, filter.Criticality)
 	}
 	if filter.StatusID != "" {
-		query += ` AND status_id = ?`
+		where += ` AND d.status_id = ?`
 		args = append(args, filter.StatusID)
 	}
 	if filter.SprintID != "" {
-		query += ` AND sprint_id = ?`
+		where += ` AND d.sprint_id = ?`
 		args = append(args, filter.SprintID)
 	}
-	query += ` ORDER BY priority DESC, created_at`
+	if filter.EnvironmentID != "" {
+		where += ` AND d.environment_id = ?`
+		args = append(args, filter.EnvironmentID)
+	}
+	if filter.MilestoneID != "" {
+		where += ` AND d.milestone_id = ?`
+		args = append(args, filter.MilestoneID)
+	}
+	// The global search deliberately spans only the columns a substring match
+	// is meaningful for. Priority is numeric, so "1" would match 10 and 21;
+	// created_at is RFC 3339 while the column renders as "12 Jul", so matching
+	// the stored form would not match what the user is looking at.
+	if pattern := searchPattern(search); search != "" {
+		where += ` AND (LOWER(d.title) LIKE ? ESCAPE '` + LikeEscape + `'` +
+			` OR LOWER(d.criticality) LIKE ? ESCAPE '` + LikeEscape + `'` +
+			` OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '` + LikeEscape + `'` +
+			` OR LOWER(COALESCE(e.name, '')) LIKE ? ESCAPE '` + LikeEscape + `')`
+		args = append(args, pattern, pattern, pattern, pattern)
+	}
+	return where, args
+}
+
+func (s *defectStore) ListByProductID(ctx context.Context, productID string, filter DefectFilter) ([]*model.Defect, error) {
+	return s.ListPageByProductID(ctx, productID, filter, ListParams{})
+}
+
+func (s *defectStore) ListPageByProductID(ctx context.Context, productID string, filter DefectFilter, params ListParams) ([]*model.Defect, error) {
+	where, args := defectListWhere(productID, filter, params.Search)
+	query := `SELECT ` + defectColumnsQualified + defectListFrom + where
+	query += orderClause(params, DefectSortColumns, defectDefaultOrder, `d.id`)
+
+	limit, limitArgs := limitClause(params)
+	query += limit
+	args = append(args, limitArgs...)
+
 	return s.listDefects(ctx, query, args...)
+}
+
+func (s *defectStore) CountByProductID(ctx context.Context, productID string, filter DefectFilter, search string) (int, error) {
+	where, args := defectListWhere(productID, filter, search)
+	var total int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*)`+defectListFrom+where, args...).Scan(&total)
+	return total, err
 }
 
 func (s *defectStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error) {
@@ -225,6 +302,13 @@ func (s *defectStore) listDefects(ctx context.Context, query string, args ...any
 const defectColumns = `id, product_id, title, description, criticality,
 	status_id, milestone_id, sprint_id, environment_id, estimation, priority, is_active,
 	created_at, updated_at`
+
+// defectColumnsQualified is defectColumns for the joined list query, where bare
+// column names would be ambiguous. Both feed the same scanDefect, so the column
+// order has to stay identical.
+const defectColumnsQualified = `d.id, d.product_id, d.title, d.description, d.criticality,
+	d.status_id, d.milestone_id, d.sprint_id, d.environment_id, d.estimation, d.priority, d.is_active,
+	d.created_at, d.updated_at`
 
 func scanDefect(sc scanner) (*model.Defect, error) {
 	var d model.Defect

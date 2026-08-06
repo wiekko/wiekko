@@ -16,6 +16,7 @@ import (
 	"nexmap.net/web/templates"
 	productpage "nexmap.net/web/templates/pages/product"
 	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
 )
 
 // PageProductController handles product pages.
@@ -6553,35 +6554,169 @@ func (c *PageProductController) RequirementHistoryTab(w http.ResponseWriter, r *
 
 // --- Defect Pages ---
 
-// Defects renders GET /products/{id}/defects.
+// defectsPageSize is the number of defects shown per page (UC-106). Fixed
+// rather than user-selectable: another dimension of URL state buys little when
+// sorting and filtering already narrow the list.
+const defectsPageSize = 50
+
+// Query parameter names for the defect list facets. They are also the names of
+// the filter <select> elements, which is what lets htmx's hx-include ship the
+// whole facet set back as the next request's query string.
+const (
+	defectFilterStatus      = "status_id"
+	defectFilterCriticality = "criticality"
+	defectFilterEnvironment = "environment_id"
+	defectFilterSprint      = "sprint_id"
+)
+
+// parseDefectListState reads sort, search, facet and page state out of the
+// request. Nothing here can fail: a stale bookmark or a hand-edited URL should
+// render the default view, not an error page, so unknown sort keys and
+// out-of-range pages are corrected rather than rejected.
+//
+// Facet values are passed through unvalidated, exactly as the JSON API does —
+// they reach SQL only as bound parameters, and an unknown ID simply matches
+// nothing.
+func parseDefectListState(r *http.Request, baseURL string) (store.DefectFilter, store.ListParams, ui.ListState) {
+	q := r.URL.Query()
+
+	filter := store.DefectFilter{
+		Criticality:   q.Get(defectFilterCriticality),
+		StatusID:      q.Get(defectFilterStatus),
+		SprintID:      q.Get(defectFilterSprint),
+		EnvironmentID: q.Get(defectFilterEnvironment),
+	}
+
+	sortKey := q.Get(ui.ParamSort)
+	if _, ok := store.DefectSortColumns[sortKey]; !ok {
+		sortKey = ""
+	}
+	dir := ui.SortAsc
+	if q.Get(ui.ParamDir) == ui.SortDesc {
+		dir = ui.SortDesc
+	}
+
+	page, err := strconv.Atoi(q.Get(ui.ParamPage))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	search := strings.TrimSpace(q.Get(ui.ParamSearch))
+
+	state := ui.ListState{
+		BaseURL: baseURL,
+		Sort:    sortKey,
+		Dir:     dir,
+		Search:  search,
+		Page:    page,
+		Filters: map[string]string{
+			defectFilterCriticality: filter.Criticality,
+			defectFilterStatus:      filter.StatusID,
+			defectFilterSprint:      filter.SprintID,
+			defectFilterEnvironment: filter.EnvironmentID,
+		},
+	}
+
+	params := store.ListParams{
+		Sort:   sortKey,
+		Dir:    dir,
+		Search: search,
+		Limit:  defectsPageSize,
+		Offset: (page - 1) * defectsPageSize,
+	}
+
+	return filter, params, state
+}
+
+// loadDefectsProps assembles everything the defects list needs, for both the
+// full page and the htmx fragment, so the two cannot render different views of
+// the same URL.
+func (c *PageProductController) loadDefectsProps(r *http.Request, user *model.User, productID string) (productpage.DefectsProps, error) {
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.DefectsProps{}, err
+	}
+
+	filter, params, state := parseDefectListState(r, "/products/"+productID+"/defects")
+
+	defects, total, err := c.backlog.ListDefectsPage(r.Context(), user, productID, filter, params)
+	if err != nil {
+		return productpage.DefectsProps{}, err
+	}
+
+	// A page beyond the end of the result set renders as empty, which looks
+	// like "no matches" rather than "you have scrolled too far". Clamp and
+	// re-query so the last page is what the user actually lands on.
+	totalPages := (total + defectsPageSize - 1) / defectsPageSize
+	if totalPages > 0 && state.Page > totalPages {
+		state.Page = totalPages
+		params.Offset = (totalPages - 1) * defectsPageSize
+		defects, _, err = c.backlog.ListDefectsPage(r.Context(), user, productID, filter, params)
+		if err != nil {
+			return productpage.DefectsProps{}, err
+		}
+	}
+
+	// The unfiltered count separates "this product has no defects yet" from
+	// "nothing matches these filters" — the first invites you to create one,
+	// the second would be wrong to.
+	productTotal := total
+	if state.Filtered() {
+		productTotal, _ = c.backlog.CountDefects(r.Context(), user, productID)
+	}
+
+	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	environments, _ := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
+	sprints, _ := c.milestone.ListSprints(r.Context(), user, productID)
+
+	return productpage.DefectsProps{
+		Meta: templates.PageMeta{
+			Title:     p.Name + " - Defects",
+			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
+		},
+		DisplayName:   user.DisplayName,
+		IsAdmin:       user.IsAdmin,
+		Product:       p,
+		Defects:       defects,
+		Statuses:      c.buildStatusMap(r, user, productID, "defect"),
+		Environments:  c.buildEnvironmentMap(r, user, productID),
+		CanCreate:     c.canCreateDefects(user, role),
+		CanEdit:       c.canEditDefects(user, role),
+		State:         state,
+		Total:         total,
+		ProductTotal:  productTotal,
+		TotalPages:    totalPages,
+		StatusOptions: statuses,
+		EnvOptions:    environments,
+		SprintOptions: sprints,
+	}, nil
+}
+
+// Defects renders GET /products/{id}/defects — the full page for a normal
+// request, and just the table fragment for an htmx one.
+//
+// The tab fragments elsewhere in this file each get their own route, but a list
+// view cannot: sort, filter and page state has to be bookmarkable
+// (docs/30_page_tree.md, "URL = state"), so the controls push their request URL
+// into the address bar. A separate fragment route would push that route's URL
+// instead, and the search box — whose URL depends on what the user has typed —
+// cannot precompute a page URL to push in its place. Serving both shapes from
+// the one URL keeps the address bar honest.
 func (c *PageProductController) Defects(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
 
-	p, role, err := c.loadProductWithRole(r, user, productID)
+	props, err := c.loadDefectsProps(r, user, r.PathValue("id"))
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	defects, _ := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DefectsPage(productpage.DefectsProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Defects",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:  user.DisplayName,
-		IsAdmin:      user.IsAdmin,
-		Product:      p,
-		Defects:      defects,
-		Statuses:     c.buildStatusMap(r, user, productID, "defect"),
-		Environments: c.buildEnvironmentMap(r, user, productID),
-		CanCreate:    c.canCreateDefects(user, role),
-		CanEdit:      c.canEditDefects(user, role),
-	}).Render(r.Context(), w)
+	if r.Header.Get("HX-Request") == "true" {
+		_ = productpage.DefectsTableContent(props).Render(r.Context(), w)
+		return
+	}
+	_ = productpage.DefectsPage(props).Render(r.Context(), w)
 }
 
 // DefectDetail renders GET /products/{id}/defects/{defectId}.

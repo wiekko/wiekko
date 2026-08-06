@@ -26,24 +26,35 @@ templ TableHeader() {
 }
 
 // SortHeader renders a clickable sortable column header using htmx.
-templ SortHeader(label, sortField, currentSort, currentDir, hxGet, hxTarget string) {
-	<th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-		<button
-			type="button"
-			class="group inline-flex items-center gap-1"
-			hx-get={ buildSortURL(hxGet, sortField, currentSort, currentDir) }
+//
+// The link comes from state.SortURL so it carries the active search, filters
+// and direction with it; the header must never build its own query string.
+templ SortHeader(label, sortField string, state ListState, hxTarget string) {
+	{{ active, dir := state.SortedBy(sortField) }}
+	<th
+		scope="col"
+		class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+		if active {
+			aria-sort={ ariaSort(dir) }
+		}
+	>
+		<a
+			href={ templ.SafeURL(state.SortURL(sortField)) }
+			class="group inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+			hx-get={ state.SortURL(sortField) }
 			hx-target={ hxTarget }
 			hx-swap="innerHTML"
+			hx-push-url="true"
 		>
 			{ label }
-			<span class={ "text-gray-400 dark:text-gray-500", sortIndicatorClass(sortField, currentSort) }>
-				if sortField == currentSort && currentDir == "desc" {
+			<span class={ "text-gray-400 dark:text-gray-500", sortIndicatorClass(active) }>
+				if active && dir == SortDesc {
 					@Icon("chevron-down", "sm")
 				} else {
-					@Icon("chevron-right", "sm")
+					@Icon("chevron-up", "sm")
 				}
 			</span>
-		</button>
+		</a>
 	</th>
 }
 
@@ -95,24 +106,16 @@ func rowClass(hxGet string) string {
 	return ""
 }
 
-func sortIndicatorClass(sortField, currentSort string) string {
-	if sortField == currentSort {
+func sortIndicatorClass(active bool) string {
+	if active {
 		return "text-indigo-600 dark:text-indigo-400"
 	}
 	return "invisible group-hover:visible"
 }
 
-func buildSortURL(base, field, currentSort, currentDir string) string {
-	dir := "asc"
-	if field == currentSort && currentDir == "asc" {
-		dir = "desc"
+func ariaSort(dir string) string {
+	if dir == SortDesc {
+		return "descending"
 	}
-	sep := "?"
-	for _, c := range base {
-		if c == '?' {
-			sep = "&"
-			break
-		}
-	}
-	return base + sep + "sort=" + field + "&dir=" + dir
+	return "ascending"
 }
