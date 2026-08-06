@@ -209,9 +209,10 @@ func sprintPlanningCards(props SprintPlanningTabProps, moveValue string) []templ
 
 // SprintStatusCount is one row of the per-status breakdown.
 type SprintStatusCount struct {
-	Name     string
-	IsClosed bool
-	Count    int
+	Name      string
+	IsDefault bool
+	IsClosed  bool
+	Count     int
 }
 
 // SprintSummaryTabProps holds the completion stats for a sprint.
@@ -249,7 +250,7 @@ templ SprintSummaryTabContent(props SprintSummaryTabProps) {
 						<ul class="mt-2 flex flex-wrap items-center gap-3">
 							for _, s := range props.Statuses {
 								<li class="inline-flex items-center gap-2">
-									@patterns.StatusBadge(s.Name, s.IsClosed)
+									@patterns.StatusBadge(s.Name, s.IsDefault, s.IsClosed)
 									<span class="text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d", s.Count) }</span>
 								</li>
 							}

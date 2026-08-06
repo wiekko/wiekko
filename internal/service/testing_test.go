@@ -975,7 +975,7 @@ func TestSetResultStatus(t *testing.T) {
 func TestMarkResultsForRetest(t *testing.T) {
 	t.Run("only failed results move to retest", func(t *testing.T) {
 		var updated []*model.CampaignResult
-		svc := newTestingService(nil, nil,
+		svc := newTestingService(nil, activeCampaign(),
 			&testutil.MockCampaignResultStore{
 				ListByDefectIDFunc: func(_ context.Context, _ string) ([]*model.CampaignResult, error) {
 					return []*model.CampaignResult{
@@ -1007,6 +1007,92 @@ func TestMarkResultsForRetest(t *testing.T) {
 		// Never straight to passed — a tester must confirm (FR-504).
 		if updated[0].Status != model.CampaignResultStatusRetest {
 			t.Fatalf("Status = %q, want %q", updated[0].Status, model.CampaignResultStatusRetest)
+		}
+	})
+
+	t.Run("results of a closed campaign are left alone", func(t *testing.T) {
+		// A closed campaign records the verdict it was closed with. Fixing a
+		// defect afterwards must not reopen one of its results, which would
+		// retroactively turn a decided campaign back into an incomplete one.
+		var updated []*model.CampaignResult
+		svc := newTestingService(nil,
+			&testutil.MockTestingCampaignStore{
+				GetByIDFunc: func(_ context.Context, id string) (*model.TestingCampaign, error) {
+					return testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+						c.ID = id
+						c.Status = model.CampaignStatusClosed
+					}), nil
+				},
+			},
+			&testutil.MockCampaignResultStore{
+				ListByDefectIDFunc: func(_ context.Context, _ string) ([]*model.CampaignResult, error) {
+					return []*model.CampaignResult{
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.Status = model.CampaignResultStatusFailed
+							cr.DefectID = "defect-001"
+						}),
+					}, nil
+				},
+				UpdateFunc: func(_ context.Context, cr *model.CampaignResult) error {
+					updated = append(updated, cr)
+					return nil
+				},
+			},
+			nil, ownerRoles(),
+		)
+
+		if err := svc.MarkResultsForRetest(context.Background(), "defect-001", "user-001"); err != nil {
+			t.Fatalf("MarkResultsForRetest: %v", err)
+		}
+		if len(updated) != 0 {
+			t.Fatalf("updated %d results of a closed campaign, want 0", len(updated))
+		}
+	})
+
+	t.Run("each campaign is looked up once", func(t *testing.T) {
+		// Two results in the same campaign must not cost two store reads.
+		lookups := 0
+		var updated []*model.CampaignResult
+		svc := newTestingService(nil,
+			&testutil.MockTestingCampaignStore{
+				GetByIDFunc: func(_ context.Context, id string) (*model.TestingCampaign, error) {
+					lookups++
+					return testutil.MakeTestingCampaign(func(c *model.TestingCampaign) {
+						c.ID = id
+						c.Status = model.CampaignStatusActive
+					}), nil
+				},
+			},
+			&testutil.MockCampaignResultStore{
+				ListByDefectIDFunc: func(_ context.Context, _ string) ([]*model.CampaignResult, error) {
+					return []*model.CampaignResult{
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.Status = model.CampaignResultStatusFailed
+							cr.DefectID = "defect-001"
+						}),
+						testutil.MakeCampaignResult(func(cr *model.CampaignResult) {
+							cr.ID = "cr-002"
+							cr.Status = model.CampaignResultStatusFailed
+							cr.DefectID = "defect-001"
+						}),
+					}, nil
+				},
+				UpdateFunc: func(_ context.Context, cr *model.CampaignResult) error {
+					updated = append(updated, cr)
+					return nil
+				},
+			},
+			nil, ownerRoles(),
+		)
+
+		if err := svc.MarkResultsForRetest(context.Background(), "defect-001", "user-001"); err != nil {
+			t.Fatalf("MarkResultsForRetest: %v", err)
+		}
+		if len(updated) != 2 {
+			t.Fatalf("updated %d results, want 2", len(updated))
+		}
+		if lookups != 1 {
+			t.Fatalf("campaign looked up %d times, want 1", lookups)
 		}
 	})
 }

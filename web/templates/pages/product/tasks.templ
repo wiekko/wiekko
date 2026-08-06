@@ -18,8 +18,8 @@ type TasksProps struct {
 	Product          *model.Product
 	Tasks            []*model.Requirement
 	CategoryPrefixes map[string]string // category ID → prefix
-	Statuses         map[string]string // status ID → name
-	CanEdit          bool              // owner or admin
+	Statuses         map[string]*model.Status // status ID → status
+	CanEdit          bool                     // owner or admin
 }
 
 templ TasksPage(props TasksProps) {
@@ -98,15 +98,7 @@ templ TasksPage(props TasksProps) {
 										@ui.Badge(requirementPrefix(props.CategoryPrefixes, task.CategoryID), "emerald")
 									}
 									@ui.TableCellMuted() {
-										if task.StatusID != "" {
-											if name, ok := props.Statuses[task.StatusID]; ok {
-												{ name }
-											} else {
-												{ task.StatusID }
-											}
-										} else {
-											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
-										}
+										@workflowStatusCell(props.Statuses, task.StatusID)
 									}
 									@ui.TableCellMuted() {
 										{ fmt.Sprintf("%d", task.Priority) }

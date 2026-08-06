@@ -18,8 +18,8 @@ type RequirementsProps struct {
 	Product          *model.Product
 	Requirements     []*model.Requirement
 	CategoryPrefixes map[string]string // category ID → prefix
-	Statuses         map[string]string // status ID → name
-	CanEdit          bool              // owner or admin
+	Statuses         map[string]*model.Status // status ID → status
+	CanEdit          bool                     // owner or admin
 }
 
 templ RequirementsPage(props RequirementsProps) {
@@ -98,15 +98,7 @@ templ RequirementsPage(props RequirementsProps) {
 										@ui.Badge(requirementPrefix(props.CategoryPrefixes, req.CategoryID), "blue")
 									}
 									@ui.TableCellMuted() {
-										if req.StatusID != "" {
-											if name, ok := props.Statuses[req.StatusID]; ok {
-												{ name }
-											} else {
-												{ req.StatusID }
-											}
-										} else {
-											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
-										}
+										@workflowStatusCell(props.Statuses, req.StatusID)
 									}
 									@ui.TableCellMuted() {
 										{ fmt.Sprintf("%d", req.Priority) }

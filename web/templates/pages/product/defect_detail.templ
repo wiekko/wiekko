@@ -17,7 +17,7 @@ type DefectDetailProps struct {
 	IsAdmin       bool
 	Product       *model.Product
 	Defect        *model.Defect
-	StatusName      string
+	Status          *model.Status
 	MilestoneName   string
 	SprintName      string
 	EnvironmentName string
@@ -54,7 +54,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 			@ui.TabGroup(defectDetailTabs(props.Product.ID, props.Defect.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@DefectOverviewTabContent(props.Product.ID, props.Product.EstimationMode, props.Product.WorkflowMode, props.Defect, props.StatusName, props.MilestoneName, props.SprintName, props.EnvironmentName)
+				@DefectOverviewTabContent(props.Product.ID, props.Product.EstimationMode, props.Product.WorkflowMode, props.Defect, props.Status, props.MilestoneName, props.SprintName, props.EnvironmentName)
 			}
 			@ui.TabPanelHidden("components") {
 				@ui.LoadingSpinner("md")
@@ -81,12 +81,12 @@ templ DefectDetailPage(props DefectDetailProps) {
 	}
 }
 
-templ DefectOverviewTabContent(productID string, estimationMode string, workflowMode string, d *model.Defect, statusName, milestoneName, sprintName, environmentName string) {
+templ DefectOverviewTabContent(productID string, estimationMode string, workflowMode string, d *model.Defect, status *model.Status, milestoneName, sprintName, environmentName string) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
 				@patterns.DetailField("Criticality", defectCriticalityDisplay(d.Criticality))
-				@patterns.DetailField("Status", statusName)
+				@workflowStatusField(status)
 				if d.MilestoneID != "" && milestoneName != "" {
 					@defectLinkedField("Milestone", milestoneName, fmt.Sprintf("/products/%s/milestones/%s", productID, d.MilestoneID))
 				} else {

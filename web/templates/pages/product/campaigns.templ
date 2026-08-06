@@ -68,7 +68,7 @@ templ CampaignsPage(props CampaignsProps) {
 								Name
 							}
 							@ui.TableHeader() {
-								State
+								Status
 							}
 							@ui.TableHeader() {
 								Outcome
@@ -100,7 +100,7 @@ templ CampaignsPage(props CampaignsProps) {
 										@campaignStatusBadge(view.Campaign.Status)
 									}
 									@ui.TableCellMuted() {
-										@campaignVerdictBadge(view.Verdict)
+										@campaignVerdictBadge(view.Verdict, view.Campaign.Status)
 									}
 									@ui.TableCellMuted() {
 										<div class="w-40">
@@ -145,14 +145,23 @@ templ campaignStatusBadge(status string) {
 	}
 }
 
-templ campaignVerdictBadge(verdict string) {
+// campaignVerdictBadge renders the derived outcome of a campaign. The label for
+// an incomplete verdict depends on the campaign's own status: results still
+// awaiting testing mean the campaign is in flight while it is open, but a closed
+// campaign is never "in progress" — it simply never reached a verdict, which a
+// force-close leaves behind (FR-041).
+templ campaignVerdictBadge(verdict, campaignStatus string) {
 	switch verdict {
 		case model.CampaignVerdictPassed:
 			@ui.Badge("Passed", "green")
 		case model.CampaignVerdictFailed:
 			@ui.Badge("Failed", "red")
 		default:
-			@ui.Badge("In progress", "gray")
+			if campaignStatus == model.CampaignStatusClosed {
+				@ui.Badge("Incomplete", "amber")
+			} else {
+				@ui.Badge("In progress", "gray")
+			}
 	}
 }
 

@@ -365,7 +365,7 @@ func (c *PageProductController) taskDetailProps(r *http.Request, user *model.Use
 		Task:             task,
 		CategoryPrefixes: prefixes,
 		CategoryNames:    catNames,
-		StatusName:       c.resolveStatusName(r, user, p.ID, task.StatusID, model.RequirementKindRequirement),
+		Status:           c.resolveStatus(r, user, p.ID, task.StatusID, model.RequirementKindRequirement),
 		MilestoneName:    c.resolveMilestoneName(r, user, p.ID, task.MilestoneID),
 		SprintName:       c.resolveSprintName(r, user, p.ID, task.SprintID),
 		ParentName:       parentName,

@@ -5193,31 +5193,35 @@ func (c *PageProductController) resolvePyramidLevelName(r *http.Request, user *m
 
 // --- Shared helpers for requirements/defects ---
 
-// buildStatusMap returns a map of status ID → name for the given entity type.
-func (c *PageProductController) buildStatusMap(r *http.Request, user *model.User, productID, entityType string) map[string]string {
+// buildStatusMap returns a map of status ID → status for the given entity type.
+// The list pages need more than the name: they colour the status badge from its
+// place in the workflow, which only the status itself knows.
+func (c *PageProductController) buildStatusMap(r *http.Request, user *model.User, productID, entityType string) map[string]*model.Status {
 	statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
-	m := make(map[string]string, len(statuses))
+	m := make(map[string]*model.Status, len(statuses))
 	for _, s := range statuses {
-		m[s.ID] = s.Name
+		m[s.ID] = s
 	}
 	return m
 }
 
-// resolveStatusName returns the status name for the given ID and entity type, or empty string.
-func (c *PageProductController) resolveStatusName(r *http.Request, user *model.User, productID, statusID, entityType string) string {
+// resolveStatus returns the status with the given ID for the entity type, or
+// nil when it is unset or no longer configured. Detail pages badge the status
+// by its place in the workflow, so they need the status and not just its name.
+func (c *PageProductController) resolveStatus(r *http.Request, user *model.User, productID, statusID, entityType string) *model.Status {
 	if statusID == "" {
-		return ""
+		return nil
 	}
 	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
 	if err != nil {
-		return ""
+		return nil
 	}
 	for _, s := range statuses {
 		if s.ID == statusID {
-			return s.Name
+			return s
 		}
 	}
-	return ""
+	return nil
 }
 
 // buildSprintMap returns a map of sprint ID → name for the product.
@@ -5410,7 +5414,7 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		Requirement:      req,
 		CategoryPrefixes: prefixes,
 		CategoryNames:    catNames,
-		StatusName:       c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
+		Status:           c.resolveStatus(r, user, productID, req.StatusID, "requirement"),
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, req.MilestoneID),
 		SprintName:       c.resolveSprintName(r, user, productID, req.SprintID),
 		ParentName:       parentName,
@@ -5757,7 +5761,7 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 		Requirement:      req,
 		CategoryPrefixes: prefixes,
 		CategoryNames:    catNames,
-		StatusName:       c.resolveStatusName(r, user, productID, req.StatusID, "requirement"),
+		Status:           c.resolveStatus(r, user, productID, req.StatusID, "requirement"),
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, req.MilestoneID),
 		SprintName:       c.resolveSprintName(r, user, productID, req.SprintID),
 		ParentName:       parentName,
@@ -6609,7 +6613,7 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 		IsAdmin:         user.IsAdmin,
 		Product:         p,
 		Defect:          d,
-		StatusName:      c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
+		Status:          c.resolveStatus(r, user, productID, d.StatusID, "defect"),
 		MilestoneName:   c.resolveMilestoneName(r, user, productID, d.MilestoneID),
 		SprintName:      c.resolveSprintName(r, user, productID, d.SprintID),
 		EnvironmentName: c.buildEnvironmentMap(r, user, productID)[d.EnvironmentID],
@@ -6910,7 +6914,7 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 		p.EstimationMode,
 		p.WorkflowMode,
 		d,
-		c.resolveStatusName(r, user, productID, d.StatusID, "defect"),
+		c.resolveStatus(r, user, productID, d.StatusID, "defect"),
 		c.resolveMilestoneName(r, user, productID, d.MilestoneID),
 		c.resolveSprintName(r, user, productID, d.SprintID),
 		c.buildEnvironmentMap(r, user, productID)[d.EnvironmentID],

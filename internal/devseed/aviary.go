@@ -679,9 +679,16 @@ func (s *seeder) aviaryCampaigns(p *productSeed) {
 		"bo", false,
 	)
 
-	// Closing the field-trial defect moves the result it failed into re-test,
-	// which is the flow FR-504 describes. Doing it here rather than at defect
-	// creation time means there is a result for it to act on.
+	// Closing a defect moves the results it failed into re-test, which is the
+	// flow FR-504 describes. Doing it here rather than at defect creation time
+	// means there are results for it to act on.
+	//
+	// The photo defect belongs to the campaign that is still running, so its
+	// result flips to re-test and the matrix shows a row waiting to be retried.
+	// The field-trial defect belongs to the campaign that has already closed:
+	// that result stays failed, because a closed campaign records the verdict
+	// it was closed with and a later fix must not rewrite it.
+	p.setDefectStatus("photo-orientation", "Done")
 	p.setDefectStatus("trial-crash", "Done")
 }
 

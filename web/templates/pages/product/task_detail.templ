@@ -22,7 +22,7 @@ type TaskDetailProps struct {
 	Task             *model.Requirement
 	CategoryPrefixes map[string]string // task category ID → prefix
 	CategoryNames    map[string]string // task category ID → name
-	StatusName       string
+	Status           *model.Status
 	MilestoneName    string
 	SprintName       string
 	ParentName       string // display name of the parent backlog item
@@ -88,7 +88,7 @@ templ TaskOverviewTabContent(props TaskDetailProps) {
 				} else {
 					@patterns.DetailField("Parent", "")
 				}
-				@patterns.DetailField("Status", props.StatusName)
+				@workflowStatusField(props.Status)
 				if props.Task.MilestoneID != "" && props.MilestoneName != "" {
 					@requirementLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Task.MilestoneID))
 				} else {

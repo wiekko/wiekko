@@ -220,28 +220,47 @@ func TestSeed(t *testing.T) {
 		}
 	})
 
-	t.Run("closing the trial defect pushed its result to re-test", func(t *testing.T) {
+	t.Run("closing a defect pushed its result to re-test", func(t *testing.T) {
 		// FR-504: closing a defect moves the results it failed to re-test. The
-		// fixture closes the field-trial defect after its campaign ran, so at
-		// least one result in the closed campaign must carry that status.
+		// fixture closes the photo defect while its campaign is still running,
+		// so a result in the active campaign must carry that status.
 		campaigns, err := svc.Testing.ListCampaigns(ctx, admin, aviary.ID)
 		if err != nil {
 			t.Fatalf("list campaigns: %v", err)
 		}
 		for _, c := range campaigns {
-			if c.Name != "Release 0.1 Regression" {
-				continue
-			}
 			results, err := svc.Testing.ListCampaignResults(ctx, admin, aviary.ID, c.ID)
 			if err != nil {
 				t.Fatalf("list results: %v", err)
 			}
+
+			retests := 0
 			for _, r := range results {
 				if r.Status == model.CampaignResultStatusRetest {
-					return
+					retests++
 				}
 			}
-			t.Error("expected a re-test result in the closed campaign")
+
+			switch c.Name {
+			case "Sprint 13 Verification":
+				if retests == 0 {
+					t.Error("expected a re-test result in the active campaign")
+				}
+			case "Release 0.1 Regression":
+				// A closed campaign keeps the verdict it was closed with, so
+				// closing the field-trial defect afterwards must not move any
+				// of its results.
+				if retests != 0 {
+					t.Errorf("closed campaign has %d re-test results, want 0", retests)
+				}
+				counts := map[string]int{}
+				for _, r := range results {
+					counts[r.Status]++
+				}
+				if got := model.CampaignVerdict(counts); got != model.CampaignVerdictFailed {
+					t.Errorf("closed campaign verdict = %q, want %q", got, model.CampaignVerdictFailed)
+				}
+			}
 		}
 	})
 

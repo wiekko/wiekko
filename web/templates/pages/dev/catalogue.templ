@@ -94,8 +94,8 @@ templ CataloguePage() {
 						@ui.Badge("Gray", "gray")
 					</div>
 					<div class="flex flex-wrap gap-2">
-						@patterns.StatusBadge("Open", false)
-						@patterns.StatusBadge("Closed", true)
+						@patterns.StatusBadge("Open", false, false)
+						@patterns.StatusBadge("Closed", false, true)
 						@patterns.PriorityBadge(1)
 						@patterns.PriorityBadge(2)
 						@patterns.PriorityBadge(3)
@@ -201,7 +201,7 @@ templ CataloguePage() {
 								Login page redesign
 							}
 							@ui.TableCell() {
-								@patterns.StatusBadge("Open", false)
+								@patterns.StatusBadge("Open", false, false)
 							}
 							@ui.TableCell() {
 								@patterns.PriorityBadge(1)
@@ -215,7 +215,7 @@ templ CataloguePage() {
 								API authentication
 							}
 							@ui.TableCell() {
-								@patterns.StatusBadge("Closed", true)
+								@patterns.StatusBadge("Closed", false, true)
 							}
 							@ui.TableCell() {
 								@patterns.PriorityBadge(3)
@@ -392,7 +392,7 @@ templ CataloguePage() {
 					"#",
 					"demo-csrf-token",
 				) {
-					@patterns.StatusBadge("Open", false)
+					@patterns.StatusBadge("Open", false, false)
 				}
 			}
 

@@ -95,9 +95,10 @@ type AuditEntryView struct {
 
 // StatusView is a display-ready status for dropdowns and badges.
 type StatusView struct {
-	ID       string
-	Name     string
-	IsClosed bool
+	ID        string
+	Name      string
+	IsDefault bool
+	IsClosed  bool
 }
 
 // BoardSurfaceProps renders a board body without any page chrome, so the same

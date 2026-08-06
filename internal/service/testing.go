@@ -733,15 +733,32 @@ func (s *TestingService) SetResultStatus(ctx context.Context, user *model.User, 
 // re-test. Called by the backlog service once a defect is closed, which has
 // already authorized the caller, so this performs no role check of its own.
 // A closed defect never marks a result as passed — only a tester can (FR-504).
+//
+// Results in a campaign that is no longer active are left alone: a closed
+// campaign records what was true when it was closed, and fixing a defect
+// afterwards must not rewrite that verdict.
 func (s *TestingService) MarkResultsForRetest(ctx context.Context, defectID, userID string) error {
 	results, err := s.campaignResults.ListByDefectID(ctx, defectID)
 	if err != nil {
 		return fmt.Errorf("list results for defect: %w", err)
 	}
 
+	active := make(map[string]bool)
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, result := range results {
 		if result.Status != model.CampaignResultStatusFailed {
+			continue
+		}
+		ok, cached := active[result.CampaignID]
+		if !cached {
+			campaign, err := s.campaigns.GetByID(ctx, result.CampaignID)
+			if err != nil {
+				return fmt.Errorf("look up campaign for result: %w", err)
+			}
+			ok = campaign.Status == model.CampaignStatusActive
+			active[result.CampaignID] = ok
+		}
+		if !ok {
 			continue
 		}
 		from := result.Status

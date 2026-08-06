@@ -601,18 +601,22 @@ func buildSprintSummary(
 	// and defect sets, which is how the merged board presents them too.
 	counts := map[string]int{}
 	closedByName := map[string]bool{}
+	defaultByName := map[string]bool{}
 	var order []string
 	var totalEstimation, completedEstimation float64
 	track := func(statusID, estimation string, closed bool) {
 		name := "No status"
+		isDefault := true // an item with no status sits at the entry column
 		if s, ok := statusNames[statusID]; ok {
 			name = s.Name
+			isDefault = s.IsDefault
 		}
 		if _, seen := counts[name]; !seen {
 			order = append(order, name)
 		}
 		counts[name]++
 		closedByName[name] = closed
+		defaultByName[name] = isDefault
 
 		value, ok := parseEstimation(estimation)
 		if ok {
@@ -635,7 +639,7 @@ func buildSprintSummary(
 
 	for _, name := range order {
 		props.Statuses = append(props.Statuses, productpage.SprintStatusCount{
-			Name: name, IsClosed: closedByName[name], Count: counts[name],
+			Name: name, IsDefault: defaultByName[name], IsClosed: closedByName[name], Count: counts[name],
 		})
 	}
 

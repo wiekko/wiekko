@@ -72,6 +72,18 @@ templ DetailField(label, value string) {
 	</div>
 }
 
+// DetailFieldSlot renders a label whose value is markup rather than text — a
+// badge, a link, an icon. The caller owns the empty case, since only it knows
+// what "unset" looks like for its own value.
+templ DetailFieldSlot(label string) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{ label }</dt>
+		<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+			{ children... }
+		</dd>
+	</div>
+}
+
 // DetailGrid renders fields in a responsive grid.
 templ DetailGrid() {
 	<dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">

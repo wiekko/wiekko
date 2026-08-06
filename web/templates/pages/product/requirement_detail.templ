@@ -19,7 +19,7 @@ type RequirementDetailProps struct {
 	Requirement      *model.Requirement
 	CategoryPrefixes map[string]string // category ID → prefix
 	CategoryNames    map[string]string // category ID → name
-	StatusName       string
+	Status           *model.Status
 	MilestoneName    string
 	SprintName       string
 	ParentName       string // display name of parent requirement
@@ -93,7 +93,7 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 				} else {
 					@patterns.DetailField("Parent", "")
 				}
-				@patterns.DetailField("Status", props.StatusName)
+				@workflowStatusField(props.Status)
 				if props.Requirement.MilestoneID != "" && props.MilestoneName != "" {
 					@requirementLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Requirement.MilestoneID))
 				} else {

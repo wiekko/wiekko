@@ -5,9 +5,20 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// StatusBadge renders a colored badge for a status.
-templ StatusBadge(name string, isClosed bool) {
-	@ui.Badge(name, statusColor(isClosed))
+// StatusBadge renders a configurable workflow status as a pill, so a
+// requirement, defect or task reads the same way as a sprint or a campaign.
+//
+// Product owners name their own statuses, so the colour cannot come from the
+// name. It comes from where the status sits in the workflow instead: the entry
+// column is neutral, a closing column is settled, and everything in between is
+// work in flight. An unset status renders as a dash rather than an empty pill,
+// which would look like a status nobody bothered to name.
+templ StatusBadge(name string, isDefault, isClosed bool) {
+	if name == "" {
+		<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+	} else {
+		@ui.Badge(name, statusColor(isDefault, isClosed))
+	}
 }
 
 // StatusTransition renders a dropdown to change status via htmx PATCH.
@@ -17,7 +28,7 @@ templ StatusTransition(currentStatusID string, statuses []templates.StatusView, 
 			<button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none dark:text-gray-300 dark:hover:text-gray-100">
 				for _, s := range statuses {
 					if s.ID == currentStatusID {
-						@StatusBadge(s.Name, s.IsClosed)
+						@StatusBadge(s.Name, s.IsDefault, s.IsClosed)
 					}
 				}
 				@ui.Icon("chevron-down", "sm")
@@ -39,9 +50,16 @@ templ StatusTransition(currentStatusID string, statuses []templates.StatusView, 
 	}
 }
 
-func statusColor(isClosed bool) string {
-	if isClosed {
+// statusColor keeps the established closed/open pairing — a settled status is
+// gray, an open one green — and splits the entry column out as blue, so a
+// backlog of five statuses does not render as four identical green pills.
+func statusColor(isDefault, isClosed bool) string {
+	switch {
+	case isClosed:
 		return "gray"
+	case isDefault:
+		return "blue"
+	default:
+		return "green"
 	}
-	return "green"
 }

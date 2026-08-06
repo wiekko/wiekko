@@ -17,7 +17,7 @@ type DefectsProps struct {
 	IsAdmin     bool
 	Product     *model.Product
 	Defects     []*model.Defect
-	Statuses    map[string]string // status ID → name
+	Statuses    map[string]*model.Status // status ID → status
 	// Environments maps environment ID → name. Empty for products that never
 	// defined one, which also hides the column.
 	Environments map[string]string
@@ -109,15 +109,7 @@ templ DefectsPage(props DefectsProps) {
 										@defectCriticalityBadge(d.Criticality)
 									}
 									@ui.TableCellMuted() {
-										if d.StatusID != "" {
-											if name, ok := props.Statuses[d.StatusID]; ok {
-												{ name }
-											} else {
-												{ d.StatusID }
-											}
-										} else {
-											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
-										}
+										@workflowStatusCell(props.Statuses, d.StatusID)
 									}
 									if len(props.Environments) > 0 {
 										@ui.TableCellMuted() {

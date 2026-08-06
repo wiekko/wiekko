@@ -47,7 +47,7 @@ templ CampaignDetailPage(props CampaignDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@campaignStatusBadge(props.Campaign.Status)
-				@campaignVerdictBadge(props.Progress.Verdict)
+				@campaignVerdictBadge(props.Progress.Verdict, props.Campaign.Status)
 				if props.CanEdit {
 					@campaignLifecycleActions(props)
 				}
