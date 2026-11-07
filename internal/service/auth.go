@@ -31,16 +31,36 @@ type AuthService struct {
 	pats     store.PATStore
 	provider auth.Provider
 	cfg      *config.Config
+
+	twoFactor      *TwoFactorService
+	twoFactorStore store.TwoFactorStore
 }
 
-// LoginResult contains the data returned after a successful login.
+// LoginResult contains the data returned after a login attempt. When the user
+// has two-factor authentication enabled, the password step yields no session:
+// TOTPRequired is set and ChallengeToken must be presented to CompleteTOTPLogin
+// together with a TOTP or recovery code.
 type LoginResult struct {
-	SessionID string
-	CSRFToken string
-	User      *model.User
+	SessionID      string
+	CSRFToken      string
+	User           *model.User
+	TOTPRequired   bool
+	ChallengeToken string
 }
 
-// Login authenticates a user and creates a session.
+const (
+	// LoginChallengeTTL bounds how long the second login step may take.
+	LoginChallengeTTL = 5 * time.Minute
+	// LoginChallengeMaxAttempts caps code guesses per password login.
+	LoginChallengeMaxAttempts = 5
+)
+
+// ErrLoginChallengeInvalid is returned when the second-step challenge is
+// unknown, expired, or exhausted; the user has to start over with the password.
+var ErrLoginChallengeInvalid = errors.New("login expired; please sign in again")
+
+// Login authenticates a user and creates a session, or, for users with
+// two-factor authentication, a pending login challenge.
 func (s *AuthService) Login(ctx context.Context, username, password, ip, userAgent string) (*LoginResult, error) {
 	identity, err := s.provider.Authenticate(ctx, username, password)
 	if err != nil {
@@ -52,6 +72,95 @@ func (s *AuthService) Login(ctx context.Context, username, password, ip, userAge
 		return nil, fmt.Errorf("fetch user: %w", err)
 	}
 
+	if user.TOTPEnabled {
+		return s.createChallenge(ctx, user, ip, userAgent)
+	}
+	return s.createSession(ctx, user, ip, userAgent)
+}
+
+// CompleteTOTPLogin finishes a two-factor login: it checks the code against
+// the user behind challengeToken and, on success, creates the session.
+// Wrong codes count against the challenge; after LoginChallengeMaxAttempts
+// the challenge is discarded and ErrLoginChallengeInvalid returned.
+func (s *AuthService) CompleteTOTPLogin(ctx context.Context, challengeToken, code, ip, userAgent string) (*LoginResult, error) {
+	if challengeToken == "" || s.twoFactorStore == nil {
+		return nil, ErrLoginChallengeInvalid
+	}
+	id := hashPATToken(challengeToken)
+	challenge, err := s.twoFactorStore.GetChallenge(ctx, id)
+	if err != nil {
+		return nil, ErrLoginChallengeInvalid
+	}
+	expiresAt, err := time.Parse(time.RFC3339, challenge.ExpiresAt)
+	if err != nil || time.Now().UTC().After(expiresAt) {
+		_ = s.twoFactorStore.DeleteChallenge(ctx, id)
+		return nil, ErrLoginChallengeInvalid
+	}
+
+	// Count the attempt before checking the code, so concurrent guesses
+	// cannot slip past the limit.
+	attempts, err := s.twoFactorStore.IncrementChallengeAttempts(ctx, id)
+	if err != nil {
+		return nil, ErrLoginChallengeInvalid
+	}
+	if attempts > LoginChallengeMaxAttempts {
+		_ = s.twoFactorStore.DeleteChallenge(ctx, id)
+		return nil, ErrLoginChallengeInvalid
+	}
+
+	user, err := s.users.GetByID(ctx, challenge.UserID)
+	if err != nil {
+		return nil, ErrLoginChallengeInvalid
+	}
+	if user.Status != model.UserStatusActive {
+		_ = s.twoFactorStore.DeleteChallenge(ctx, id)
+		return nil, errors.New("account is not active")
+	}
+	if !user.TOTPEnabled {
+		// 2FA was reset by an administrator meanwhile; the password step
+		// already succeeded, so the login can proceed.
+		_ = s.twoFactorStore.DeleteChallenge(ctx, id)
+		return s.createSession(ctx, user, ip, userAgent)
+	}
+
+	if err := s.twoFactor.Verify(ctx, user, code); err != nil {
+		if attempts >= LoginChallengeMaxAttempts {
+			_ = s.twoFactorStore.DeleteChallenge(ctx, id)
+			return nil, ErrLoginChallengeInvalid
+		}
+		return nil, err
+	}
+
+	_ = s.twoFactorStore.DeleteChallenge(ctx, id)
+	return s.createSession(ctx, user, ip, userAgent)
+}
+
+func (s *AuthService) createChallenge(ctx context.Context, user *model.User, ip, userAgent string) (*LoginResult, error) {
+	if s.twoFactorStore == nil {
+		return nil, errors.New("two-factor authentication is not available")
+	}
+	token, err := generateToken(sessionTokenBytes)
+	if err != nil {
+		return nil, fmt.Errorf("generate challenge token: %w", err)
+	}
+	now := time.Now().UTC()
+	// Opportunistic cleanup keeps the table from growing with abandoned logins.
+	_ = s.twoFactorStore.DeleteExpiredChallenges(ctx, now.Format(time.RFC3339))
+	challenge := &model.LoginChallenge{
+		ID:        hashPATToken(token),
+		UserID:    user.ID,
+		CreatedAt: now.Format(time.RFC3339),
+		ExpiresAt: now.Add(LoginChallengeTTL).Format(time.RFC3339),
+		IPAddress: ip,
+		UserAgent: userAgent,
+	}
+	if err := s.twoFactorStore.CreateChallenge(ctx, challenge); err != nil {
+		return nil, fmt.Errorf("create login challenge: %w", err)
+	}
+	return &LoginResult{User: user, TOTPRequired: true, ChallengeToken: token}, nil
+}
+
+func (s *AuthService) createSession(ctx context.Context, user *model.User, ip, userAgent string) (*LoginResult, error) {
 	sessionID, err := generateToken(sessionTokenBytes)
 	if err != nil {
 		return nil, fmt.Errorf("generate session token: %w", err)

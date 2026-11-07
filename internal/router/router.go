@@ -27,6 +27,7 @@ func New(svc *service.Services, cookieSecure, devMode bool, maxUploadBytes int64
 		middleware.Recovery,
 		middleware.SecurityHeaders,
 		middleware.Authenticate(svc.Auth, svc.Auth),
+		middleware.RequireTwoFactorEnrollment(svc.TwoFactor),
 	)
 
 	return stack(mux)

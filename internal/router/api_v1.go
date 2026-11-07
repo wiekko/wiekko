@@ -14,6 +14,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	authCtrl := controller.NewAuth(svc.Auth, svc.User, cookieSecure)
 	userCtrl := controller.NewUser(svc.User)
 	patCtrl := controller.NewPAT(svc.PAT)
+	totpCtrl := controller.NewTOTP(svc.TwoFactor)
 	adminCtrl := controller.NewAdmin(svc.User, svc.Setting)
 	invCtrl := controller.NewInvitation(svc.Invitation)
 	productCtrl := controller.NewProduct(svc.Product)
@@ -31,6 +32,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 
 	// Auth (public).
 	apiV1.HandleFunc("POST /auth/login", authCtrl.Login)
+	apiV1.HandleFunc("POST /auth/login/totp", authCtrl.LoginTOTP)
 	apiV1.HandleFunc("POST /auth/register", authCtrl.Register)
 	apiV1.HandleFunc("POST /auth/accept-invite", authCtrl.AcceptInvite)
 
@@ -44,6 +46,13 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("POST /user/me/delete", authed(csrf(http.HandlerFunc(userCtrl.RequestDeletion))))
 
 	// Personal access tokens (authenticated).
+	// Two-factor authentication (authenticated).
+	apiV1.Handle("GET /user/me/totp", authed(http.HandlerFunc(totpCtrl.Status)))
+	apiV1.Handle("POST /user/me/totp", authed(csrf(http.HandlerFunc(totpCtrl.Begin))))
+	apiV1.Handle("POST /user/me/totp/confirm", authed(csrf(http.HandlerFunc(totpCtrl.Confirm))))
+	apiV1.Handle("POST /user/me/totp/recovery-codes", authed(csrf(http.HandlerFunc(totpCtrl.Regenerate))))
+	apiV1.Handle("DELETE /user/me/totp", authed(csrf(http.HandlerFunc(totpCtrl.Disable))))
+
 	apiV1.Handle("GET /user/me/tokens", authed(http.HandlerFunc(patCtrl.List)))
 	apiV1.Handle("POST /user/me/tokens", authed(csrf(http.HandlerFunc(patCtrl.Create))))
 	apiV1.Handle("DELETE /user/me/tokens/{id}", authed(csrf(http.HandlerFunc(patCtrl.Revoke))))
@@ -55,6 +64,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("POST /admin/users/{id}/unlock", admin(csrf(http.HandlerFunc(adminCtrl.UnlockUser))))
 	apiV1.Handle("POST /admin/users/{id}/password", admin(csrf(http.HandlerFunc(adminCtrl.SetPassword))))
 	apiV1.Handle("POST /admin/users/{id}/approve", admin(csrf(http.HandlerFunc(adminCtrl.ApproveUser))))
+	apiV1.Handle("DELETE /admin/users/{id}/totp", admin(csrf(http.HandlerFunc(totpCtrl.AdminReset))))
 	apiV1.Handle("DELETE /admin/users/{id}", admin(csrf(http.HandlerFunc(adminCtrl.DeleteUser))))
 
 	// Admin: settings (admin only).

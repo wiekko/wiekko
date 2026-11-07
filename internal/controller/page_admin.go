@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"log/slog"
 	"net/http"
 
 	"nexmap.net/internal/middleware"
@@ -16,11 +17,12 @@ type PageAdminController struct {
 	user       *service.UserService
 	setting    *service.SettingService
 	invitation *service.InvitationService
+	twoFactor  *service.TwoFactorService
 }
 
 // NewPageAdmin creates a PageAdminController.
-func NewPageAdmin(user *service.UserService, setting *service.SettingService, invitation *service.InvitationService) *PageAdminController {
-	return &PageAdminController{user: user, setting: setting, invitation: invitation}
+func NewPageAdmin(user *service.UserService, setting *service.SettingService, invitation *service.InvitationService, twoFactor *service.TwoFactorService) *PageAdminController {
+	return &PageAdminController{user: user, setting: setting, invitation: invitation, twoFactor: twoFactor}
 }
 
 // ListUsers renders GET /admin/users.
@@ -130,6 +132,20 @@ func (c *PageAdminController) SetPassword(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = admin.PasswordResetSuccess().Render(r.Context(), w)
+}
+
+// ResetTwoFactor handles POST /admin/users/{id}/2fa/reset: it removes the
+// user's TOTP setup and recovery codes, e.g. after a lost phone.
+func (c *PageAdminController) ResetTwoFactor(w http.ResponseWriter, r *http.Request) {
+	currentUser := middleware.UserFromContext(r.Context())
+	targetID := r.PathValue("id")
+
+	if err := c.twoFactor.AdminReset(r.Context(), targetID); err != nil {
+		c.renderActionsCard(w, r, targetID, currentUser, err.Error())
+		return
+	}
+	slog.Warn("two-factor authentication reset by administrator", "user_id", targetID, "admin_id", currentUser.ID)
+	c.renderActionsCard(w, r, targetID, currentUser, "Two-factor authentication has been reset.")
 }
 
 // DeleteUser handles DELETE /admin/users/{id}.

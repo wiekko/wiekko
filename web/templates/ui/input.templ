@@ -13,6 +13,7 @@ type InputProps struct {
 	Pattern     string // HTML pattern attribute for validation
 	Required    bool
 	Disabled    bool
+	Autofocus   bool
 	Error       string
 	HelpText    string
 }
@@ -40,6 +41,7 @@ templ TextInput(props InputProps) {
 				}
 				required?={ props.Required }
 				disabled?={ props.Disabled }
+				autofocus?={ props.Autofocus }
 				class={ "block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500",
 					inputRing(props.Error),
 					disabledClass(props.Disabled) }

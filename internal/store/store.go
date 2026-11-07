@@ -10,6 +10,7 @@ import (
 type Store struct {
 	User               UserStore
 	Session            SessionStore
+	TwoFactor          TwoFactorStore
 	PAT                PATStore
 	Setting            SettingStore
 	Invitation         InvitationStore
@@ -40,6 +41,7 @@ func New(db *sql.DB, keys *crypto.KeyRing) *Store {
 	return &Store{
 		User:               &userStore{db: db, keys: keys},
 		Session:            &sessionStore{db: db},
+		TwoFactor:          &twoFactorStore{db: db},
 		PAT:                &patStore{db: db},
 		Setting:            &settingStore{db: db},
 		Invitation:         &invitationStore{db: db, keys: keys},

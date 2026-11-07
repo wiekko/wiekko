@@ -12,16 +12,18 @@ import (
 
 // MockUserStore implements store.UserStore with configurable function fields.
 type MockUserStore struct {
-	CreateFunc         func(ctx context.Context, user *model.User) error
-	GetByIDFunc        func(ctx context.Context, id string) (*model.User, error)
-	GetByUsernameFunc  func(ctx context.Context, username string) (*model.User, error)
-	GetByEmailFunc     func(ctx context.Context, email string) (*model.User, error)
-	UpdateFunc         func(ctx context.Context, user *model.User) error
-	UpdateStatusFunc   func(ctx context.Context, id, status string) error
-	UpdatePasswordFunc func(ctx context.Context, id, hash string) error
-	DeleteFunc         func(ctx context.Context, id string) error
-	ListFunc           func(ctx context.Context, filter store.UserFilter) ([]*model.User, error)
-	CountFunc          func(ctx context.Context) (int64, error)
+	CreateFunc          func(ctx context.Context, user *model.User) error
+	GetByIDFunc         func(ctx context.Context, id string) (*model.User, error)
+	GetByUsernameFunc   func(ctx context.Context, username string) (*model.User, error)
+	GetByEmailFunc      func(ctx context.Context, email string) (*model.User, error)
+	UpdateFunc          func(ctx context.Context, user *model.User) error
+	UpdateStatusFunc    func(ctx context.Context, id, status string) error
+	UpdatePasswordFunc  func(ctx context.Context, id, hash string) error
+	DeleteFunc          func(ctx context.Context, id string) error
+	ListFunc            func(ctx context.Context, filter store.UserFilter) ([]*model.User, error)
+	CountFunc           func(ctx context.Context) (int64, error)
+	SetTOTPFunc         func(ctx context.Context, id, secret string, enabled bool) error
+	ConsumeTOTPStepFunc func(ctx context.Context, id string, step int64) (bool, error)
 }
 
 func (m *MockUserStore) Create(ctx context.Context, user *model.User) error {
@@ -53,6 +55,12 @@ func (m *MockUserStore) List(ctx context.Context, filter store.UserFilter) ([]*m
 }
 func (m *MockUserStore) Count(ctx context.Context) (int64, error) {
 	return m.CountFunc(ctx)
+}
+func (m *MockUserStore) SetTOTP(ctx context.Context, id, secret string, enabled bool) error {
+	return m.SetTOTPFunc(ctx, id, secret, enabled)
+}
+func (m *MockUserStore) ConsumeTOTPStep(ctx context.Context, id string, step int64) (bool, error) {
+	return m.ConsumeTOTPStepFunc(ctx, id, step)
 }
 
 // MockSessionStore implements store.SessionStore with configurable function fields.

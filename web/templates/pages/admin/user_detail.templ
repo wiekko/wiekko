@@ -54,6 +54,7 @@ templ UserDetailPage(props UserDetailProps) {
 						@detailField("Username", props.Target.Username)
 						@detailField("Email", props.Target.Email)
 						@detailField("Display Name", props.Target.DisplayName)
+						@detailField("Two-Factor Authentication", twoFactorLabel(props.Target.TOTPEnabled))
 						@detailField("Created", formatDate(props.Target.CreatedAt))
 						@detailField("Updated", formatDate(props.Target.UpdatedAt))
 					</dl>
@@ -125,6 +126,19 @@ templ ActionsCard(target *model.User, isSelf bool, feedback string) {
 						@ui.Icon("lock", "sm")
 						Reset Password
 					</button>
+					if target.TOTPEnabled {
+						<button
+							type="button"
+							class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700 dark:focus:ring-offset-gray-900"
+							hx-post={ "/admin/users/" + target.ID + "/2fa/reset" }
+							hx-target="#actions-card"
+							hx-swap="outerHTML"
+							hx-confirm={ "Reset two-factor authentication for " + target.Username + "? They can then sign in with their password alone until they set it up again." }
+						>
+							@ui.Icon("shield", "sm")
+							Reset 2FA
+						</button>
+					}
 					if !isSelf {
 						<button
 							type="button"
@@ -203,4 +217,11 @@ func actionButtonClass(variant string) string {
 	default:
 		return "bg-white text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
 	}
+}
+
+func twoFactorLabel(enabled bool) string {
+	if enabled {
+		return "Enabled"
+	}
+	return "Not configured"
 }

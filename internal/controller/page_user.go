@@ -12,13 +12,14 @@ import (
 
 // PageUserController handles user profile and token pages.
 type PageUserController struct {
-	user *service.UserService
-	pat  *service.PATService
+	user      *service.UserService
+	pat       *service.PATService
+	twoFactor *service.TwoFactorService
 }
 
 // NewPageUser creates a PageUserController.
-func NewPageUser(user *service.UserService, pat *service.PATService) *PageUserController {
-	return &PageUserController{user: user, pat: pat}
+func NewPageUser(user *service.UserService, pat *service.PATService, twoFactor *service.TwoFactorService) *PageUserController {
+	return &PageUserController{user: user, pat: pat, twoFactor: twoFactor}
 }
 
 // Profile renders GET /user/profile.
@@ -35,6 +36,7 @@ func (c *PageUserController) Profile(w http.ResponseWriter, r *http.Request) {
 		DisplayName: user.DisplayName,
 		IsAdmin:     user.IsAdmin,
 		User:        user,
+		TwoFactor:   c.twoFactorCard(r, user, false),
 	}).Render(r.Context(), w)
 }
 

@@ -46,3 +46,19 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	}
 	return true
 }
+
+// ErrorWithDetails writes an error response like Error, plus extra top-level
+// fields a client needs to act on the error (e.g. a login challenge token).
+func ErrorWithDetails(w http.ResponseWriter, status int, code, message string, details map[string]any) {
+	body := map[string]any{"error": errorBody{Code: code, Message: message}}
+	for k, v := range details {
+		if k != "error" {
+			body[k] = v
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		slog.Error("failed to encode JSON error response", "err", err)
+	}
+}

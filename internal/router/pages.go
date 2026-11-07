@@ -11,14 +11,15 @@ import (
 func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64) {
 	loginCtrl := controller.NewPageLogin(svc.Auth, svc.Setting, cookieSecure)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
-	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation)
-	userCtrl := controller.NewPageUser(svc.User, svc.PAT)
+	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor)
+	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor)
 	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes)
 	upload := pageUpload(productCtrl)
 
 	// Public pages.
 	mux.HandleFunc("GET /login", loginCtrl.Show)
 	mux.HandleFunc("POST /login", loginCtrl.Login)
+	mux.HandleFunc("POST /login/totp", loginCtrl.LoginTOTP)
 
 	// Authenticated pages.
 	mux.Handle("GET /{$}", pageAuthed(http.HandlerFunc(dashCtrl.Show)))
@@ -29,6 +30,11 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("POST /user/profile", pageAuthed(http.HandlerFunc(userCtrl.UpdateProfile)))
 	mux.Handle("POST /user/profile/password", pageAuthed(http.HandlerFunc(userCtrl.ChangePassword)))
 	mux.Handle("POST /user/profile/delete", pageAuthed(http.HandlerFunc(userCtrl.RequestDeletion)))
+	mux.Handle("GET /user/2fa/setup", pageAuthed(http.HandlerFunc(userCtrl.TwoFactorSetupPage)))
+	mux.Handle("POST /user/2fa/setup", pageCSRF(http.HandlerFunc(userCtrl.TwoFactorBegin)))
+	mux.Handle("POST /user/2fa/confirm", pageCSRF(http.HandlerFunc(userCtrl.TwoFactorConfirm)))
+	mux.Handle("POST /user/2fa/disable", pageCSRF(http.HandlerFunc(userCtrl.TwoFactorDisable)))
+	mux.Handle("POST /user/2fa/recovery-codes", pageCSRF(http.HandlerFunc(userCtrl.TwoFactorRegenerate)))
 	mux.Handle("GET /user/tokens", pageAuthed(http.HandlerFunc(userCtrl.Tokens)))
 	mux.Handle("POST /user/tokens", pageAuthed(http.HandlerFunc(userCtrl.CreateToken)))
 	mux.Handle("DELETE /user/tokens/{id}", pageAuthed(http.HandlerFunc(userCtrl.RevokeToken)))
@@ -400,6 +406,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("POST /admin/users/{id}/lock", pageAdmin(http.HandlerFunc(adminCtrl.LockUser)))
 	mux.Handle("POST /admin/users/{id}/unlock", pageAdmin(http.HandlerFunc(adminCtrl.UnlockUser)))
 	mux.Handle("POST /admin/users/{id}/password", pageAdmin(http.HandlerFunc(adminCtrl.SetPassword)))
+	mux.Handle("POST /admin/users/{id}/2fa/reset", pageAdmin(middleware.CSRF(http.HandlerFunc(adminCtrl.ResetTwoFactor))))
 	mux.Handle("DELETE /admin/users/{id}", pageAdmin(http.HandlerFunc(adminCtrl.DeleteUser)))
 	mux.Handle("GET /admin/settings", pageAdmin(http.HandlerFunc(adminCtrl.Settings)))
 	mux.Handle("PATCH /admin/settings", pageAdmin(http.HandlerFunc(adminCtrl.UpdateSetting)))

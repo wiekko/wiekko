@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     status        TEXT NOT NULL DEFAULT 'active',
     totp_secret   TEXT NOT NULL DEFAULT '',
     totp_enabled  BOOLEAN NOT NULL DEFAULT FALSE,
+    totp_last_step BIGINT NOT NULL DEFAULT 0,
     created_at    TIMESTAMPTZ NOT NULL,
     updated_at    TIMESTAMPTZ NOT NULL
 );
@@ -38,6 +39,29 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+-- TOTP recovery codes (SHA-256 hashes; each usable once).
+CREATE TABLE IF NOT EXISTS totp_recovery_codes (
+    id         UUID PRIMARY KEY,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code_hash  TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    used_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_totp_recovery_codes_user_id ON totp_recovery_codes(user_id);
+
+-- Pending second login step: the password was accepted, the TOTP code is
+-- still outstanding. The id is the SHA-256 of the token handed to the client.
+CREATE TABLE IF NOT EXISTS login_challenges (
+    id         TEXT PRIMARY KEY,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    ip_address TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_login_challenges_user_id ON login_challenges(user_id);
 
 CREATE TABLE IF NOT EXISTS personal_access_tokens (
     id           UUID PRIMARY KEY,
@@ -85,6 +109,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_pd_unique_user_email
 DROP TABLE IF EXISTS personal_data;
 DROP TABLE IF EXISTS invitations;
 DROP TABLE IF EXISTS personal_access_tokens;
+DROP TABLE IF EXISTS login_challenges;
+DROP TABLE IF EXISTS totp_recovery_codes;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS settings;

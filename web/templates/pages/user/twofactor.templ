@@ -1,0 +1,271 @@
+package user
+
+import (
+	"strconv"
+
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+)
+
+// TOTPSetupView is what the setup step shows: the QR code and the secret for manual entry.
+type TOTPSetupView struct {
+	QRCodeSVG       string
+	FormattedSecret string
+}
+
+// TwoFactorCardProps drives the two-factor card. Exactly one of the states
+// applies, checked in this order: RecoveryCodes (just issued), Setup (pending
+// confirmation), Enabled, not configured.
+type TwoFactorCardProps struct {
+	Enabled           bool
+	Enforced          bool
+	RecoveryRemaining int
+	Setup             *TOTPSetupView
+	RecoveryCodes     []string
+	Feedback          string
+	IsError           bool
+	// Section names the collapsible form a failed action came from
+	// ("regenerate" or "disable"). That section is re-rendered open, with the
+	// feedback inside it and the code field focused, instead of collapsing
+	// back as if nothing had been submitted.
+	Section string
+	// Standalone marks the card as rendered on /user/2fa/setup (the page users
+	// land on when the instance enforces 2FA) rather than on the profile.
+	Standalone bool
+}
+
+// TwoFactorSetupProps holds the data for the standalone setup page.
+type TwoFactorSetupProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Enforced    bool
+	Card        TwoFactorCardProps
+}
+
+// TwoFactorSetupPage is where users are sent when the instance requires 2FA
+// and they have not set it up yet.
+templ TwoFactorSetupPage(props TwoFactorSetupProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "user-profile",
+	}) {
+		<div class="mx-auto max-w-3xl space-y-6">
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Set up two-factor authentication</h1>
+				if props.Enforced {
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+						Your administrator requires two-factor authentication. Finish the setup below to continue using Nexmap.
+					</p>
+				}
+			</div>
+			@TwoFactorCard(props.Card)
+		</div>
+	}
+}
+
+// TwoFactorCard renders the two-factor section. Returned as fragment on htmx updates.
+templ TwoFactorCard(props TwoFactorCardProps) {
+	<div id="twofactor-card">
+		@ui.Card() {
+			@ui.CardHeader("Two-Factor Authentication") {
+			}
+			@ui.CardBody() {
+				if props.RecoveryCodes != nil {
+					@recoveryCodesView(props)
+				} else if props.Setup != nil {
+					@setupView(props)
+				} else if props.Enabled {
+					@enabledView(props)
+				} else {
+					@disabledView(props)
+				}
+			}
+		}
+	</div>
+}
+
+templ standaloneField(standalone bool) {
+	if standalone {
+		<input type="hidden" name="standalone" value="1"/>
+	}
+}
+
+templ disabledView(props TwoFactorCardProps) {
+	<div class="flex flex-wrap items-center justify-between gap-4">
+		<div class="flex items-center gap-3">
+			<div class="text-gray-400 dark:text-gray-500">
+				@ui.Icon("shield", "md")
+			</div>
+			<div>
+				<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Not configured</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					if props.Enforced {
+						Required on this instance. Protect your account with a code from an authenticator app.
+					} else {
+						Protect your account with a code from an authenticator app.
+					}
+				</p>
+			</div>
+		</div>
+		<form hx-post="/user/2fa/setup" hx-target="#twofactor-card" hx-swap="outerHTML">
+			@standaloneField(props.Standalone)
+			@ui.Button(ui.ButtonProps{
+				Label:   "Set up",
+				Variant: "primary",
+				Size:    "md",
+				Type:    "submit",
+			})
+		</form>
+	</div>
+	@Feedback(props.Feedback, props.IsError)
+}
+
+templ setupView(props TwoFactorCardProps) {
+	<div class="space-y-6">
+		<ol class="list-decimal space-y-1 pl-5 text-sm text-gray-600 dark:text-gray-400">
+			<li>Open an authenticator app (for example Aegis, 2FAS, 1Password or Google Authenticator).</li>
+			<li>Scan the QR code, or enter the key manually.</li>
+			<li>Enter the 6-digit code the app shows to confirm.</li>
+		</ol>
+		<div class="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+			<div class="w-44 shrink-0 rounded-md bg-white p-2 ring-1 ring-gray-200 dark:ring-gray-700">
+				@templ.Raw(props.Setup.QRCodeSVG)
+			</div>
+			<div class="min-w-0 flex-1 space-y-4">
+				<div>
+					<p class="text-sm font-medium text-gray-700 dark:text-gray-300">Setup key</p>
+					<p class="mt-1 break-all rounded-md bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900 dark:bg-gray-800 dark:text-gray-100">{ props.Setup.FormattedSecret }</p>
+					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Time-based, 6 digits, 30 seconds.</p>
+				</div>
+				<form class="space-y-4" hx-post="/user/2fa/confirm" hx-target="#twofactor-card" hx-swap="outerHTML">
+					@standaloneField(props.Standalone)
+					@ui.CodeInput(ui.CodeInputProps{
+						ID:        "totp-confirm-code",
+						Name:      "code",
+						Label:     "Code from your app",
+						Autofocus: true,
+					})
+					@Feedback(props.Feedback, props.IsError)
+					<div class="flex justify-end">
+						@ui.Button(ui.ButtonProps{
+							Label:   "Enable",
+							Variant: "primary",
+							Size:    "md",
+							Type:    "submit",
+						})
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+templ recoveryCodesView(props TwoFactorCardProps) {
+	<div class="space-y-4">
+		if props.Feedback != "" {
+			<div class="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+				@ui.Icon("shield-check", "md")
+				<p class="text-sm font-medium">{ props.Feedback }</p>
+			</div>
+		}
+		<div>
+			<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Save your recovery codes</p>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+				Each code signs you in once if you lose your authenticator. Store them somewhere safe — they will not be shown again.
+			</p>
+		</div>
+		<ul class="grid grid-cols-2 gap-2 rounded-md bg-gray-50 p-4 font-mono text-sm text-gray-900 sm:grid-cols-5 dark:bg-gray-800 dark:text-gray-100" aria-label="Recovery codes">
+			for _, code := range props.RecoveryCodes {
+				<li>{ code }</li>
+			}
+		</ul>
+		<div class="flex justify-end">
+			if props.Standalone {
+				<a href="/" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">I have saved them — continue</a>
+			} else {
+				<a href="/user/profile" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">I have saved them</a>
+			}
+		</div>
+	</div>
+}
+
+templ enabledView(props TwoFactorCardProps) {
+	<div class="space-y-6">
+		<div class="flex items-center gap-3">
+			<div class="text-emerald-500">
+				@ui.Icon("shield-check", "md")
+			</div>
+			<div>
+				<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Enabled</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					Your account is protected with two-factor authentication.
+					{ strconv.Itoa(props.RecoveryRemaining) } of 10 recovery codes left.
+				</p>
+			</div>
+		</div>
+		if props.Section == "" {
+			@Feedback(props.Feedback, props.IsError)
+		}
+		<details class="group rounded-md ring-1 ring-gray-200 dark:ring-gray-700" open?={ props.Section == "regenerate" }>
+			<summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">New recovery codes</summary>
+			<form class="space-y-4 px-4 pb-4" hx-post="/user/2fa/recovery-codes" hx-target="#twofactor-card" hx-swap="outerHTML">
+				<p class="text-sm text-gray-500 dark:text-gray-400">Replaces all existing recovery codes.</p>
+				@ui.CodeInput(ui.CodeInputProps{
+					ID:        "totp-regen-code",
+					Name:      "code",
+					Label:     "Code from your app",
+					Autofocus: props.Section == "regenerate",
+				})
+				if props.Section == "regenerate" {
+					@Feedback(props.Feedback, props.IsError)
+				}
+				<div class="flex justify-end">
+					@ui.Button(ui.ButtonProps{
+						Label:   "Generate new codes",
+						Variant: "secondary",
+						Size:    "md",
+						Type:    "submit",
+					})
+				</div>
+			</form>
+		</details>
+		if props.Enforced {
+			<p class="text-sm text-gray-500 dark:text-gray-400">Two-factor authentication is required on this instance and cannot be turned off.</p>
+		} else {
+			<details class="group rounded-md ring-1 ring-gray-200 dark:ring-gray-700" open?={ props.Section == "disable" }>
+				<summary class="cursor-pointer px-4 py-3 text-sm font-medium text-red-700 dark:text-red-400">Turn off two-factor authentication</summary>
+				<form class="space-y-4 px-4 pb-4" hx-post="/user/2fa/disable" hx-target="#twofactor-card" hx-swap="outerHTML">
+					@ui.TextInput(ui.InputProps{
+						ID:       "totp-disable-password",
+						Name:     "password",
+						Label:    "Current Password",
+						Type:      "password",
+						Required:  true,
+						Autofocus: props.Section == "disable",
+					})
+					@ui.CodeInput(ui.CodeInputProps{
+						ID:            "totp-disable-code",
+						Name:          "code",
+						Label:         "Code from your app or a recovery code",
+						AllowRecovery: true,
+					})
+					if props.Section == "disable" {
+						@Feedback(props.Feedback, props.IsError)
+					}
+					<div class="flex justify-end">
+						@ui.Button(ui.ButtonProps{
+							Label:   "Turn off",
+							Variant: "danger",
+							Size:    "md",
+							Type:    "submit",
+						})
+					</div>
+				</form>
+			</details>
+		}
+	</div>
+}

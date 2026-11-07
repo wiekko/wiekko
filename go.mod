@@ -10,6 +10,7 @@ require (
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/yuin/goldmark v1.8.4
 	modernc.org/sqlite v1.38.2
+	rsc.io/qr v0.2.0
 )
 
 require (

@@ -13,6 +13,7 @@ type ProfileProps struct {
 	DisplayName string
 	IsAdmin     bool
 	User        *model.User
+	TwoFactor   TwoFactorCardProps
 }
 
 templ ProfilePage(props ProfileProps) {
@@ -41,33 +42,7 @@ templ ProfilePage(props ProfileProps) {
 			<!-- Change password -->
 			@PasswordCard("")
 			<!-- Two-factor authentication -->
-			@ui.Card() {
-				@ui.CardHeader("Two-Factor Authentication") {
-				}
-				@ui.CardBody() {
-					if props.User.TOTPEnabled {
-						<div class="flex items-center gap-3">
-							<div class="text-emerald-500">
-								@ui.Icon("shield-check", "md")
-							</div>
-							<div>
-								<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Enabled</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">Your account is protected with two-factor authentication.</p>
-							</div>
-						</div>
-					} else {
-						<div class="flex items-center gap-3">
-							<div class="text-gray-400 dark:text-gray-500">
-								@ui.Icon("shield", "md")
-							</div>
-							<div>
-								<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Not configured</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">TOTP setup will be available in a future update.</p>
-							</div>
-						</div>
-					}
-				}
-			}
+			@TwoFactorCard(props.TwoFactor)
 			<!-- Theme preference -->
 			@ui.Card() {
 				@ui.CardHeader("Theme") {

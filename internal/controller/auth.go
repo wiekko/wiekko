@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -40,6 +42,10 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		// TOTPCode lets clients send the second factor with the password in
+		// one request. Without it, users with 2FA get a TOTP_REQUIRED answer
+		// carrying a challenge for POST /auth/login/totp.
+		TOTPCode string `json:"totp_code"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -49,10 +55,7 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		ip = fwd
-	}
+	ip := clientIP(r)
 
 	result, err := c.auth.Login(r.Context(), req.Username, req.Password, ip, r.UserAgent())
 	if err != nil {
@@ -61,6 +64,54 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if result.TOTPRequired {
+		if req.TOTPCode == "" {
+			httputil.ErrorWithDetails(w, http.StatusUnauthorized, "TOTP_REQUIRED",
+				"Two-factor authentication code required", map[string]any{
+					"challenge":            result.ChallengeToken,
+					"challenge_expires_in": int(service.LoginChallengeTTL.Seconds()),
+				})
+			return
+		}
+		c.completeTOTP(w, r, result.ChallengeToken, req.TOTPCode, req.Username, ip)
+		return
+	}
+
+	c.writeSession(w, result)
+}
+
+// LoginTOTP handles POST /auth/login/totp, the second step of a login for
+// users with two-factor authentication.
+func (c *AuthController) LoginTOTP(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Challenge string `json:"challenge"`
+		Code      string `json:"code"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+	if req.Challenge == "" || req.Code == "" {
+		httputil.Error(w, http.StatusBadRequest, "MISSING_FIELDS", "Challenge and code are required")
+		return
+	}
+	c.completeTOTP(w, r, req.Challenge, req.Code, "", clientIP(r))
+}
+
+func (c *AuthController) completeTOTP(w http.ResponseWriter, r *http.Request, challenge, code, username, ip string) {
+	result, err := c.auth.CompleteTOTPLogin(r.Context(), challenge, code, ip, r.UserAgent())
+	if err != nil {
+		logFailedLogin(r, username, ip, fmt.Errorf("second factor: %w", err))
+		if errors.Is(err, service.ErrLoginChallengeInvalid) {
+			httputil.Error(w, http.StatusUnauthorized, "CHALLENGE_INVALID", err.Error())
+			return
+		}
+		httputil.Error(w, http.StatusUnauthorized, "INVALID_TOTP_CODE", "Invalid authentication code")
+		return
+	}
+	c.writeSession(w, result)
+}
+
+func (c *AuthController) writeSession(w http.ResponseWriter, result *service.LoginResult) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "nexmap_session",
 		Value:    result.SessionID,

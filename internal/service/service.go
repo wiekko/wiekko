@@ -10,6 +10,7 @@ import (
 // Services groups all service interfaces.
 type Services struct {
 	Auth       *AuthService
+	TwoFactor  *TwoFactorService
 	User       *UserService
 	PAT        *PATService
 	Setting    *SettingService
@@ -55,14 +56,24 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		authz:           authz,
 	}
 
+	twoFactorSvc := &TwoFactorService{
+		users:     st.User,
+		twoFactor: st.TwoFactor,
+		settings:  st.Setting,
+		provider:  provider,
+	}
+
 	return &Services{
 		Auth: &AuthService{
-			users:    st.User,
-			sessions: st.Session,
-			pats:     st.PAT,
-			provider: provider,
-			cfg:      cfg,
+			users:          st.User,
+			sessions:       st.Session,
+			pats:           st.PAT,
+			provider:       provider,
+			cfg:            cfg,
+			twoFactor:      twoFactorSvc,
+			twoFactorStore: st.TwoFactor,
 		},
+		TwoFactor: twoFactorSvc,
 		User: &UserService{
 			users:       st.User,
 			sessions:    st.Session,

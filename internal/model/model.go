@@ -9,8 +9,8 @@ type User struct {
 	PasswordHash string
 	IsAdmin      bool
 	Status       string // "pending_approval", "active", "locked", "deletion_requested"
-	TOTPSecret   string
-	TOTPEnabled  bool
+	TOTPSecret   string // plaintext base32; encrypted at rest by the store
+	TOTPEnabled  bool   // false while a secret is only pending confirmation
 	CreatedAt    string // RFC 3339
 	UpdatedAt    string // RFC 3339
 }
@@ -28,6 +28,18 @@ type Session struct {
 	ID        string
 	UserID    string
 	CSRFToken string
+	CreatedAt string
+	ExpiresAt string
+	IPAddress string
+	UserAgent string
+}
+
+// LoginChallenge is a pending second login step: the password was accepted
+// and the user still has to present a TOTP or recovery code.
+type LoginChallenge struct {
+	ID        string // SHA-256 of the raw challenge token
+	UserID    string
+	Attempts  int
 	CreatedAt string
 	ExpiresAt string
 	IPAddress string

@@ -51,3 +51,42 @@ templ LoginForm(showRegister bool, errorMessage string) {
 		})
 	</form>
 }
+
+// TOTPPage renders the second login step as a full page (non-htmx fallback).
+templ TOTPPage(errorMessage string) {
+	@layout.AuthLayout(templates.PageMeta{Title: "Two-factor authentication"}) {
+		@TOTPForm(errorMessage)
+	}
+}
+
+// TOTPForm asks for the TOTP or recovery code after the password was accepted.
+// It replaces the login form in place (same id), so htmx can swap either way.
+templ TOTPForm(errorMessage string) {
+	<form id="login-form" class="space-y-6" hx-post="/login/totp" hx-target="this" hx-swap="outerHTML" method="post" action="/login/totp">
+		<div class="flex items-start gap-3">
+			<div class="mt-0.5 text-indigo-600 dark:text-indigo-400">
+				@ui.Icon("shield-check", "md")
+			</div>
+			<p class="text-sm text-gray-600 dark:text-gray-400">
+				Enter the 6-digit code from your authenticator app. If you have lost access to it, enter one of your recovery codes instead.
+			</p>
+		</div>
+		@patterns.FormError(errorMessage)
+		@ui.CodeInput(ui.CodeInputProps{
+			ID:            "totp-code",
+			Name:          "code",
+			Label:         "Authentication code",
+			Autofocus:     true,
+			AllowRecovery: true,
+		})
+		@ui.Button(ui.ButtonProps{
+			Label:   "Verify",
+			Variant: "primary",
+			Size:    "md",
+			Type:    "submit",
+		})
+		<p class="text-center text-sm">
+			<a href="/login" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">Back to sign in</a>
+		</p>
+	</form>
+}

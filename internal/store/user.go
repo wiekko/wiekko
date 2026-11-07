@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -28,6 +30,12 @@ type UserStore interface {
 	UpdatePassword(ctx context.Context, id, hash string) error
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, filter UserFilter) ([]*model.User, error)
+	// SetTOTP stores the user's TOTP secret (encrypted) and enabled flag and
+	// resets the replay guard. An empty secret removes TOTP entirely.
+	SetTOTP(ctx context.Context, id, secret string, enabled bool) error
+	// ConsumeTOTPStep records step as used. It returns false when this step
+	// or a later one was already used, i.e. the code is a replay.
+	ConsumeTOTPStep(ctx context.Context, id string, step int64) (bool, error)
 	Count(ctx context.Context) (int64, error)
 }
 
@@ -46,6 +54,11 @@ const userJoins = `FROM users u
 	LEFT JOIN personal_data pd_dn ON pd_dn.owner_table = 'users' AND pd_dn.owner_id = u.id AND pd_dn.field_name = 'display_name'`
 
 func (s *userStore) Create(ctx context.Context, user *model.User) error {
+	totpSecret, err := s.encryptTOTPSecret(user.TOTPSecret)
+	if err != nil {
+		return fmt.Errorf("user create: %w", err)
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("user create: begin tx: %w", err)
@@ -56,7 +69,7 @@ func (s *userStore) Create(ctx context.Context, user *model.User) error {
 		`INSERT INTO users (id, username, password_hash, is_admin, status, totp_secret, totp_enabled, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID, user.Username, user.PasswordHash,
-		boolToInt(user.IsAdmin), user.Status, user.TOTPSecret, boolToInt(user.TOTPEnabled),
+		boolToInt(user.IsAdmin), user.Status, totpSecret, boolToInt(user.TOTPEnabled),
 		user.CreatedAt, user.UpdatedAt,
 	)
 	if err != nil {
@@ -164,6 +177,68 @@ func (s *userStore) List(ctx context.Context, filter UserFilter) ([]*model.User,
 	return users, rows.Err()
 }
 
+func (s *userStore) SetTOTP(ctx context.Context, id, secret string, enabled bool) error {
+	stored, err := s.encryptTOTPSecret(secret)
+	if err != nil {
+		return fmt.Errorf("user set totp: %w", err)
+	}
+	if secret == "" {
+		enabled = false
+	}
+	_, err = s.db.ExecContext(ctx,
+		`UPDATE users SET totp_secret = ?, totp_enabled = ?, totp_last_step = 0, updated_at = ? WHERE id = ?`,
+		stored, boolToInt(enabled), time.Now().UTC().Format(time.RFC3339), id,
+	)
+	if err != nil {
+		return fmt.Errorf("user set totp: %w", err)
+	}
+	return nil
+}
+
+func (s *userStore) ConsumeTOTPStep(ctx context.Context, id string, step int64) (bool, error) {
+	// A single conditional UPDATE makes check-and-set atomic, so two requests
+	// racing with the same code cannot both succeed.
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE users SET totp_last_step = ? WHERE id = ? AND totp_last_step < ?`, step, id, step)
+	if err != nil {
+		return false, fmt.Errorf("user consume totp step: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("user consume totp step: %w", err)
+	}
+	return n == 1, nil
+}
+
+// encryptTOTPSecret encrypts a TOTP secret for the totp_secret column as
+// "<key id>:<ciphertext>". Base64 ciphertext never contains a colon, so the
+// last colon separates the two even if a key id contains one.
+func (s *userStore) encryptTOTPSecret(secret string) (string, error) {
+	if secret == "" {
+		return "", nil
+	}
+	ct, keyID, err := s.keys.Encrypt(secret)
+	if err != nil {
+		return "", fmt.Errorf("encrypt totp secret: %w", err)
+	}
+	return keyID + ":" + ct, nil
+}
+
+func (s *userStore) decryptTOTPSecret(stored string) (string, error) {
+	if stored == "" {
+		return "", nil
+	}
+	i := strings.LastIndex(stored, ":")
+	if i < 0 {
+		return "", errors.New("decrypt totp secret: malformed value")
+	}
+	secret, err := s.keys.Decrypt(stored[i+1:], stored[:i])
+	if err != nil {
+		return "", fmt.Errorf("decrypt totp secret: %w", err)
+	}
+	return secret, nil
+}
+
 func (s *userStore) Count(ctx context.Context) (int64, error) {
 	var count int64
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&count)
@@ -193,6 +268,11 @@ func (s *userStore) scanUser(sc scanner) (*model.User, error) {
 
 	u.IsAdmin = isAdmin != 0
 	u.TOTPEnabled = totpEnabled != 0
+
+	u.TOTPSecret, err = s.decryptTOTPSecret(u.TOTPSecret)
+	if err != nil {
+		return nil, err
+	}
 
 	if emailCT.Valid && emailKeyID.Valid {
 		u.Email, err = s.keys.Decrypt(emailCT.String, emailKeyID.String)
