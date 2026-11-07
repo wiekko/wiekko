@@ -67,7 +67,7 @@ type DefectStore interface {
 }
 
 type defectStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *defectStore) Create(ctx context.Context, d *model.Defect) error {
@@ -78,7 +78,7 @@ func (s *defectStore) Create(ctx context.Context, d *model.Defect) error {
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.ID, d.ProductID, d.Title, d.Description, d.Criticality,
 		nullableText(d.StatusID), nullableText(d.MilestoneID), nullableText(d.SprintID),
-		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, boolToInt(d.IsActive),
+		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, d.IsActive,
 		d.CreatedAt, d.UpdatedAt,
 	)
 	return err
@@ -101,7 +101,7 @@ func (s *defectStore) Update(ctx context.Context, d *model.Defect) error {
 		 WHERE id = ?`,
 		d.Title, d.Description, d.Criticality,
 		nullableText(d.StatusID), nullableText(d.MilestoneID), nullableText(d.SprintID),
-		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, boolToInt(d.IsActive),
+		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, d.IsActive,
 		d.UpdatedAt, d.ID,
 	)
 	return err
@@ -313,10 +313,9 @@ const defectColumnsQualified = `d.id, d.product_id, d.title, d.description, d.cr
 func scanDefect(sc scanner) (*model.Defect, error) {
 	var d model.Defect
 	var statusID, milestoneID, sprintID, environmentID, estimation sql.NullString
-	var isActive int
 	err := sc.Scan(&d.ID, &d.ProductID, &d.Title, &d.Description, &d.Criticality,
 		&statusID, &milestoneID, &sprintID, &environmentID, &estimation, &d.Priority,
-		&isActive, &d.CreatedAt, &d.UpdatedAt)
+		&d.IsActive, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +324,5 @@ func scanDefect(sc scanner) (*model.Defect, error) {
 	d.SprintID = sprintID.String
 	d.EnvironmentID = environmentID.String
 	d.Estimation = estimation.String
-	d.IsActive = isActive != 0
 	return &d, nil
 }

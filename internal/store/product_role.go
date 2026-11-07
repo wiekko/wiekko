@@ -20,7 +20,7 @@ type ProductRoleStore interface {
 }
 
 type productRoleStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *productRoleStore) Create(ctx context.Context, role *model.ProductRole) error {

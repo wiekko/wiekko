@@ -9,12 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
 
 	"nexmap.net/internal/auth/builtin"
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/database"
+	"nexmap.net/internal/database/dbtest"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
 	"nexmap.net/internal/storage"
@@ -25,8 +24,29 @@ import (
 // real service layer, so a service that gains a validation rule or changes a
 // precondition breaks here rather than silently at a developer's next startup.
 func TestSeed(t *testing.T) {
+	// Services discard audit write errors, so a dialect bug there would only
+	// show as missing rows. Seeding is deterministic: every engine must end up
+	// with the same number of audit entries.
+	auditRows := map[string]int{}
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		testSeed(t, driver, db)
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM audit_trail`).Scan(&n); err != nil {
+			t.Fatalf("count audit rows: %v", err)
+		}
+		if n == 0 {
+			t.Error("seeding wrote no audit entries")
+		}
+		auditRows[driver] = n
+	})
+	if a, b := auditRows[dbtest.SQLite], auditRows[dbtest.Postgres]; a != 0 && b != 0 && a != b {
+		t.Errorf("audit entries after seeding: sqlite %d, postgres %d", a, b)
+	}
+}
+
+func testSeed(t *testing.T, driver string, db *sql.DB) {
 	ctx := context.Background()
-	st, svc, provider := newSeedEnv(t)
+	st, svc, provider := newSeedEnv(t, driver, db)
 	admin := newAdmin(t, st, provider)
 
 	if err := Seed(ctx, svc, st, provider, admin); err != nil {
@@ -299,20 +319,9 @@ func TestSeed(t *testing.T) {
 // --- helpers ---
 
 // newSeedEnv builds the same object graph main.go wires up, against a migrated
-// throwaway SQLite database.
-func newSeedEnv(t *testing.T) (*store.Store, *service.Services, *builtin.Provider) {
+// throwaway database.
+func newSeedEnv(t *testing.T, driver string, db *sql.DB) (*store.Store, *service.Services, *builtin.Provider) {
 	t.Helper()
-
-	dsn := filepath.Join(t.TempDir(), "devseed.db") + "?_pragma=foreign_keys(1)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-
-	if err := database.Migrate(db, "sqlite"); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
 
 	keys, err := crypto.NewKeyRing(testKeyJSON())
 	if err != nil {
@@ -331,7 +340,7 @@ func newSeedEnv(t *testing.T) (*store.Store, *service.Services, *builtin.Provide
 		PBKDF2Iterations: 1,
 	}
 
-	st := store.New(db, keys)
+	st := store.New(db, store.Dialect(driver), keys)
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
 	return st, service.New(st, provider, cfg, blobs), provider
 }

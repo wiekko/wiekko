@@ -24,7 +24,7 @@ type CampaignResultStore interface {
 }
 
 type campaignResultStore struct {
-	db *sql.DB
+	db *DB
 }
 
 const campaignResultColumns = `id, campaign_id, test_case_id, environment_id, status,

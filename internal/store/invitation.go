@@ -22,7 +22,7 @@ type InvitationStore interface {
 }
 
 type invitationStore struct {
-	db   *sql.DB
+	db   *DB
 	keys *crypto.KeyRing
 }
 

@@ -18,7 +18,7 @@ type CampaignResultEventStore interface {
 }
 
 type campaignResultEventStore struct {
-	db *sql.DB
+	db *DB
 }
 
 const campaignResultEventColumns = `id, result_id, campaign_id, user_id,

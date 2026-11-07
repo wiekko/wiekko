@@ -19,7 +19,7 @@ type AttachmentStore interface {
 }
 
 type attachmentStore struct {
-	db *sql.DB
+	db *DB
 }
 
 const attachmentColumns = `id, product_id, owner_type, owner_id, user_id,
@@ -84,7 +84,7 @@ func (s *attachmentStore) ListByOwner(ctx context.Context, productID, ownerType,
 	return collectAttachments(rows)
 }
 
-func collectAttachments(rows *sql.Rows) ([]*model.Attachment, error) {
+func collectAttachments(rows *Rows) ([]*model.Attachment, error) {
 	var attachments []*model.Attachment
 	for rows.Next() {
 		a, err := scanAttachment(rows)

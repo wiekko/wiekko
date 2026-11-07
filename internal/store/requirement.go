@@ -35,7 +35,7 @@ type RequirementStore interface {
 }
 
 type requirementStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *requirementStore) Create(ctx context.Context, r *model.Requirement) error {
@@ -48,7 +48,7 @@ func (s *requirementStore) Create(ctx context.Context, r *model.Requirement) err
 		r.Title, r.Description, r.DefinitionOfDone,
 		nullableText(r.StatusID), nullableText(r.MilestoneID), nullableText(r.SprintID),
 		nullableText(r.Estimation), r.Priority,
-		boolToInt(r.IsCoarse), boolToInt(r.IsActive),
+		r.IsCoarse, r.IsActive,
 		r.CreatedAt, r.UpdatedAt,
 	)
 	return err
@@ -73,7 +73,7 @@ func (s *requirementStore) Update(ctx context.Context, r *model.Requirement) err
 		r.DefinitionOfDone, nullableText(r.StatusID),
 		nullableText(r.MilestoneID), nullableText(r.SprintID),
 		nullableText(r.Estimation), r.Priority,
-		boolToInt(r.IsCoarse), boolToInt(r.IsActive),
+		r.IsCoarse, r.IsActive,
 		r.UpdatedAt, r.ID,
 	)
 	return err
@@ -209,11 +209,10 @@ const requirementColumns = `id, product_id, kind, parent_id, category_id, sequen
 func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement
 	var parentID, statusID, milestoneID, sprintID, estimation sql.NullString
-	var isCoarse, isActive int
 	err := sc.Scan(&r.ID, &r.ProductID, &r.Kind, &parentID, &r.CategoryID, &r.SequenceNumber,
 		&r.Title, &r.Description, &r.DefinitionOfDone,
 		&statusID, &milestoneID, &sprintID, &estimation, &r.Priority,
-		&isCoarse, &isActive, &r.CreatedAt, &r.UpdatedAt)
+		&r.IsCoarse, &r.IsActive, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +221,5 @@ func scanRequirement(sc scanner) (*model.Requirement, error) {
 	r.MilestoneID = milestoneID.String
 	r.SprintID = sprintID.String
 	r.Estimation = estimation.String
-	r.IsCoarse = isCoarse != 0
-	r.IsActive = isActive != 0
 	return &r, nil
 }

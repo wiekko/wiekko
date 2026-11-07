@@ -26,7 +26,7 @@ type SprintStore interface {
 }
 
 type sprintStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *sprintStore) Create(ctx context.Context, sprint *model.Sprint) error {
@@ -99,7 +99,7 @@ func (s *sprintStore) GetActiveByProductID(ctx context.Context, productID string
 	return sp, err
 }
 
-func collectSprints(rows *sql.Rows) ([]*model.Sprint, error) {
+func collectSprints(rows *Rows) ([]*model.Sprint, error) {
 	defer closeRows(rows)
 
 	var sprints []*model.Sprint

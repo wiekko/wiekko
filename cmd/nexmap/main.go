@@ -90,7 +90,12 @@ func main() {
 	slog.Info("attachment storage ready", "dir", blobs.Root, "max_bytes", cfg.MaxUploadBytes)
 
 	// Create store, auth provider, and services.
-	st := store.New(db, keys)
+	dialect, err := store.ParseDialect(cfg.DBDriver)
+	if err != nil {
+		slog.Error("failed to select store dialect", "err", err)
+		os.Exit(1)
+	}
+	st := store.New(db, dialect, keys)
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
 	svc := service.New(st, provider, cfg, blobs)
 

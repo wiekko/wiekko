@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -32,7 +31,7 @@ type TwoFactorStore interface {
 }
 
 type twoFactorStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *twoFactorStore) ReplaceRecoveryCodes(ctx context.Context, userID string, hashes []string) error {
@@ -45,7 +44,7 @@ func (s *twoFactorStore) ReplaceRecoveryCodes(ctx context.Context, userID string
 	if _, err := tx.ExecContext(ctx, `DELETE FROM totp_recovery_codes WHERE user_id = ?`, userID); err != nil {
 		return fmt.Errorf("recovery codes replace: delete: %w", err)
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := Now()
 	for _, h := range hashes {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO totp_recovery_codes (id, user_id, code_hash, created_at) VALUES (?, ?, ?, ?)`,
@@ -66,7 +65,7 @@ func (s *twoFactorStore) ConsumeRecoveryCode(ctx context.Context, userID, hash s
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE totp_recovery_codes SET used_at = ?
 		 WHERE user_id = ? AND code_hash = ? AND used_at IS NULL`,
-		time.Now().UTC().Format(time.RFC3339), userID, hash,
+		Now(), userID, hash,
 	)
 	if err != nil {
 		return false, fmt.Errorf("recovery code consume: %w", err)

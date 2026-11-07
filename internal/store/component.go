@@ -20,7 +20,7 @@ type ComponentStore interface {
 }
 
 type componentStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *componentStore) Create(ctx context.Context, c *model.Component) error {

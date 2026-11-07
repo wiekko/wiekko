@@ -21,7 +21,7 @@ type StatusStore interface {
 }
 
 type statusStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *statusStore) Create(ctx context.Context, status *model.Status) error {
@@ -29,7 +29,7 @@ func (s *statusStore) Create(ctx context.Context, status *model.Status) error {
 		`INSERT INTO statuses (id, product_id, entity_type, name, position, is_default, is_closed, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		status.ID, status.ProductID, status.EntityType, status.Name,
-		status.Position, boolToInt(status.IsDefault), boolToInt(status.IsClosed),
+		status.Position, status.IsDefault, status.IsClosed,
 		status.CreatedAt,
 	)
 	return err
@@ -51,7 +51,7 @@ func (s *statusStore) Update(ctx context.Context, status *model.Status) error {
 		`UPDATE statuses SET name = ?, position = ?, is_default = ?, is_closed = ?
 		 WHERE id = ?`,
 		status.Name, status.Position,
-		boolToInt(status.IsDefault), boolToInt(status.IsClosed),
+		status.IsDefault, status.IsClosed,
 		status.ID,
 	)
 	return err
@@ -86,7 +86,7 @@ func (s *statusStore) ListByProductID(ctx context.Context, productID, entityType
 func (s *statusStore) GetDefault(ctx context.Context, productID, entityType string) (*model.Status, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, created_at
-		 FROM statuses WHERE product_id = ? AND entity_type = ? AND is_default = 1
+		 FROM statuses WHERE product_id = ? AND entity_type = ? AND is_default = TRUE
 		 LIMIT 1`, productID, entityType)
 	st, err := scanStatus(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -109,13 +109,10 @@ func (s *statusStore) GetByProductAndName(ctx context.Context, productID, entity
 
 func scanStatus(sc scanner) (*model.Status, error) {
 	var st model.Status
-	var isDefault, isClosed int
 	err := sc.Scan(&st.ID, &st.ProductID, &st.EntityType, &st.Name,
-		&st.Position, &isDefault, &isClosed, &st.CreatedAt)
+		&st.Position, &st.IsDefault, &st.IsClosed, &st.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
-	st.IsDefault = isDefault != 0
-	st.IsClosed = isClosed != 0
 	return &st, nil
 }

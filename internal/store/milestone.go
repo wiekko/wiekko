@@ -19,7 +19,7 @@ type MilestoneStore interface {
 }
 
 type milestoneStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *milestoneStore) Create(ctx context.Context, m *model.Milestone) error {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -40,7 +39,7 @@ type UserStore interface {
 }
 
 type userStore struct {
-	db   *sql.DB
+	db   *DB
 	keys *crypto.KeyRing
 }
 
@@ -69,7 +68,7 @@ func (s *userStore) Create(ctx context.Context, user *model.User) error {
 		`INSERT INTO users (id, username, password_hash, is_admin, status, totp_secret, totp_enabled, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID, user.Username, user.PasswordHash,
-		boolToInt(user.IsAdmin), user.Status, totpSecret, boolToInt(user.TOTPEnabled),
+		user.IsAdmin, user.Status, totpSecret, user.TOTPEnabled,
 		user.CreatedAt, user.UpdatedAt,
 	)
 	if err != nil {
@@ -108,7 +107,7 @@ func (s *userStore) Update(ctx context.Context, user *model.User) error {
 
 	_, err = tx.ExecContext(ctx,
 		`UPDATE users SET username = ?, is_admin = ?, status = ?, updated_at = ? WHERE id = ?`,
-		user.Username, boolToInt(user.IsAdmin), user.Status, user.UpdatedAt, user.ID,
+		user.Username, user.IsAdmin, user.Status, user.UpdatedAt, user.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("user update: update user: %w", err)
@@ -122,12 +121,12 @@ func (s *userStore) Update(ctx context.Context, user *model.User) error {
 }
 
 func (s *userStore) UpdateStatus(ctx context.Context, id, status string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET status = ?, updated_at = datetime('now') WHERE id = ?`, status, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET status = ?, updated_at = ? WHERE id = ?`, status, Now(), id)
 	return err
 }
 
 func (s *userStore) UpdatePassword(ctx context.Context, id, hash string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`, hash, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`, hash, Now(), id)
 	return err
 }
 
@@ -187,7 +186,7 @@ func (s *userStore) SetTOTP(ctx context.Context, id, secret string, enabled bool
 	}
 	_, err = s.db.ExecContext(ctx,
 		`UPDATE users SET totp_secret = ?, totp_enabled = ?, totp_last_step = 0, updated_at = ? WHERE id = ?`,
-		stored, boolToInt(enabled), time.Now().UTC().Format(time.RFC3339), id,
+		stored, enabled, Now(), id,
 	)
 	if err != nil {
 		return fmt.Errorf("user set totp: %w", err)
@@ -256,18 +255,14 @@ func (s *userStore) getOne(ctx context.Context, query string, args ...any) (*mod
 
 func (s *userStore) scanUser(sc scanner) (*model.User, error) {
 	var u model.User
-	var isAdmin, totpEnabled int
 	var emailCT, emailKeyID, dnCT, dnKeyID sql.NullString
 
 	err := sc.Scan(&u.ID, &u.Username, &u.PasswordHash,
-		&isAdmin, &u.Status, &u.TOTPSecret, &totpEnabled, &u.CreatedAt, &u.UpdatedAt,
+		&u.IsAdmin, &u.Status, &u.TOTPSecret, &u.TOTPEnabled, &u.CreatedAt, &u.UpdatedAt,
 		&emailCT, &emailKeyID, &dnCT, &dnKeyID)
 	if err != nil {
 		return nil, err
 	}
-
-	u.IsAdmin = isAdmin != 0
-	u.TOTPEnabled = totpEnabled != 0
 
 	u.TOTPSecret, err = s.decryptTOTPSecret(u.TOTPSecret)
 	if err != nil {
@@ -291,7 +286,7 @@ func (s *userStore) scanUser(sc scanner) (*model.User, error) {
 	return &u, nil
 }
 
-func (s *userStore) insertPersonalData(ctx context.Context, tx *sql.Tx, user *model.User) error {
+func (s *userStore) insertPersonalData(ctx context.Context, tx *Tx, user *model.User) error {
 	emailCT, emailKeyID, err := s.keys.Encrypt(user.Email)
 	if err != nil {
 		return fmt.Errorf("encrypt email: %w", err)
@@ -324,7 +319,7 @@ func (s *userStore) insertPersonalData(ctx context.Context, tx *sql.Tx, user *mo
 	return nil
 }
 
-func (s *userStore) updatePersonalData(ctx context.Context, tx *sql.Tx, user *model.User) error {
+func (s *userStore) updatePersonalData(ctx context.Context, tx *Tx, user *model.User) error {
 	emailCT, emailKeyID, err := s.keys.Encrypt(user.Email)
 	if err != nil {
 		return fmt.Errorf("encrypt email: %w", err)

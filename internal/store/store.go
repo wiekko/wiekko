@@ -36,8 +36,10 @@ type Store struct {
 	Audit              AuditStore
 }
 
-// New creates a Store backed by the given database connection.
-func New(db *sql.DB, keys *crypto.KeyRing) *Store {
+// New creates a Store backed by the given database connection. dialect selects
+// how the portable queries are adapted to the engine (see DB).
+func New(conn *sql.DB, dialect Dialect, keys *crypto.KeyRing) *Store {
+	db := NewDB(conn, dialect)
 	return &Store{
 		User:               &userStore{db: db, keys: keys},
 		Session:            &sessionStore{db: db},

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-    id         UUID PRIMARY KEY,
+    id         TEXT PRIMARY KEY, -- random session token, not a UUID
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     csrf_token TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,

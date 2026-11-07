@@ -2,35 +2,12 @@ package store
 
 import (
 	"context"
-	"database/sql"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
 
-	"nexmap.net/internal/database"
 	"nexmap.net/internal/model"
 )
-
-// newTestDB opens a migrated SQLite database. These tests exercise the real SQL
-// rather than mocks, so schema and query mistakes surface here.
-func newTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	dsn := filepath.Join(t.TempDir(), "store.db") + "?_pragma=foreign_keys(1)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-
-	if err := database.Migrate(db, "sqlite"); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	return db
-}
 
 // campaignFixture seeds a product, two environments and two test cases, and
 // returns their IDs.
@@ -41,10 +18,10 @@ type campaignFixture struct {
 	tcBare     string // linked to none
 }
 
-func seedCampaignFixture(t *testing.T, db *sql.DB) campaignFixture {
+func seedCampaignFixture(t *testing.T, db *DB) campaignFixture {
 	t.Helper()
 
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := Now()
 	f := campaignFixture{
 		productID: uuid.New().String(),
 		envA:      uuid.New().String(),
@@ -83,7 +60,7 @@ func seedCampaignFixture(t *testing.T, db *sql.DB) campaignFixture {
 func makeCampaign(t *testing.T, s TestingCampaignStore, productID, name, status string) *model.TestingCampaign {
 	t.Helper()
 
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := Now()
 	c := &model.TestingCampaign{
 		ID:        uuid.New().String(),
 		ProductID: productID,
@@ -99,427 +76,436 @@ func makeCampaign(t *testing.T, s TestingCampaignStore, productID, name, status 
 }
 
 func TestTestingCampaignStoreRoundTrip(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	store := &testingCampaignStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		store := &testingCampaignStore{db: db}
+		ctx := context.Background()
 
-	c := makeCampaign(t, store, f.productID, "Release 1.0", model.CampaignStatusDraft)
+		c := makeCampaign(t, store, f.productID, "Release 1.0", model.CampaignStatusDraft)
 
-	got, err := store.GetByID(ctx, c.ID)
-	if err != nil {
-		t.Fatalf("GetByID: %v", err)
-	}
-	// Optional columns are stored NULL and must read back as empty strings.
-	if got.StartsAt != "" || got.EndsAt != "" || got.ClosedAt != "" || got.ClosedBy != "" {
-		t.Fatalf("expected empty optional fields, got %+v", got)
-	}
-	if got.Status != model.CampaignStatusDraft {
-		t.Fatalf("Status = %q, want draft", got.Status)
-	}
+		got, err := store.GetByID(ctx, c.ID)
+		if err != nil {
+			t.Fatalf("GetByID: %v", err)
+		}
+		// Optional columns are stored NULL and must read back as empty strings.
+		if got.StartsAt != "" || got.EndsAt != "" || got.ClosedAt != "" || got.ClosedBy != "" {
+			t.Fatalf("expected empty optional fields, got %+v", got)
+		}
+		if got.Status != model.CampaignStatusDraft {
+			t.Fatalf("Status = %q, want draft", got.Status)
+		}
 
-	got.Status = model.CampaignStatusActive
-	got.StartsAt = "2026-07-01T00:00:00Z"
-	if err := store.Update(ctx, got); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
+		got.Status = model.CampaignStatusActive
+		got.StartsAt = "2026-07-01T00:00:00Z"
+		if err := store.Update(ctx, got); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
 
-	active, err := store.GetActiveByProductID(ctx, f.productID)
-	if err != nil {
-		t.Fatalf("GetActiveByProductID: %v", err)
-	}
-	if active == nil || active.ID != c.ID {
-		t.Fatalf("GetActiveByProductID = %+v, want campaign %s", active, c.ID)
-	}
-	if active.StartsAt != "2026-07-01T00:00:00Z" {
-		t.Fatalf("StartsAt = %q, want the stored value", active.StartsAt)
-	}
+		active, err := store.GetActiveByProductID(ctx, f.productID)
+		if err != nil {
+			t.Fatalf("GetActiveByProductID: %v", err)
+		}
+		if active == nil || active.ID != c.ID {
+			t.Fatalf("GetActiveByProductID = %+v, want campaign %s", active, c.ID)
+		}
+		if active.StartsAt != "2026-07-01T00:00:00Z" {
+			t.Fatalf("StartsAt = %q, want the stored value", active.StartsAt)
+		}
+	})
 }
 
 func TestTestingCampaignStoreNoActiveCampaign(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	store := &testingCampaignStore{db: db}
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		store := &testingCampaignStore{db: db}
 
-	makeCampaign(t, store, f.productID, "Draft only", model.CampaignStatusDraft)
+		makeCampaign(t, store, f.productID, "Draft only", model.CampaignStatusDraft)
 
-	active, err := store.GetActiveByProductID(context.Background(), f.productID)
-	if err != nil {
-		t.Fatalf("GetActiveByProductID: %v", err)
-	}
-	if active != nil {
-		t.Fatalf("GetActiveByProductID = %+v, want nil", active)
-	}
+		active, err := store.GetActiveByProductID(context.Background(), f.productID)
+		if err != nil {
+			t.Fatalf("GetActiveByProductID: %v", err)
+		}
+		if active != nil {
+			t.Fatalf("GetActiveByProductID = %+v, want nil", active)
+		}
+	})
 }
 
 // The partial unique index is what actually enforces FR-322.
 func TestTestingCampaignStoreOneActivePerProduct(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	store := &testingCampaignStore{db: db}
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		store := &testingCampaignStore{db: db}
 
-	makeCampaign(t, store, f.productID, "First", model.CampaignStatusActive)
+		makeCampaign(t, store, f.productID, "First", model.CampaignStatusActive)
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	second := &model.TestingCampaign{
-		ID:        uuid.New().String(),
-		ProductID: f.productID,
-		Name:      "Second",
-		Status:    model.CampaignStatusActive,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := store.Create(context.Background(), second); err == nil {
-		t.Fatal("expected the schema to reject a second active campaign")
-	}
+		now := Now()
+		second := &model.TestingCampaign{
+			ID:        uuid.New().String(),
+			ProductID: f.productID,
+			Name:      "Second",
+			Status:    model.CampaignStatusActive,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := store.Create(context.Background(), second); err == nil {
+			t.Fatal("expected the schema to reject a second active campaign")
+		}
 
-	// Draft and closed campaigns are unconstrained.
-	makeCampaign(t, store, f.productID, "Draft", model.CampaignStatusDraft)
-	makeCampaign(t, store, f.productID, "Closed", model.CampaignStatusClosed)
+		// Draft and closed campaigns are unconstrained.
+		makeCampaign(t, store, f.productID, "Draft", model.CampaignStatusDraft)
+		makeCampaign(t, store, f.productID, "Closed", model.CampaignStatusClosed)
+	})
 }
 
 func TestCampaignResultStoreSeedingAndLookups(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	campaigns := &testingCampaignStore{db: db}
-	results := &campaignResultStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		ctx := context.Background()
 
-	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
-	now := time.Now().UTC().Format(time.RFC3339)
+		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+		now := Now()
 
-	seed := []*model.CampaignResult{
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-	}
-	if err := results.CreateBatch(ctx, seed); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
+		seed := []*model.CampaignResult{
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+		}
+		if err := results.CreateBatch(ctx, seed); err != nil {
+			t.Fatalf("CreateBatch: %v", err)
+		}
 
-	all, err := results.ListByCampaignID(ctx, c.ID)
-	if err != nil {
-		t.Fatalf("ListByCampaignID: %v", err)
-	}
-	if len(all) != 3 {
-		t.Fatalf("listed %d results, want 3", len(all))
-	}
+		all, err := results.ListByCampaignID(ctx, c.ID)
+		if err != nil {
+			t.Fatalf("ListByCampaignID: %v", err)
+		}
+		if len(all) != 3 {
+			t.Fatalf("listed %d results, want 3", len(all))
+		}
 
-	// The environment-less row round-trips as an empty string, not "NULL".
-	bare, err := results.GetByCampaignAndTestCase(ctx, c.ID, f.tcBare, "")
-	if err != nil {
-		t.Fatalf("GetByCampaignAndTestCase: %v", err)
-	}
-	if bare.EnvironmentID != "" {
-		t.Fatalf("EnvironmentID = %q, want empty", bare.EnvironmentID)
-	}
+		// The environment-less row round-trips as an empty string, not "NULL".
+		bare, err := results.GetByCampaignAndTestCase(ctx, c.ID, f.tcBare, "")
+		if err != nil {
+			t.Fatalf("GetByCampaignAndTestCase: %v", err)
+		}
+		if bare.EnvironmentID != "" {
+			t.Fatalf("EnvironmentID = %q, want empty", bare.EnvironmentID)
+		}
 
-	byTestCase, err := results.ListByTestCaseID(ctx, f.tcMatrix)
-	if err != nil {
-		t.Fatalf("ListByTestCaseID: %v", err)
-	}
-	if len(byTestCase) != 2 {
-		t.Fatalf("listed %d results for the matrix test case, want 2", len(byTestCase))
-	}
+		byTestCase, err := results.ListByTestCaseID(ctx, f.tcMatrix)
+		if err != nil {
+			t.Fatalf("ListByTestCaseID: %v", err)
+		}
+		if len(byTestCase) != 2 {
+			t.Fatalf("listed %d results for the matrix test case, want 2", len(byTestCase))
+		}
 
-	counts, err := results.CountsByProductID(ctx, f.productID)
-	if err != nil {
-		t.Fatalf("CountsByProductID: %v", err)
-	}
-	if counts[c.ID][model.CampaignResultStatusPending] != 3 {
-		t.Fatalf("counts = %v, want 3 pending", counts[c.ID])
-	}
+		counts, err := results.CountsByProductID(ctx, f.productID)
+		if err != nil {
+			t.Fatalf("CountsByProductID: %v", err)
+		}
+		if counts[c.ID][model.CampaignResultStatusPending] != 3 {
+			t.Fatalf("counts = %v, want 3 pending", counts[c.ID])
+		}
 
-	// CreateBatch is transactional: a duplicate must roll the whole batch back.
-	before := len(all)
-	dup := []*model.CampaignResult{
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-	}
-	if err := results.CreateBatch(ctx, dup); err == nil {
-		t.Fatal("expected a duplicate campaign/test case/environment to be rejected")
-	}
-	after, _ := results.ListByCampaignID(ctx, c.ID)
-	if len(after) != before {
-		t.Fatalf("listed %d results after a failed batch, want %d", len(after), before)
-	}
+		// CreateBatch is transactional: a duplicate must roll the whole batch back.
+		before := len(all)
+		dup := []*model.CampaignResult{
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+		}
+		if err := results.CreateBatch(ctx, dup); err == nil {
+			t.Fatal("expected a duplicate campaign/test case/environment to be rejected")
+		}
+		after, _ := results.ListByCampaignID(ctx, c.ID)
+		if len(after) != before {
+			t.Fatalf("listed %d results after a failed batch, want %d", len(after), before)
+		}
+	})
 }
 
 // Deleting a runtime environment must remove its matrix rows rather than
 // collapsing them into indistinguishable NULL rows.
 func TestCampaignResultsCascadeOnEnvironmentDelete(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	campaigns := &testingCampaignStore{db: db}
-	results := &campaignResultStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		ctx := context.Background()
 
-	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := results.CreateBatch(ctx, []*model.CampaignResult{
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPassed, UpdatedAt: now},
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-	}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
-
-	if _, err := db.Exec(`DELETE FROM runtime_environments WHERE id = ?`, f.envA); err != nil {
-		t.Fatalf("delete environment: %v", err)
-	}
-
-	remaining, err := results.ListByCampaignID(ctx, c.ID)
-	if err != nil {
-		t.Fatalf("ListByCampaignID: %v", err)
-	}
-	if len(remaining) != 2 {
-		t.Fatalf("listed %d results after deleting an environment, want 2", len(remaining))
-	}
-
-	// Exactly one environment-less row must remain: the one seeded that way.
-	bare := 0
-	for _, result := range remaining {
-		if result.EnvironmentID == "" {
-			bare++
+		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+		now := Now()
+		if err := results.CreateBatch(ctx, []*model.CampaignResult{
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPassed, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+		}); err != nil {
+			t.Fatalf("CreateBatch: %v", err)
 		}
-	}
-	if bare != 1 {
-		t.Fatalf("found %d environment-less results, want 1", bare)
-	}
+
+		if _, err := db.Exec(`DELETE FROM runtime_environments WHERE id = ?`, f.envA); err != nil {
+			t.Fatalf("delete environment: %v", err)
+		}
+
+		remaining, err := results.ListByCampaignID(ctx, c.ID)
+		if err != nil {
+			t.Fatalf("ListByCampaignID: %v", err)
+		}
+		if len(remaining) != 2 {
+			t.Fatalf("listed %d results after deleting an environment, want 2", len(remaining))
+		}
+
+		// Exactly one environment-less row must remain: the one seeded that way.
+		bare := 0
+		for _, result := range remaining {
+			if result.EnvironmentID == "" {
+				bare++
+			}
+		}
+		if bare != 1 {
+			t.Fatalf("found %d environment-less results, want 1", bare)
+		}
+	})
 }
 
 func TestCampaignResultStoreDefectLinkage(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	campaigns := &testingCampaignStore{db: db}
-	results := &campaignResultStore{db: db}
-	events := &campaignResultEventStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		events := &campaignResultEventStore{db: db}
+		ctx := context.Background()
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	defectID := uuid.New().String()
-	if _, err := db.Exec(`INSERT INTO defects (id, product_id, title, description, criticality, priority, is_active, created_at, updated_at)
-	                      VALUES (?, ?, 'Login is broken', '', 'high', 0, 0, ?, ?)`, defectID, f.productID, now, now); err != nil {
-		t.Fatalf("seed defect: %v", err)
-	}
+		now := Now()
+		defectID := uuid.New().String()
+		if _, err := db.Exec(`INSERT INTO defects (id, product_id, title, description, criticality, priority, is_active, created_at, updated_at)
+	                      VALUES (?, ?, 'Login is broken', '', 'high', 0, FALSE, ?, ?)`, defectID, f.productID, now, now); err != nil {
+			t.Fatalf("seed defect: %v", err)
+		}
 
-	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
-	resultID := uuid.New().String()
-	if err := results.Create(ctx, &model.CampaignResult{
-		ID: resultID, CampaignID: c.ID, TestCaseID: f.tcBare,
-		Status: model.CampaignResultStatusPending, UpdatedAt: now,
-	}); err != nil {
-		t.Fatalf("Create: %v", err)
-	}
+		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+		resultID := uuid.New().String()
+		if err := results.Create(ctx, &model.CampaignResult{
+			ID: resultID, CampaignID: c.ID, TestCaseID: f.tcBare,
+			Status: model.CampaignResultStatusPending, UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("Create: %v", err)
+		}
 
-	result, err := results.GetByID(ctx, resultID)
-	if err != nil {
-		t.Fatalf("GetByID: %v", err)
-	}
-	result.Status = model.CampaignResultStatusFailed
-	result.DefectID = defectID
-	result.ExecutedAt = now
-	if err := results.Update(ctx, result); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
+		result, err := results.GetByID(ctx, resultID)
+		if err != nil {
+			t.Fatalf("GetByID: %v", err)
+		}
+		result.Status = model.CampaignResultStatusFailed
+		result.DefectID = defectID
+		result.ExecutedAt = now
+		if err := results.Update(ctx, result); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
 
-	byDefect, err := results.ListByDefectID(ctx, defectID)
-	if err != nil {
-		t.Fatalf("ListByDefectID: %v", err)
-	}
-	if len(byDefect) != 1 || byDefect[0].ID != resultID {
-		t.Fatalf("ListByDefectID = %+v, want the failed result", byDefect)
-	}
+		byDefect, err := results.ListByDefectID(ctx, defectID)
+		if err != nil {
+			t.Fatalf("ListByDefectID: %v", err)
+		}
+		if len(byDefect) != 1 || byDefect[0].ID != resultID {
+			t.Fatalf("ListByDefectID = %+v, want the failed result", byDefect)
+		}
 
-	if err := events.Create(ctx, &model.CampaignResultEvent{
-		ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
-		FromStatus: model.CampaignResultStatusPending,
-		ToStatus:   model.CampaignResultStatusFailed,
-		DefectID:   defectID, CreatedAt: now,
-	}); err != nil {
-		t.Fatalf("event Create: %v", err)
-	}
+		if err := events.Create(ctx, &model.CampaignResultEvent{
+			ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
+			FromStatus: model.CampaignResultStatusPending,
+			ToStatus:   model.CampaignResultStatusFailed,
+			DefectID:   defectID, CreatedAt: now,
+		}); err != nil {
+			t.Fatalf("event Create: %v", err)
+		}
 
-	logged, err := events.ListByCampaignID(ctx, c.ID)
-	if err != nil {
-		t.Fatalf("ListByCampaignID: %v", err)
-	}
-	if len(logged) != 1 || logged[0].ToStatus != model.CampaignResultStatusFailed {
-		t.Fatalf("events = %+v, want one pending->failed entry", logged)
-	}
-	// user_id was never set and must survive the NULL round trip.
-	if logged[0].UserID != "" {
-		t.Fatalf("UserID = %q, want empty", logged[0].UserID)
-	}
+		logged, err := events.ListByCampaignID(ctx, c.ID)
+		if err != nil {
+			t.Fatalf("ListByCampaignID: %v", err)
+		}
+		if len(logged) != 1 || logged[0].ToStatus != model.CampaignResultStatusFailed {
+			t.Fatalf("events = %+v, want one pending->failed entry", logged)
+		}
+		// user_id was never set and must survive the NULL round trip.
+		if logged[0].UserID != "" {
+			t.Fatalf("UserID = %q, want empty", logged[0].UserID)
+		}
 
-	// Deleting the defect must not delete the history that references it.
-	if _, err := db.Exec(`DELETE FROM defects WHERE id = ?`, defectID); err != nil {
-		t.Fatalf("delete defect: %v", err)
-	}
-	orphaned, err := results.GetByID(ctx, resultID)
-	if err != nil {
-		t.Fatalf("GetByID after defect delete: %v", err)
-	}
-	if orphaned.DefectID != "" {
-		t.Fatalf("DefectID = %q, want empty after the defect was deleted", orphaned.DefectID)
-	}
-	if orphaned.Status != model.CampaignResultStatusFailed {
-		t.Fatalf("Status = %q, want the result to keep its verdict", orphaned.Status)
-	}
+		// Deleting the defect must not delete the history that references it.
+		if _, err := db.Exec(`DELETE FROM defects WHERE id = ?`, defectID); err != nil {
+			t.Fatalf("delete defect: %v", err)
+		}
+		orphaned, err := results.GetByID(ctx, resultID)
+		if err != nil {
+			t.Fatalf("GetByID after defect delete: %v", err)
+		}
+		if orphaned.DefectID != "" {
+			t.Fatalf("DefectID = %q, want empty after the defect was deleted", orphaned.DefectID)
+		}
+		if orphaned.Status != model.CampaignResultStatusFailed {
+			t.Fatalf("Status = %q, want the result to keep its verdict", orphaned.Status)
+		}
+	})
 }
 
 func TestCampaignResultStoreDeleteByCampaignAndTestCase(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	campaigns := &testingCampaignStore{db: db}
-	results := &campaignResultStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		ctx := context.Background()
 
-	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusDraft)
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := results.CreateBatch(ctx, []*model.CampaignResult{
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-		{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-	}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
+		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusDraft)
+		now := Now()
+		if err := results.CreateBatch(ctx, []*model.CampaignResult{
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+		}); err != nil {
+			t.Fatalf("CreateBatch: %v", err)
+		}
 
-	// Dropping a test case from a draft scope removes all of its environments.
-	if err := results.DeleteByCampaignAndTestCase(ctx, c.ID, f.tcMatrix); err != nil {
-		t.Fatalf("DeleteByCampaignAndTestCase: %v", err)
-	}
-	remaining, err := results.ListByCampaignID(ctx, c.ID)
-	if err != nil {
-		t.Fatalf("ListByCampaignID: %v", err)
-	}
-	if len(remaining) != 1 || remaining[0].TestCaseID != f.tcBare {
-		t.Fatalf("remaining = %+v, want only the bare test case", remaining)
-	}
+		// Dropping a test case from a draft scope removes all of its environments.
+		if err := results.DeleteByCampaignAndTestCase(ctx, c.ID, f.tcMatrix); err != nil {
+			t.Fatalf("DeleteByCampaignAndTestCase: %v", err)
+		}
+		remaining, err := results.ListByCampaignID(ctx, c.ID)
+		if err != nil {
+			t.Fatalf("ListByCampaignID: %v", err)
+		}
+		if len(remaining) != 1 || remaining[0].TestCaseID != f.tcBare {
+			t.Fatalf("remaining = %+v, want only the bare test case", remaining)
+		}
+	})
 }
 
 // The defect trail must survive the fact that a passing verdict clears the
 // result's defect: the closing event carries no defect_id, and a plain column
 // filter would drop exactly the row that proves the fix worked.
 func TestCampaignResultEventStoreDefectTrail(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	campaigns := &testingCampaignStore{db: db}
-	results := &campaignResultStore{db: db}
-	events := &campaignResultEventStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		events := &campaignResultEventStore{db: db}
+		ctx := context.Background()
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	defectID := uuid.New().String()
-	if _, err := db.Exec(`INSERT INTO defects (id, product_id, title, description, criticality, priority, is_active, created_at, updated_at)
-	                      VALUES (?, ?, 'Login is broken', '', 'high', 0, 0, ?, ?)`, defectID, f.productID, now, now); err != nil {
-		t.Fatalf("seed defect: %v", err)
-	}
-
-	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
-
-	// The verified result, and a second one that never touched the defect.
-	verified := uuid.New().String()
-	unrelated := uuid.New().String()
-	for _, id := range []string{verified, unrelated} {
-		if err := results.Create(ctx, &model.CampaignResult{
-			ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
-			Status: model.CampaignResultStatusPending, UpdatedAt: now,
-		}); err != nil {
-			t.Fatalf("Create result: %v", err)
+		now := Now()
+		defectID := uuid.New().String()
+		if _, err := db.Exec(`INSERT INTO defects (id, product_id, title, description, criticality, priority, is_active, created_at, updated_at)
+	                      VALUES (?, ?, 'Login is broken', '', 'high', 0, FALSE, ?, ?)`, defectID, f.productID, now, now); err != nil {
+			t.Fatalf("seed defect: %v", err)
 		}
-	}
 
-	record := func(resultID, from, to, defect, at string) {
-		t.Helper()
-		if err := events.Create(ctx, &model.CampaignResultEvent{
-			ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
-			FromStatus: from, ToStatus: to, DefectID: defect, CreatedAt: at,
-		}); err != nil {
-			t.Fatalf("event Create: %v", err)
-		}
-	}
+		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
 
-	// The full loop: failed with the defect, reopened for re-test, then passed.
-	// The pass clears the defect, so its event names no defect at all.
-	record(verified, model.CampaignResultStatusPending, model.CampaignResultStatusFailed, defectID, "2026-08-01T10:00:00Z")
-	record(verified, model.CampaignResultStatusFailed, model.CampaignResultStatusRetest, defectID, "2026-08-02T10:00:00Z")
-	record(verified, model.CampaignResultStatusRetest, model.CampaignResultStatusPassed, "", "2026-08-03T10:00:00Z")
-	record(unrelated, model.CampaignResultStatusPending, model.CampaignResultStatusPassed, "", "2026-08-03T11:00:00Z")
+		// The verified result, and a second one that never touched the defect.
+		verified := uuid.New().String()
+		unrelated := uuid.New().String()
+		for _, id := range []string{verified, unrelated} {
+			if err := results.Create(ctx, &model.CampaignResult{
+				ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
+				Status: model.CampaignResultStatusPending, UpdatedAt: now,
+			}); err != nil {
+				t.Fatalf("Create result: %v", err)
+			}
+		}
 
-	trail, err := events.ListByDefectTrail(ctx, defectID)
-	if err != nil {
-		t.Fatalf("ListByDefectTrail: %v", err)
-	}
-	if len(trail) != 3 {
-		t.Fatalf("len(trail) = %d, want 3 (the unrelated result must not appear)", len(trail))
-	}
-	for i, want := range []string{
-		model.CampaignResultStatusFailed,
-		model.CampaignResultStatusRetest,
-		model.CampaignResultStatusPassed,
-	} {
-		if trail[i].ToStatus != want {
-			t.Fatalf("trail[%d].ToStatus = %q, want %q", i, trail[i].ToStatus, want)
+		record := func(resultID, from, to, defect, at string) {
+			t.Helper()
+			if err := events.Create(ctx, &model.CampaignResultEvent{
+				ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
+				FromStatus: from, ToStatus: to, DefectID: defect, CreatedAt: at,
+			}); err != nil {
+				t.Fatalf("event Create: %v", err)
+			}
 		}
-		if trail[i].ResultID != verified {
-			t.Fatalf("trail[%d].ResultID = %q, want the verified result", i, trail[i].ResultID)
+
+		// The full loop: failed with the defect, reopened for re-test, then passed.
+		// The pass clears the defect, so its event names no defect at all.
+		record(verified, model.CampaignResultStatusPending, model.CampaignResultStatusFailed, defectID, "2026-08-01T10:00:00Z")
+		record(verified, model.CampaignResultStatusFailed, model.CampaignResultStatusRetest, defectID, "2026-08-02T10:00:00Z")
+		record(verified, model.CampaignResultStatusRetest, model.CampaignResultStatusPassed, "", "2026-08-03T10:00:00Z")
+		record(unrelated, model.CampaignResultStatusPending, model.CampaignResultStatusPassed, "", "2026-08-03T11:00:00Z")
+
+		trail, err := events.ListByDefectTrail(ctx, defectID)
+		if err != nil {
+			t.Fatalf("ListByDefectTrail: %v", err)
 		}
-	}
-	// The row that matters carries no defect_id and is only reachable through
-	// the result, which is the whole reason for the subquery.
-	if trail[2].DefectID != "" {
-		t.Fatalf("closing event DefectID = %q, want empty", trail[2].DefectID)
-	}
+		if len(trail) != 3 {
+			t.Fatalf("len(trail) = %d, want 3 (the unrelated result must not appear)", len(trail))
+		}
+		for i, want := range []string{
+			model.CampaignResultStatusFailed,
+			model.CampaignResultStatusRetest,
+			model.CampaignResultStatusPassed,
+		} {
+			if trail[i].ToStatus != want {
+				t.Fatalf("trail[%d].ToStatus = %q, want %q", i, trail[i].ToStatus, want)
+			}
+			if trail[i].ResultID != verified {
+				t.Fatalf("trail[%d].ResultID = %q, want the verified result", i, trail[i].ResultID)
+			}
+		}
+		// The row that matters carries no defect_id and is only reachable through
+		// the result, which is the whole reason for the subquery.
+		if trail[2].DefectID != "" {
+			t.Fatalf("closing event DefectID = %q, want empty", trail[2].DefectID)
+		}
+	})
 }
 
 func TestCampaignResultEventStoreCountsByCampaignID(t *testing.T) {
-	db := newTestDB(t)
-	f := seedCampaignFixture(t, db)
-	campaigns := &testingCampaignStore{db: db}
-	results := &campaignResultStore{db: db}
-	events := &campaignResultEventStore{db: db}
-	ctx := context.Background()
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		events := &campaignResultEventStore{db: db}
+		ctx := context.Background()
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+		now := Now()
+		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
 
-	changed := uuid.New().String()
-	setOnce := uuid.New().String()
-	untouched := uuid.New().String()
-	for _, id := range []string{changed, setOnce, untouched} {
-		if err := results.Create(ctx, &model.CampaignResult{
-			ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
-			Status: model.CampaignResultStatusPending, UpdatedAt: now,
-		}); err != nil {
-			t.Fatalf("Create result: %v", err)
+		changed := uuid.New().String()
+		setOnce := uuid.New().String()
+		untouched := uuid.New().String()
+		for _, id := range []string{changed, setOnce, untouched} {
+			if err := results.Create(ctx, &model.CampaignResult{
+				ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
+				Status: model.CampaignResultStatusPending, UpdatedAt: now,
+			}); err != nil {
+				t.Fatalf("Create result: %v", err)
+			}
 		}
-	}
 
-	record := func(resultID, to string) {
-		t.Helper()
-		if err := events.Create(ctx, &model.CampaignResultEvent{
-			ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
-			ToStatus: to, CreatedAt: now,
-		}); err != nil {
-			t.Fatalf("event Create: %v", err)
+		record := func(resultID, to string) {
+			t.Helper()
+			if err := events.Create(ctx, &model.CampaignResultEvent{
+				ID: uuid.New().String(), ResultID: resultID, CampaignID: c.ID,
+				ToStatus: to, CreatedAt: now,
+			}); err != nil {
+				t.Fatalf("event Create: %v", err)
+			}
 		}
-	}
-	record(changed, model.CampaignResultStatusPassed)
-	record(changed, model.CampaignResultStatusFailed)
-	record(setOnce, model.CampaignResultStatusPassed)
+		record(changed, model.CampaignResultStatusPassed)
+		record(changed, model.CampaignResultStatusFailed)
+		record(setOnce, model.CampaignResultStatusPassed)
 
-	counts, err := events.CountsByCampaignID(ctx, c.ID)
-	if err != nil {
-		t.Fatalf("CountsByCampaignID: %v", err)
-	}
-	if counts[changed] != 2 {
-		t.Fatalf("counts[changed] = %d, want 2", counts[changed])
-	}
-	if counts[setOnce] != 1 {
-		t.Fatalf("counts[setOnce] = %d, want 1", counts[setOnce])
-	}
-	// A result nobody ever set has no events and simply does not appear.
-	if _, ok := counts[untouched]; ok {
-		t.Fatalf("counts[untouched] = %d, want no entry", counts[untouched])
-	}
+		counts, err := events.CountsByCampaignID(ctx, c.ID)
+		if err != nil {
+			t.Fatalf("CountsByCampaignID: %v", err)
+		}
+		if counts[changed] != 2 {
+			t.Fatalf("counts[changed] = %d, want 2", counts[changed])
+		}
+		if counts[setOnce] != 1 {
+			t.Fatalf("counts[setOnce] = %d, want 1", counts[setOnce])
+		}
+		// A result nobody ever set has no events and simply does not appear.
+		if _, ok := counts[untouched]; ok {
+			t.Fatalf("counts[untouched] = %d, want no entry", counts[untouched])
+		}
+	})
 }

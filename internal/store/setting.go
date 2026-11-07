@@ -15,7 +15,7 @@ type SettingStore interface {
 }
 
 type settingStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *settingStore) Get(ctx context.Context, key string) (string, error) {

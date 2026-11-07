@@ -23,7 +23,7 @@ type CategoryStore interface {
 }
 
 type categoryStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *categoryStore) Create(ctx context.Context, cat *model.Category) error {

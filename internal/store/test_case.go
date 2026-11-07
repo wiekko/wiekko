@@ -28,7 +28,7 @@ type TestCaseStore interface {
 }
 
 type testCaseStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *testCaseStore) Create(ctx context.Context, tc *model.TestCase) error {

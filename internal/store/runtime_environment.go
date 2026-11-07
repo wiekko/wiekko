@@ -18,7 +18,7 @@ type RuntimeEnvironmentStore interface {
 }
 
 type runtimeEnvironmentStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *runtimeEnvironmentStore) Create(ctx context.Context, env *model.RuntimeEnvironment) error {

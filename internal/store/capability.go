@@ -25,7 +25,7 @@ type CapabilityStore interface {
 }
 
 type capabilityStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *capabilityStore) Create(ctx context.Context, c *model.Capability) error {

@@ -19,7 +19,7 @@ type PyramidLevelStore interface {
 }
 
 type pyramidLevelStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *pyramidLevelStore) Create(ctx context.Context, pl *model.PyramidLevel) error {

@@ -20,7 +20,7 @@ type CommentStore interface {
 }
 
 type commentStore struct {
-	db *sql.DB
+	db *DB
 }
 
 const commentColumns = `id, product_id, owner_type, owner_id, user_id, body, created_at, updated_at`

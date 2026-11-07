@@ -19,7 +19,7 @@ type ProductStore interface {
 }
 
 type productStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *productStore) Create(ctx context.Context, product *model.Product) error {
@@ -28,7 +28,7 @@ func (s *productStore) Create(ctx context.Context, product *model.Product) error
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		product.ID, product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
-		boolToInt(product.StatusSync),
+		product.StatusSync,
 		product.CreatedAt, product.UpdatedAt,
 	)
 	return err
@@ -51,7 +51,7 @@ func (s *productStore) Update(ctx context.Context, product *model.Product) error
 		 WHERE id = ?`,
 		product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
-		boolToInt(product.StatusSync),
+		product.StatusSync,
 		product.UpdatedAt, product.ID,
 	)
 	return err
@@ -84,14 +84,12 @@ func (s *productStore) List(ctx context.Context) ([]*model.Product, error) {
 
 func scanProduct(sc scanner) (*model.Product, error) {
 	var p model.Product
-	var statusSync int
 	err := sc.Scan(&p.ID, &p.Name, &p.Description,
 		&p.EstimationMode, &p.WorkflowMode,
-		&statusSync,
+		&p.StatusSync,
 		&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
-	p.StatusSync = statusSync != 0
 	return &p, nil
 }

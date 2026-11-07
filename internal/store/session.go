@@ -19,7 +19,7 @@ type SessionStore interface {
 }
 
 type sessionStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *sessionStore) Create(ctx context.Context, session *model.Session) error {
@@ -59,6 +59,6 @@ func (s *sessionStore) DeleteByUserID(ctx context.Context, userID string) error 
 }
 
 func (s *sessionStore) DeleteExpired(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < datetime('now')`)
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at < ?`, Now())
 	return err
 }

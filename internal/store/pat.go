@@ -19,7 +19,7 @@ type PATStore interface {
 }
 
 type patStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *patStore) Create(ctx context.Context, pat *model.PAT) error {

@@ -20,7 +20,7 @@ type TestingCampaignStore interface {
 }
 
 type testingCampaignStore struct {
-	db *sql.DB
+	db *DB
 }
 
 const testingCampaignColumns = `id, product_id, name, description, status,

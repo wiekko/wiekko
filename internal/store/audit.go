@@ -14,7 +14,7 @@ type AuditStore interface {
 }
 
 type auditStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *auditStore) Create(ctx context.Context, entry *model.AuditEntry) error {

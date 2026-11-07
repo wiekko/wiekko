@@ -31,7 +31,7 @@ type ConstraintStore interface {
 }
 
 type constraintStore struct {
-	db *sql.DB
+	db *DB
 }
 
 func (s *constraintStore) Create(ctx context.Context, c *model.Constraint) error {
