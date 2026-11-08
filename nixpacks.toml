@@ -8,4 +8,4 @@ cmds = ['go install github.com/a-h/templ/cmd/templ@latest']
 cmds = ['just all']
 
 [start]
-cmd = './nexmap'
+cmd = './nexmapd'

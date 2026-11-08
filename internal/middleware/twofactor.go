@@ -58,6 +58,7 @@ func twoFactorExempt(r *http.Request) bool {
 		p == "/login",
 		p == "/api/v1/auth/logout",
 		p == "/api/v1/health",
+		p == "/api/v1/version",
 		p == "/api/v1/user/me" && r.Method == http.MethodGet:
 		return true
 	}

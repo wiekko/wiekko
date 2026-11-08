@@ -15,11 +15,12 @@ all: clean generate copy-assets css build
 
 build: generate css
     go vet ./...
+    go build ./cmd/nexmapd
     go build ./cmd/nexmap
 
 clean:
     go clean
-    rm -f nexmap nexmap.exe
+    rm -f nexmap nexmap.exe nexmapd nexmapd.exe
     find . -name '*_templ.go' -delete
     rm -rf {{ DIST }}
 
@@ -35,7 +36,7 @@ copy-assets:
 dev:
     {{ TEMPL }} generate --watch &
     {{ TAILWIND }} -i {{ STATIC }}/css/input.css -o {{ DIST }}/css/styles.css --watch &
-    go run ./cmd/nexmap
+    go run ./cmd/nexmapd
 
 generate:
     {{ TEMPL }} generate

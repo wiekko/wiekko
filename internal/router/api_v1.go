@@ -29,6 +29,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 
 	// Health (public).
 	apiV1.HandleFunc("GET /health", controller.Health)
+	apiV1.HandleFunc("GET /version", controller.Version)
 
 	// Auth (public).
 	apiV1.HandleFunc("POST /auth/login", authCtrl.Login)

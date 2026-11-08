@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 
@@ -227,6 +228,12 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	}
 	if errors.Is(err, service.ErrNotFound) || errors.Is(err, storage.ErrNotFound) {
 		httputil.Error(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+		return
+	}
+	// Stores report a missing row as a wrapped sql.ErrNoRows. That is a 404 for
+	// the client, and the driver's wording must not leak into the response.
+	if errors.Is(err, sql.ErrNoRows) {
+		httputil.Error(w, http.StatusNotFound, "NOT_FOUND", "not found")
 		return
 	}
 	if errors.Is(err, storage.ErrTooLarge) {
