@@ -19,6 +19,7 @@ type ConstraintService struct {
 	comments    ownerPurger
 	audit       store.AuditStore
 	authz       *Authorizer
+	owns        *ownership
 }
 
 // CreateConstraintInput contains the fields required to create a constraint.
@@ -45,6 +46,9 @@ type UpdateConstraintInput struct {
 // CreateConstraint creates a new constraint. Requires owner role.
 func (s *ConstraintService) CreateConstraint(ctx context.Context, user *model.User, input CreateConstraintInput) (*model.Constraint, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindCategory, input.CategoryID}, ref{kindMilestone, input.MilestoneID}); err != nil {
 		return nil, err
 	}
 
@@ -104,12 +108,21 @@ func (s *ConstraintService) GetConstraint(ctx context.Context, user *model.User,
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindConstraint, id}); err != nil {
+		return nil, err
+	}
 	return s.constraints.GetByID(ctx, id)
 }
 
 // UpdateConstraint modifies a constraint. Requires owner role.
 func (s *ConstraintService) UpdateConstraint(ctx context.Context, user *model.User, productID, id string, input UpdateConstraintInput) (*model.Constraint, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindConstraint, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCategory, opt(input.CategoryID)}, ref{kindMilestone, opt(input.MilestoneID)}); err != nil {
 		return nil, err
 	}
 
@@ -155,6 +168,9 @@ func (s *ConstraintService) UpdateConstraint(ctx context.Context, user *model.Us
 // DeleteConstraint removes a constraint. Requires owner role.
 func (s *ConstraintService) DeleteConstraint(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindConstraint, id}); err != nil {
 		return err
 	}
 
@@ -210,6 +226,9 @@ func (s *ConstraintService) LinkCapability(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindConstraint, constraintID}, ref{kindCapability, capabilityID}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return s.constraints.LinkCapability(ctx, &model.ConstraintCapability{
@@ -225,12 +244,18 @@ func (s *ConstraintService) UnlinkCapability(ctx context.Context, user *model.Us
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindConstraint, constraintID}, ref{kindCapability, capabilityID}); err != nil {
+		return err
+	}
 	return s.constraints.UnlinkCapability(ctx, constraintID, capabilityID)
 }
 
 // ListConstraintCapabilities returns capability links for a constraint. Requires viewer role.
 func (s *ConstraintService) ListConstraintCapabilities(ctx context.Context, user *model.User, productID, constraintID string) ([]*model.ConstraintCapability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindConstraint, constraintID}); err != nil {
 		return nil, err
 	}
 	return s.constraints.ListCapabilitiesByConstraint(ctx, constraintID)

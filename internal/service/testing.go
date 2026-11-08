@@ -21,6 +21,7 @@ type TestingService struct {
 	comments        ownerPurger
 	audit           store.AuditStore
 	authz           *Authorizer
+	owns            *ownership
 }
 
 // --- Test Cases ---
@@ -51,6 +52,9 @@ type UpdateTestCaseInput struct {
 // CreateTestCase creates a new test case. Requires developer role.
 func (s *TestingService) CreateTestCase(ctx context.Context, user *model.User, input CreateTestCaseInput) (*model.TestCase, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleDeveloper); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindComponent, input.ComponentID}, ref{kindCapability, input.CapabilityID}, ref{kindPyramidLevel, input.PyramidLevelID}); err != nil {
 		return nil, err
 	}
 
@@ -92,12 +96,21 @@ func (s *TestingService) GetTestCase(ctx context.Context, user *model.User, prod
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, id}); err != nil {
+		return nil, err
+	}
 	return s.testCases.GetByID(ctx, id)
 }
 
 // UpdateTestCase modifies a test case. Requires developer role.
 func (s *TestingService) UpdateTestCase(ctx context.Context, user *model.User, productID, id string, input UpdateTestCaseInput) (*model.TestCase, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, opt(input.ComponentID)}, ref{kindCapability, opt(input.CapabilityID)}, ref{kindPyramidLevel, opt(input.PyramidLevelID)}); err != nil {
 		return nil, err
 	}
 
@@ -147,6 +160,9 @@ func (s *TestingService) DeleteTestCase(ctx context.Context, user *model.User, p
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, id}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.testCases.Delete(ctx, id); err != nil {
@@ -180,6 +196,9 @@ func (s *TestingService) LinkRequirement(ctx context.Context, user *model.User, 
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}, ref{kindRequirement, reqID}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return s.testCases.LinkRequirement(ctx, &model.TestCaseRequirement{
@@ -196,12 +215,18 @@ func (s *TestingService) UnlinkRequirement(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}, ref{kindBacklogItem, reqID}); err != nil {
+		return err
+	}
 	return s.testCases.UnlinkRequirement(ctx, tcID, reqID)
 }
 
 // ListTestCaseRequirements returns requirement links for a test case. Requires viewer role.
 func (s *TestingService) ListTestCaseRequirements(ctx context.Context, user *model.User, productID, tcID string) ([]*model.TestCaseRequirement, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}); err != nil {
 		return nil, err
 	}
 	return s.testCases.ListRequirementLinks(ctx, tcID)
@@ -213,6 +238,9 @@ func (s *TestingService) ListTestCasesByCapability(ctx context.Context, user *mo
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, capabilityID}); err != nil {
+		return nil, err
+	}
 	return s.testCases.ListByCapabilityID(ctx, capabilityID)
 }
 
@@ -222,6 +250,9 @@ func (s *TestingService) ListTestCasesByComponent(ctx context.Context, user *mod
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, componentID}); err != nil {
+		return nil, err
+	}
 	return s.testCases.ListByComponentID(ctx, componentID)
 }
 
@@ -229,6 +260,9 @@ func (s *TestingService) ListTestCasesByComponent(ctx context.Context, user *mod
 // to a requirement. Requires viewer role.
 func (s *TestingService) ListLinkedTestCasesForRequirement(ctx context.Context, user *model.User, productID, requirementID string) ([]*model.TestCase, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, requirementID}); err != nil {
 		return nil, err
 	}
 	links, err := s.testCases.ListTestCaseLinksByRequirement(ctx, requirementID)
@@ -254,6 +288,9 @@ func (s *TestingService) AddTestCaseEnvironment(ctx context.Context, user *model
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}, ref{kindEnvironment, envID}); err != nil {
+		return err
+	}
 	return s.testCases.AddEnvironment(ctx, uuid.New().String(), tcID, envID)
 }
 
@@ -262,12 +299,18 @@ func (s *TestingService) RemoveTestCaseEnvironment(ctx context.Context, user *mo
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}, ref{kindEnvironment, envID}); err != nil {
+		return err
+	}
 	return s.testCases.RemoveEnvironment(ctx, tcID, envID)
 }
 
 // ListTestCaseEnvironments returns environment IDs for a test case. Requires viewer role.
 func (s *TestingService) ListTestCaseEnvironments(ctx context.Context, user *model.User, productID, tcID string) ([]string, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}); err != nil {
 		return nil, err
 	}
 	return s.testCases.ListEnvironments(ctx, tcID)
@@ -550,12 +593,18 @@ func (s *TestingService) GetCampaign(ctx context.Context, user *model.User, prod
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, id}); err != nil {
+		return nil, err
+	}
 	return s.campaigns.GetByID(ctx, id)
 }
 
 // UpdateCampaign modifies a campaign. Requires owner role.
 func (s *TestingService) UpdateCampaign(ctx context.Context, user *model.User, productID, id string, input UpdateCampaignInput) (*model.TestingCampaign, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, id}); err != nil {
 		return nil, err
 	}
 
@@ -599,6 +648,9 @@ func (s *TestingService) DeleteCampaign(ctx context.Context, user *model.User, p
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, id}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.campaigns.Delete(ctx, id); err != nil {
@@ -626,6 +678,9 @@ func (s *TestingService) ListCampaignResults(ctx context.Context, user *model.Us
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, campaignID}); err != nil {
+		return nil, err
+	}
 	return s.campaignResults.ListByCampaignID(ctx, campaignID)
 }
 
@@ -635,6 +690,9 @@ func (s *TestingService) ListResultsForTestCase(ctx context.Context, user *model
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindTestCase, testCaseID}); err != nil {
+		return nil, err
+	}
 	return s.campaignResults.ListByTestCaseID(ctx, testCaseID)
 }
 
@@ -642,6 +700,9 @@ func (s *TestingService) ListResultsForTestCase(ctx context.Context, user *model
 // oldest first. Requires viewer role (FR-042, UC-207).
 func (s *TestingService) ListResultEvents(ctx context.Context, user *model.User, productID, campaignID string) ([]*model.CampaignResultEvent, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, campaignID}); err != nil {
 		return nil, err
 	}
 	return s.campaignEvents.ListByCampaignID(ctx, campaignID)
@@ -681,6 +742,9 @@ func (s *TestingService) ResultChurn(ctx context.Context, user *model.User, prod
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, campaignID}); err != nil {
+		return nil, err
+	}
 	return s.campaignEvents.CountsByCampaignID(ctx, campaignID)
 }
 
@@ -693,6 +757,9 @@ func (s *TestingService) ResultChurn(ctx context.Context, user *model.User, prod
 // part of this product are dropped rather than trusted.
 func (s *TestingService) ListVerificationEvents(ctx context.Context, user *model.User, productID, defectID string) ([]*model.CampaignResultEvent, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defectID}); err != nil {
 		return nil, err
 	}
 
@@ -750,6 +817,9 @@ func (s *TestingService) ListCampaignProgress(ctx context.Context, user *model.U
 // requires a defect that explains the failure (FR-502). Requires tester role.
 func (s *TestingService) SetResultStatus(ctx context.Context, user *model.User, productID, campaignID, resultID, status, defectID string) (*model.CampaignResult, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleTester); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defectID}); err != nil {
 		return nil, err
 	}
 

@@ -24,6 +24,7 @@ type MilestoneService struct {
 	comments      ownerPurger
 	audit         store.AuditStore
 	authz         *Authorizer
+	owns          *ownership
 }
 
 // --- Milestone ---
@@ -86,12 +87,18 @@ func (s *MilestoneService) GetMilestone(ctx context.Context, user *model.User, p
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindMilestone, id}); err != nil {
+		return nil, err
+	}
 	return s.milestones.GetByID(ctx, id)
 }
 
 // UpdateMilestone modifies a milestone. Requires owner role.
 func (s *MilestoneService) UpdateMilestone(ctx context.Context, user *model.User, productID, id string, input UpdateMilestoneInput) (*model.Milestone, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindMilestone, id}); err != nil {
 		return nil, err
 	}
 
@@ -130,6 +137,9 @@ func (s *MilestoneService) UpdateMilestone(ctx context.Context, user *model.User
 // DeleteMilestone removes a milestone. Requires owner role.
 func (s *MilestoneService) DeleteMilestone(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindMilestone, id}); err != nil {
 		return err
 	}
 
@@ -197,6 +207,9 @@ func (s *MilestoneService) CreateSprint(ctx context.Context, user *model.User, i
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindMilestone, input.MilestoneID}); err != nil {
+		return nil, err
+	}
 
 	if input.Name == "" {
 		return nil, errors.New("sprint name is required")
@@ -234,12 +247,21 @@ func (s *MilestoneService) GetSprint(ctx context.Context, user *model.User, prod
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindSprint, id}); err != nil {
+		return nil, err
+	}
 	return s.sprints.GetByID(ctx, id)
 }
 
 // UpdateSprint modifies a sprint. Requires owner role.
 func (s *MilestoneService) UpdateSprint(ctx context.Context, user *model.User, productID, id string, input UpdateSprintInput) (*model.Sprint, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindSprint, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindMilestone, opt(input.MilestoneID)}); err != nil {
 		return nil, err
 	}
 
@@ -313,6 +335,9 @@ func (s *MilestoneService) SetSprintStatus(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindSprint, id}); err != nil {
+		return nil, err
+	}
 
 	sprint, err := s.sprints.GetByID(ctx, id)
 	if err != nil {
@@ -362,6 +387,9 @@ func (s *MilestoneService) GetActiveSprint(ctx context.Context, user *model.User
 // DeleteSprint removes a sprint. Requires owner role.
 func (s *MilestoneService) DeleteSprint(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindSprint, id}); err != nil {
 		return err
 	}
 
@@ -498,12 +526,18 @@ func (s *MilestoneService) GetStatus(ctx context.Context, user *model.User, prod
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindStatus, id}); err != nil {
+		return nil, err
+	}
 	return s.statuses.GetByID(ctx, id)
 }
 
 // UpdateStatus modifies a status. Requires owner role.
 func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, productID, id string, input UpdateStatusInput) (*model.Status, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindStatus, id}); err != nil {
 		return nil, err
 	}
 
@@ -567,6 +601,9 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 // DeleteStatus removes a status. Requires owner role.
 func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindStatus, id}); err != nil {
 		return err
 	}
 
@@ -637,6 +674,9 @@ func (s *MilestoneService) CreatePyramidLevel(ctx context.Context, user *model.U
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindPyramidLevel, input.ParentID}); err != nil {
+		return nil, err
+	}
 
 	if input.Name == "" {
 		return nil, errors.New("pyramid level name is required")
@@ -668,12 +708,18 @@ func (s *MilestoneService) GetPyramidLevel(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindPyramidLevel, id}); err != nil {
+		return nil, err
+	}
 	return s.pyramidLevels.GetByID(ctx, id)
 }
 
 // UpdatePyramidLevel modifies a pyramid level. Requires owner role.
 func (s *MilestoneService) UpdatePyramidLevel(ctx context.Context, user *model.User, productID, id string, input UpdatePyramidLevelInput) (*model.PyramidLevel, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindPyramidLevel, id}); err != nil {
 		return nil, err
 	}
 
@@ -705,6 +751,9 @@ func (s *MilestoneService) UpdatePyramidLevel(ctx context.Context, user *model.U
 // DeletePyramidLevel removes a pyramid level. Requires owner role.
 func (s *MilestoneService) DeletePyramidLevel(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindPyramidLevel, id}); err != nil {
 		return err
 	}
 
@@ -763,6 +812,9 @@ func (s *MilestoneService) CreateRuntimeEnvironment(ctx context.Context, user *m
 // DeleteRuntimeEnvironment removes a runtime environment. Requires owner role.
 func (s *MilestoneService) DeleteRuntimeEnvironment(ctx context.Context, user *model.User, productID, id string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindEnvironment, id}); err != nil {
 		return err
 	}
 

@@ -11,6 +11,7 @@ import (
 
 func newComponentService(components *testutil.MockComponentStore, capabilities *testutil.MockCapabilityStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *ComponentService {
 	return &ComponentService{
+		owns:         testOwnership(),
 		components:   components,
 		capabilities: capabilities,
 		comments:     &recordingPurger{},

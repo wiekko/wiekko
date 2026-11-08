@@ -19,6 +19,7 @@ func newDiscussionService(comments *testutil.MockCommentStore, attachments *test
 
 func newDiscussionServiceWithBlobs(comments *testutil.MockCommentStore, attachments *testutil.MockAttachmentStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore, blobs storage.Store) *DiscussionService {
 	return &DiscussionService{
+		owns:        testOwnership(),
 		comments:    comments,
 		attachments: attachments,
 		audit:       audit,

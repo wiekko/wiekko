@@ -17,6 +17,7 @@ func newTestingService(
 	roles *testutil.MockProductRoleStore,
 ) *TestingService {
 	return &TestingService{
+		owns:            testOwnership(),
 		testCases:       testCases,
 		campaigns:       campaigns,
 		campaignResults: campaignResults,

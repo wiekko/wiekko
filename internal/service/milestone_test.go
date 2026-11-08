@@ -20,6 +20,7 @@ func newMilestoneService(
 	roles *testutil.MockProductRoleStore,
 ) *MilestoneService {
 	return &MilestoneService{
+		owns:          testOwnership(),
 		milestones:    milestones,
 		sprints:       sprints,
 		statuses:      statuses,

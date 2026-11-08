@@ -27,6 +27,7 @@ type CategoryService struct {
 	constraints  store.ConstraintStore
 	audit        store.AuditStore
 	authz        *Authorizer
+	owns         *ownership
 }
 
 // CreateCategoryInput contains the fields required to create a category.
@@ -97,6 +98,9 @@ func (s *CategoryService) GetCategory(ctx context.Context, user *model.User, pro
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCategory, id}); err != nil {
+		return nil, err
+	}
 	return s.categories.GetByID(ctx, id)
 }
 
@@ -109,6 +113,9 @@ func (s *CategoryService) GetCategory(ctx context.Context, user *model.User, pro
 // UI warns and asks for confirmation before sending the change.
 func (s *CategoryService) UpdateCategory(ctx context.Context, user *model.User, productID, id string, input UpdateCategoryInput) (*model.Category, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCategory, id}); err != nil {
 		return nil, err
 	}
 
@@ -162,6 +169,9 @@ func (s *CategoryService) DeleteCategory(ctx context.Context, user *model.User, 
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCategory, id}); err != nil {
+		return err
+	}
 
 	cat, err := s.categories.GetByID(ctx, id)
 	if err != nil {
@@ -213,6 +223,9 @@ func (s *CategoryService) ListCategories(ctx context.Context, user *model.User, 
 // UsageCount returns how many items reference the category. Requires viewer role.
 func (s *CategoryService) UsageCount(ctx context.Context, user *model.User, productID, id string) (int, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return 0, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCategory, id}); err != nil {
 		return 0, err
 	}
 	cat, err := s.categories.GetByID(ctx, id)

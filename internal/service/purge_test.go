@@ -52,6 +52,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeComponent,
 			del: func(p *recordingPurger) error {
 				svc := &ComponentService{
+					owns:       testOwnership(),
 					components: &testutil.MockComponentStore{DeleteFunc: deletesOK()},
 					comments:   p,
 					audit:      noopAudit(),
@@ -65,6 +66,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeCapability,
 			del: func(p *recordingPurger) error {
 				svc := &ComponentService{
+					owns:         testOwnership(),
 					capabilities: &testutil.MockCapabilityStore{DeleteFunc: deletesOK()},
 					comments:     p,
 					audit:        noopAudit(),
@@ -78,6 +80,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeMilestone,
 			del: func(p *recordingPurger) error {
 				svc := &MilestoneService{
+					owns:       testOwnership(),
 					milestones: &testutil.MockMilestoneStore{DeleteFunc: deletesOK()},
 					comments:   p,
 					audit:      noopAudit(),
@@ -91,6 +94,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeRequirement,
 			del: func(p *recordingPurger) error {
 				svc := &BacklogService{
+					owns:         testOwnership(),
 					requirements: &testutil.MockRequirementStore{DeleteFunc: deletesOK()},
 					comments:     p,
 					audit:        noopAudit(),
@@ -104,6 +108,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeDefect,
 			del: func(p *recordingPurger) error {
 				svc := &BacklogService{
+					owns:     testOwnership(),
 					defects:  &testutil.MockDefectStore{DeleteFunc: deletesOK()},
 					comments: p,
 					audit:    noopAudit(),
@@ -117,6 +122,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeConstraint,
 			del: func(p *recordingPurger) error {
 				svc := &ConstraintService{
+					owns:        testOwnership(),
 					constraints: &testutil.MockConstraintStore{DeleteFunc: deletesOK()},
 					comments:    p,
 					audit:       noopAudit(),
@@ -130,6 +136,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeTestCase,
 			del: func(p *recordingPurger) error {
 				svc := &TestingService{
+					owns:      testOwnership(),
 					testCases: &testutil.MockTestCaseStore{DeleteFunc: deletesOK()},
 					comments:  p,
 					audit:     noopAudit(),
@@ -158,6 +165,7 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 		sentinel := errors.New("purge exploded")
 		purger := &recordingPurger{err: sentinel}
 		svc := &ComponentService{
+			owns:       testOwnership(),
 			components: &testutil.MockComponentStore{DeleteFunc: deletesOK()},
 			comments:   purger,
 			audit:      noopAudit(),

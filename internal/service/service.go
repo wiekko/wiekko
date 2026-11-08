@@ -32,6 +32,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 	settingSvc := &SettingService{settings: st.Setting}
 
 	authz := &Authorizer{productRoles: st.ProductRole}
+	owns := newOwnership(st)
 
 	// Built first: the entity services below delegate their comment and
 	// attachment cleanup to it when they delete a row.
@@ -42,6 +43,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		blobs:       blobs,
 		policy:      storage.NewPolicy(cfg.AllowedUploads),
 		authz:       authz,
+		owns:        owns,
 	}
 
 	// Built before the backlog service, which calls into it to reopen campaign
@@ -54,6 +56,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		comments:        discussionSvc,
 		audit:           st.Audit,
 		authz:           authz,
+		owns:            owns,
 	}
 
 	twoFactorSvc := &TwoFactorService{
@@ -105,6 +108,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			comments:     discussionSvc,
 			audit:        st.Audit,
 			authz:        authz,
+			owns:         owns,
 		},
 		Milestone: &MilestoneService{
 			milestones:    st.Milestone,
@@ -116,6 +120,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			comments:      discussionSvc,
 			audit:         st.Audit,
 			authz:         authz,
+			owns:          owns,
 		},
 		Category: &CategoryService{
 			categories:   st.Category,
@@ -123,6 +128,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			constraints:  st.Constraint,
 			audit:        st.Audit,
 			authz:        authz,
+			owns:         owns,
 		},
 		Backlog: &BacklogService{
 			requirements: st.Requirement,
@@ -133,6 +139,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			retester:     testingSvc,
 			audit:        st.Audit,
 			authz:        authz,
+			owns:         owns,
 		},
 		Constraint: &ConstraintService{
 			constraints: st.Constraint,
@@ -140,12 +147,14 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			comments:    discussionSvc,
 			audit:       st.Audit,
 			authz:       authz,
+			owns:        owns,
 		},
 		Testing:    testingSvc,
 		Discussion: discussionSvc,
 		Audit: &AuditService{
 			audit: st.Audit,
 			authz: authz,
+			owns:  owns,
 		},
 		Dashboard: &DashboardService{
 			products:     st.Product,

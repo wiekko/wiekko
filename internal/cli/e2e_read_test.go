@@ -253,6 +253,35 @@ func TestE2EContext(t *testing.T) {
 	}
 }
 
+// TestE2ECrossProductIDs checks product isolation through the real router: a
+// Finch Tracker requirement must not be reachable under Aviary's URL, neither
+// by ID nor by identifier.
+func TestE2ECrossProductIDs(t *testing.T) {
+	e := newAviary(t)
+	var finchID string
+	for _, p := range e.products {
+		if p.Name == "Finch Tracker" {
+			finchID = p.ID
+		}
+	}
+	finchReqs := decode[[]ops.RequirementSummary](t, e.mustRun("", "req", "list", "--product", finchID, "--limit", "1", "-o", "json").stdout)
+	if len(finchReqs) == 0 {
+		t.Fatal("no Finch requirements")
+	}
+	r := e.run("", "", "api", "/products/{product}/requirements/"+finchReqs[0].ID)
+	if r.code != cli.ExitNotFound {
+		t.Fatalf("foreign requirement by ID: exit %d, stdout %q", r.code, r.stdout)
+	}
+	r = e.run("", "", "api", "PATCH", "/products/{product}/requirements/"+finchReqs[0].ID, "--data", `{"title":"hijacked"}`)
+	if r.code != cli.ExitNotFound {
+		t.Fatalf("foreign requirement PATCH: exit %d", r.code)
+	}
+	after := e.mustRun("", "req", "show", finchReqs[0].Identifier, "--product", finchID, "-o", "json").stdout
+	if strings.Contains(after, "hijacked") {
+		t.Fatal("foreign requirement was modified")
+	}
+}
+
 func TestE2EReadNeedsProduct(t *testing.T) {
 	e := newAviary(t)
 	delete(e.env, cliconfig.EnvProduct)

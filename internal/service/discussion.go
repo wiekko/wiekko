@@ -26,6 +26,7 @@ type DiscussionService struct {
 	blobs       storage.Store
 	policy      storage.Policy
 	authz       *Authorizer
+	owns        *ownership
 }
 
 // minRoleForOwnerType returns the minimum role required to comment on an entity type.
@@ -44,6 +45,9 @@ func (s *DiscussionService) CreateComment(ctx context.Context, user *model.User,
 		return nil, fmt.Errorf("invalid comment owner type: %q", ownerType)
 	}
 	if _, err := s.authz.RequireRole(ctx, user, productID, minRoleForOwnerType(ownerType)); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{ownerType, ownerID}); err != nil {
 		return nil, err
 	}
 
@@ -181,6 +185,9 @@ func (s *DiscussionService) CreateAttachment(ctx context.Context, user *model.Us
 		return nil, fmt.Errorf("invalid attachment owner type: %q", input.OwnerType)
 	}
 	if _, err := s.authz.RequireRole(ctx, user, productID, minRoleForOwnerType(input.OwnerType)); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{input.OwnerType, input.OwnerID}); err != nil {
 		return nil, err
 	}
 

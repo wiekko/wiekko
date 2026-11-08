@@ -13,6 +13,7 @@ import (
 
 func newBacklogService(requirements *testutil.MockRequirementStore, defects *testutil.MockDefectStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *BacklogService {
 	return &BacklogService{
+		owns:         testOwnership(),
 		requirements: requirements,
 		defects:      defects,
 		categories:   backlogCategories(),

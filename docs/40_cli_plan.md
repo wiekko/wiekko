@@ -121,7 +121,7 @@ Implemented in phases 0–1:
 Still open:
 
 - Defects have no human identifier today. Add a per-product sequence (prefix e.g. `DF`) so agents and commit messages can say `DF-7`. Needs a migration + backfill; the CLI uses 8-character ID prefixes meanwhile.
-- **Product scoping of entity IDs (security, before phase 3).** Most service `Get*`/`Update*`/`Delete*` methods check the caller's role on the product in the URL but never check that the entity belongs to that product, so `/products/A/requirements/<id of a B requirement>` reads (or, with developer role on A, modifies) B's item. New code in phase 1 checks ownership; the existing methods need the same check before agents get write access.
+- ~~Product scoping of entity IDs~~ — fixed: every service method that takes an entity ID (path IDs and references inside create/update payloads, link targets, audit queries) now checks that the entity belongs to the product in the URL via a shared ownership checker (`internal/service/ownership.go`), answering 404 otherwise. Covered by `TestCrossProductIsolation` (both engines) and an API-level e2e test.
 
 ### 3.3 Later (not blocking v1)
 

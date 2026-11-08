@@ -29,6 +29,7 @@ type BacklogService struct {
 	retester     campaignRetester
 	audit        store.AuditStore
 	authz        *Authorizer
+	owns         *ownership
 }
 
 // --- Requirements ---
@@ -69,6 +70,9 @@ type UpdateRequirementInput struct {
 // CreateRequirement creates a new requirement. Requires owner role.
 func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User, input CreateRequirementInput) (*model.Requirement, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindCategory, input.CategoryID}, ref{kindStatus, input.StatusID}, ref{kindMilestone, input.MilestoneID}, ref{kindSprint, input.SprintID}, ref{kindBacklogItem, input.ParentID}); err != nil {
 		return nil, err
 	}
 
@@ -131,6 +135,9 @@ func (s *BacklogService) GetRequirement(ctx context.Context, user *model.User, p
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, id}); err != nil {
+		return nil, err
+	}
 	return s.requirements.GetByID(ctx, id)
 }
 
@@ -139,6 +146,12 @@ func (s *BacklogService) GetRequirement(ctx context.Context, user *model.User, p
 func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User, productID, id string, input UpdateRequirementInput) (*model.Requirement, error) {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCategory, opt(input.CategoryID)}, ref{kindStatus, opt(input.StatusID)}, ref{kindMilestone, opt(input.MilestoneID)}, ref{kindSprint, opt(input.SprintID)}, ref{kindBacklogItem, opt(input.ParentID)}); err != nil {
 		return nil, err
 	}
 
@@ -221,6 +234,9 @@ func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, id}); err != nil {
+		return err
+	}
 
 	// The kind decides which owner type the comments were filed under.
 	kind := model.RequirementKindRequirement
@@ -278,6 +294,9 @@ func (s *BacklogService) ListRequirementsByMilestone(ctx context.Context, user *
 
 func (s *BacklogService) ListChildRequirements(ctx context.Context, user *model.User, productID, parentID string) ([]*model.Requirement, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, parentID}); err != nil {
 		return nil, err
 	}
 	return s.requirements.ListByParentID(ctx, parentID)
@@ -366,6 +385,9 @@ func (s *BacklogService) AssignRequirement(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, reqID}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return s.requirements.Assign(ctx, &model.Assignment{
@@ -381,12 +403,18 @@ func (s *BacklogService) UnassignRequirement(ctx context.Context, user *model.Us
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, reqID}); err != nil {
+		return err
+	}
 	return s.requirements.Unassign(ctx, reqID, targetUserID)
 }
 
 // ListRequirementAssignees returns assignees for a requirement. Requires viewer role.
 func (s *BacklogService) ListRequirementAssignees(ctx context.Context, user *model.User, productID, reqID string) ([]*model.Assignment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, reqID}); err != nil {
 		return nil, err
 	}
 	return s.requirements.ListAssignees(ctx, reqID)
@@ -425,6 +453,9 @@ type UpdateDefectInput struct {
 // CreateDefect creates a new defect. Requires tester role.
 func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, input CreateDefectInput) (*model.Defect, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleTester); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindStatus, input.StatusID}, ref{kindMilestone, input.MilestoneID}, ref{kindSprint, input.SprintID}, ref{kindEnvironment, input.EnvironmentID}); err != nil {
 		return nil, err
 	}
 
@@ -468,6 +499,9 @@ func (s *BacklogService) GetDefect(ctx context.Context, user *model.User, produc
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, id}); err != nil {
+		return nil, err
+	}
 	return s.defects.GetByID(ctx, id)
 }
 
@@ -476,6 +510,12 @@ func (s *BacklogService) GetDefect(ctx context.Context, user *model.User, produc
 func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, productID, id string, input UpdateDefectInput) (*model.Defect, error) {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindStatus, opt(input.StatusID)}, ref{kindMilestone, opt(input.MilestoneID)}, ref{kindSprint, opt(input.SprintID)}, ref{kindEnvironment, opt(input.EnvironmentID)}); err != nil {
 		return nil, err
 	}
 
@@ -572,6 +612,9 @@ func (s *BacklogService) DeleteDefect(ctx context.Context, user *model.User, pro
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, id}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.defects.Delete(ctx, id); err != nil {
@@ -658,6 +701,9 @@ func (s *BacklogService) AssignDefect(ctx context.Context, user *model.User, pro
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return s.defects.Assign(ctx, &model.Assignment{
@@ -673,12 +719,18 @@ func (s *BacklogService) UnassignDefect(ctx context.Context, user *model.User, p
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
+		return err
+	}
 	return s.defects.Unassign(ctx, defID, targetUserID)
 }
 
 // ListDefectAssignees returns assignees for a defect. Requires viewer role.
 func (s *BacklogService) ListDefectAssignees(ctx context.Context, user *model.User, productID, defID string) ([]*model.Assignment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
 		return nil, err
 	}
 	return s.defects.ListAssignees(ctx, defID)
@@ -694,6 +746,9 @@ func (s *BacklogService) AddDefectLink(ctx context.Context, user *model.User, pr
 	}
 	if targetID == "" {
 		return errors.New("target id is required")
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}, ref{defectLinkKind(targetType), targetID}); err != nil {
+		return err
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -711,12 +766,18 @@ func (s *BacklogService) RemoveDefectLink(ctx context.Context, user *model.User,
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindDefectLink, linkID}); err != nil {
+		return err
+	}
 	return s.defects.RemoveLink(ctx, linkID)
 }
 
 // ListDefectLinks returns links for a defect. Requires viewer role.
 func (s *BacklogService) ListDefectLinks(ctx context.Context, user *model.User, productID, defID string) ([]*model.DefectLink, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
 		return nil, err
 	}
 	return s.defects.ListLinks(ctx, defID)
@@ -755,6 +816,9 @@ func (s *BacklogService) ListLinkedDefects(ctx context.Context, user *model.User
 // the services for the respective target types. Requires viewer role.
 func (s *BacklogService) ListDefectLinkTargets(ctx context.Context, user *model.User, productID, defID, targetType string) ([]string, map[string]string, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
 		return nil, nil, err
 	}
 	links, err := s.defects.ListLinks(ctx, defID)

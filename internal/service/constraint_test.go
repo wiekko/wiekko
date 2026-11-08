@@ -15,6 +15,7 @@ func newConstraintService(constraints *testutil.MockConstraintStore, categories 
 		categories = constraintCategories()
 	}
 	return &ConstraintService{
+		owns:        testOwnership(),
 		constraints: constraints,
 		categories:  categories,
 		comments:    &recordingPurger{},

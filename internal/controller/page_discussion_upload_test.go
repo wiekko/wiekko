@@ -87,6 +87,13 @@ func newUploadController(t *testing.T, maxBytes int64) *PageProductController {
 				return []*model.User{testutil.MakeUser()}, nil
 			},
 		},
+		// The upload targets component-001, which must belong to the product
+		// for the ownership check to let it through.
+		Component: &testutil.MockComponentStore{
+			GetByIDFunc: func(_ context.Context, id string) (*model.Component, error) {
+				return testutil.MakeComponent(func(c *model.Component) { c.ID = id }), nil
+			},
+		},
 		Comment: &testutil.MockCommentStore{},
 		Attachment: &testutil.MockAttachmentStore{
 			CreateFunc: func(_ context.Context, _ *model.Attachment) error { return nil },

@@ -19,6 +19,7 @@ type ComponentService struct {
 	comments     ownerPurger
 	audit        store.AuditStore
 	authz        *Authorizer
+	owns         *ownership
 }
 
 // CreateComponentInput contains the fields required to create a component.
@@ -58,6 +59,9 @@ func (s *ComponentService) CreateComponent(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindMilestone, input.MilestoneID}); err != nil {
+		return nil, err
+	}
 
 	if input.Name == "" {
 		return nil, errors.New("component name is required")
@@ -90,12 +94,21 @@ func (s *ComponentService) GetComponent(ctx context.Context, user *model.User, p
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, id}); err != nil {
+		return nil, err
+	}
 	return s.components.GetByID(ctx, id)
 }
 
 // UpdateComponent modifies a component. Requires owner role.
 func (s *ComponentService) UpdateComponent(ctx context.Context, user *model.User, productID, id string, input UpdateComponentInput) (*model.Component, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindMilestone, opt(input.MilestoneID)}); err != nil {
 		return nil, err
 	}
 
@@ -133,6 +146,9 @@ func (s *ComponentService) DeleteComponent(ctx context.Context, user *model.User
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, id}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.components.Delete(ctx, id); err != nil {
@@ -164,6 +180,9 @@ func (s *ComponentService) ListComponents(ctx context.Context, user *model.User,
 // CreateCapability creates a new capability. Requires owner role.
 func (s *ComponentService) CreateCapability(ctx context.Context, user *model.User, input CreateCapabilityInput) (*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, input.ProductID, ref{kindComponent, input.ComponentID}, ref{kindMilestone, input.MilestoneID}); err != nil {
 		return nil, err
 	}
 
@@ -199,12 +218,21 @@ func (s *ComponentService) GetCapability(ctx context.Context, user *model.User, 
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, id}); err != nil {
+		return nil, err
+	}
 	return s.capabilities.GetByID(ctx, id)
 }
 
 // UpdateCapability modifies a capability. Requires owner role.
 func (s *ComponentService) UpdateCapability(ctx context.Context, user *model.User, productID, id string, input UpdateCapabilityInput) (*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, id}); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, opt(input.ComponentID)}, ref{kindMilestone, opt(input.MilestoneID)}); err != nil {
 		return nil, err
 	}
 
@@ -245,6 +273,9 @@ func (s *ComponentService) DeleteCapability(ctx context.Context, user *model.Use
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, id}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := s.capabilities.Delete(ctx, id); err != nil {
@@ -276,6 +307,9 @@ func (s *ComponentService) ListCapabilities(ctx context.Context, user *model.Use
 // ListCapabilitiesByComponent returns capabilities for a component. Requires viewer role.
 func (s *ComponentService) ListCapabilitiesByComponent(ctx context.Context, user *model.User, productID, componentID string) ([]*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindComponent, componentID}); err != nil {
 		return nil, err
 	}
 	return s.capabilities.ListByComponentID(ctx, componentID)
@@ -326,6 +360,9 @@ func (s *ComponentService) LinkRequirementToCapability(ctx context.Context, user
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, capabilityID}, ref{kindRequirement, requirementID}); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return s.capabilities.LinkRequirement(ctx, &model.RequirementCapability{
@@ -341,12 +378,18 @@ func (s *ComponentService) UnlinkRequirementFromCapability(ctx context.Context, 
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, capabilityID}, ref{kindBacklogItem, requirementID}); err != nil {
+		return err
+	}
 	return s.capabilities.UnlinkRequirement(ctx, capabilityID, requirementID)
 }
 
 // ListCapabilityRequirements returns requirement links for a capability. Requires viewer role.
 func (s *ComponentService) ListCapabilityRequirements(ctx context.Context, user *model.User, productID, capabilityID string) ([]*model.RequirementCapability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, capabilityID}); err != nil {
 		return nil, err
 	}
 	return s.capabilities.ListRequirementsByCapability(ctx, capabilityID)
@@ -357,6 +400,9 @@ func (s *ComponentService) ListRequirementCapabilities(ctx context.Context, user
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, requirementID}); err != nil {
+		return nil, err
+	}
 	return s.capabilities.ListCapabilitiesByRequirement(ctx, requirementID)
 }
 
@@ -364,6 +410,9 @@ func (s *ComponentService) ListRequirementCapabilities(ctx context.Context, user
 // requirement. Requires viewer role.
 func (s *ComponentService) ListLinkedCapabilities(ctx context.Context, user *model.User, productID, requirementID string) ([]*model.Capability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, requirementID}); err != nil {
 		return nil, err
 	}
 	links, err := s.capabilities.ListCapabilitiesByRequirement(ctx, requirementID)

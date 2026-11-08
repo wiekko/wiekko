@@ -23,6 +23,7 @@ func newCategoryService(
 		constraints = &testutil.MockConstraintStore{}
 	}
 	return &CategoryService{
+		owns:         testOwnership(),
 		categories:   categories,
 		requirements: requirements,
 		constraints:  constraints,

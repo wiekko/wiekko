@@ -11,6 +11,7 @@ import (
 
 func newAuditService(audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *AuditService {
 	return &AuditService{
+		owns:  testOwnership(),
 		audit: audit,
 		authz: &Authorizer{productRoles: roles},
 	}

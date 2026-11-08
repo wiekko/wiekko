@@ -62,6 +62,7 @@ type DefectStore interface {
 	ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error)
 	AddLink(ctx context.Context, link *model.DefectLink) error
 	RemoveLink(ctx context.Context, id string) error
+	GetLink(ctx context.Context, id string) (*model.DefectLink, error)
 	ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error)
 	ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
 }
@@ -237,6 +238,20 @@ func (s *defectStore) AddLink(ctx context.Context, link *model.DefectLink) error
 func (s *defectStore) RemoveLink(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM defect_links WHERE id = ?`, id)
 	return err
+}
+
+func (s *defectStore) GetLink(ctx context.Context, id string) (*model.DefectLink, error) {
+	var l model.DefectLink
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, defect_id, target_type, target_id, created_at FROM defect_links WHERE id = ?`, id).
+		Scan(&l.ID, &l.DefectID, &l.TargetType, &l.TargetID, &l.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("defect link not found: %w", err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &l, nil
 }
 
 func (s *defectStore) ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error) {
