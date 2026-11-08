@@ -18,7 +18,9 @@ nexmap whoami
 nexmap api /products/{product}/requirements -o json
 ```
 
-In CI, set `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and `NEXMAP_TOKEN` instead of logging in.
+In CI, set `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and `NEXMAP_TOKEN` instead of logging in, and pipe test output into
+`nexmap utest` to record it in the active testing campaign (`go test -json ./... | nexmap utest --env linux`);
+see `docs/50_ci_integration.md` for setup and CI snippets.
 
 For AI agents working in a repository, `nexmap agent-guide` prints a usage guide to paste into
 `AGENTS.md` / `CLAUDE.md`; `nexmap context -o md` gives a product briefing, and `nexmap req show FR-12`,

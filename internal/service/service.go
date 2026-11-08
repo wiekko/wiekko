@@ -22,6 +22,7 @@ type Services struct {
 	Backlog    *BacklogService
 	Constraint *ConstraintService
 	Testing    *TestingService
+	TestRun    *TestRunService
 	Discussion *DiscussionService
 	Audit      *AuditService
 	Dashboard  *DashboardService
@@ -64,6 +65,20 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		twoFactor: st.TwoFactor,
 		settings:  st.Setting,
 		provider:  provider,
+	}
+
+	// Built before the test run service, which files defects for automated
+	// failures through it.
+	backlogSvc := &BacklogService{
+		requirements: st.Requirement,
+		defects:      st.Defect,
+		categories:   st.Category,
+		statuses:     st.Status,
+		comments:     discussionSvc,
+		retester:     testingSvc,
+		audit:        st.Audit,
+		authz:        authz,
+		owns:         owns,
 	}
 
 	return &Services{
@@ -130,17 +145,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			authz:        authz,
 			owns:         owns,
 		},
-		Backlog: &BacklogService{
-			requirements: st.Requirement,
-			defects:      st.Defect,
-			categories:   st.Category,
-			statuses:     st.Status,
-			comments:     discussionSvc,
-			retester:     testingSvc,
-			audit:        st.Audit,
-			authz:        authz,
-			owns:         owns,
-		},
+		Backlog: backlogSvc,
 		Constraint: &ConstraintService{
 			constraints: st.Constraint,
 			categories:  st.Category,
@@ -149,7 +154,19 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			authz:       authz,
 			owns:        owns,
 		},
-		Testing:    testingSvc,
+		Testing: testingSvc,
+		TestRun: &TestRunService{
+			testCases:    st.TestCase,
+			campaigns:    st.TestingCampaign,
+			results:      st.CampaignResult,
+			events:       st.CampaignEvent,
+			environments: st.RuntimeEnvironment,
+			defects:      st.Defect,
+			statuses:     st.Status,
+			backlog:      backlogSvc,
+			authz:        authz,
+			owns:         owns,
+		},
 		Discussion: discussionSvc,
 		Audit: &AuditService{
 			audit: st.Audit,

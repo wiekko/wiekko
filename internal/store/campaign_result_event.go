@@ -22,13 +22,13 @@ type campaignResultEventStore struct {
 }
 
 const campaignResultEventColumns = `id, result_id, campaign_id, user_id,
-	from_status, to_status, defect_id, created_at`
+	from_status, to_status, defect_id, source, revision, branch, created_at`
 
 func scanCampaignResultEvent(sc scanner) (*model.CampaignResultEvent, error) {
 	var ev model.CampaignResultEvent
 	var userID, defectID sql.NullString
 	if err := sc.Scan(&ev.ID, &ev.ResultID, &ev.CampaignID, &userID,
-		&ev.FromStatus, &ev.ToStatus, &defectID, &ev.CreatedAt); err != nil {
+		&ev.FromStatus, &ev.ToStatus, &defectID, &ev.Source, &ev.Revision, &ev.Branch, &ev.CreatedAt); err != nil {
 		return nil, err
 	}
 	ev.UserID = userID.String
@@ -39,9 +39,10 @@ func scanCampaignResultEvent(sc scanner) (*model.CampaignResultEvent, error) {
 func (s *campaignResultEventStore) Create(ctx context.Context, ev *model.CampaignResultEvent) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO campaign_result_events (`+campaignResultEventColumns+`)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		ev.ID, ev.ResultID, ev.CampaignID, nullableText(ev.UserID),
-		ev.FromStatus, ev.ToStatus, nullableText(ev.DefectID), ev.CreatedAt,
+		ev.FromStatus, ev.ToStatus, nullableText(ev.DefectID),
+		ev.Source, ev.Revision, ev.Branch, ev.CreatedAt,
 	)
 	return err
 }

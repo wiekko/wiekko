@@ -140,7 +140,12 @@ type CampaignResultEvent struct {
 	FromStatus string // empty for the seeding event
 	ToStatus   string
 	DefectID   string // defect linked at the time of the change; empty otherwise
-	CreatedAt  string // RFC 3339
+	// Source, Revision and Branch describe the automated run that made the
+	// change (FR-409); all empty for changes made by a person.
+	Source    string // e.g. "go-test", "junit"
+	Revision  string // VCS revision the run tested
+	Branch    string // VCS branch the run tested
+	CreatedAt string // RFC 3339
 }
 
 // PyramidLevel represents a test pyramid categorization level.

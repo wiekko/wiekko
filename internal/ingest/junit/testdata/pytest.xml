@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="1" failures="1" skipped="1" tests="5" time="0.083" timestamp="2026-11-08T14:00:00.000000" hostname="ci"><testcase classname="tests.test_calc" name="test_add" time="0.001" /><testcase classname="tests.test_calc" name="test_divide" time="0.002"><failure message="assert 0 == 1">def test_divide():
+&gt;       assert 0 == 1
+E       assert 0 == 1
+
+tests/test_calc.py:7: AssertionError</failure></testcase><testcase classname="tests.test_calc" name="test_skip" time="0.000"><skipped type="pytest.skip" message="not on ci">tests/test_calc.py:10: not on ci</skipped></testcase><testcase classname="tests.test_calc" name="test_db" time="0.000"><error message="failed on setup with &quot;fixture 'db' not found&quot;">file tests/test_calc.py, line 12
+  def test_db(db):
+E       fixture 'db' not found</error></testcase><testcase classname="tests.test_calc.TestClass" name="test_method[param-1]" time="0.001"><system-out>captured but passed</system-out></testcase></testsuite></testsuites>

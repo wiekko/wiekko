@@ -104,7 +104,7 @@ Response: per-identifier outcome (`updated`, `unchanged`, `unknown_test_case`, `
 
    If the output is too large even after truncation or the parser could not capture it, the defect is still created with metadata only. This keeps FR-504 working: closing the defect moves the result to re-test, and the next green CI run marks it passed.
 6. **Defects are only created for results that are actually recorded.** A failure that is discarded — no active campaign (step 1), unknown identifier, or test case not in the campaign's scope — creates no defect: a defect from automation exists to explain a campaign result, and without one it would be an unlinked duplicate created on every push between campaigns. These failures are still reported back in the response (and printed by the CLI), so the build log shows them.
-7. Record result events with the PAT user, plus `revision`/`branch` (new nullable columns on `campaign_result_events`, migration for both dialects + parity test).
+7. Record result events with the PAT user, plus `revision`/`branch` (new columns on `campaign_result_events` in both dialects, covered by the parity test).
 
 Role: tester (same as `SetResultStatus`).
 
@@ -236,8 +236,23 @@ Ordered by priority: agent access first, CI ingestion after. Phases 0–4 make u
 | **1 — Agent reads** ✅ | §3.2 identifiers + ref resolution; `internal/cli/ops` read operations; `context`, `req/constraint/capability/component/defect/test/campaign` list+show; md/json renderers; `agent-guide` | An agent given only `agent-guide` can answer "what does FR-12 require and which tests cover it" |
 | **2 — MCP (read-only)** ✅ | `nexmap mcp --read-only` over the phase-1 ops; `init --agents` writes `.mcp.json` | Claude Code in a repo with `.nexmap.json` can call `get_context` / `get_requirement` without further setup |
 | **3 — Agent writes** ✅ | Write ops (`req status/create`, `defect create`, `comment add`) in CLI and MCP | Role checks verified for viewer/tester/developer tokens; `--read-only` hides them |
-| **4 — CI ingestion** | §3.1 endpoint + service + migration; `internal/ingest` parsers with output capture; `nexmap utest` incl. `--dry-run`, `--exit-code`, env/revision detection; `test sync`; CI snippets | Nexmap's own `go test -json ./...` lands in a campaign of a dev-seed product; repeated runs produce no duplicate events; a failure creates/reuses a defect containing the test output; closing it and re-running green ends passed; with no active campaign nothing is written |
+| **4 — CI ingestion** ✅ | §3.1 endpoint + service + migration; `internal/ingest` parsers with output capture; `nexmap utest` incl. `--dry-run`, `--exit-code`, env/revision detection; `test sync`; CI snippets | Nexmap's own `go test -json ./...` lands in a campaign of a dev-seed product; repeated runs produce no duplicate events; a failure creates/reuses a defect containing the test output; closing it and re-running green ends passed; with no active campaign nothing is written |
 | **5 — Later** | FR-319 import/export, FR-701 search (server + CLI + MCP), PAT scopes, defect identifiers | — |
+
+Phase 4 as built (user guide: [50_ci_integration.md](50_ci_integration.md)):
+
+- `POST /products/{p}/test-runs` → `TestRunService.IngestRun` (`internal/service/testrun.go`), tester role. Behaves as §3.1, with these decisions:
+  - **No single transaction.** The store has no cross-store transactions; results are applied one by one instead, and every step is idempotent (unchanged statuses are skipped, an open defect on the result is reused). A run that fails half way is completed by sending it again. Two concurrent uploads failing the same new test could both file a defect.
+  - Identifiers are matched in memory against the product's automatic test cases (no `ListByIdentifiers` store method needed at current sizes). Manual test cases are never touched.
+  - An unknown environment name, an explicit campaign that is not active, an unknown status (only `passed`/`failed`/`skipped`) or an empty run is a 400, not a silent no-op.
+  - `dry_run` evaluates the run against the campaign and reports what would happen without writing; `nexmap utest --dry-run` uses it.
+  - A test case with an environment matrix needs the run's environment; without one it is reported as `environment_required`.
+  - Defects are filed through `BacklogService.CreateDefect`/`AddDefectLink`, so they get the default status, audit entries and the same validation as manual ones.
+  - Body limit 32 MiB, at most 50,000 results; defect output keeps the last 64 KiB, inside a code fence longer than any backtick run in the output.
+- `campaign_result_events` gained `source`, `revision`, `branch` (NOT NULL DEFAULT ''), folded into `00003_products.sql` for both dialects while the project is pre-release.
+- Parsers in `internal/ingest` (`gotest`: `-json` and `-v` text, `junit`), tested against a real `go test` run (subtests, skip, parallel interleaving, a panic, a build failure) and pytest / jest-junit / Surefire XML. Build failures and package crashes are reported as run errors (they count for `--exit-code`, match no test case).
+- `nexmap utest` and `nexmap test sync` as in §4.2. `utest` copies stdin to stdout unless `--quiet` or `-o json`. `test sync` skips subtests and titles new cases `TestName (pkg)`.
+- Verified end to end against the seeded Aviary campaign (dry run, recording, defect filing with output and revision, unchanged repeat, environment matrix, `--exit-code`, viewer refusal, no-campaign upload). Not run against Nexmap's own test suite: none of the dev-seed products registers Nexmap's tests.
 
 ## 6. Testing
 

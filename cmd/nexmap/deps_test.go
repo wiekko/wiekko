@@ -15,6 +15,7 @@ var allowedModulePackages = []string{
 	"nexmap.net/internal/buildinfo",
 	"nexmap.net/internal/client",
 	"nexmap.net/internal/cli",
+	"nexmap.net/internal/ingest",
 }
 
 // allowedThirdParty lists the non-module, non-standard-library dependencies.

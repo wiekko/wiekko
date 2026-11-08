@@ -26,7 +26,7 @@ const (
 	ExitUsage       = 1 // usage or configuration error
 	ExitAPI         = 2 // server unreachable, authentication or other API error
 	ExitNotFound    = 3 // the requested entity does not exist (or is not visible)
-	ExitTestsFailed = 4 // reserved for `utest --exit-code`
+	ExitTestsFailed = 4 // `utest --exit-code`: a test failed
 )
 
 // IO is the process environment a command runs in. Tests construct it
@@ -99,6 +99,7 @@ func commands() []*command {
 		testGroup(),
 		campaignGroup(),
 		commentGroup(),
+		utestCommand(),
 		agentGuideCommand(),
 		mcpCommand(),
 	}
@@ -367,7 +368,8 @@ func (a *app) usage(w io.Writer) {
 	b.WriteString("  --allow-http     allow plain HTTP to non-local servers\n\n")
 	b.WriteString("Credentials come from NEXMAP_TOKEN or `nexmap login`.\n")
 	b.WriteString("AI agents: `nexmap agent-guide` explains usage, `nexmap context` briefs on the product.\n")
-	b.WriteString("Exit codes: 0 ok, 1 usage/config, 2 API/auth error, 3 not found.\n")
+	b.WriteString("CI: `go test -json ./... | nexmap utest --env linux` records results in the active campaign.\n")
+	b.WriteString("Exit codes: 0 ok, 1 usage/config, 2 API/auth error, 3 not found, 4 tests failed (utest --exit-code).\n")
 	_, _ = io.WriteString(w, b.String())
 }
 

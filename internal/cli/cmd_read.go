@@ -341,7 +341,7 @@ func testGroup() *command {
 			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.TestCase(w, d) })
 		},
 	}
-	return &command{name: "test", summary: "test cases", subs: []*command{list, show}}
+	return &command{name: "test", summary: "test cases", subs: []*command{list, show, testSyncCommand()}}
 }
 
 func campaignGroup() *command {

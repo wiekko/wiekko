@@ -25,6 +25,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	backlogCtrl := controller.NewBacklog(svc.Backlog)
 	constraintCtrl := controller.NewConstraint(svc.Constraint)
 	testingCtrl := controller.NewTesting(svc.Testing)
+	testRunCtrl := controller.NewTestRun(svc.TestRun)
 	discussionCtrl := controller.NewDiscussion(svc.Discussion)
 	auditCtrl := controller.NewAudit(svc.Audit)
 
@@ -227,6 +228,9 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("GET /products/{productId}/campaigns/{id}/events", authed(http.HandlerFunc(testingCtrl.ListResultEvents)))
 	apiV1.Handle("GET /products/{productId}/campaigns/{id}/results", authed(http.HandlerFunc(testingCtrl.ListCampaignResults)))
 	apiV1.Handle("PATCH /products/{productId}/campaigns/{id}/results/{resultId}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateResult))))
+
+	// Automated test runs (FR-409): CI uploads results into the active campaign.
+	apiV1.Handle("POST /products/{productId}/test-runs", authed(csrf(http.HandlerFunc(testRunCtrl.Ingest))))
 
 	// Comments.
 	apiV1.Handle("GET /products/{productId}/comments", authed(http.HandlerFunc(discussionCtrl.ListComments)))

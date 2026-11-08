@@ -284,6 +284,10 @@ CREATE TABLE IF NOT EXISTS campaign_result_events (
     from_status TEXT NOT NULL DEFAULT '',
     to_status   TEXT NOT NULL,
     defect_id   TEXT REFERENCES defects(id) ON DELETE SET NULL,
+    -- Automated runs (FR-409): where the verdict came from; empty for people.
+    source      TEXT NOT NULL DEFAULT '',
+    revision    TEXT NOT NULL DEFAULT '',
+    branch      TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_campaign_result_events_result_id ON campaign_result_events(result_id);

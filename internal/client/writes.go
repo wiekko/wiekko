@@ -83,3 +83,72 @@ func (c *Client) CreateComment(ctx context.Context, productID, ownerType, ownerI
 	in := map[string]string{"owner_type": ownerType, "owner_id": ownerID, "body": body}
 	return send[Comment](ctx, c, http.MethodPost, productPath(productID, "comments"), in)
 }
+
+// TestRun is an automated test run upload (POST /products/{p}/test-runs).
+type TestRun struct {
+	Source      string          `json:"source"`
+	CampaignID  string          `json:"campaign_id,omitempty"`
+	Environment string          `json:"environment,omitempty"`
+	Revision    string          `json:"revision,omitempty"`
+	Branch      string          `json:"branch,omitempty"`
+	DryRun      bool            `json:"dry_run,omitempty"`
+	Results     []TestRunResult `json:"results"`
+}
+
+// TestRunResult is one reported test.
+type TestRunResult struct {
+	TestIdentifier string `json:"test_identifier"`
+	Status         string `json:"status"`
+	Output         string `json:"output,omitempty"`
+	DurationMS     int64  `json:"duration_ms,omitempty"`
+}
+
+// TestRunReport is the server's account of an uploaded run.
+type TestRunReport struct {
+	Recorded    bool             `json:"recorded"`
+	DryRun      bool             `json:"dry_run"`
+	Campaign    *NamedRef        `json:"campaign"`
+	Environment string           `json:"environment"`
+	Summary     map[string]int   `json:"summary"`
+	Results     []TestRunOutcome `json:"results"`
+}
+
+// NamedRef is an entity's ID and name.
+type NamedRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// TestRunOutcome is what happened to one test case of a run.
+type TestRunOutcome struct {
+	TestIdentifier string `json:"test_identifier"`
+	Reported       int    `json:"reported"`
+	Status         string `json:"status"`
+	Outcome        string `json:"outcome"`
+	TestCaseID     string `json:"test_case_id,omitempty"`
+	ResultID       string `json:"result_id,omitempty"`
+	PreviousStatus string `json:"previous_status,omitempty"`
+	DefectID       string `json:"defect_id,omitempty"`
+	Defect         string `json:"defect,omitempty"`
+}
+
+// IngestTestRun uploads a test run (tester role). With no active campaign
+// the server records nothing and says so in Recorded.
+func (c *Client) IngestTestRun(ctx context.Context, productID string, run TestRun) (*TestRunReport, error) {
+	return send[TestRunReport](ctx, c, http.MethodPost, productPath(productID, "test-runs"), run)
+}
+
+// TestCaseCreate is the payload of CreateTestCase.
+type TestCaseCreate struct {
+	Title          string `json:"title"`
+	Description    string `json:"description,omitempty"`
+	ExecutionMode  string `json:"execution_mode"`
+	TestIdentifier string `json:"test_identifier,omitempty"`
+	CapabilityID   string `json:"capability_id,omitempty"`
+	ComponentID    string `json:"component_id,omitempty"`
+}
+
+// CreateTestCase creates a test case (developer role).
+func (c *Client) CreateTestCase(ctx context.Context, productID string, in TestCaseCreate) (*TestCase, error) {
+	return send[TestCase](ctx, c, http.MethodPost, productPath(productID, "test-cases"), in)
+}
