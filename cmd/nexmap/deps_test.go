@@ -31,6 +31,8 @@ var allowedThirdParty = []string{
 	"github.com/segmentio/encoding/",
 	"github.com/yosida95/uritemplate/",
 	"golang.org/x/oauth2",
+	"golang.org/x/sync/errgroup",
+	"golang.org/x/time/rate",
 }
 
 // mcpSDK may only be imported by mcpPackage, which keeps the protocol library
