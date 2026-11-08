@@ -199,7 +199,17 @@ Agent ergonomics:
 - Results are returned as markdown text (the `-o md` renderer) plus structured JSON content, so agents get readable context and exact fields.
 - Config and token resolution are identical to the CLI (§2.3), so a repo with `.nexmap.json` needs only `{"command": "nexmap", "args": ["mcp"]}` in `.mcp.json`; `nexmap init --agents` writes that entry.
 - `--read-only` flag hides all write tools — the recommended default until PAT scopes (§3.3) exist.
-- Implementation: the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk`) — protocol details (capability negotiation, schema, transport) are not worth hand-rolling. It is the only new dependency of the CLI and is confined to `internal/cli/mcp`.
+- Implementation: the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk`) — protocol details (capability negotiation, schema, transport) are not worth hand-rolling. It is the only new dependency of the CLI and is confined to `internal/cli/mcp` (enforced by `cmd/nexmap/deps_test.go`). It requires Go 1.25, so `go.mod` moved from 1.24.
+
+Phase 2 as built:
+
+- Read tools: `get_context`, `list_requirements`, `get_requirement`, `list_constraints`, `get_constraint`, `get_structure`, `get_capability`, `list_defects`, `get_defect`, `list_test_cases`, `get_test_case`, `campaign_status` — all annotated read-only. List tools return `{"items": [...]}` as structured content (MCP requires an object); show tools return the same object as `-o json`.
+- Input schemas come from the `ops` query structs' `json`/`jsonschema` tags; show tools take `{"ref": "..."}`. Unknown arguments are rejected.
+- Each tool call gets a fresh `ops.Session`, so a long-running server never serves stale status or category names.
+- Missing configuration or credentials do not stop the server: every tool call returns the reason (e.g. "run `nexmap login`") as a tool error the agent can relay.
+- Server instructions (sent on initialize) are a short tool-oriented version of the agent guide.
+- `--read-only` is accepted but has nothing to hide until phase 3 adds write tools.
+- `nexmap init --agents` additionally writes the `nexmap` entry (`nexmap mcp --read-only`) into `.mcp.json`, preserving other servers and keeping an existing `nexmap` entry unless `--force`, and appends the agent guide once to `CLAUDE.md` if present, else `AGENTS.md`. An existing `.nexmap.json` is kept with `--agents` instead of being an error.
 
 ### 4.5 Import / export (FR-319)
 
@@ -213,7 +223,7 @@ Ordered by priority: agent access first, CI ingestion after. Phases 0–4 make u
 |---|---|---|
 | **0 — Groundwork** ✅ | Binary split (§2.1); `internal/client` with auth, envelope decoding, typed errors, retry on 429/5xx for idempotent calls; config + `init/login/whoami/version/api`; `GET /version` | `nexmap whoami` works against a dev server with a PAT; dependency-guard test green |
 | **1 — Agent reads** ✅ | §3.2 identifiers + ref resolution; `internal/cli/ops` read operations; `context`, `req/constraint/capability/component/defect/test/campaign` list+show; md/json renderers; `agent-guide` | An agent given only `agent-guide` can answer "what does FR-12 require and which tests cover it" |
-| **2 — MCP (read-only)** | `nexmap mcp --read-only` over the phase-1 ops; `init --agents` writes `.mcp.json` | Claude Code in a repo with `.nexmap.json` can call `get_context` / `get_requirement` without further setup |
+| **2 — MCP (read-only)** ✅ | `nexmap mcp --read-only` over the phase-1 ops; `init --agents` writes `.mcp.json` | Claude Code in a repo with `.nexmap.json` can call `get_context` / `get_requirement` without further setup |
 | **3 — Agent writes** | Write ops (`req status/create`, `defect create`, `comment add`) in CLI and MCP | Role checks verified for viewer/tester/developer tokens; `--read-only` hides them |
 | **4 — CI ingestion** | §3.1 endpoint + service + migration; `internal/ingest` parsers with output capture; `nexmap utest` incl. `--dry-run`, `--exit-code`, env/revision detection; `test sync`; CI snippets | Nexmap's own `go test -json ./...` lands in a campaign of a dev-seed product; repeated runs produce no duplicate events; a failure creates/reuses a defect containing the test output; closing it and re-running green ends passed; with no active campaign nothing is written |
 | **5 — Later** | FR-319 import/export, FR-701 search (server + CLI + MCP), PAT scopes, defect identifiers | — |

@@ -99,6 +99,7 @@ func commands() []*command {
 		testGroup(),
 		campaignGroup(),
 		agentGuideCommand(),
+		mcpCommand(),
 	}
 }
 

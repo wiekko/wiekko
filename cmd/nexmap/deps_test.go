@@ -18,10 +18,26 @@ var allowedModulePackages = []string{
 }
 
 // allowedThirdParty lists the non-module, non-standard-library dependencies.
+// A trailing slash allows a module's packages. Everything below the MCP SDK
+// line is the SDK with its own dependencies.
 var allowedThirdParty = []string{
 	"golang.org/x/term",
 	"golang.org/x/sys/",
+
+	"github.com/modelcontextprotocol/go-sdk/",
+	"github.com/google/jsonschema-go/",
+	"github.com/segmentio/asm/",
+	"github.com/segmentio/encoding/",
+	"github.com/yosida95/uritemplate/",
+	"golang.org/x/oauth2",
 }
+
+// mcpSDK may only be imported by mcpPackage, which keeps the protocol library
+// out of the rest of the CLI.
+const (
+	mcpSDK     = "github.com/modelcontextprotocol/go-sdk/"
+	mcpPackage = "nexmap.net/internal/cli/mcp"
+)
 
 func TestCLIDependencies(t *testing.T) {
 	if testing.Short() {
@@ -39,6 +55,24 @@ func TestCLIDependencies(t *testing.T) {
 	for _, pkg := range strings.Fields(string(out)) {
 		if !allowed(pkg) {
 			t.Errorf("the CLI must not depend on %s", pkg)
+		}
+	}
+
+	// Direct imports of each of the CLI's own packages.
+	out, err = exec.Command(goBin, "list", "-deps", "-f",
+		`{{if not .Standard}}{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{"\n"}}{{end}}`, "nexmap.net/cmd/nexmap").Output()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.HasPrefix(fields[0], "nexmap.net/") || fields[0] == mcpPackage {
+			continue
+		}
+		for _, imp := range fields[1:] {
+			if strings.HasPrefix(imp, mcpSDK) {
+				t.Errorf("%s imports %s; only %s may use the MCP SDK", fields[0], imp, mcpPackage)
+			}
 		}
 	}
 }

@@ -71,13 +71,14 @@ func versionCommand() *command {
 
 func initCommand() *command {
 	var dir string
-	var force bool
+	var force, agents bool
 	return &command{
 		name:    "init",
-		summary: "create " + config.RepoFileName + " for this repository (server and product)",
+		summary: "create " + config.RepoFileName + " for this repository (server and product); --agents also sets up AI agents",
 		flags: func(fs *flag.FlagSet) {
 			fs.StringVar(&dir, "dir", "", "directory to write "+config.RepoFileName+" to (default: repository root)")
-			fs.BoolVar(&force, "force", false, "overwrite an existing "+config.RepoFileName)
+			fs.BoolVar(&force, "force", false, "overwrite an existing "+config.RepoFileName+" (and the nexmap entry in "+mcpConfigFile+")")
+			fs.BoolVar(&agents, "agents", false, "also register the MCP server in "+mcpConfigFile+" and add the agent guide to CLAUDE.md or AGENTS.md")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) > 0 {
@@ -90,30 +91,63 @@ func initCommand() *command {
 				target = filepath.Join(a.io.Cwd, target)
 			}
 			path := filepath.Join(target, config.RepoFileName)
-			if _, err := os.Stat(path); err == nil && !force {
-				return usageErr(fmt.Errorf("%s already exists (use --force to overwrite)", path))
-			} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			exists := false
+			if _, err := os.Stat(path); err == nil {
+				exists = true
+			} else if !errors.Is(err, fs.ErrNotExist) {
 				return usageErr(err)
 			}
-
-			c, err := a.newClient(true)
-			if err != nil {
-				return err
-			}
-			product, err := a.pickProduct(ctx, c)
-			if err != nil {
-				return err
+			// With --agents, an existing repository config is kept: setting
+			// up agents in an already initialized repository is the common case.
+			keep := exists && !force && agents
+			if exists && !force && !agents {
+				return usageErr(fmt.Errorf("%s already exists (use --force to overwrite)", path))
 			}
 
-			repo := &config.Repo{Server: c.Server(), Product: product.ID}
-			if err := config.WriteRepo(path, repo); err != nil {
-				return fmt.Errorf("write %s: %w", path, err)
+			fields := []output.Field{}
+			result := map[string]any{}
+			if keep {
+				fields = append(fields, output.Field{Label: "File", Value: path + " (kept)"})
+				result["file"] = path
+				result["kept"] = true
+			} else {
+				c, err := a.newClient(true)
+				if err != nil {
+					return err
+				}
+				product, err := a.pickProduct(ctx, c)
+				if err != nil {
+					return err
+				}
+				repo := &config.Repo{Server: c.Server(), Product: product.ID}
+				if err := config.WriteRepo(path, repo); err != nil {
+					return fmt.Errorf("write %s: %w", path, err)
+				}
+				fields = append(fields,
+					output.Field{Label: "File", Value: path},
+					output.Field{Label: "Server", Value: repo.Server},
+					output.Field{Label: "Product", Value: fmt.Sprintf("%s (%s)", product.Name, product.ID)},
+				)
+				result["file"], result["server"], result["product"] = path, repo.Server, product
 			}
-			return output.Record(a.io.Stdout, a.format, "Initialized", []output.Field{
-				{Label: "File", Value: path},
-				{Label: "Server", Value: repo.Server},
-				{Label: "Product", Value: fmt.Sprintf("%s (%s)", product.Name, product.ID)},
-			}, map[string]any{"file": path, "server": repo.Server, "product": product})
+
+			if agents {
+				mcpPath, mcpState, err := writeMCPConfig(target, force)
+				if err != nil {
+					return err
+				}
+				guidePath, guideState, err := appendAgentGuide(target)
+				if err != nil {
+					return err
+				}
+				fields = append(fields,
+					output.Field{Label: "MCP", Value: fmt.Sprintf("%s (%s)", mcpPath, mcpState)},
+					output.Field{Label: "Guide", Value: fmt.Sprintf("%s (%s)", guidePath, guideState)},
+				)
+				result["mcp"] = map[string]string{"file": mcpPath, "state": mcpState}
+				result["guide"] = map[string]string{"file": guidePath, "state": guideState}
+			}
+			return output.Record(a.io.Stdout, a.format, "Initialized", fields, result)
 		},
 	}
 }

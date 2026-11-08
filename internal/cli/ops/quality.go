@@ -14,11 +14,11 @@ var criticalityRank = map[string]int{"critical": 0, "high": 1, "medium": 2, "low
 
 // DefectQuery filters ListDefects.
 type DefectQuery struct {
-	Open        bool   // only defects whose status is not a closed one
-	Criticality string // critical, high, medium, low
-	Status      string // status name
-	Search      string
-	Limit       int
+	Open        bool   `json:"open,omitempty" jsonschema:"only defects whose status is not a closed one"`
+	Criticality string `json:"criticality,omitempty" jsonschema:"critical, high, medium or low"`
+	Status      string `json:"status,omitempty" jsonschema:"status name (case-insensitive)"`
+	Search      string `json:"search,omitempty" jsonschema:"case-insensitive text in title"`
+	Limit       int    `json:"limit,omitempty" jsonschema:"return at most this many items; 0 for all"`
 }
 
 // ListDefects lists defects, most critical first, then by priority.
@@ -213,11 +213,11 @@ func rank(criticality string) int {
 
 // TestCaseQuery filters ListTestCases.
 type TestCaseQuery struct {
-	Mode       string // manual or automatic
-	Component  string // name or ID
-	Capability string // name or ID
-	Search     string // substring of title or test identifier
-	Limit      int
+	Mode       string `json:"mode,omitempty" jsonschema:"manual or automatic; omit for both"`
+	Component  string `json:"component,omitempty" jsonschema:"component name or ID"`
+	Capability string `json:"capability,omitempty" jsonschema:"capability name or ID"`
+	Search     string `json:"search,omitempty" jsonschema:"case-insensitive text in title or test identifier"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"return at most this many items; 0 for all"`
 }
 
 // ListTestCases lists test cases.

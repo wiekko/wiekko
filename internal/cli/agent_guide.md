@@ -14,6 +14,12 @@ before and while you change code. Server and product are configured in
   definition of done, children, linked capabilities, test cases, defects,
   comments. Read it before implementing the item.
 
+If your client has the `nexmap` MCP server configured (`.mcp.json`), the same
+reads are available as tools: `get_context`, `get_requirement`,
+`list_requirements`, `get_constraint`, `list_constraints`, `get_structure`,
+`get_capability`, `list_defects`, `get_defect`, `list_test_cases`,
+`get_test_case` and `campaign_status`. Prefer them over the CLI.
+
 ### Identifiers
 
 - Requirements, tasks and constraints have identifiers like `FR-12`, `MT-3`,

@@ -9,16 +9,19 @@ import (
 )
 
 // RequirementQuery filters ListRequirements. Empty fields do not filter.
+//
+// The json and jsonschema tags define the input schema of the MCP tool built
+// on this operation, so CLI flags and MCP arguments cannot drift apart.
 type RequirementQuery struct {
-	Kind     string // requirement, task, or "" for both
-	Status   string // status name (case-insensitive)
-	Category string // category prefix or name
-	Sprint   string // sprint name or ID, or "current" for the active sprint
-	Search   string // case-insensitive substring of title or identifier
-	Open     bool   // only items whose status is not a closed one
-	Active   bool   // only items activated for work
-	Coarse   bool   // only items marked as needing refinement
-	Limit    int    // 0 = no limit
+	Kind     string `json:"kind,omitempty" jsonschema:"requirement or task; omit for both"`
+	Status   string `json:"status,omitempty" jsonschema:"status name (case-insensitive)"`
+	Category string `json:"category,omitempty" jsonschema:"category prefix (e.g. FR) or name"`
+	Sprint   string `json:"sprint,omitempty" jsonschema:"sprint name or ID, or 'current' for the active sprint"`
+	Search   string `json:"search,omitempty" jsonschema:"case-insensitive text in title or identifier"`
+	Open     bool   `json:"open,omitempty" jsonschema:"only items whose status is not a closed one"`
+	Active   bool   `json:"active,omitempty" jsonschema:"only items activated for work"`
+	Coarse   bool   `json:"coarse,omitempty" jsonschema:"only items marked as needing refinement"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"return at most this many items; 0 for all"`
 }
 
 // ListRequirements lists requirements and tasks.
@@ -205,10 +208,10 @@ func (s *Session) requirementSummary(ctx context.Context, r client.Requirement) 
 
 // ConstraintQuery filters ListConstraints.
 type ConstraintQuery struct {
-	Category   string // prefix or name
-	Compliance string // not_assessed, met, violated
-	Search     string
-	Limit      int
+	Category   string `json:"category,omitempty" jsonschema:"category prefix (e.g. AC) or name"`
+	Compliance string `json:"compliance,omitempty" jsonschema:"not_assessed, met or violated"`
+	Search     string `json:"search,omitempty" jsonschema:"case-insensitive text in title or identifier"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"return at most this many items; 0 for all"`
 }
 
 // ListConstraints lists constraints.
