@@ -64,9 +64,27 @@ func (s *sprintStore) Update(ctx context.Context, sprint *model.Sprint) error {
 	return err
 }
 
+// Delete removes a sprint. Its items go back to the backlog and, as when an
+// item is taken out of a sprint, are no longer active (FR-318): the backlog is
+// the product owner's again. The foreign keys would only clear sprint_id, so
+// the items are released explicitly in the same transaction.
 func (s *sprintStore) Delete(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sprints WHERE id = ?`, id)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, table := range []string{"requirements", "defects"} {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE `+table+` SET sprint_id = NULL, is_active = ? WHERE sprint_id = ?`, false, id); err != nil {
+			return fmt.Errorf("release %s: %w", table, err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sprints WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *sprintStore) ListByProductID(ctx context.Context, productID string) ([]*model.Sprint, error) {

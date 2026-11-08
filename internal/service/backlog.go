@@ -118,6 +118,7 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		Estimation:       input.Estimation,
 		Priority:         input.Priority,
 		IsCoarse:         input.IsCoarse,
+		IsActive:         input.SprintID != "", // planning into a sprint activates (FR-318)
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -165,7 +166,7 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
 	if isDeveloper {
-		if err := requireActivatedForStatus(r.Kind, r.IsActive, r.SprintID, r.StatusID, input.StatusID); err != nil {
+		if err := requireActivatedForStatus(r.Kind, r.IsActive, r.StatusID, input.StatusID); err != nil {
 			return nil, err
 		}
 	}
@@ -211,6 +212,7 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 			r.MilestoneID = *input.MilestoneID
 		}
 		if input.SprintID != nil {
+			r.IsActive = activationAfterSprintMove(r.SprintID, *input.SprintID, r.IsActive, input.IsActive != nil)
 			r.SprintID = *input.SprintID
 		}
 		if input.Estimation != nil {
@@ -510,6 +512,7 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 		EnvironmentID: input.EnvironmentID,
 		Estimation:    input.Estimation,
 		Priority:      input.Priority,
+		IsActive:      input.SprintID != "", // planning into a sprint activates (FR-318)
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -557,7 +560,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
 	if isDeveloper {
-		if err := requireActivatedForStatus("defect", d.IsActive, d.SprintID, d.StatusID, input.StatusID); err != nil {
+		if err := requireActivatedForStatus("defect", d.IsActive, d.StatusID, input.StatusID); err != nil {
 			return nil, err
 		}
 	}
@@ -591,6 +594,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 			d.MilestoneID = *input.MilestoneID
 		}
 		if input.SprintID != nil {
+			d.IsActive = activationAfterSprintMove(d.SprintID, *input.SprintID, d.IsActive, input.IsActive != nil)
 			d.SprintID = *input.SprintID
 		}
 		if input.EnvironmentID != nil {
@@ -623,16 +627,31 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 	return d, nil
 }
 
+// activationAfterSprintMove returns an item's is_active after its sprint changes
+// from oldSprintID to newSprintID (FR-318). Planning into a sprint, or moving
+// to another one, activates the item. Taking it out of a sprint deactivates it:
+// back in the backlog, it is the product owner's responsibility again. An
+// unchanged sprint (forms re-send it on every save) keeps the current state, as
+// does an explicit is_active in the same request.
+func activationAfterSprintMove(oldSprintID, newSprintID string, isActive, explicit bool) bool {
+	if explicit || oldSprintID == newSprintID {
+		return isActive
+	}
+	return newSprintID != ""
+}
+
 // requireActivatedForStatus enforces FR-407 for developers: they may change the
-// status of a backlog item only if it was activated upfront, either directly
-// (kanban) or by being planned into a sprint (FR-318). "Upfront" means the
-// stored state before this update, so activating and moving an item in the
-// same request is refused. Re-sending the current status is not a change.
-func requireActivatedForStatus(kind string, isActive bool, sprintID, currentStatusID string, newStatusID *string) error {
+// status of a backlog item only if it was activated upfront. is_active is the
+// single record of activation: it is set directly (kanban) or when the item is
+// planned into a sprint, and cleared when it leaves one (FR-318).
+// "Upfront" means the stored state before this update, so activating and
+// moving an item in the same request is refused. Re-sending the current status
+// is not a change.
+func requireActivatedForStatus(kind string, isActive bool, currentStatusID string, newStatusID *string) error {
 	if newStatusID == nil || *newStatusID == currentStatusID {
 		return nil
 	}
-	if isActive || sprintID != "" {
+	if isActive {
 		return nil
 	}
 	return fmt.Errorf("%w: the %s must be activated before a developer can change its status", ErrForbidden, kind)

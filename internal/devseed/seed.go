@@ -384,7 +384,7 @@ func (p *productSeed) requirement(spec reqSpec) {
 	}
 
 	// IsActive is not part of the create input — activation is a deliberate
-	// step in the UI too.
+	// step in the UI too. Items created in a sprint are already active (FR-318).
 	if spec.active {
 		active := true
 		_, err := p.s.svc.Backlog.UpdateRequirement(p.s.ctx, p.s.admin, p.id, r.ID, service.UpdateRequirementInput{

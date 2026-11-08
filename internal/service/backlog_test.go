@@ -110,6 +110,27 @@ func TestCreateRequirement(t *testing.T) {
 		}
 		// CategoryID is set from DB lookup or left empty if no categories configured.
 		_ = created.CategoryID
+		if created.IsActive {
+			t.Fatal("a requirement outside any sprint must not start active")
+		}
+	})
+
+	t.Run("created in a sprint starts active", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				CreateFunc: func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+		r, err := svc.CreateRequirement(context.Background(), testutil.MakeUser(), CreateRequirementInput{
+			ProductID: "product-001", Title: "Planned", CategoryID: "cat-001", SprintID: "sprint-001",
+		})
+		if err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if !r.IsActive {
+			t.Fatal("IsActive should be true for an item created in a sprint")
+		}
 	})
 
 	t.Run("missing title", func(t *testing.T) {
@@ -386,7 +407,9 @@ func TestUpdateRequirement(t *testing.T) {
 		}{
 			{"inactive item refused", testutil.MakeRequirement(), UpdateRequirementInput{StatusID: &newStatus}, true},
 			{"activating in same request refused", testutil.MakeRequirement(), UpdateRequirementInput{StatusID: &newStatus, IsActive: &active}, true},
-			{"sprint item allowed", testutil.MakeRequirement(func(r *model.Requirement) { r.SprintID = "sprint-001" }), UpdateRequirementInput{StatusID: &newStatus}, false},
+			// is_active is the only record of activation.
+			{"sprint without is_active refused", testutil.MakeRequirement(func(r *model.Requirement) { r.SprintID = "sprint-001" }), UpdateRequirementInput{StatusID: &newStatus}, true},
+			{"active item allowed", testutil.MakeRequirement(func(r *model.Requirement) { r.IsActive = true }), UpdateRequirementInput{StatusID: &newStatus}, false},
 			{"activation alone allowed", testutil.MakeRequirement(), UpdateRequirementInput{IsActive: &active}, false},
 		}
 		for _, tc := range cases {
@@ -404,6 +427,43 @@ func TestUpdateRequirement(t *testing.T) {
 				}
 				if !tc.wantErr && err != nil {
 					t.Fatalf("UpdateRequirement: %v", err)
+				}
+			})
+		}
+	})
+
+	// FR-318: planning into a sprint activates, going back to the backlog deactivates.
+	t.Run("sprint assignment and activation", func(t *testing.T) {
+		sprint, other, none := "sprint-001", "sprint-002", ""
+		inSprint := func(r *model.Requirement) { r.SprintID = sprint; r.IsActive = true }
+		kanban := func(r *model.Requirement) { r.IsActive = true }
+		cases := []struct {
+			name       string
+			req        *model.Requirement
+			sprint     *string
+			wantActive bool
+		}{
+			{"moving into a sprint activates", testutil.MakeRequirement(), &sprint, true},
+			{"leaving a sprint deactivates", testutil.MakeRequirement(inSprint), &none, false},
+			{"moving to another sprint stays active", testutil.MakeRequirement(inSprint), &other, true},
+			{"unchanged empty sprint keeps kanban activation", testutil.MakeRequirement(kanban), &none, true},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				svc := newBacklogService(
+					&testutil.MockRequirementStore{
+						GetByIDFunc: func(_ context.Context, _ string) (*model.Requirement, error) { return tc.req, nil },
+						UpdateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+					},
+					nil, noopAudit(), ownerRoles(),
+				)
+				got, err := svc.UpdateRequirement(context.Background(), testutil.MakeUser(), "product-001", "req-001",
+					UpdateRequirementInput{SprintID: tc.sprint})
+				if err != nil {
+					t.Fatalf("UpdateRequirement: %v", err)
+				}
+				if got.IsActive != tc.wantActive {
+					t.Fatalf("IsActive = %v, want %v", got.IsActive, tc.wantActive)
 				}
 			})
 		}
@@ -800,6 +860,27 @@ func TestCreateDefect(t *testing.T) {
 		if created.Criticality != model.DefectCriticalityMedium {
 			t.Fatalf("Criticality = %q, want %q", created.Criticality, model.DefectCriticalityMedium)
 		}
+		if created.IsActive {
+			t.Fatal("a defect outside any sprint must not start active")
+		}
+	})
+
+	t.Run("created in a sprint starts active", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				CreateFunc: func(_ context.Context, _ *model.Defect) error { return nil },
+			},
+			noopAudit(), testerRoles(),
+		)
+		d, err := svc.CreateDefect(context.Background(), testutil.MakeUser(), CreateDefectInput{
+			ProductID: "product-001", Title: "Bug", SprintID: "sprint-001",
+		})
+		if err != nil {
+			t.Fatalf("CreateDefect: %v", err)
+		}
+		if !d.IsActive {
+			t.Fatal("IsActive should be true for a defect created in a sprint")
+		}
 	})
 
 	t.Run("missing title", func(t *testing.T) {
@@ -849,6 +930,46 @@ func TestGetDefect(t *testing.T) {
 }
 
 func TestUpdateDefect(t *testing.T) {
+	t.Run("taking a defect out of its sprint deactivates it", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Defect, error) {
+					return testutil.MakeDefect(func(d *model.Defect) { d.SprintID = "sprint-001"; d.IsActive = true }), nil
+				},
+				UpdateFunc: func(_ context.Context, _ *model.Defect) error { return nil },
+			},
+			noopAudit(), ownerRoles(),
+		)
+		none := ""
+		d, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(), "product-001", "defect-001",
+			UpdateDefectInput{SprintID: &none})
+		if err != nil {
+			t.Fatalf("UpdateDefect: %v", err)
+		}
+		if d.IsActive {
+			t.Fatal("IsActive should be false after going back to the backlog")
+		}
+	})
+
+	t.Run("moving a defect into a sprint activates it", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Defect, error) { return testutil.MakeDefect(), nil },
+				UpdateFunc:  func(_ context.Context, _ *model.Defect) error { return nil },
+			},
+			noopAudit(), ownerRoles(),
+		)
+		sprint := "sprint-001"
+		d, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(), "product-001", "defect-001",
+			UpdateDefectInput{SprintID: &sprint})
+		if err != nil {
+			t.Fatalf("UpdateDefect: %v", err)
+		}
+		if !d.IsActive {
+			t.Fatal("IsActive should be true after planning into a sprint")
+		}
+	})
+
 	t.Run("developer cannot change status of inactive defect", func(t *testing.T) {
 		svc := newBacklogService(nil,
 			&testutil.MockDefectStore{

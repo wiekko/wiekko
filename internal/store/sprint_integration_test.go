@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/google/uuid"
@@ -118,5 +119,60 @@ func TestSprintStoreGetActiveByProductID(t *testing.T) {
 		if otherActive != nil {
 			t.Fatalf("active = %+v, want nil", otherActive)
 		}
+	})
+}
+
+// Deleting a sprint sends its items back to the backlog: out of the sprint and
+// no longer active (FR-318). Items outside the sprint keep their activation.
+func TestSprintStoreDeleteReleasesItems(t *testing.T) {
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedDefectFixture(t, db, "Nexmap")
+		st := &sprintStore{db: db}
+		ctx := context.Background()
+		now := Now()
+
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.Exec(query, args...); err != nil {
+				t.Fatalf("seed (%s): %v", query, err)
+			}
+		}
+		category := uuid.NewString()
+		exec(`INSERT INTO categories (id, product_id, entity_type, name, prefix, position, created_at)
+		      VALUES (?, ?, 'requirement', 'Functionality', 'FR', 0, ?)`, category, f.productID, now)
+		insertReq := func(seq int, sprintID string) string {
+			id := uuid.NewString()
+			exec(`INSERT INTO requirements (id, product_id, category_id, title, sprint_id, sequence_number, is_active, created_at, updated_at)
+			      VALUES (?, ?, ?, 'r', ?, ?, ?, ?, ?)`, id, f.productID, category, nullableText(sprintID), seq, true, now, now)
+			return id
+		}
+		plannedReq := insertReq(1, f.sprintID)
+		kanbanReq := insertReq(2, "")
+		plannedDefect := f.addDefect(t, db, "d1", "high", f.statusOpen, "", f.sprintID, 0, now)
+		kanbanDefect := f.addDefect(t, db, "d2", "high", f.statusOpen, "", "", 0, now)
+		exec(`UPDATE defects SET is_active = ?`, true)
+
+		if err := st.Delete(ctx, f.sprintID); err != nil {
+			t.Fatalf("Delete: %v", err)
+		}
+
+		check := func(table, id string, wantActive bool) {
+			t.Helper()
+			var active bool
+			var sprint sql.NullString
+			if err := db.QueryRowContext(ctx, `SELECT is_active, sprint_id FROM `+table+` WHERE id = ?`, id).Scan(&active, &sprint); err != nil {
+				t.Fatalf("read %s: %v", table, err)
+			}
+			if sprint.Valid {
+				t.Errorf("%s %s: sprint_id = %q, want NULL", table, id, sprint.String)
+			}
+			if active != wantActive {
+				t.Errorf("%s %s: is_active = %v, want %v", table, id, active, wantActive)
+			}
+		}
+		check("requirements", plannedReq, false)
+		check("requirements", kanbanReq, true)
+		check("defects", plannedDefect, false)
+		check("defects", kanbanDefect, true)
 	})
 }
