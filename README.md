@@ -21,8 +21,15 @@ generator needs no install: the `justfile` runs it at the version pinned in `go.
 ```sh
 just build     # vet and build nexmapd and nexmap
 just dev       # regenerate templates and CSS on change, run the server
-just test
+just test      # SQLite only: PostgreSQL subtests skip without a server
+just test-pg   # also PostgreSQL, on a throwaway server in a container
 ```
+
+Integration tests run on both SQLite and PostgreSQL to catch dialect differences. The PostgreSQL runs need
+a server named by `NEXMAP_TEST_POSTGRES_DSN` (a `postgres://` URL whose role may create databases);
+`just test-pg` starts one with podman or docker and removes it afterwards. Without a server those subtests
+are skipped, not failed; set `NEXMAP_TEST_POSTGRES=required` where PostgreSQL coverage must not be
+skipped silently, such as CI.
 
 For release binaries, `just container-build [os] [arch]` builds in a container (podman, else docker;
 override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Containerfile`, and

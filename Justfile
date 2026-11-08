@@ -52,6 +52,34 @@ generate:
 test:
     go test -v ./...
 
+# PostgreSQL image for test-pg; override with NEXMAP_TEST_POSTGRES_IMAGE.
+PG_IMAGE := env("NEXMAP_TEST_POSTGRES_IMAGE", "docker.io/library/postgres:18")
+
+# Run the tests with the PostgreSQL runs included: start a throwaway server in
+# a container (data on tmpfs, durability off), point the tests at it, remove
+# it afterwards. Extra arguments go to `go test` (default ./...).
+test-pg *args="./...":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Git Bash on Windows would rewrite container paths like /var/lib/...
+    export MSYS_NO_PATHCONV=1
+    engine={{ CONTAINER }}
+    id=$($engine run -d --rm -e POSTGRES_PASSWORD=nexmap -p 127.0.0.1::5432 \
+        --tmpfs /var/lib/postgresql {{ PG_IMAGE }} \
+        -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=500)
+    trap '$engine rm -f "$id" >/dev/null' EXIT
+    # The image's init phase runs a temporary server on the Unix socket only;
+    # the real one is up once TCP answers.
+    for i in $(seq 1 60); do
+        $engine exec "$id" pg_isready -q -h 127.0.0.1 -U postgres && break
+        [ "$i" = 60 ] && { echo "postgres did not come up" >&2; $engine logs "$id" >&2; exit 1; }
+        sleep 1
+    done
+    port=$($engine port "$id" 5432/tcp | head -n1 | sed 's/.*://')
+    export NEXMAP_TEST_POSTGRES_DSN="postgres://postgres:nexmap@127.0.0.1:${port}/postgres?sslmode=disable"
+    export NEXMAP_TEST_POSTGRES=required
+    go test {{ args }}
+
 # Build release binaries in a container with the pinned Go toolchain, templ and
 # Tailwind; nothing but a container engine is needed on the host. Binaries land
 # in build/<os>-<arch>/.
