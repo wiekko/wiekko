@@ -220,7 +220,7 @@ Phase 3 as built:
 - References (parent, category, status, test case, requirement) are resolved before the first write, so bad input creates nothing. `defect create` links after creating; if a link fails, the error names the created defect.
 - New items get the workflow's default status unless one is given: the server stores an empty status when none is sent and does not apply `is_default` itself (this also affects items created through the web UI and REST API; worth fixing in the service layer).
 - `init --agents` still registers `nexmap mcp --read-only`; drop the flag in `.mcp.json` to allow writes.
-- Not enforced by the server today: FR-407's "if they have been activated upfront" — developers can change the status of items that are not active.
+- FR-407's "if they have been activated upfront" is enforced in the service layer: a developer's status change is refused (403) unless the item was already active or planned into a sprint (FR-318) before the request. Owners are exempt.
 
 ### 4.5 Import / export (FR-319)
 

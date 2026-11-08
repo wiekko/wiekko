@@ -164,6 +164,11 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 	}
 
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+	if isDeveloper {
+		if err := requireActivatedForStatus(r.Kind, r.IsActive, r.SprintID, r.StatusID, input.StatusID); err != nil {
+			return nil, err
+		}
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if input.StatusID != nil {
@@ -551,6 +556,11 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 	}
 
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+	if isDeveloper {
+		if err := requireActivatedForStatus("defect", d.IsActive, d.SprintID, d.StatusID, input.StatusID); err != nil {
+			return nil, err
+		}
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	previousStatusID := d.StatusID
@@ -611,6 +621,21 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 	})
 
 	return d, nil
+}
+
+// requireActivatedForStatus enforces FR-407 for developers: they may change the
+// status of a backlog item only if it was activated upfront, either directly
+// (kanban) or by being planned into a sprint (FR-318). "Upfront" means the
+// stored state before this update, so activating and moving an item in the
+// same request is refused. Re-sending the current status is not a change.
+func requireActivatedForStatus(kind string, isActive bool, sprintID, currentStatusID string, newStatusID *string) error {
+	if newStatusID == nil || *newStatusID == currentStatusID {
+		return nil
+	}
+	if isActive || sprintID != "" {
+		return nil
+	}
+	return fmt.Errorf("%w: the %s must be activated before a developer can change its status", ErrForbidden, kind)
 }
 
 // defectJustClosed reports whether a status change moved a defect into a closed

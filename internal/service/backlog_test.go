@@ -345,7 +345,7 @@ func TestGetRequirement(t *testing.T) {
 
 func TestUpdateRequirement(t *testing.T) {
 	t.Run("developer can update status and is_active", func(t *testing.T) {
-		req := testutil.MakeRequirement()
+		req := testutil.MakeRequirement(func(r *model.Requirement) { r.IsActive = true })
 		var updated *model.Requirement
 		svc := newBacklogService(
 			&testutil.MockRequirementStore{
@@ -371,6 +371,56 @@ func TestUpdateRequirement(t *testing.T) {
 		}
 		if updated == nil {
 			t.Fatal("requirement was not updated")
+		}
+	})
+
+	// FR-407: developers may change the status only of activated items.
+	t.Run("developer status change requires activation", func(t *testing.T) {
+		newStatus := "status-002"
+		active := true
+		cases := []struct {
+			name    string
+			req     *model.Requirement
+			input   UpdateRequirementInput
+			wantErr bool
+		}{
+			{"inactive item refused", testutil.MakeRequirement(), UpdateRequirementInput{StatusID: &newStatus}, true},
+			{"activating in same request refused", testutil.MakeRequirement(), UpdateRequirementInput{StatusID: &newStatus, IsActive: &active}, true},
+			{"sprint item allowed", testutil.MakeRequirement(func(r *model.Requirement) { r.SprintID = "sprint-001" }), UpdateRequirementInput{StatusID: &newStatus}, false},
+			{"activation alone allowed", testutil.MakeRequirement(), UpdateRequirementInput{IsActive: &active}, false},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				svc := newBacklogService(
+					&testutil.MockRequirementStore{
+						GetByIDFunc: func(_ context.Context, _ string) (*model.Requirement, error) { return tc.req, nil },
+						UpdateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+					},
+					nil, noopAudit(), developerRoles(),
+				)
+				_, err := svc.UpdateRequirement(context.Background(), testutil.MakeUser(), "product-001", "req-001", tc.input)
+				if tc.wantErr && !errors.Is(err, ErrForbidden) {
+					t.Fatalf("err = %v, want ErrForbidden", err)
+				}
+				if !tc.wantErr && err != nil {
+					t.Fatalf("UpdateRequirement: %v", err)
+				}
+			})
+		}
+	})
+
+	t.Run("owner can change status of inactive item", func(t *testing.T) {
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Requirement, error) { return testutil.MakeRequirement(), nil },
+				UpdateFunc:  func(_ context.Context, _ *model.Requirement) error { return nil },
+			},
+			nil, noopAudit(), ownerRoles(),
+		)
+		newStatus := "status-002"
+		if _, err := svc.UpdateRequirement(context.Background(), testutil.MakeUser(), "product-001", "req-001",
+			UpdateRequirementInput{StatusID: &newStatus}); err != nil {
+			t.Fatalf("UpdateRequirement: %v", err)
 		}
 	})
 
@@ -799,8 +849,24 @@ func TestGetDefect(t *testing.T) {
 }
 
 func TestUpdateDefect(t *testing.T) {
+	t.Run("developer cannot change status of inactive defect", func(t *testing.T) {
+		svc := newBacklogService(nil,
+			&testutil.MockDefectStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Defect, error) { return testutil.MakeDefect(), nil },
+				UpdateFunc:  func(_ context.Context, _ *model.Defect) error { return nil },
+			},
+			noopAudit(), developerRoles(),
+		)
+		newStatus := "status-002"
+		_, err := svc.UpdateDefect(context.Background(), testutil.MakeUser(), "product-001", "defect-001",
+			UpdateDefectInput{StatusID: &newStatus})
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+
 	t.Run("developer can update status and is_active", func(t *testing.T) {
-		defect := testutil.MakeDefect()
+		defect := testutil.MakeDefect(func(d *model.Defect) { d.IsActive = true })
 		var updated *model.Defect
 		svc := newBacklogService(nil,
 			&testutil.MockDefectStore{

@@ -176,6 +176,9 @@ func TestE2EDefectWrites(t *testing.T) {
 
 	// Testers report defects, developers move them through the workflow.
 	wantForbidden(t, "tester", e.as("bo", "", "defect", "status", d.ShortID, "In Progress"))
+	// FR-407: only once the defect has been activated.
+	wantForbidden(t, "developer on an inactive defect", e.as("cy", "", "defect", "status", d.ShortID, "Done"))
+	e.mustRun("", "api", "PATCH", "/products/{product}/defects/"+d.ID, "--data", `{"is_active":true}`)
 	moved := decode[ops.DefectDetail](t, e.mustAs("cy", "", "defect", "status", d.ShortID, "Done", "-o", "json").stdout)
 	if moved.Status != "Done" || !moved.StatusClosed {
 		t.Errorf("after status change: %s (closed %v)", moved.Status, moved.StatusClosed)
