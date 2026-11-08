@@ -92,6 +92,9 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 	if err := s.validateParent(ctx, input.ProductID, "", input.Kind, input.ParentID); err != nil {
 		return nil, err
 	}
+	if err := s.resolveDefaultStatus(ctx, input.ProductID, model.RequirementKindRequirement, &input.StatusID); err != nil {
+		return nil, err
+	}
 
 	seq, err := s.requirements.NextSequenceNumber(ctx, input.ProductID)
 	if err != nil {
@@ -319,6 +322,26 @@ func (s *BacklogService) resolveCategory(ctx context.Context, productID, kind st
 	return nil
 }
 
+// resolveDefaultStatus fills an empty status with the product's default status
+// for the entity type ("requirement" covers tasks too, "defect" defects). If the
+// product has no default status, the item is left without one.
+func (s *BacklogService) resolveDefaultStatus(ctx context.Context, productID, entityType string, statusID *string) error {
+	if *statusID != "" {
+		return nil
+	}
+	statuses, err := s.statuses.ListByProductID(ctx, productID, entityType)
+	if err != nil {
+		return fmt.Errorf("list statuses: %w", err)
+	}
+	for _, st := range statuses {
+		if st.IsDefault {
+			*statusID = st.ID
+			return nil
+		}
+	}
+	return nil
+}
+
 // checkCategoryKind rejects a category belonging to a different kind, so a
 // task cannot be filed under FR and a requirement cannot be filed under MT.
 func (s *BacklogService) checkCategoryKind(ctx context.Context, kind, categoryID string) error {
@@ -464,6 +487,9 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 	}
 	if input.Criticality == "" {
 		input.Criticality = model.DefectCriticalityMedium
+	}
+	if err := s.resolveDefaultStatus(ctx, input.ProductID, "defect", &input.StatusID); err != nil {
+		return nil, err
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)

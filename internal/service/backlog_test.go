@@ -17,9 +17,26 @@ func newBacklogService(requirements *testutil.MockRequirementStore, defects *tes
 		requirements: requirements,
 		defects:      defects,
 		categories:   backlogCategories(),
+		statuses:     backlogStatuses(),
 		comments:     &recordingPurger{},
 		audit:        audit,
 		authz:        &Authorizer{productRoles: roles},
+	}
+}
+
+// backlogStatuses returns the seeded workflow for each entity type, with "New"
+// ("<entityType>-new") as the default and "Done" ("<entityType>-done") as the
+// closed status. GetByID finds nothing, so status-change side effects (such as
+// re-testing on defect close) stay off unless a test wires its own store.
+func backlogStatuses() *testutil.MockStatusStore {
+	return &testutil.MockStatusStore{
+		GetByIDFunc: func(context.Context, string) (*model.Status, error) { return nil, errors.New("status not found") },
+		ListByProductIDFunc: func(_ context.Context, productID, entityType string) ([]*model.Status, error) {
+			return []*model.Status{
+				{ID: entityType + "-new", ProductID: productID, EntityType: entityType, Name: "New", Position: 1, IsDefault: true},
+				{ID: entityType + "-done", ProductID: productID, EntityType: entityType, Name: "Done", Position: 2, IsClosed: true},
+			}, nil
+		},
 	}
 }
 
@@ -580,6 +597,128 @@ func TestListRequirementAssignees(t *testing.T) {
 		_, err := svc.ListRequirementAssignees(context.Background(), testutil.MakeUser(), "product-001", "req-001")
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+}
+
+// --- Default status ---
+
+func TestCreateAppliesDefaultStatus(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("requirement without status gets the requirement default", func(t *testing.T) {
+		var created *model.Requirement
+		svc := newBacklogService(&testutil.MockRequirementStore{
+			CreateFunc: func(_ context.Context, r *model.Requirement) error { created = r; return nil },
+		}, nil, noopAudit(), ownerRoles())
+
+		if _, err := svc.CreateRequirement(ctx, testutil.MakeUser(), CreateRequirementInput{ProductID: "product-001", Title: "X"}); err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if created.StatusID != "requirement-new" {
+			t.Errorf("StatusID = %q, want %q", created.StatusID, "requirement-new")
+		}
+	})
+
+	t.Run("task without status gets the requirement default", func(t *testing.T) {
+		var created *model.Requirement
+		svc := newBacklogService(&testutil.MockRequirementStore{
+			CreateFunc: func(_ context.Context, r *model.Requirement) error { created = r; return nil },
+		}, nil, noopAudit(), ownerRoles())
+
+		if _, err := svc.CreateRequirement(ctx, testutil.MakeUser(), CreateRequirementInput{ProductID: "product-001", Kind: model.RequirementKindTask, Title: "X"}); err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if created.StatusID != "requirement-new" {
+			t.Errorf("StatusID = %q, want %q", created.StatusID, "requirement-new")
+		}
+	})
+
+	t.Run("defect without status gets the defect default", func(t *testing.T) {
+		var created *model.Defect
+		svc := newBacklogService(nil, &testutil.MockDefectStore{
+			CreateFunc: func(_ context.Context, d *model.Defect) error { created = d; return nil },
+		}, noopAudit(), testerRoles())
+
+		if _, err := svc.CreateDefect(ctx, testutil.MakeUser(), CreateDefectInput{ProductID: "product-001", Title: "Bug"}); err != nil {
+			t.Fatalf("CreateDefect: %v", err)
+		}
+		if created.StatusID != "defect-new" {
+			t.Errorf("StatusID = %q, want %q", created.StatusID, "defect-new")
+		}
+	})
+
+	t.Run("explicit status is kept", func(t *testing.T) {
+		var req *model.Requirement
+		var def *model.Defect
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{CreateFunc: func(_ context.Context, r *model.Requirement) error { req = r; return nil }},
+			&testutil.MockDefectStore{CreateFunc: func(_ context.Context, d *model.Defect) error { def = d; return nil }},
+			noopAudit(), ownerRoles(),
+		)
+		svc.statuses = &testutil.MockStatusStore{} // must not be consulted
+
+		if _, err := svc.CreateRequirement(ctx, testutil.MakeUser(), CreateRequirementInput{ProductID: "product-001", Title: "X", StatusID: "requirement-done"}); err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if req.StatusID != "requirement-done" {
+			t.Errorf("requirement StatusID = %q, want %q", req.StatusID, "requirement-done")
+		}
+		if _, err := svc.CreateDefect(ctx, testutil.MakeUser(), CreateDefectInput{ProductID: "product-001", Title: "Bug", StatusID: "defect-done"}); err != nil {
+			t.Fatalf("CreateDefect: %v", err)
+		}
+		if def.StatusID != "defect-done" {
+			t.Errorf("defect StatusID = %q, want %q", def.StatusID, "defect-done")
+		}
+	})
+
+	t.Run("no default status leaves the status empty", func(t *testing.T) {
+		var req *model.Requirement
+		var def *model.Defect
+		svc := newBacklogService(
+			&testutil.MockRequirementStore{CreateFunc: func(_ context.Context, r *model.Requirement) error { req = r; return nil }},
+			&testutil.MockDefectStore{CreateFunc: func(_ context.Context, d *model.Defect) error { def = d; return nil }},
+			noopAudit(), ownerRoles(),
+		)
+		svc.statuses = &testutil.MockStatusStore{
+			ListByProductIDFunc: func(_ context.Context, _, entityType string) ([]*model.Status, error) {
+				return []*model.Status{{ID: entityType + "-open", EntityType: entityType, Name: "Open"}}, nil
+			},
+		}
+
+		if _, err := svc.CreateRequirement(ctx, testutil.MakeUser(), CreateRequirementInput{ProductID: "product-001", Title: "X"}); err != nil {
+			t.Fatalf("CreateRequirement: %v", err)
+		}
+		if req.StatusID != "" {
+			t.Errorf("requirement StatusID = %q, want empty", req.StatusID)
+		}
+		if _, err := svc.CreateDefect(ctx, testutil.MakeUser(), CreateDefectInput{ProductID: "product-001", Title: "Bug"}); err != nil {
+			t.Fatalf("CreateDefect: %v", err)
+		}
+		if def.StatusID != "" {
+			t.Errorf("defect StatusID = %q, want empty", def.StatusID)
+		}
+	})
+
+	t.Run("status lookup failure aborts creation", func(t *testing.T) {
+		svc := newBacklogService(&testutil.MockRequirementStore{
+			CreateFunc: func(_ context.Context, _ *model.Requirement) error {
+				t.Fatal("requirement must not be created")
+				return nil
+			},
+		}, &testutil.MockDefectStore{
+			CreateFunc: func(_ context.Context, _ *model.Defect) error { t.Fatal("defect must not be created"); return nil },
+		}, noopAudit(), ownerRoles())
+		boom := errors.New("db down")
+		svc.statuses = &testutil.MockStatusStore{
+			ListByProductIDFunc: func(context.Context, string, string) ([]*model.Status, error) { return nil, boom },
+		}
+
+		if _, err := svc.CreateRequirement(ctx, testutil.MakeUser(), CreateRequirementInput{ProductID: "product-001", Title: "X"}); !errors.Is(err, boom) {
+			t.Errorf("CreateRequirement err = %v, want %v", err, boom)
+		}
+		if _, err := svc.CreateDefect(ctx, testutil.MakeUser(), CreateDefectInput{ProductID: "product-001", Title: "Bug"}); !errors.Is(err, boom) {
+			t.Errorf("CreateDefect err = %v, want %v", err, boom)
 		}
 	})
 }
