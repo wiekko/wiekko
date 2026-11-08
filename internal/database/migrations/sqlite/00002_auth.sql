@@ -1,5 +1,3 @@
--- +goose Up
-
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -104,13 +102,3 @@ CREATE INDEX IF NOT EXISTS idx_pd_blind ON personal_data(blind_index) WHERE blin
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pd_unique_user_email
     ON personal_data(blind_index)
     WHERE owner_table = 'users' AND field_name = 'email';
-
--- +goose Down
-DROP TABLE IF EXISTS personal_data;
-DROP TABLE IF EXISTS invitations;
-DROP TABLE IF EXISTS personal_access_tokens;
-DROP TABLE IF EXISTS login_challenges;
-DROP TABLE IF EXISTS totp_recovery_codes;
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS settings;

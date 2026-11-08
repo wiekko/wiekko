@@ -1,5 +1,3 @@
--- +goose Up
-
 -- Product: top-level entity (FR-001)
 CREATE TABLE IF NOT EXISTS products (
     id              UUID PRIMARY KEY,
@@ -405,32 +403,3 @@ CREATE TABLE IF NOT EXISTS audit_trail (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_trail_entity ON audit_trail(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_trail_created_at ON audit_trail(created_at);
-
--- +goose Down
-DROP TABLE IF EXISTS audit_trail;
-DROP TABLE IF EXISTS attachments;
-DROP TABLE IF EXISTS comments;
-DROP TABLE IF EXISTS defect_links;
-DROP TABLE IF EXISTS constraint_capabilities;
-DROP TABLE IF EXISTS test_case_requirements;
-DROP TABLE IF EXISTS requirement_capabilities;
-DROP TABLE IF EXISTS defect_assignments;
-DROP TABLE IF EXISTS requirement_assignments;
-DROP TABLE IF EXISTS campaign_result_events;
-DROP TABLE IF EXISTS campaign_results;
-DROP TABLE IF EXISTS testing_campaigns;
-DROP TABLE IF EXISTS test_case_environments;
-DROP TABLE IF EXISTS test_cases;
-DROP TABLE IF EXISTS pyramid_levels;
-DROP TABLE IF EXISTS constraints;
-DROP TABLE IF EXISTS defects;
-DROP TABLE IF EXISTS runtime_environments;
-DROP TABLE IF EXISTS requirements;
-DROP TABLE IF EXISTS sprints;
-DROP TABLE IF EXISTS categories;
-DROP TABLE IF EXISTS statuses;
-DROP TABLE IF EXISTS capabilities;
-DROP TABLE IF EXISTS components;
-DROP TABLE IF EXISTS milestones;
-DROP TABLE IF EXISTS product_roles;
-DROP TABLE IF EXISTS products;

@@ -68,7 +68,7 @@ func main() {
 	}(db)
 
 	// Run database migrations.
-	if err := database.Migrate(db, cfg.DBDriver); err != nil {
+	if err := database.Migrate(db, cfg.DBDriver, slog.Default()); err != nil {
 		slog.Error("failed to run migrations", "err", err)
 		os.Exit(1)
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 // TestMigrateSQLiteAppliesCleanly guards the hand-maintained SQLite migrations:
-// every statement must apply to an empty database, and roll back again.
+// every statement must apply to an empty database.
 func TestMigrateSQLiteAppliesCleanly(t *testing.T) {
 	dsn := filepath.Join(t.TempDir(), "migrate.db")
 	db, err := sql.Open("sqlite", dsn+"?_pragma=foreign_keys(1)")
@@ -18,7 +18,7 @@ func TestMigrateSQLiteAppliesCleanly(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := Migrate(db, "sqlite"); err != nil {
+	if err := Migrate(db, "sqlite", nil); err != nil {
 		t.Fatalf("migrate up: %v", err)
 	}
 

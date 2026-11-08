@@ -30,7 +30,7 @@ func (c column) String() string {
 
 // TestSchemaParity migrates both engines and compares their tables and
 // columns, so the hand-maintained SQLite and PostgreSQL migrations cannot
-// drift apart. goose's own bookkeeping table is left out.
+// drift apart. The schema_migrations table is compared like any other.
 func TestSchemaParity(t *testing.T) {
 	sqliteCols := sqliteColumns(t, dbtest.Open(t, dbtest.SQLite))
 	pgCols := postgresColumns(t, dbtest.Open(t, dbtest.Postgres))
@@ -64,7 +64,7 @@ func sqliteColumns(t *testing.T, db *sql.DB) []column {
 	rows, err := db.Query(`
 		SELECT m.name, p.name, p."notnull", p.pk
 		FROM sqlite_master m JOIN pragma_table_info(m.name) p
-		WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%' AND m.name <> 'goose_db_version'`)
+		WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'`)
 	if err != nil {
 		t.Fatalf("sqlite columns: %v", err)
 	}
@@ -93,7 +93,7 @@ func postgresColumns(t *testing.T, db *sql.DB) []column {
 	rows, err := db.Query(`
 		SELECT table_name, column_name, is_nullable
 		FROM information_schema.columns
-		WHERE table_schema = 'public' AND table_name <> 'goose_db_version'`)
+		WHERE table_schema = 'public'`)
 	if err != nil {
 		t.Fatalf("postgres columns: %v", err)
 	}

@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
-	"github.com/pressly/goose/v3"
 
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/database"
@@ -53,9 +52,6 @@ var (
 func Main(m *testing.M) int {
 	flag.Parse()
 	mainCalled = true
-	// Every test migrates a database; goose's per-file log lines drown the
-	// test output.
-	goose.SetLogger(goose.NopLogger())
 
 	switch v := strings.ToLower(os.Getenv(EnvPostgres)); {
 	case testing.Short():
@@ -143,7 +139,7 @@ func createTemplate() error {
 		return err
 	}
 	defer func() { _ = tmpl.Close() }()
-	if err := database.Migrate(tmpl, Postgres); err != nil {
+	if err := database.Migrate(tmpl, Postgres, nil); err != nil {
 		return fmt.Errorf("migrate template: %w", err)
 	}
 	return nil
@@ -197,9 +193,9 @@ func Open(t testing.TB, driver string) *sql.DB {
 	t.Helper()
 	switch driver {
 	case SQLite:
-		return openSQLite(t)
+		return openSQLite(t, true)
 	case Postgres:
-		return openPostgresTest(t)
+		return openPostgresTest(t, true)
 	default:
 		t.Fatalf("dbtest: unknown driver %q", driver)
 		return nil
@@ -216,7 +212,7 @@ func Each(t *testing.T, fn func(t *testing.T, driver string, db *sql.DB)) {
 	}
 }
 
-func openSQLite(t testing.TB) *sql.DB {
+func openSQLite(t testing.TB, migrate bool) *sql.DB {
 	t.Helper()
 	db, err := database.Open(&config.Config{
 		DBDriver: SQLite,
@@ -226,13 +222,16 @@ func openSQLite(t testing.TB) *sql.DB {
 		t.Fatalf("dbtest: open sqlite: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if err := database.Migrate(db, SQLite); err != nil {
+	if !migrate {
+		return db
+	}
+	if err := database.Migrate(db, SQLite, nil); err != nil {
 		t.Fatalf("dbtest: migrate sqlite: %v", err)
 	}
 	return db
 }
 
-func openPostgresTest(t testing.TB) *sql.DB {
+func openPostgresTest(t testing.TB, migrate bool) *sql.DB {
 	t.Helper()
 	if !mainCalled {
 		t.Fatalf("dbtest: PostgreSQL requested but the package has no TestMain calling dbtest.Main")
@@ -247,7 +246,11 @@ func openPostgresTest(t testing.TB) *sql.DB {
 		t.Fatalf("dbtest: %v", err)
 	}
 	t.Cleanup(func() { _ = admin.Close() })
-	if _, err := admin.Exec(`CREATE DATABASE ` + name + ` TEMPLATE ` + templateDB); err != nil {
+	create := `CREATE DATABASE ` + name
+	if migrate {
+		create += ` TEMPLATE ` + templateDB
+	}
+	if _, err := admin.Exec(create); err != nil {
 		t.Fatalf("dbtest: create database: %v", err)
 	}
 
@@ -260,4 +263,19 @@ func openPostgresTest(t testing.TB) *sql.DB {
 		_, _ = admin.Exec(`DROP DATABASE IF EXISTS ` + name + ` WITH (FORCE)`)
 	})
 	return db
+}
+
+// OpenEmpty is Open without the migrations: an empty database for tests of
+// the migration runner itself.
+func OpenEmpty(t testing.TB, driver string) *sql.DB {
+	t.Helper()
+	switch driver {
+	case SQLite:
+		return openSQLite(t, false)
+	case Postgres:
+		return openPostgresTest(t, false)
+	default:
+		t.Fatalf("dbtest: unknown driver %q", driver)
+		return nil
+	}
 }
