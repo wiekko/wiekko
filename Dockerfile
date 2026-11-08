@@ -54,8 +54,13 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG GOOS
 ARG GOARCH
-# VERSION is stamped into the binaries; without it, SOURCE_COMMIT (which
-# Coolify can pass as a build argument) gives dev-<commit>, else "dev".
+# The version the binaries report, first match wins:
+#   1. VERSION, if passed as a build argument;
+#   2. with .git in the context, what Go derives from it: v0.1.0 on a tagged
+#      commit, a pseudo-version (v0.1.1-0.<date>-<commit>) after it, v0.0.0-...
+#      when the checkout has no tags (e.g. a shallow clone);
+#   3. dev-<commit> from SOURCE_COMMIT (Coolify can pass it);
+#   4. "dev".
 ARG VERSION
 ARG SOURCE_COMMIT
 
@@ -64,18 +69,27 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     set -eu; \
     goos="${GOOS:-${TARGETOS:-linux}}"; \
     goarch="${GOARCH:-${TARGETARCH:-amd64}}"; \
+    git config --global --add safe.directory /src; \
     version="${VERSION:-}"; \
-    if [ -z "$version" ] && [ -n "${SOURCE_COMMIT:-}" ]; then \
+    if [ -z "$version" ] && git rev-parse --verify -q HEAD >/dev/null 2>&1; then \
+        version=vcs; \
+    elif [ -z "$version" ] && [ -n "${SOURCE_COMMIT:-}" ]; then \
         version="dev-$(printf %.12s "$SOURCE_COMMIT")"; \
     fi; \
     version="${version:-dev}"; \
+    ldflags="-s -w"; \
+    if [ "$version" = vcs ]; then \
+        echo "version: from git ($(git describe --tags --always --dirty))"; \
+    else \
+        echo "version: $version"; \
+        ldflags="$ldflags -X nexmap.net/internal/buildinfo.Version=${version}"; \
+    fi; \
     just generate css; \
     go vet ./...; \
     mkdir -p /out /data/uploads; \
     for cmd in nexmapd nexmap; do \
         CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath \
-            -ldflags "-s -w -X nexmap.net/internal/buildinfo.Version=${version}" \
-            -o /out/ ./cmd/"$cmd"; \
+            -ldflags "$ldflags" -o /out/ ./cmd/"$cmd"; \
     done
 
 FROM scratch AS export

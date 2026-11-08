@@ -87,8 +87,7 @@ test-pg *args="./...":
 # `build --output`, which podman's remote client on Windows and macOS lacks.)
 container-build os="linux" arch="amd64":
     {{ CONTAINER }} build -f Dockerfile --target export -t nexmap-build:{{ os }}-{{ arch }} \
-        --build-arg GOOS={{ os }} --build-arg GOARCH={{ arch }} \
-        --build-arg VERSION=`git describe --tags --always --dirty 2>/dev/null || echo dev` .
+        --build-arg GOOS={{ os }} --build-arg GOARCH={{ arch }} .
     mkdir -p build/{{ os }}-{{ arch }}
     id=`{{ CONTAINER }} create nexmap-build:{{ os }}-{{ arch }} /none` && \
         {{ CONTAINER }} cp "$id:/out/." build/{{ os }}-{{ arch }}/; rc=$?; \

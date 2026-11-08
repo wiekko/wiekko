@@ -1,5 +1,5 @@
 # Build context for the Dockerfile (read by both podman and docker).
-.git
+# .git stays in the context: the build derives the version from its tags.
 .claude
 .vscode
 .idea
