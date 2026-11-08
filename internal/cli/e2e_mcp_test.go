@@ -115,6 +115,17 @@ var readTools = []string{
 	"get_structure", "get_test_case", "list_constraints", "list_defects", "list_requirements", "list_test_cases",
 }
 
+var writeTools = []string{"add_comment", "create_backlog_item", "create_defect", "set_defect_status", "set_requirement_status"}
+
+func contains(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
 func TestE2EMCPTools(t *testing.T) {
 	e := newAviary(t)
 	for _, args := range [][]string{{"mcp"}, {"mcp", "--read-only"}} {
@@ -124,19 +135,29 @@ func TestE2EMCPTools(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			readOnly := len(args) > 1
+			want := append([]string{}, readTools...)
+			if !readOnly {
+				want = append(want, writeTools...)
+			}
+			sort.Strings(want)
 			var names []string
 			for _, tool := range list.Tools {
 				names = append(names, tool.Name)
-				if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
-					t.Errorf("%s is not annotated read-only", tool.Name)
+				isWrite := contains(writeTools, tool.Name)
+				if tool.Annotations == nil || tool.Annotations.ReadOnlyHint == isWrite {
+					t.Errorf("%s: read-only annotation wrong (write tool: %v)", tool.Name, isWrite)
+				}
+				if isWrite && (tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint) {
+					t.Errorf("%s: write tools only add or update, so they must not be marked destructive", tool.Name)
 				}
 				if tool.Description == "" {
 					t.Errorf("%s has no description", tool.Name)
 				}
 			}
 			sort.Strings(names)
-			if !reflect.DeepEqual(names, readTools) {
-				t.Errorf("tools = %v, want %v", names, readTools)
+			if !reflect.DeepEqual(names, want) {
+				t.Errorf("tools = %v, want %v", names, want)
 			}
 			if init := s.InitializeResult(); init == nil || !strings.Contains(init.Instructions, "get_context") {
 				t.Error("server instructions do not explain the tools")

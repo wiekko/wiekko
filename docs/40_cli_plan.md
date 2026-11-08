@@ -211,6 +211,17 @@ Phase 2 as built:
 - `--read-only` is accepted but has nothing to hide until phase 3 adds write tools.
 - `nexmap init --agents` additionally writes the `nexmap` entry (`nexmap mcp --read-only`) into `.mcp.json`, preserving other servers and keeping an existing `nexmap` entry unless `--force`, and appends the agent guide once to `CLAUDE.md` if present, else `AGENTS.md`. An existing `.nexmap.json` is kept with `--agents` instead of being an error.
 
+Phase 3 as built:
+
+- CLI: `req|task status <ref> <status>`, `req|task create`, `defect status <short ID> <status>`, `defect create [--test] [--req]`, `comment add <ref> [--type]`. Long texts via `--body`/`--body-file -` (and `--dod`/`--dod-file` for create). Status names may be unquoted (`req status FR-12 in review`).
+- MCP write tools (left out by `--read-only`): `set_requirement_status`, `set_defect_status`, `create_backlog_item` (task by default; replaces the planned `create_task`), `create_defect`, `add_comment`. Annotated not read-only and not destructive; the status setters as idempotent. Inputs are the `ops` write structs.
+- Every write returns the resulting detail view (same as `show`), so the agent sees the effect.
+- Roles are entirely the server's: owner creates requirements/tasks (FR-308a), developer sets requirement and defect status (FR-407) and comments, tester creates defects and comments on defects/test cases. A 403 exits 2 with a hint about the role; MCP returns it as a tool error. Verified end to end with the demo viewer, tester and developer tokens plus an admin.
+- References (parent, category, status, test case, requirement) are resolved before the first write, so bad input creates nothing. `defect create` links after creating; if a link fails, the error names the created defect.
+- New items get the workflow's default status unless one is given: the server stores an empty status when none is sent and does not apply `is_default` itself (this also affects items created through the web UI and REST API; worth fixing in the service layer).
+- `init --agents` still registers `nexmap mcp --read-only`; drop the flag in `.mcp.json` to allow writes.
+- Not enforced by the server today: FR-407's "if they have been activated upfront" — developers can change the status of items that are not active.
+
 ### 4.5 Import / export (FR-319)
 
 `nexmap req export > backlog.md` / `nexmap req import backlog.md [--dry-run]` in the To Do Markdown format, keyed by identifier so round-trips update instead of duplicating. Separate phase; needs a precise format spec first.
@@ -224,7 +235,7 @@ Ordered by priority: agent access first, CI ingestion after. Phases 0–4 make u
 | **0 — Groundwork** ✅ | Binary split (§2.1); `internal/client` with auth, envelope decoding, typed errors, retry on 429/5xx for idempotent calls; config + `init/login/whoami/version/api`; `GET /version` | `nexmap whoami` works against a dev server with a PAT; dependency-guard test green |
 | **1 — Agent reads** ✅ | §3.2 identifiers + ref resolution; `internal/cli/ops` read operations; `context`, `req/constraint/capability/component/defect/test/campaign` list+show; md/json renderers; `agent-guide` | An agent given only `agent-guide` can answer "what does FR-12 require and which tests cover it" |
 | **2 — MCP (read-only)** ✅ | `nexmap mcp --read-only` over the phase-1 ops; `init --agents` writes `.mcp.json` | Claude Code in a repo with `.nexmap.json` can call `get_context` / `get_requirement` without further setup |
-| **3 — Agent writes** | Write ops (`req status/create`, `defect create`, `comment add`) in CLI and MCP | Role checks verified for viewer/tester/developer tokens; `--read-only` hides them |
+| **3 — Agent writes** ✅ | Write ops (`req status/create`, `defect create`, `comment add`) in CLI and MCP | Role checks verified for viewer/tester/developer tokens; `--read-only` hides them |
 | **4 — CI ingestion** | §3.1 endpoint + service + migration; `internal/ingest` parsers with output capture; `nexmap utest` incl. `--dry-run`, `--exit-code`, env/revision detection; `test sync`; CI snippets | Nexmap's own `go test -json ./...` lands in a campaign of a dev-seed product; repeated runs produce no duplicate events; a failure creates/reuses a defect containing the test output; closing it and re-running green ends passed; with no active campaign nothing is written |
 | **5 — Later** | FR-319 import/export, FR-701 search (server + CLI + MCP), PAT scopes, defect identifiers | — |
 

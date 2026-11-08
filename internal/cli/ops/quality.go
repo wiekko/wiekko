@@ -110,6 +110,20 @@ func (s *Session) ShowDefect(ctx context.Context, ref string) (*DefectDetail, er
 	return out, nil
 }
 
+// findTestCase matches a test case by test identifier, short ID or ID.
+func (s *Session) findTestCase(ctx context.Context, ref string) (client.TestCase, error) {
+	list, err := s.C.TestCases(ctx, s.ProductID, "")
+	if err != nil {
+		return client.TestCase{}, err
+	}
+	return match("test case", ref, list,
+		func(t client.TestCase) string { return t.ID },
+		func(t client.TestCase) string { return ShortID(t.ID) + " " + t.Title },
+		func(t client.TestCase) bool {
+			return t.TestIdentifier != "" && t.TestIdentifier == strings.TrimSpace(ref)
+		})
+}
+
 func (s *Session) findDefect(ctx context.Context, ref string) (*client.Defect, error) {
 	ref = strings.TrimSpace(ref)
 	// A full ID is fetched directly; anything else is matched as a prefix.
@@ -269,16 +283,7 @@ func (s *Session) ListTestCases(ctx context.Context, q TestCaseQuery) ([]TestCas
 // ShowTestCase returns one test case by ID, unique ID prefix, or exact test
 // identifier (e.g. a Go test function name).
 func (s *Session) ShowTestCase(ctx context.Context, ref string) (*TestCaseDetail, error) {
-	list, err := s.C.TestCases(ctx, s.ProductID, "")
-	if err != nil {
-		return nil, err
-	}
-	tc, err := match("test case", ref, list,
-		func(t client.TestCase) string { return t.ID },
-		func(t client.TestCase) string { return ShortID(t.ID) + " " + t.Title },
-		func(t client.TestCase) bool {
-			return t.TestIdentifier != "" && t.TestIdentifier == strings.TrimSpace(ref)
-		})
+	tc, err := s.findTestCase(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

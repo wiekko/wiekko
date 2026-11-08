@@ -499,3 +499,20 @@ func comments(d *doc, list []ops.CommentView) {
 		fmt.Fprintf(&d.b, "**%s** (%s):\n\n%s\n\n", c.Author, c.CreatedAt, strings.TrimSpace(c.Body))
 	}
 }
+
+// --- Writes ---
+
+// Comment renders a comment that was just added.
+func Comment(w io.Writer, c *ops.CommentResult) error {
+	var d doc
+	owner := c.Owner.Title
+	if c.Owner.Identifier != "" {
+		owner = c.Owner.Identifier + " " + owner
+	}
+	d.h(1, "Comment added to "+strings.ReplaceAll(c.OwnerType, "_", " ")+" "+owner)
+	d.kv("Author", c.Comment.Author)
+	d.kv("Created", c.Comment.CreatedAt)
+	d.gap()
+	d.text(c.Comment.Body)
+	return d.write(w)
+}

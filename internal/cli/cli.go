@@ -98,6 +98,7 @@ func commands() []*command {
 		defectGroup(),
 		testGroup(),
 		campaignGroup(),
+		commentGroup(),
 		agentGuideCommand(),
 		mcpCommand(),
 	}
@@ -341,6 +342,9 @@ func (a *app) fail(err error) int {
 	msg := err.Error()
 	if client.IsUnauthorized(err) {
 		msg += "\n(the token is missing, invalid, expired or revoked: run `nexmap login`)"
+	}
+	if client.IsForbidden(err) {
+		msg += "\n(your role in this product does not allow this; ask a product owner)"
 	}
 	fmt.Fprintf(a.io.Stderr, "nexmap: %s\n", msg)
 	return code

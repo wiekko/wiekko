@@ -18,7 +18,10 @@ If your client has the `nexmap` MCP server configured (`.mcp.json`), the same
 reads are available as tools: `get_context`, `get_requirement`,
 `list_requirements`, `get_constraint`, `list_constraints`, `get_structure`,
 `get_capability`, `list_defects`, `get_defect`, `list_test_cases`,
-`get_test_case` and `campaign_status`. Prefer them over the CLI.
+`get_test_case` and `campaign_status`. Unless the server runs with
+`--read-only`, the writes below are tools too: `set_requirement_status`,
+`set_defect_status`, `create_backlog_item`, `create_defect` and `add_comment`.
+Prefer the tools over the CLI.
 
 ### Identifiers
 
@@ -42,6 +45,22 @@ reads are available as tools: `get_context`, `get_requirement`,
 | `nexmap test list [--automatic]` / `test show <test identifier>` | Test cases and their results |
 | `nexmap campaign status` | Active testing campaign: verdict and failing tests |
 | `nexmap api [METHOD] <path>` | Raw REST call for anything else (`{product}` is replaced) |
+
+### Changing things
+
+Writes are limited by your role in the product; a refusal (exit 2, "role")
+means the user has to do it or grant the role, not that you should retry.
+
+| Command | Purpose | Role |
+| --- | --- | --- |
+| `nexmap req status FR-12 "In Progress"` | Move an item through the workflow when you start or finish it | developer |
+| `nexmap defect status <short ID> Done` | Same for a defect you fixed | developer |
+| `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; `--type defect` etc. for short IDs) | developer (tester on defects and test cases) |
+| `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
+| `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |
+
+Only change what the task at hand calls for, and tell the user what you
+changed.
 
 ### Output
 

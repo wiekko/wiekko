@@ -129,7 +129,8 @@ func requirementGroup(name, summary, fixedKind string) *command {
 			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Requirement(w, d) })
 		},
 	}
-	return &command{name: name, summary: summary, subs: []*command{list, show}}
+	return &command{name: name, summary: summary, subs: []*command{list, show,
+		requirementStatusCommand(name, fixedKind), requirementCreateCommand(name, fixedKind)}}
 }
 
 func constraintGroup() *command {
@@ -279,7 +280,8 @@ func defectGroup() *command {
 			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Defect(w, d) })
 		},
 	}
-	return &command{name: "defect", summary: "defects (bugs and issues)", subs: []*command{list, show}}
+	return &command{name: "defect", summary: "defects (bugs and issues)", subs: []*command{list, show,
+		defectStatusCommand(), defectCreateCommand()}}
 }
 
 func testGroup() *command {

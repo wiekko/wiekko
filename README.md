@@ -27,3 +27,5 @@ For AI agents working in a repository, `nexmap agent-guide` prints a usage guide
 MCP-capable agents (Claude Code and others) can use the same reads as tools: `nexmap init --agents`
 registers `nexmap mcp --read-only` in the repository's `.mcp.json` and appends the agent guide to
 `CLAUDE.md` (or `AGENTS.md`). The server reuses the CLI's configuration, so nothing else is needed.
+Agents can also change things within their user's role: `req status`, `defect status`, `comment add`,
+`defect create` and `task create` (CLI), and the matching MCP tools unless the server runs with `--read-only`.

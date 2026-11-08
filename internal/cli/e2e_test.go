@@ -41,6 +41,9 @@ type e2e struct {
 	configDir string
 	repoDir   string
 	env       map[string]string
+	// tokens holds PATs of the demo users (ada viewer, bo tester, cy
+	// developer in Aviary) in seeded environments.
+	tokens map[string]string
 }
 
 func newE2E(t *testing.T) *e2e { return newEnv(t, false) }
@@ -102,6 +105,20 @@ func newEnv(t *testing.T, seed bool) *e2e {
 	if err != nil {
 		t.Fatalf("create PAT: %v", err)
 	}
+	tokens := map[string]string{}
+	if seed {
+		for _, name := range []string{"ada", "bo", "cy"} {
+			u, err := st.User.GetByUsername(ctx, name)
+			if err != nil {
+				t.Fatalf("demo user %s: %v", name, err)
+			}
+			p, err := svc.PAT.Create(ctx, u.ID, "cli e2e", nil)
+			if err != nil {
+				t.Fatalf("create PAT for %s: %v", name, err)
+			}
+			tokens[name] = p.RawToken
+		}
+	}
 
 	srv := httptest.NewServer(router.New(svc, false, false, 1<<20))
 	t.Cleanup(srv.Close)
@@ -114,7 +131,8 @@ func newEnv(t *testing.T, seed bool) *e2e {
 	return &e2e{
 		t: t, serverURL: srv.URL, token: pat.RawToken, products: products,
 		configDir: configDir, repoDir: repoDir,
-		env: map[string]string{cliconfig.EnvConfigDir: configDir},
+		env:    map[string]string{cliconfig.EnvConfigDir: configDir},
+		tokens: tokens,
 	}
 }
 

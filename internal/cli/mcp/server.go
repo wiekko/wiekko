@@ -33,8 +33,9 @@ type Options struct {
 	// caches lookups (statuses, categories, …); creating one per call keeps a
 	// long-running server from serving stale names.
 	NewSession func() (*ops.Session, error)
-	// ReadOnly hides tools that change data. Phase 2 has none yet, so it only
-	// documents intent; write tools must check it when they are added.
+	// ReadOnly leaves out every tool that changes data. The server still
+	// enforces the token user's role on each write; this is the extra guard
+	// for agents that should only read.
 	ReadOnly bool
 }
 
@@ -56,6 +57,9 @@ func New(opts Options) *sdk.Server {
 	})
 	h := &handlers{newSession: opts.NewSession}
 	registerReadTools(s, h)
+	if !opts.ReadOnly {
+		registerWriteTools(s, h)
+	}
 	return s
 }
 
@@ -113,28 +117,39 @@ type CampaignInput struct {
 // rendering; errors are returned as tool errors the model can read.
 func readTool[In, Out any](s *sdk.Server, h *handlers, name, title, desc string,
 	run func(ctx context.Context, sess *ops.Session, in In) (Out, func(io.Writer) error, error)) {
+	addTool(s, h, name, title, desc, &sdk.ToolAnnotations{Title: title, ReadOnlyHint: true, IdempotentHint: true}, run)
+}
+
+// writeTool registers a tool that changes data. None of them delete
+// anything; idempotent marks tools where repeating a call changes nothing
+// further (setting a status), as opposed to creating another item.
+func writeTool[In, Out any](s *sdk.Server, h *handlers, name, title, desc string, idempotent bool,
+	run func(ctx context.Context, sess *ops.Session, in In) (Out, func(io.Writer) error, error)) {
+	f := false
+	addTool(s, h, name, title, desc, &sdk.ToolAnnotations{Title: title, DestructiveHint: &f, IdempotentHint: idempotent}, run)
+}
+
+func addTool[In, Out any](s *sdk.Server, h *handlers, name, title, desc string, ann *sdk.ToolAnnotations,
+	run func(ctx context.Context, sess *ops.Session, in In) (Out, func(io.Writer) error, error)) {
 	t := true
-	sdk.AddTool(s, &sdk.Tool{
-		Name:        name,
-		Title:       title,
-		Description: desc,
-		Annotations: &sdk.ToolAnnotations{Title: title, ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &t},
-	}, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, Out, error) {
-		var zero Out
-		sess, err := h.newSession()
-		if err != nil {
-			return nil, zero, toolError(err)
-		}
-		out, md, err := run(ctx, sess, in)
-		if err != nil {
-			return nil, zero, toolError(err)
-		}
-		var b bytes.Buffer
-		if err := md(&b); err != nil {
-			return nil, zero, err
-		}
-		return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: b.String()}}}, out, nil
-	})
+	ann.OpenWorldHint = &t // talks to a remote server
+	sdk.AddTool(s, &sdk.Tool{Name: name, Title: title, Description: desc, Annotations: ann},
+		func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, Out, error) {
+			var zero Out
+			sess, err := h.newSession()
+			if err != nil {
+				return nil, zero, toolError(err)
+			}
+			out, md, err := run(ctx, sess, in)
+			if err != nil {
+				return nil, zero, toolError(err)
+			}
+			var b bytes.Buffer
+			if err := md(&b); err != nil {
+				return nil, zero, err
+			}
+			return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: b.String()}}}, out, nil
+		})
 }
 
 func required(ref string) error {
@@ -255,7 +270,7 @@ func toolError(err error) error {
 	case client.IsUnauthorized(err):
 		return fmt.Errorf("%w (the Nexmap token is missing, invalid, expired or revoked: run `nexmap login` or set NEXMAP_TOKEN)", err)
 	case client.IsForbidden(err):
-		return fmt.Errorf("%w (the token's user lacks the product role for this)", err)
+		return fmt.Errorf("%w (your Nexmap role in this product does not allow this; ask a product owner)", err)
 	}
 	return err
 }
