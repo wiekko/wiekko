@@ -22,6 +22,8 @@ type ConstraintStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter ConstraintFilter) ([]*model.Constraint, error)
 	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Constraint, error)
+	// GetBySequence returns the product's constraint with the given sequence number.
+	GetBySequence(ctx context.Context, productID string, seq int) (*model.Constraint, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	CountByCategoryID(ctx context.Context, categoryID string) (int, error)
 	LinkCapability(ctx context.Context, link *model.ConstraintCapability) error
@@ -49,6 +51,16 @@ func (s *constraintStore) Create(ctx context.Context, c *model.Constraint) error
 
 func (s *constraintStore) GetByID(ctx context.Context, id string) (*model.Constraint, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT `+constraintColumns+` FROM constraints WHERE id = ?`, id)
+	c, err := scanConstraint(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("constraint not found: %w", err)
+	}
+	return c, err
+}
+
+func (s *constraintStore) GetBySequence(ctx context.Context, productID string, seq int) (*model.Constraint, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+constraintColumns+` FROM constraints WHERE product_id = ? AND sequence_number = ?`, productID, seq)
 	c, err := scanConstraint(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("constraint not found: %w", err)

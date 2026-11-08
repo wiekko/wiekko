@@ -19,3 +19,7 @@ nexmap api /products/{product}/requirements -o json
 ```
 
 In CI, set `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and `NEXMAP_TOKEN` instead of logging in.
+
+For AI agents working in a repository, `nexmap agent-guide` prints a usage guide to paste into
+`AGENTS.md` / `CLAUDE.md`; `nexmap context -o md` gives a product briefing, and `nexmap req show FR-12`,
+`constraint show`, `defect list --open`, `test show <test identifier>` and `campaign status` cover the details.

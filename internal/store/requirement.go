@@ -27,6 +27,9 @@ type RequirementStore interface {
 	ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error)
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
+	// GetBySequence returns the product's requirement or task with the given
+	// sequence number; the number is unique per product across both kinds.
+	GetBySequence(ctx context.Context, productID string, seq int) (*model.Requirement, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	CountByCategoryID(ctx context.Context, categoryID string) (int, error)
 	Assign(ctx context.Context, a *model.Assignment) error
@@ -56,6 +59,16 @@ func (s *requirementStore) Create(ctx context.Context, r *model.Requirement) err
 
 func (s *requirementStore) GetByID(ctx context.Context, id string) (*model.Requirement, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT `+requirementColumns+` FROM requirements WHERE id = ?`, id)
+	r, err := scanRequirement(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("requirement not found: %w", err)
+	}
+	return r, err
+}
+
+func (s *requirementStore) GetBySequence(ctx context.Context, productID string, seq int) (*model.Requirement, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+requirementColumns+` FROM requirements WHERE product_id = ? AND sequence_number = ?`, productID, seq)
 	r, err := scanRequirement(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("requirement not found: %w", err)

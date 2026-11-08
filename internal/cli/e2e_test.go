@@ -25,6 +25,7 @@ import (
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/crypto"
 	"nexmap.net/internal/database/dbtest"
+	"nexmap.net/internal/devseed"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/router"
 	"nexmap.net/internal/service"
@@ -42,7 +43,13 @@ type e2e struct {
 	env       map[string]string
 }
 
-func newE2E(t *testing.T) *e2e {
+func newE2E(t *testing.T) *e2e { return newEnv(t, false) }
+
+// newSeededE2E populates the database with the dev-mode demo products
+// (Aviary, Finch Tracker) instead of two empty ones.
+func newSeededE2E(t *testing.T) *e2e { return newEnv(t, true) }
+
+func newEnv(t *testing.T, seed bool) *e2e {
 	t.Helper()
 	db := dbtest.Open(t, dbtest.SQLite)
 
@@ -66,19 +73,30 @@ func newE2E(t *testing.T) *e2e {
 	ctx := context.Background()
 	now := time.Now().UTC().Format(time.RFC3339)
 	admin := &model.User{
-		ID: uuid.New().String(), Username: "ada", Email: "ada@localhost", DisplayName: "Ada",
+		ID: uuid.New().String(), Username: "root", Email: "root@localhost", DisplayName: "Root",
 		PasswordHash: "x", IsAdmin: true, Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := st.User.Create(ctx, admin); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	var products []*model.Product
-	for _, name := range []string{"Aviary", "Finch"} {
-		p, err := svc.Product.Create(ctx, admin, service.CreateProductInput{Name: name})
-		if err != nil {
-			t.Fatalf("create product: %v", err)
+	if seed {
+		if err := devseed.Seed(ctx, svc, st, provider, admin); err != nil {
+			t.Fatalf("seed: %v", err)
 		}
-		products = append(products, p)
+		list, err := svc.Product.List(ctx, admin)
+		if err != nil {
+			t.Fatalf("list products: %v", err)
+		}
+		products = list
+	} else {
+		for _, name := range []string{"Aviary", "Finch"} {
+			p, err := svc.Product.Create(ctx, admin, service.CreateProductInput{Name: name})
+			if err != nil {
+				t.Fatalf("create product: %v", err)
+			}
+			products = append(products, p)
+		}
 	}
 	pat, err := svc.PAT.Create(ctx, admin.ID, "cli e2e", nil)
 	if err != nil {
@@ -184,7 +202,7 @@ func TestE2ELoginWhoamiLogout(t *testing.T) {
 			Username string `json:"username"`
 		} `json:"user"`
 	}](t, r.stdout)
-	if who.User.Username != "ada" || who.Server != e.serverURL {
+	if who.User.Username != "root" || who.Server != e.serverURL {
 		t.Fatalf("whoami = %+v", who)
 	}
 
@@ -200,7 +218,7 @@ func TestE2ETokenFromEnvironment(t *testing.T) {
 	e.env[cliconfig.EnvToken] = e.token
 	e.env[cliconfig.EnvServer] = e.serverURL
 	r := e.mustRun("", "whoami")
-	if !strings.Contains(r.stdout, "ada") || !strings.Contains(r.stdout, cliconfig.EnvToken) {
+	if !strings.Contains(r.stdout, "root") || !strings.Contains(r.stdout, cliconfig.EnvToken) {
 		t.Fatalf("whoami = %q", r.stdout)
 	}
 }

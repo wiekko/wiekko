@@ -40,9 +40,10 @@ func (c *BacklogController) ListRequirements(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	prefixes := c.prefixes(r, user, productID)
 	result := make([]map[string]any, 0, len(items))
 	for _, item := range items {
-		result = append(result, requirementToJSON(item))
+		result = append(result, requirementToJSON(item, prefixes))
 	}
 	httputil.JSON(w, http.StatusOK, result)
 }
@@ -90,7 +91,7 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	httputil.JSON(w, http.StatusCreated, requirementToJSON(item))
+	httputil.JSON(w, http.StatusCreated, requirementToJSON(item, c.prefixes(r, user, productID)))
 }
 
 // GetRequirement handles GET /products/{productId}/requirements/{id}.
@@ -105,7 +106,7 @@ func (c *BacklogController) GetRequirement(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, requirementToJSON(item))
+	httputil.JSON(w, http.StatusOK, requirementToJSON(item, c.prefixes(r, user, productID)))
 }
 
 // UpdateRequirement handles PATCH /products/{productId}/requirements/{id}.
@@ -149,7 +150,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, requirementToJSON(item))
+	httputil.JSON(w, http.StatusOK, requirementToJSON(item, c.prefixes(r, user, productID)))
 }
 
 // DeleteRequirement handles DELETE /products/{productId}/requirements/{id}.
@@ -178,9 +179,10 @@ func (c *BacklogController) ListChildRequirements(w http.ResponseWriter, r *http
 		return
 	}
 
+	prefixes := c.prefixes(r, user, productID)
 	result := make([]map[string]any, 0, len(items))
 	for _, item := range items {
-		result = append(result, requirementToJSON(item))
+		result = append(result, requirementToJSON(item, prefixes))
 	}
 	httputil.JSON(w, http.StatusOK, result)
 }
@@ -238,6 +240,26 @@ func (c *BacklogController) UnassignRequirement(w http.ResponseWriter, r *http.R
 	}
 
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "unassigned"})
+}
+
+// LinkedDefects returns a handler for GET .../{targetType}s/{id}/defects:
+// the defects linked to that entity (FR-023, FR-501).
+func (c *BacklogController) LinkedDefects(targetType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.UserFromContext(r.Context())
+		productID := r.PathValue("productId")
+
+		items, _, err := c.backlog.ListLinkedDefects(r.Context(), user, productID, targetType, r.PathValue("id"))
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		result := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			result = append(result, defectToJSON(item))
+		}
+		httputil.JSON(w, http.StatusOK, result)
+	}
 }
 
 // --- Defects ---
@@ -487,9 +509,28 @@ func (c *BacklogController) RemoveDefectLink(w http.ResponseWriter, r *http.Requ
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "unlinked"})
 }
 
-func requirementToJSON(r *model.Requirement) map[string]any {
+// prefixes returns the category prefix map used to render identifiers. The
+// request was already authorized by the call that produced the items, so a
+// failure here only drops the identifiers rather than failing the request.
+func (c *BacklogController) prefixes(r *http.Request, user *model.User, productID string) map[string]string {
+	m, err := c.backlog.CategoryPrefixes(r.Context(), user, productID)
+	if err != nil {
+		return nil
+	}
+	return m
+}
+
+// requirementToJSON renders a requirement or task. identifier ("FR-12") is
+// empty when the category prefix is unknown.
+func requirementToJSON(r *model.Requirement, prefixes map[string]string) map[string]any {
+	identifier := ""
+	if p, ok := prefixes[r.CategoryID]; ok {
+		identifier = model.EntityIdentifier(p, r.SequenceNumber)
+	}
 	return map[string]any{
 		"id":                 r.ID,
+		"identifier":         identifier,
+		"sequence_number":    r.SequenceNumber,
 		"product_id":         r.ProductID,
 		"kind":               r.Kind,
 		"parent_id":          r.ParentID,

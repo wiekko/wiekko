@@ -15,6 +15,7 @@ import (
 
 	"nexmap.net/internal/buildinfo"
 	"nexmap.net/internal/cli/config"
+	"nexmap.net/internal/cli/ops"
 	"nexmap.net/internal/cli/output"
 	"nexmap.net/internal/client"
 )
@@ -75,6 +76,9 @@ type command struct {
 	// flags registers command-specific flags; may be nil.
 	flags func(fs *flag.FlagSet)
 	run   func(ctx context.Context, a *app, args []string) error
+	// subs makes this a command group ("req list", "req show"); run is
+	// unused then.
+	subs []*command
 }
 
 func commands() []*command {
@@ -85,6 +89,16 @@ func commands() []*command {
 		whoamiCommand(),
 		initCommand(),
 		apiCommand(),
+		contextCommand(),
+		requirementGroup("req", "requirements and tasks", ""),
+		requirementGroup("task", "tasks (shorthand for `req … --kind task`)", "task"),
+		constraintGroup(),
+		componentGroup(),
+		capabilityGroup(),
+		defectGroup(),
+		testGroup(),
+		campaignGroup(),
+		agentGuideCommand(),
 	}
 }
 
@@ -114,6 +128,11 @@ func Run(ctx context.Context, args []string, io IO) int {
 	if name == "help" {
 		if len(rest) > 1 {
 			if cmd := lookup(rest[1]); cmd != nil {
+				if len(rest) > 2 {
+					if sub := cmd.sub(rest[2]); sub != nil {
+						cmd = sub
+					}
+				}
 				a.commandUsage(io.Stdout, cmd, nil)
 				return ExitOK
 			}
@@ -127,6 +146,24 @@ func Run(ctx context.Context, args []string, io IO) int {
 		a.usage(io.Stderr)
 		return ExitUsage
 	}
+	rest = rest[1:]
+	if len(cmd.subs) > 0 {
+		if len(rest) == 0 {
+			a.commandUsage(io.Stderr, cmd, nil)
+			return ExitUsage
+		}
+		if rest[0] == "-h" || rest[0] == "--help" || rest[0] == "help" {
+			a.commandUsage(io.Stdout, cmd, nil)
+			return ExitOK
+		}
+		sub := cmd.sub(rest[0])
+		if sub == nil {
+			fmt.Fprintf(io.Stderr, "nexmap: unknown command %q\n\n", cmd.name+" "+rest[0])
+			a.commandUsage(io.Stderr, cmd, nil)
+			return ExitUsage
+		}
+		cmd, rest = sub, rest[1:]
+	}
 
 	// Global flags are accepted after the command name as well.
 	fs := flag.NewFlagSet("nexmap "+cmd.name, flag.ContinueOnError)
@@ -136,7 +173,7 @@ func Run(ctx context.Context, args []string, io IO) int {
 		cmd.flags(fs)
 	}
 	fs.Usage = func() { a.commandUsage(io.Stderr, cmd, fs) }
-	positional, err := parseInterleaved(fs, rest[1:])
+	positional, err := parseInterleaved(fs, rest)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return ExitOK
@@ -151,6 +188,16 @@ func Run(ctx context.Context, args []string, io IO) int {
 		return a.fail(err)
 	}
 	return ExitOK
+}
+
+// sub returns the group member "<group> <name>", if any.
+func (c *command) sub(name string) *command {
+	for _, s := range c.subs {
+		if s.name == c.name+" "+name {
+			return s
+		}
+	}
+	return nil
 }
 
 func lookup(name string) *command {
@@ -275,8 +322,10 @@ func (a *app) fail(err error) int {
 	switch {
 	case errors.As(err, &ee):
 		code = ee.code
-	case client.IsNotFound(err):
+	case client.IsNotFound(err), errors.As(err, new(*ops.NotFoundError)):
 		code = ExitNotFound
+	case errors.As(err, new(*ops.AmbiguousError)):
+		code = ExitUsage
 	}
 
 	if a.format == output.JSON {
@@ -303,20 +352,32 @@ func (a *app) usage(w io.Writer) {
 	cmds := commands()
 	sort.Slice(cmds, func(i, j int) bool { return cmds[i].name < cmds[j].name })
 	for _, c := range cmds {
-		fmt.Fprintf(&b, "  %-9s %s\n", c.name, c.summary)
+		fmt.Fprintf(&b, "  %-12s %s\n", c.name, c.summary)
 	}
-	b.WriteString("  help      show help for a command\n\n")
+	b.WriteString("  help         show help for a command, e.g. `nexmap help req show`\n\n")
 	b.WriteString("Global flags:\n")
 	b.WriteString("  --server URL     Nexmap server (env NEXMAP_SERVER, .nexmap.json)\n")
 	b.WriteString("  --product ID     product (env NEXMAP_PRODUCT, .nexmap.json)\n")
 	b.WriteString("  -o, --output F   table, md or json (env NEXMAP_OUTPUT)\n")
 	b.WriteString("  --allow-http     allow plain HTTP to non-local servers\n\n")
 	b.WriteString("Credentials come from NEXMAP_TOKEN or `nexmap login`.\n")
+	b.WriteString("AI agents: `nexmap agent-guide` explains usage, `nexmap context` briefs on the product.\n")
 	b.WriteString("Exit codes: 0 ok, 1 usage/config, 2 API/auth error, 3 not found.\n")
 	_, _ = io.WriteString(w, b.String())
 }
 
 func (a *app) commandUsage(w io.Writer, c *command, fs *flag.FlagSet) {
+	if len(c.subs) > 0 {
+		fmt.Fprintf(w, "Usage: nexmap %s <command> [flags]\n\n%s\n\nCommands:\n", c.name, c.summary)
+		for _, s := range c.subs {
+			name := strings.TrimPrefix(s.name, c.name+" ")
+			if s.args != "" {
+				name += " " + s.args
+			}
+			fmt.Fprintf(w, "  %-20s %s\n", name, s.summary)
+		}
+		return
+	}
 	fmt.Fprintf(w, "Usage: nexmap %s", c.name)
 	if c.args != "" {
 		fmt.Fprintf(w, " %s", c.args)

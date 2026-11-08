@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -291,6 +292,7 @@ type MockConstraintStore struct {
 	ListByProductIDFunc              func(ctx context.Context, productID string, filter store.ConstraintFilter) ([]*model.Constraint, error)
 	ListByMilestoneIDFunc            func(ctx context.Context, milestoneID string) ([]*model.Constraint, error)
 	NextSequenceNumberFunc           func(ctx context.Context, productID string) (int, error)
+	GetBySequenceFunc                func(ctx context.Context, productID string, seq int) (*model.Constraint, error)
 	CountByCategoryIDFunc            func(ctx context.Context, categoryID string) (int, error)
 	LinkCapabilityFunc               func(ctx context.Context, link *model.ConstraintCapability) error
 	UnlinkCapabilityFunc             func(ctx context.Context, constraintID, capabilityID string) error
@@ -324,6 +326,12 @@ func (m *MockConstraintStore) NextSequenceNumber(ctx context.Context, productID 
 		return 1, nil
 	}
 	return m.NextSequenceNumberFunc(ctx, productID)
+}
+func (m *MockConstraintStore) GetBySequence(ctx context.Context, productID string, seq int) (*model.Constraint, error) {
+	if m.GetBySequenceFunc != nil {
+		return m.GetBySequenceFunc(ctx, productID, seq)
+	}
+	return nil, sql.ErrNoRows
 }
 func (m *MockConstraintStore) CountByCategoryID(ctx context.Context, categoryID string) (int, error) {
 	if m.CountByCategoryIDFunc == nil {
@@ -553,6 +561,7 @@ type MockRequirementStore struct {
 	ListBySprintIDFunc     func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneIDFunc  func(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumberFunc func(ctx context.Context, productID string) (int, error)
+	GetBySequenceFunc      func(ctx context.Context, productID string, seq int) (*model.Requirement, error)
 	CountByCategoryIDFunc  func(ctx context.Context, categoryID string) (int, error)
 	AssignFunc             func(ctx context.Context, a *model.Assignment) error
 	UnassignFunc           func(ctx context.Context, requirementID, userID string) error
@@ -594,6 +603,12 @@ func (m *MockRequirementStore) NextSequenceNumber(ctx context.Context, productID
 		return m.NextSequenceNumberFunc(ctx, productID)
 	}
 	return 1, nil
+}
+func (m *MockRequirementStore) GetBySequence(ctx context.Context, productID string, seq int) (*model.Requirement, error) {
+	if m.GetBySequenceFunc != nil {
+		return m.GetBySequenceFunc(ctx, productID, seq)
+	}
+	return nil, sql.ErrNoRows
 }
 func (m *MockRequirementStore) CountByCategoryID(ctx context.Context, categoryID string) (int, error) {
 	if m.CountByCategoryIDFunc == nil {

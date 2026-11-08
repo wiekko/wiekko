@@ -35,9 +35,10 @@ func (c *ConstraintController) ListConstraints(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	prefixes := c.prefixes(r, user, productID)
 	result := make([]map[string]any, 0, len(items))
 	for _, item := range items {
-		result = append(result, constraintToJSON(item))
+		result = append(result, constraintToJSON(item, prefixes))
 	}
 	httputil.JSON(w, http.StatusOK, result)
 }
@@ -73,7 +74,7 @@ func (c *ConstraintController) CreateConstraint(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	httputil.JSON(w, http.StatusCreated, constraintToJSON(item))
+	httputil.JSON(w, http.StatusCreated, constraintToJSON(item, c.prefixes(r, user, productID)))
 }
 
 // GetConstraint handles GET /products/{productId}/constraints/{id}.
@@ -88,7 +89,7 @@ func (c *ConstraintController) GetConstraint(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, constraintToJSON(item))
+	httputil.JSON(w, http.StatusOK, constraintToJSON(item, c.prefixes(r, user, productID)))
 }
 
 // UpdateConstraint handles PATCH /products/{productId}/constraints/{id}.
@@ -122,7 +123,7 @@ func (c *ConstraintController) UpdateConstraint(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, constraintToJSON(item))
+	httputil.JSON(w, http.StatusOK, constraintToJSON(item, c.prefixes(r, user, productID)))
 }
 
 // DeleteConstraint handles DELETE /products/{productId}/constraints/{id}.
@@ -199,9 +200,26 @@ func (c *ConstraintController) UnlinkConstraintCapability(w http.ResponseWriter,
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func constraintToJSON(c *model.Constraint) map[string]any {
+// prefixes returns the constraint category prefix map used to render
+// identifiers; see BacklogController.prefixes.
+func (c *ConstraintController) prefixes(r *http.Request, user *model.User, productID string) map[string]string {
+	m, err := c.constraint.CategoryPrefixes(r.Context(), user, productID)
+	if err != nil {
+		return nil
+	}
+	return m
+}
+
+// constraintToJSON renders a constraint. identifier ("AC-42") is empty when the
+// category prefix is unknown.
+func constraintToJSON(c *model.Constraint, prefixes map[string]string) map[string]any {
+	identifier := ""
+	if p, ok := prefixes[c.CategoryID]; ok {
+		identifier = model.EntityIdentifier(p, c.SequenceNumber)
+	}
 	return map[string]any{
 		"id":               c.ID,
+		"identifier":       identifier,
 		"product_id":       c.ProductID,
 		"category_id":      c.CategoryID,
 		"sequence_number":  c.SequenceNumber,

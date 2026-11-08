@@ -5,6 +5,7 @@ import (
 
 	"nexmap.net/internal/controller"
 	"nexmap.net/internal/middleware"
+	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
 )
 
@@ -17,7 +18,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	totpCtrl := controller.NewTOTP(svc.TwoFactor)
 	adminCtrl := controller.NewAdmin(svc.User, svc.Setting)
 	invCtrl := controller.NewInvitation(svc.Invitation)
-	productCtrl := controller.NewProduct(svc.Product)
+	productCtrl := controller.NewProduct(svc.Product, svc.User)
 	componentCtrl := controller.NewComponent(svc.Component)
 	planningCtrl := controller.NewPlanning(svc.Milestone)
 	categoryCtrl := controller.NewCategory(svc.Category)
@@ -26,6 +27,12 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	testingCtrl := controller.NewTesting(svc.Testing)
 	discussionCtrl := controller.NewDiscussion(svc.Discussion)
 	auditCtrl := controller.NewAudit(svc.Audit)
+
+	// Requirement and constraint routes accept identifiers ("FR-12", "AC-42")
+	// wherever they take an ID in the path.
+	reqRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "id")
+	reqParamRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "reqId")
+	conRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "id")
 
 	// Health (public).
 	apiV1.HandleFunc("GET /health", controller.Health)
@@ -108,12 +115,14 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	// Capability-requirement links.
 	apiV1.Handle("GET /products/{productId}/capabilities/{id}/requirements", authed(http.HandlerFunc(componentCtrl.ListCapabilityRequirements)))
 	apiV1.Handle("POST /products/{productId}/capabilities/{id}/requirements", authed(csrf(http.HandlerFunc(componentCtrl.LinkCapabilityRequirement))))
-	apiV1.Handle("DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}", authed(csrf(http.HandlerFunc(componentCtrl.UnlinkCapabilityRequirement))))
+	apiV1.Handle("DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}", authed(reqParamRef(csrf(http.HandlerFunc(componentCtrl.UnlinkCapabilityRequirement)))))
+	apiV1.Handle("GET /products/{productId}/capabilities/{id}/test-cases", authed(http.HandlerFunc(testingCtrl.ListCapabilityTestCases)))
+	apiV1.Handle("GET /products/{productId}/capabilities/{id}/defects", authed(backlogCtrl.LinkedDefects(model.DefectLinkTargetCapability)))
 
 	// Requirement-capability links.
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/capabilities", authed(http.HandlerFunc(componentCtrl.ListRequirementCapabilities)))
-	apiV1.Handle("POST /products/{productId}/requirements/{id}/capabilities", authed(csrf(http.HandlerFunc(componentCtrl.LinkRequirementCapability))))
-	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/capabilities/{capId}", authed(csrf(http.HandlerFunc(componentCtrl.UnlinkRequirementCapability))))
+	apiV1.Handle("GET /products/{productId}/requirements/{id}/capabilities", authed(reqRef(http.HandlerFunc(componentCtrl.ListRequirementCapabilities))))
+	apiV1.Handle("POST /products/{productId}/requirements/{id}/capabilities", authed(reqRef(csrf(http.HandlerFunc(componentCtrl.LinkRequirementCapability)))))
+	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/capabilities/{capId}", authed(reqRef(csrf(http.HandlerFunc(componentCtrl.UnlinkRequirementCapability)))))
 
 	// Milestones.
 	apiV1.Handle("GET /products/{productId}/milestones", authed(http.HandlerFunc(planningCtrl.ListMilestones)))
@@ -158,23 +167,25 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	// Requirements.
 	apiV1.Handle("GET /products/{productId}/requirements", authed(http.HandlerFunc(backlogCtrl.ListRequirements)))
 	apiV1.Handle("POST /products/{productId}/requirements", authed(csrf(http.HandlerFunc(backlogCtrl.CreateRequirement))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}", authed(http.HandlerFunc(backlogCtrl.GetRequirement)))
-	apiV1.Handle("PATCH /products/{productId}/requirements/{id}", authed(csrf(http.HandlerFunc(backlogCtrl.UpdateRequirement))))
-	apiV1.Handle("DELETE /products/{productId}/requirements/{id}", authed(csrf(http.HandlerFunc(backlogCtrl.DeleteRequirement))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/children", authed(http.HandlerFunc(backlogCtrl.ListChildRequirements)))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/assignees", authed(http.HandlerFunc(backlogCtrl.ListRequirementAssignees)))
-	apiV1.Handle("POST /products/{productId}/requirements/{id}/assignees", authed(csrf(http.HandlerFunc(backlogCtrl.AssignRequirement))))
-	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/assignees/{userId}", authed(csrf(http.HandlerFunc(backlogCtrl.UnassignRequirement))))
+	apiV1.Handle("GET /products/{productId}/requirements/{id}", authed(reqRef(http.HandlerFunc(backlogCtrl.GetRequirement))))
+	apiV1.Handle("PATCH /products/{productId}/requirements/{id}", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.UpdateRequirement)))))
+	apiV1.Handle("DELETE /products/{productId}/requirements/{id}", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.DeleteRequirement)))))
+	apiV1.Handle("GET /products/{productId}/requirements/{id}/children", authed(reqRef(http.HandlerFunc(backlogCtrl.ListChildRequirements))))
+	apiV1.Handle("GET /products/{productId}/requirements/{id}/assignees", authed(reqRef(http.HandlerFunc(backlogCtrl.ListRequirementAssignees))))
+	apiV1.Handle("POST /products/{productId}/requirements/{id}/assignees", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.AssignRequirement)))))
+	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/assignees/{userId}", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.UnassignRequirement)))))
+	apiV1.Handle("GET /products/{productId}/requirements/{id}/test-cases", authed(reqRef(http.HandlerFunc(testingCtrl.ListRequirementTestCases))))
+	apiV1.Handle("GET /products/{productId}/requirements/{id}/defects", authed(reqRef(backlogCtrl.LinkedDefects(model.DefectLinkTargetRequirement))))
 
 	// Constraints.
 	apiV1.Handle("GET /products/{productId}/constraints", authed(http.HandlerFunc(constraintCtrl.ListConstraints)))
 	apiV1.Handle("POST /products/{productId}/constraints", authed(csrf(http.HandlerFunc(constraintCtrl.CreateConstraint))))
-	apiV1.Handle("GET /products/{productId}/constraints/{id}", authed(http.HandlerFunc(constraintCtrl.GetConstraint)))
-	apiV1.Handle("PATCH /products/{productId}/constraints/{id}", authed(csrf(http.HandlerFunc(constraintCtrl.UpdateConstraint))))
-	apiV1.Handle("DELETE /products/{productId}/constraints/{id}", authed(csrf(http.HandlerFunc(constraintCtrl.DeleteConstraint))))
-	apiV1.Handle("GET /products/{productId}/constraints/{id}/capabilities", authed(http.HandlerFunc(constraintCtrl.ListConstraintCapabilities)))
-	apiV1.Handle("POST /products/{productId}/constraints/{id}/capabilities", authed(csrf(http.HandlerFunc(constraintCtrl.LinkConstraintCapability))))
-	apiV1.Handle("DELETE /products/{productId}/constraints/{id}/capabilities/{capId}", authed(csrf(http.HandlerFunc(constraintCtrl.UnlinkConstraintCapability))))
+	apiV1.Handle("GET /products/{productId}/constraints/{id}", authed(conRef(http.HandlerFunc(constraintCtrl.GetConstraint))))
+	apiV1.Handle("PATCH /products/{productId}/constraints/{id}", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.UpdateConstraint)))))
+	apiV1.Handle("DELETE /products/{productId}/constraints/{id}", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.DeleteConstraint)))))
+	apiV1.Handle("GET /products/{productId}/constraints/{id}/capabilities", authed(conRef(http.HandlerFunc(constraintCtrl.ListConstraintCapabilities))))
+	apiV1.Handle("POST /products/{productId}/constraints/{id}/capabilities", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.LinkConstraintCapability)))))
+	apiV1.Handle("DELETE /products/{productId}/constraints/{id}/capabilities/{capId}", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.UnlinkConstraintCapability)))))
 
 	// Defects.
 	apiV1.Handle("GET /products/{productId}/defects", authed(http.HandlerFunc(backlogCtrl.ListDefects)))
@@ -197,10 +208,12 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}", authed(csrf(http.HandlerFunc(testingCtrl.DeleteTestCase))))
 	apiV1.Handle("GET /products/{productId}/test-cases/{id}/requirements", authed(http.HandlerFunc(testingCtrl.ListTestCaseRequirements)))
 	apiV1.Handle("POST /products/{productId}/test-cases/{id}/requirements", authed(csrf(http.HandlerFunc(testingCtrl.LinkRequirement))))
-	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}/requirements/{reqId}", authed(csrf(http.HandlerFunc(testingCtrl.UnlinkRequirement))))
+	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}/requirements/{reqId}", authed(reqParamRef(csrf(http.HandlerFunc(testingCtrl.UnlinkRequirement)))))
 	apiV1.Handle("GET /products/{productId}/test-cases/{id}/environments", authed(http.HandlerFunc(testingCtrl.ListTestCaseEnvironments)))
 	apiV1.Handle("POST /products/{productId}/test-cases/{id}/environments", authed(csrf(http.HandlerFunc(testingCtrl.AddEnvironment))))
 	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}/environments/{envId}", authed(csrf(http.HandlerFunc(testingCtrl.RemoveEnvironment))))
+	apiV1.Handle("GET /products/{productId}/test-cases/{id}/results", authed(http.HandlerFunc(testingCtrl.ListTestCaseResults)))
+	apiV1.Handle("GET /products/{productId}/test-cases/{id}/defects", authed(backlogCtrl.LinkedDefects(model.DefectLinkTargetTestCase)))
 
 	// Campaigns.
 	apiV1.Handle("GET /products/{productId}/campaigns", authed(http.HandlerFunc(testingCtrl.ListCampaigns)))

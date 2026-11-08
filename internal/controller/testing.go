@@ -33,8 +33,87 @@ func (c *TestingController) ListTestCases(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Optional exact-match filters, e.g. ?test_identifier=TestFoo to find the
+	// test case behind a test function.
+	identifier := r.URL.Query().Get("test_identifier")
+	mode := r.URL.Query().Get("execution_mode")
 	result := make([]map[string]any, 0, len(items))
 	for _, item := range items {
+		if identifier != "" && item.TestIdentifier != identifier {
+			continue
+		}
+		if mode != "" && item.ExecutionMode != mode {
+			continue
+		}
+		result = append(result, testCaseToJSON(item))
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+// ListRequirementTestCases handles GET /products/{productId}/requirements/{id}/test-cases.
+func (c *TestingController) ListRequirementTestCases(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+
+	items, err := c.testing.ListLinkedTestCasesForRequirement(r.Context(), user, productID, r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeTestCases(w, items, productID)
+}
+
+// ListCapabilityTestCases handles GET /products/{productId}/capabilities/{id}/test-cases.
+func (c *TestingController) ListCapabilityTestCases(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+
+	items, err := c.testing.ListTestCasesByCapability(r.Context(), user, productID, r.PathValue("id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeTestCases(w, items, productID)
+}
+
+// ListTestCaseResults handles GET /products/{productId}/test-cases/{id}/results:
+// the test case's results across all campaigns.
+func (c *TestingController) ListTestCaseResults(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	// The result store is keyed by test case only; make sure the test case
+	// belongs to the product in the URL before listing its results.
+	tc, err := c.testing.GetTestCase(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	if tc.ProductID != productID {
+		writeServiceError(w, service.ErrNotFound)
+		return
+	}
+	items, err := c.testing.ListResultsForTestCase(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		result = append(result, campaignResultToJSON(item))
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+// writeTestCases renders test cases, dropping any that belong to another
+// product.
+func writeTestCases(w http.ResponseWriter, items []*model.TestCase, productID string) {
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if item.ProductID != productID {
+			continue
+		}
 		result = append(result, testCaseToJSON(item))
 	}
 	httputil.JSON(w, http.StatusOK, result)

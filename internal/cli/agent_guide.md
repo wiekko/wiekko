@@ -1,0 +1,54 @@
+## Nexmap (product definition, backlog and QA)
+
+This repository's product is managed in Nexmap. Use the `nexmap` CLI to read
+the product definition, requirements, constraints, test cases and defects
+before and while you change code. Server and product are configured in
+`.nexmap.json`; credentials come from `nexmap login` or `NEXMAP_TOKEN`.
+
+### Start here
+
+- `nexmap context -o md` — product briefing: purpose, components and
+  capabilities, constraints, work in progress, open defects, testing status.
+  Read it once at the start of a task.
+- `nexmap req show FR-12 -o md` — one requirement or task: description,
+  definition of done, children, linked capabilities, test cases, defects,
+  comments. Read it before implementing the item.
+
+### Identifiers
+
+- Requirements, tasks and constraints have identifiers like `FR-12`, `MT-3`,
+  `AC-42` (category prefix + number). Use them in commands, commit messages
+  and code comments.
+- Defects and test cases are referenced by their short ID (first 8 characters
+  of the ID, shown in lists). Test cases can also be referenced by their test
+  identifier, e.g. the Go test function name.
+- Capabilities are referenced by name.
+
+### Commands
+
+| Command | Purpose |
+| --- | --- |
+| `nexmap req list [--open] [--active] [--kind task] [--status NAME] [--search TEXT]` | Backlog items |
+| `nexmap req show <FR-12>` | One requirement or task |
+| `nexmap constraint list [--compliance violated]` / `constraint show <AC-42>` | Rules the code must follow |
+| `nexmap component list` / `capability show <name>` | Product structure and traceability |
+| `nexmap defect list [--open] [--criticality high]` / `defect show <short ID>` | Known bugs |
+| `nexmap test list [--automatic]` / `test show <test identifier>` | Test cases and their results |
+| `nexmap campaign status` | Active testing campaign: verdict and failing tests |
+| `nexmap api [METHOD] <path>` | Raw REST call for anything else (`{product}` is replaced) |
+
+### Output
+
+- `-o md` gives compact markdown (best for reading), `-o json` gives stable
+  machine-readable fields (best for scripting), the default is a plain table.
+- Exit codes: 0 ok, 1 usage or configuration error, 2 API or authentication
+  error, 3 not found.
+
+### Working rules
+
+- Treat constraints (`AC-…`, `SC-…`, `UC-…`) as non-negotiable unless the
+  user says otherwise; check `nexmap constraint list` when designing a change.
+- A requirement is done when its definition of done holds; the linked test
+  cases show how it is verified.
+- Prefer the CLI over guessing: if a requirement is unclear, read its
+  comments and parent, and ask the user rather than inventing scope.

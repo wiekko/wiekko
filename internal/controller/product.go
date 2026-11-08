@@ -15,11 +15,12 @@ import (
 // ProductController handles product CRUD and member management endpoints.
 type ProductController struct {
 	product *service.ProductService
+	users   *service.UserService
 }
 
-// NewProduct creates a ProductController.
-func NewProduct(product *service.ProductService) *ProductController {
-	return &ProductController{product: product}
+// NewProduct creates a ProductController. users resolves member usernames.
+func NewProduct(product *service.ProductService, users *service.UserService) *ProductController {
+	return &ProductController{product: product, users: users}
 }
 
 // List handles GET /products.
@@ -137,9 +138,18 @@ func (c *ProductController) ListMembers(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Usernames are pseudonyms (SC-306) and visible to every product member
+	// in the web UI; display names and emails stay out of the API listing.
 	items := make([]map[string]any, 0, len(members))
 	for _, m := range members {
-		items = append(items, productRoleToJSON(m))
+		item := productRoleToJSON(m)
+		item["username"] = ""
+		if c.users != nil {
+			if u, err := c.users.GetByID(r.Context(), m.UserID); err == nil {
+				item["username"] = u.Username
+			}
+		}
+		items = append(items, item)
 	}
 	httputil.JSON(w, http.StatusOK, items)
 }
