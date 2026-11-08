@@ -218,7 +218,7 @@ Phase 3 as built:
 - Every write returns the resulting detail view (same as `show`), so the agent sees the effect.
 - Roles are entirely the server's: owner creates requirements/tasks (FR-308a), developer sets requirement and defect status (FR-407) and comments, tester creates defects and comments on defects/test cases. A 403 exits 2 with a hint about the role; MCP returns it as a tool error. Verified end to end with the demo viewer, tester and developer tokens plus an admin.
 - References (parent, category, status, test case, requirement) are resolved before the first write, so bad input creates nothing. `defect create` links after creating; if a link fails, the error names the created defect.
-- New items get the workflow's default status unless one is given: the server stores an empty status when none is sent and does not apply `is_default` itself (this also affects items created through the web UI and REST API; worth fixing in the service layer).
+- New items get the workflow's default status unless one is given; the service layer applies `is_default`, so the CLI sends no status when none is named.
 - `init --agents` still registers `nexmap mcp --read-only`; drop the flag in `.mcp.json` to allow writes.
 - FR-407's "if they have been activated upfront" is enforced in the service layer: a developer's status change is refused (403) unless the item was already active before the request. Owners are exempt. `is_active` is the single record of activation: planning an item into a sprint (or moving it to another one) sets it (FR-318); taking it out of a sprint, or deleting the sprint, clears it, since the item goes back to the product owner's backlog.
 

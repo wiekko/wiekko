@@ -74,23 +74,13 @@ func (s *Session) SetDefectStatus(ctx context.Context, in StatusChange) (*Defect
 	return s.ShowDefect(ctx, d.ID)
 }
 
-// initialStatus resolves the status a new item starts in: the named one, or
-// the workflow's default. The server does not apply the default itself, so
-// without this an item created through the API would have no status at all.
+// initialStatus resolves an optional status name for a new item; empty
+// leaves the choice to the server, which applies the workflow's default.
 func (s *Session) initialStatus(ctx context.Context, entityType, name string) (string, error) {
-	if name = strings.TrimSpace(name); name != "" {
-		return s.statusID(ctx, entityType, name)
+	if name = strings.TrimSpace(name); name == "" {
+		return "", nil
 	}
-	list, err := s.workflow(ctx, entityType)
-	if err != nil {
-		return "", err
-	}
-	for _, st := range list {
-		if st.IsDefault {
-			return st.ID, nil
-		}
-	}
-	return "", nil
+	return s.statusID(ctx, entityType, name)
 }
 
 // requirement fetches a requirement or task by identifier or ID, optionally

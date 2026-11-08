@@ -50,11 +50,13 @@ Prefer the tools over the CLI.
 
 Writes are limited by your role in the product; a refusal (exit 2, "role")
 means the user has to do it or grant the role, not that you should retry.
+Developers may only change the status of items a product owner has activated
+(directly or by planning them into a sprint).
 
 | Command | Purpose | Role |
 | --- | --- | --- |
-| `nexmap req status FR-12 "In Progress"` | Move an item through the workflow when you start or finish it | developer |
-| `nexmap defect status <short ID> Done` | Same for a defect you fixed | developer |
+| `nexmap req status FR-12 "In Progress"` | Move an item through the workflow when you start or finish it | developer, on active items only |
+| `nexmap defect status <short ID> Done` | Same for a defect you fixed | developer, on active defects only |
 | `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; `--type defect` etc. for short IDs) | developer (tester on defects and test cases) |
 | `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
 | `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |

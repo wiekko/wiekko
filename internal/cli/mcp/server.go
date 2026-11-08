@@ -270,7 +270,7 @@ func toolError(err error) error {
 	case client.IsUnauthorized(err):
 		return fmt.Errorf("%w (the Nexmap token is missing, invalid, expired or revoked: run `nexmap login` or set NEXMAP_TOKEN)", err)
 	case client.IsForbidden(err):
-		return fmt.Errorf("%w (your Nexmap role in this product does not allow this; ask a product owner)", err)
+		return fmt.Errorf("%w (not permitted for your Nexmap role in this product; ask a product owner)", err)
 	}
 	return err
 }

@@ -15,7 +15,7 @@ and defects.
 - If a requirement is unclear, read its comments and parent, and ask the user
   rather than inventing scope.
 - Write tools (absent when the server runs read-only) are limited by the
-  user's product role: set statuses (developer), comment (developer; tester on
+  user's product role: set statuses (developer, only on items a product owner has activated), comment (developer; tester on
   defects and test cases), report defects (tester), create tasks (owner). A
   role refusal is final; tell the user instead of retrying. Only change what
   the task calls for, check `list_defects` before reporting a defect, and tell

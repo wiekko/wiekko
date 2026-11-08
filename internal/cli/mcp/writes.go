@@ -16,7 +16,7 @@ var WriteToolNames = []string{"add_comment", "create_backlog_item", "create_defe
 func registerWriteTools(s *sdk.Server, h *handlers) {
 	writeTool(s, h, "set_requirement_status", "Set requirement status",
 		"Move a requirement or task to another workflow status by name, e.g. when starting or finishing work on it. "+
-			"Requires the developer role. Returns the updated item.",
+			"Requires the developer role, and the item must be active (activated by a product owner or planned into a sprint). Returns the updated item.",
 		true,
 		func(ctx context.Context, sess *ops.Session, in ops.StatusChange) (*ops.RequirementDetail, func(io.Writer) error, error) {
 			v, err := sess.SetRequirementStatus(ctx, in)
@@ -42,7 +42,7 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 		})
 
 	writeTool(s, h, "set_defect_status", "Set defect status",
-		"Move a defect to another workflow status by name, e.g. after fixing it. Requires the developer role. "+
+		"Move a defect to another workflow status by name, e.g. after fixing it. Requires the developer role, and the defect must be active. "+
 			"Returns the updated defect.",
 		true,
 		func(ctx context.Context, sess *ops.Session, in ops.StatusChange) (*ops.DefectDetail, func(io.Writer) error, error) {

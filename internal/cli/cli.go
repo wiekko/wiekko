@@ -344,7 +344,7 @@ func (a *app) fail(err error) int {
 		msg += "\n(the token is missing, invalid, expired or revoked: run `nexmap login`)"
 	}
 	if client.IsForbidden(err) {
-		msg += "\n(your role in this product does not allow this; ask a product owner)"
+		msg += "\n(not permitted for your role in this product; ask a product owner)"
 	}
 	fmt.Fprintf(a.io.Stderr, "nexmap: %s\n", msg)
 	return code
