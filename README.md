@@ -32,8 +32,27 @@ are skipped, not failed; set `NEXMAP_TEST_POSTGRES=required` where PostgreSQL co
 skipped silently, such as CI.
 
 For release binaries, `just container-build [os] [arch]` builds in a container (podman, else docker;
-override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Containerfile`, and
+override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Dockerfile`, and
 writes the binaries to `build/<os>-<arch>/`. The host needs only the container engine and `just`.
+
+## Deployment
+
+The `Dockerfile`'s default stage is the server image: `nexmapd` alone on a distroless base, running as a
+non-root user, listening on port 8080 on all interfaces, with a `HEALTHCHECK` (`nexmapd healthcheck`).
+It keeps the SQLite database and attachments in `/data`, so mount persistent storage there. Migrations
+run automatically when the server starts.
+
+On Coolify, create the application with the **Dockerfile** build pack and:
+
+- add persistent storage (a volume) with destination path `/data`;
+- set the environment variables, at least `NEXMAP_ENCRYPTION_KEY`, and `NEXMAP_ADMIN_USER` /
+  `NEXMAP_ADMIN_PASSWORD` for the first start; for PostgreSQL, `NEXMAP_DB_DRIVER=postgres` and
+  `NEXMAP_DB_DSN`;
+- optionally make `SOURCE_COMMIT` available at build time, so the binaries report `dev-<commit>`
+  instead of `dev`.
+
+Ports (8080) and the health check come from the image. When building with podman, pass
+`--format docker`: the default OCI image format drops the `HEALTHCHECK`.
 
 ## Binaries
 

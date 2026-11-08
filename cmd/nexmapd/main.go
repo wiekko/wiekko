@@ -28,6 +28,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck(os.Args[2:]))
+	}
+
 	// Load configuration (defaults → env → flags).
 	cfg, err := config.Load(os.Args[1:])
 	if err != nil {

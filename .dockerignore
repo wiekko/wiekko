@@ -1,4 +1,4 @@
-# Build context for Containerfile (read by both podman and docker).
+# Build context for the Dockerfile (read by both podman and docker).
 .git
 .claude
 .vscode
