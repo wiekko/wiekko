@@ -51,3 +51,6 @@ CLAUDE.md
 
 # Mac
 .DS_Store
+
+# Container build output
+/build/

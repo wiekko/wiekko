@@ -2,6 +2,32 @@
 
 Nexmap Product Management Solution
 
+## Building
+
+nexmap needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is
+built and tested with. Older distribution packages work as well: since Go 1.21, `go` reads that line,
+fetches the named toolchain once (from the Go module proxy, verified against the Go checksum database)
+and uses it for this repository, `gopls` included. This needs automatic toolchain switching, which some
+distributions turn off:
+
+```sh
+go env GOTOOLCHAIN              # "auto" or "path+auto": nothing to do
+go env -w GOTOOLCHAIN=auto      # if it prints "local"
+```
+
+Local builds need `just` and the Tailwind CSS v4 standalone CLI (`tailwindcss`) on the `PATH`. The templ
+generator needs no install: the `justfile` runs it at the version pinned in `go.mod`.
+
+```sh
+just build     # vet and build nexmapd and nexmap
+just dev       # regenerate templates and CSS on change, run the server
+just test
+```
+
+For release binaries, `just container-build [os] [arch]` builds in a container (podman, else docker;
+override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Containerfile`, and
+writes the binaries to `build/<os>-<arch>/`. The host needs only the container engine and `just`.
+
 ## Binaries
 
 | Binary    | Source          | Purpose                                                      |

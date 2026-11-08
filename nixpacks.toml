@@ -1,8 +1,8 @@
 [phases.setup]
 nixPkgs = ['...', 'just', 'tailwindcss_4']
 
-[phases.install]
-cmds = ['go install github.com/a-h/templ/cmd/templ@latest']
+# templ needs no install step: the justfile runs the generator at the version
+# pinned in go.mod.
 
 [phases.build]
 cmds = ['just all']

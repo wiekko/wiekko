@@ -1,0 +1,17 @@
+# Build context for Containerfile (read by both podman and docker).
+.git
+.claude
+.vscode
+.idea
+.fleet
+build
+web/dist
+**/*_templ.go
+*.exe
+nexmap
+nexmapd
+*.db
+*.db-shm
+*.db-wal
+uploads
+.env
