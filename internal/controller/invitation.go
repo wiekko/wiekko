@@ -35,7 +35,7 @@ func (c *InvitationController) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := middleware.UserFromContext(r.Context())
-	result, err := c.invitation.Create(r.Context(), user.ID, req.Email, req.ProductID, req.Role)
+	result, err := c.invitation.Create(r.Context(), user, req.Email, req.ProductID, req.Role)
 	if err != nil {
 		httputil.Error(w, http.StatusBadRequest, "INVITATION_FAILED", err.Error())
 		return

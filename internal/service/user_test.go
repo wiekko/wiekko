@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -30,7 +32,19 @@ func noopProvider() *testutil.MockAuthProvider {
 	}
 }
 
+// notFoundUser mimics the user store's "no such user" error.
+func notFoundUser(context.Context, string) (*model.User, error) {
+	return nil, fmt.Errorf("user not found: %w", sql.ErrNoRows)
+}
+
 func newUserService(users *testutil.MockUserStore, sessions *testutil.MockSessionStore, settings *testutil.MockSettingStore, invitations *testutil.MockInvitationStore, provider *testutil.MockAuthProvider) *UserService {
+	// New accounts are checked against existing ones; default to "none".
+	if users != nil && users.GetByUsernameFunc == nil {
+		users.GetByUsernameFunc = notFoundUser
+	}
+	if users != nil && users.GetByEmailFunc == nil {
+		users.GetByEmailFunc = notFoundUser
+	}
 	return &UserService{
 		users:       users,
 		sessions:    sessions,
@@ -111,7 +125,7 @@ func TestRegister(t *testing.T) {
 		provider.ValidatePasswordFunc = func(_ string, _ auth.PasswordPolicy) error {
 			return errors.New("password too short")
 		}
-		svc := newUserService(nil, nil,
+		svc := newUserService(&testutil.MockUserStore{}, nil,
 			&testutil.MockSettingStore{
 				GetFunc: settingsGetFunc(map[string]string{"self_registration_enabled": "true"}),
 			}, nil, provider,
@@ -127,7 +141,8 @@ func TestAcceptInvitation(t *testing.T) {
 	rawToken := "somerawtoken"
 	tokenHash := hashPATToken(rawToken)
 	input := RegisterInput{
-		Username: "bob", Email: "bob@example.com", DisplayName: "Bob", Password: "Str0ng!",
+		// The address the invitation (testutil.MakeInvitation) was sent to.
+		Username: "bob", Email: "invite@example.com", DisplayName: "Bob", Password: "Str0ng!",
 	}
 
 	t.Run("valid invitation", func(t *testing.T) {
@@ -565,4 +580,94 @@ func TestUserGetByID(t *testing.T) {
 	if result.ID != user.ID {
 		t.Fatalf("ID = %q, want %q", result.ID, user.ID)
 	}
+}
+
+func TestRegisterRejectsTakenIdentity(t *testing.T) {
+	input := RegisterInput{Username: "alice", Email: "alice@example.com", Password: "Str0ngP@ss!"}
+	existing := func(context.Context, string) (*model.User, error) { return testutil.MakeUser(), nil }
+	settings := &testutil.MockSettingStore{
+		GetFunc: settingsGetFunc(map[string]string{"self_registration_enabled": "true"}),
+	}
+
+	t.Run("username", func(t *testing.T) {
+		svc := newUserService(&testutil.MockUserStore{GetByUsernameFunc: existing}, nil, settings, nil, noopProvider())
+		if _, err := svc.Register(context.Background(), input); !errors.Is(err, ErrUsernameTaken) {
+			t.Fatalf("err = %v, want ErrUsernameTaken", err)
+		}
+	})
+	t.Run("email", func(t *testing.T) {
+		svc := newUserService(&testutil.MockUserStore{GetByEmailFunc: existing}, nil, settings, nil, noopProvider())
+		if _, err := svc.Register(context.Background(), input); !errors.Is(err, ErrEmailTaken) {
+			t.Fatalf("err = %v, want ErrEmailTaken", err)
+		}
+	})
+	t.Run("missing fields are an input error", func(t *testing.T) {
+		svc := newUserService(&testutil.MockUserStore{}, nil, settings, nil, noopProvider())
+		_, err := svc.Register(context.Background(), RegisterInput{Username: " ", Email: "a@b.c", Password: "x"})
+		var inputErr *AccountInputError
+		if !errors.As(err, &inputErr) {
+			t.Fatalf("err = %v, want AccountInputError", err)
+		}
+	})
+}
+
+func TestAcceptInvitationProductMembership(t *testing.T) {
+	rawToken := "producttoken"
+	inv := testutil.MakeInvitation(func(i *model.Invitation) {
+		i.TokenHash = hashPATToken(rawToken)
+		i.ProductID = "prod-1"
+		i.Role = model.RoleTester
+	})
+	newSvc := func(created *model.User, roles *[]*model.ProductRole) *UserService {
+		svc := newUserService(
+			&testutil.MockUserStore{
+				CreateFunc: func(_ context.Context, u *model.User) error { *created = *u; return nil },
+			}, nil,
+			&testutil.MockSettingStore{GetFunc: settingsGetFunc(map[string]string{})},
+			&testutil.MockInvitationStore{
+				GetByTokenHashFunc: func(_ context.Context, _ string) (*model.Invitation, error) { return inv, nil },
+				MarkAcceptedFunc:   func(_ context.Context, _, _ string) error { return nil },
+			}, noopProvider(),
+		)
+		svc.productRoles = &testutil.MockProductRoleStore{
+			CreateFunc: func(_ context.Context, r *model.ProductRole) error { *roles = append(*roles, r); return nil },
+		}
+		return svc
+	}
+
+	t.Run("grants the invited role", func(t *testing.T) {
+		var created model.User
+		var roles []*model.ProductRole
+		user, err := newSvc(&created, &roles).AcceptInvitation(context.Background(), rawToken,
+			RegisterInput{Username: "carol", Password: "Str0ng!"})
+		if err != nil {
+			t.Fatalf("AcceptInvitation: %v", err)
+		}
+		if len(roles) != 1 {
+			t.Fatalf("roles created = %d, want 1", len(roles))
+		}
+		if r := roles[0]; r.UserID != user.ID || r.ProductID != "prod-1" || r.Role != model.RoleTester {
+			t.Fatalf("role = %+v, want tester in prod-1 for %s", r, user.ID)
+		}
+		if created.Email != inv.Email {
+			t.Fatalf("email = %q, want the invited address %q", created.Email, inv.Email)
+		}
+		if created.DisplayName != "carol" {
+			t.Fatalf("display name = %q, want the username as fallback", created.DisplayName)
+		}
+	})
+
+	t.Run("rejects another email address", func(t *testing.T) {
+		var created model.User
+		var roles []*model.ProductRole
+		_, err := newSvc(&created, &roles).AcceptInvitation(context.Background(), rawToken,
+			RegisterInput{Username: "carol", Email: "other@example.com", Password: "Str0ng!"})
+		var inputErr *AccountInputError
+		if !errors.As(err, &inputErr) {
+			t.Fatalf("err = %v, want AccountInputError", err)
+		}
+		if len(roles) != 0 || created.ID != "" {
+			t.Fatal("nothing should be created")
+		}
+	})
 }

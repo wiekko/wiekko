@@ -1,0 +1,17 @@
+package middleware
+
+import "testing"
+
+func TestLoggablePathRedactsInvitationTokens(t *testing.T) {
+	tests := map[string]string{
+		"/accept-invite/3107d8dbc3de88f6": "/accept-invite/[redacted]",
+		"/accept-invite/":                 "/accept-invite/",
+		"/products/abc/defects":           "/products/abc/defects",
+		"/login":                          "/login",
+	}
+	for in, want := range tests {
+		if got := loggablePath(in); got != want {
+			t.Errorf("loggablePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

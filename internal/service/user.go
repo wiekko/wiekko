@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,11 +18,45 @@ import (
 
 // UserService handles user account operations.
 type UserService struct {
-	users       store.UserStore
-	sessions    store.SessionStore
-	settings    store.SettingStore
-	invitations store.InvitationStore
-	provider    auth.Provider
+	users        store.UserStore
+	sessions     store.SessionStore
+	settings     store.SettingStore
+	invitations  store.InvitationStore
+	products     store.ProductStore
+	productRoles store.ProductRoleStore
+	provider     auth.Provider
+}
+
+// Errors returned when a new account would clash with an existing one. Their
+// messages are shown to the person registering.
+var (
+	ErrUsernameTaken = errors.New("this username is already taken")
+	ErrEmailTaken    = errors.New("an account with this email address already exists")
+)
+
+// AccountInputError is a problem with what someone entered to create an
+// account: a missing field, a password the policy rejects. Its message is
+// meant for that person.
+type AccountInputError struct{ Err error }
+
+func (e *AccountInputError) Error() string { return e.Err.Error() }
+func (e *AccountInputError) Unwrap() error { return e.Err }
+
+func inputError(err error) error { return &AccountInputError{Err: err} }
+
+// Errors returned for invitation tokens that cannot be used. Their messages
+// are shown to the person holding the link.
+var (
+	ErrInvitationInvalid  = errors.New("invalid invitation token")
+	ErrInvitationAccepted = errors.New("invitation already accepted")
+	ErrInvitationExpired  = errors.New("invitation expired")
+)
+
+// InvitationDetails describes a usable invitation to the person holding its link.
+type InvitationDetails struct {
+	Email       string
+	ProductName string // empty for an invitation to the installation only
+	Role        string // empty for an invitation to the installation only
 }
 
 // RegisterInput contains the fields required to register a new user.
@@ -41,7 +77,15 @@ type UpdateProfileInput struct {
 func (s *UserService) Register(ctx context.Context, input RegisterInput) (*model.User, error) {
 	enabled, err := s.settings.Get(ctx, "self_registration_enabled")
 	if err != nil || enabled != "true" {
-		return nil, errors.New("self-registration is disabled")
+		return nil, inputError(errors.New("self-registration is disabled"))
+	}
+
+	input, err = normalizeRegisterInput(input)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureAvailable(ctx, input.Username, input.Email); err != nil {
+		return nil, err
 	}
 
 	hash, err := s.validateAndHashPassword(ctx, input.Password)
@@ -73,19 +117,45 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*model
 	return user, nil
 }
 
-// AcceptInvitation registers a user from an invitation token.
-func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, input RegisterInput) (*model.User, error) {
-	tokenHash := hashPATToken(rawToken)
-	inv, err := s.invitations.GetByTokenHash(ctx, tokenHash)
+// LookupInvitation returns what a usable invitation offers, for the page its
+// link opens. Accepted, expired and unknown tokens are reported as errors.
+func (s *UserService) LookupInvitation(ctx context.Context, rawToken string) (*InvitationDetails, error) {
+	inv, err := s.usableInvitation(ctx, rawToken)
 	if err != nil {
-		return nil, errors.New("invalid invitation token")
+		return nil, err
 	}
-	if inv.AcceptedAt != "" {
-		return nil, errors.New("invitation already accepted")
+	details := &InvitationDetails{Email: inv.Email, Role: inv.Role}
+	if inv.ProductID != "" && s.products != nil {
+		if p, err := s.products.GetByID(ctx, inv.ProductID); err == nil {
+			details.ProductName = p.Name
+		}
 	}
-	expiresAt, err := time.Parse(time.RFC3339, inv.ExpiresAt)
-	if err != nil || time.Now().UTC().After(expiresAt) {
-		return nil, errors.New("invitation expired")
+	return details, nil
+}
+
+// AcceptInvitation registers a user from an invitation token. A product
+// invitation also makes the new user a member of that product with the
+// invited role (FR-305).
+func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, input RegisterInput) (*model.User, error) {
+	inv, err := s.usableInvitation(ctx, rawToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// The invitation was sent to one address; the account gets that address.
+	if inv.Email != "" {
+		if strings.TrimSpace(input.Email) == "" {
+			input.Email = inv.Email
+		} else if !strings.EqualFold(strings.TrimSpace(input.Email), inv.Email) {
+			return nil, inputError(fmt.Errorf("this invitation is for %s; register with that email address", inv.Email))
+		}
+	}
+	input, err = normalizeRegisterInput(input)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureAvailable(ctx, input.Username, input.Email); err != nil {
+		return nil, err
 	}
 
 	hash, err := s.validateAndHashPassword(ctx, input.Password)
@@ -108,10 +178,72 @@ func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, inp
 	if err := s.users.Create(ctx, user); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
+	if inv.ProductID != "" {
+		if err := s.productRoles.Create(ctx, &model.ProductRole{
+			ID:        uuid.New().String(),
+			UserID:    user.ID,
+			ProductID: inv.ProductID,
+			Role:      inv.Role,
+			CreatedAt: now,
+		}); err != nil {
+			return nil, fmt.Errorf("add product membership: %w", err)
+		}
+	}
 	if err := s.invitations.MarkAccepted(ctx, inv.ID, now); err != nil {
 		return nil, fmt.Errorf("mark invitation accepted: %w", err)
 	}
 	return user, nil
+}
+
+// usableInvitation resolves a raw invitation token to an invitation that has
+// neither been accepted nor expired.
+func (s *UserService) usableInvitation(ctx context.Context, rawToken string) (*model.Invitation, error) {
+	if rawToken == "" {
+		return nil, ErrInvitationInvalid
+	}
+	inv, err := s.invitations.GetByTokenHash(ctx, hashPATToken(rawToken))
+	if err != nil {
+		return nil, ErrInvitationInvalid
+	}
+	if inv.AcceptedAt != "" {
+		return nil, ErrInvitationAccepted
+	}
+	expiresAt, err := time.Parse(time.RFC3339, inv.ExpiresAt)
+	if err != nil || time.Now().UTC().After(expiresAt) {
+		return nil, ErrInvitationExpired
+	}
+	return inv, nil
+}
+
+// normalizeRegisterInput trims the identifying fields, checks the required
+// ones and falls back to the username as display name.
+func normalizeRegisterInput(input RegisterInput) (RegisterInput, error) {
+	input.Username = strings.TrimSpace(input.Username)
+	input.Email = strings.TrimSpace(input.Email)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	if input.Username == "" || input.Email == "" || input.Password == "" {
+		return input, inputError(errors.New("username, email and password are required"))
+	}
+	if input.DisplayName == "" {
+		input.DisplayName = input.Username
+	}
+	return input, nil
+}
+
+// ensureAvailable reports a clash with an existing account before the insert,
+// so the person registering gets a clear message instead of a database error.
+func (s *UserService) ensureAvailable(ctx context.Context, username, email string) error {
+	if _, err := s.users.GetByUsername(ctx, username); err == nil {
+		return ErrUsernameTaken
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check username: %w", err)
+	}
+	if _, err := s.users.GetByEmail(ctx, email); err == nil {
+		return ErrEmailTaken
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check email: %w", err)
+	}
+	return nil
 }
 
 // GetByID returns a user by ID.
@@ -213,7 +345,7 @@ func (s *UserService) validateAndHashPassword(ctx context.Context, password stri
 		return "", fmt.Errorf("load password policy: %w", err)
 	}
 	if err := s.provider.ValidatePassword(password, policy); err != nil {
-		return "", err
+		return "", inputError(err)
 	}
 	hash, err := s.provider.HashPassword(password)
 	if err != nil {

@@ -172,7 +172,7 @@ func TestAuthAcceptInvite(t *testing.T) {
 
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 		w := httptest.NewRecorder()
-		body := `{"token":"sometoken","username":"bob","email":"b@c.com","password":"Str0ngP@ss!"}`
+		body := `{"token":"sometoken","username":"bob","password":"Str0ngP@ss!"}` // email defaults to the invited address
 		r := httptest.NewRequest(http.MethodPost, "/auth/accept-invite", strings.NewReader(body))
 		ctrl.AcceptInvite(w, r)
 

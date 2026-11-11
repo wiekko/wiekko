@@ -1,0 +1,120 @@
+package login
+
+import (
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// RegisterFormProps drives the account form shared by self-registration and
+// invitation acceptance. Values are echoed back after a failed submit; the
+// passwords never are.
+type RegisterFormProps struct {
+	Action      string // form target: "/register" or "/accept-invite/<token>"
+	Username    string
+	Email       string
+	DisplayName string
+	// EmailLocked shows the email as fixed: an invitation was sent to it.
+	EmailLocked bool
+	Error       string
+}
+
+// RegisterPage renders the account form as a full page. Intro, if set, is
+// shown above the form (e.g. what an invitation grants).
+templ RegisterPage(title, intro string, props RegisterFormProps) {
+	@layout.AuthLayout(templates.PageMeta{Title: title}) {
+		if intro != "" {
+			<p class="mb-6 text-sm text-gray-600 dark:text-gray-400">{ intro }</p>
+		}
+		@RegisterForm(props)
+		<p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+			Already have an account?
+			<a href="/login" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">Sign in</a>
+		</p>
+	}
+}
+
+// RegisterForm renders the account form. Used on full page load and as htmx
+// fragment after a failed submit.
+templ RegisterForm(props RegisterFormProps) {
+	<form id="register-form" class="space-y-6" method="post" action={ templ.SafeURL(props.Action) } hx-post={ props.Action } hx-target="this" hx-swap="outerHTML">
+		@patterns.FormError(props.Error)
+		@ui.TextInput(ui.InputProps{
+			ID:        "username",
+			Name:      "username",
+			Label:     "Username",
+			Value:     props.Username,
+			Required:  true,
+			Autofocus: true,
+			HelpText:  "Used to sign in, and visible to the people you work with.",
+		})
+		if props.EmailLocked {
+			@ui.TextInput(ui.InputProps{
+				ID:       "email",
+				Name:     "email",
+				Label:    "Email",
+				Type:     "email",
+				Value:    props.Email,
+				Disabled: true,
+				HelpText: "The address this invitation was sent to.",
+			})
+		} else {
+			@ui.TextInput(ui.InputProps{
+				ID:       "email",
+				Name:     "email",
+				Label:    "Email",
+				Type:     "email",
+				Value:    props.Email,
+				Required: true,
+			})
+		}
+		@ui.TextInput(ui.InputProps{
+			ID:       "display_name",
+			Name:     "display_name",
+			Label:    "Display name",
+			Value:    props.DisplayName,
+			HelpText: "Optional; defaults to your username.",
+		})
+		@ui.TextInput(ui.InputProps{
+			ID:       "password",
+			Name:     "password",
+			Label:    "Password",
+			Type:     "password",
+			Required: true,
+		})
+		@ui.TextInput(ui.InputProps{
+			ID:       "password_confirm",
+			Name:     "password_confirm",
+			Label:    "Confirm password",
+			Type:     "password",
+			Required: true,
+		})
+		@ui.Button(ui.ButtonProps{
+			Label:   "Create account",
+			Variant: "primary",
+			Size:    "md",
+			Type:    "submit",
+		})
+	</form>
+}
+
+// RegisterDone replaces the form after an htmx submit that created an account
+// the person cannot use yet (it awaits approval).
+templ RegisterDone(message string) {
+	<div id="register-form" class="space-y-6">
+		<p class="text-sm text-gray-600 dark:text-gray-400">{ message }</p>
+	</div>
+}
+
+// AccountMessagePage tells someone on the public pages how things stand, e.g.
+// that an invitation has expired or an account awaits approval, and offers
+// the way back to sign in.
+templ AccountMessagePage(title, message string) {
+	@layout.AuthLayout(templates.PageMeta{Title: title}) {
+		<p class="text-sm text-gray-600 dark:text-gray-400">{ message }</p>
+		<p class="mt-6 text-center text-sm">
+			<a href="/login" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">Go to sign in</a>
+		</p>
+	}
+}

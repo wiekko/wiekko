@@ -2,8 +2,10 @@ package controller_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,7 +36,11 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
-	users := &testutil.MockUserStore{}
+	// New accounts are checked against existing ones; default to "none".
+	notFound := func(context.Context, string) (*model.User, error) {
+		return nil, fmt.Errorf("user not found: %w", sql.ErrNoRows)
+	}
+	users := &testutil.MockUserStore{GetByUsernameFunc: notFound, GetByEmailFunc: notFound}
 	sessions := &testutil.MockSessionStore{}
 	pats := &testutil.MockPATStore{}
 	settings := &testutil.MockSettingStore{

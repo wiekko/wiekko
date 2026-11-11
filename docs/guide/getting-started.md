@@ -35,18 +35,21 @@ enabled product creation; administrators always can. You become the product's ow
 On the **Team** page, search for existing users, add them with a role, and change or remove roles later.
 The roles are explained in [Concepts](concepts.md#roles).
 
-> **Not available yet in the web UI:** pages for accepting an invitation or registering an account.
-> The **Invite New User** form on the Team page creates an invitation link, but the page it points to does
-> not exist yet, and nexmap cannot send emails. Until that is fixed, people need an account before you can
-> add them. If the administrator has enabled self-registration, they can create one through the REST API:
->
-> ```sh
-> curl -X POST https://nexmap.example.com/api/v1/auth/register \
->   -H 'Content-Type: application/json' \
->   -d '{"username": "jdoe", "email": "jdoe@example.com", "display_name": "Jane Doe", "password": "…"}'
-> ```
->
-> With moderation enabled, an administrator then approves the account under `/admin/users`.
+People who have no account yet can be invited:
+
+1. Under **Invite New User**, enter their email address and the role they should get, and choose
+   **Send Invitation**.
+2. nexmap shows an invitation link. It does not send emails, so pass the link on yourself, through a
+   channel only that person reads: whoever opens it can use it.
+3. The link opens a page where they choose a username and password. Their account gets the invited email
+   address, joins the product with the invited role, and they are signed in right away.
+
+An invitation link works once and expires after 7 days. Accounts created from an invitation never need an
+administrator's approval.
+
+If the administrator has enabled self-registration, people can also create an account themselves on the
+sign-in page (**Register**) and then be added to the product by you. With moderation enabled, such an
+account waits for an administrator's approval under `/admin/users` before it can sign in.
 
 To hand the product over, use **Transfer Ownership** next to a member. They become the owner and you
 become a developer.

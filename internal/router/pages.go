@@ -10,6 +10,7 @@ import (
 
 func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64) {
 	loginCtrl := controller.NewPageLogin(svc.Auth, svc.Setting, cookieSecure)
+	registerCtrl := controller.NewPageRegister(svc.User, loginCtrl)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor)
@@ -20,6 +21,10 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.HandleFunc("GET /login", loginCtrl.Show)
 	mux.HandleFunc("POST /login", loginCtrl.Login)
 	mux.HandleFunc("POST /login/totp", loginCtrl.LoginTOTP)
+	mux.HandleFunc("GET /register", registerCtrl.ShowRegister)
+	mux.HandleFunc("POST /register", registerCtrl.Register)
+	mux.HandleFunc("GET /accept-invite/{token}", registerCtrl.ShowAcceptInvite)
+	mux.HandleFunc("POST /accept-invite/{token}", registerCtrl.AcceptInvite)
 
 	// Authenticated pages.
 	mux.Handle("GET /{$}", pageAuthed(http.HandlerFunc(dashCtrl.Show)))

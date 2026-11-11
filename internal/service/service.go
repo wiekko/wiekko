@@ -93,11 +93,13 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		},
 		TwoFactor: twoFactorSvc,
 		User: &UserService{
-			users:       st.User,
-			sessions:    st.Session,
-			settings:    st.Setting,
-			invitations: st.Invitation,
-			provider:    provider,
+			users:        st.User,
+			sessions:     st.Session,
+			settings:     st.Setting,
+			invitations:  st.Invitation,
+			products:     st.Product,
+			productRoles: st.ProductRole,
+			provider:     provider,
 		},
 		PAT: &PATService{
 			pats: st.PAT,
@@ -105,6 +107,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		Setting: settingSvc,
 		Invitation: &InvitationService{
 			invitations: st.Invitation,
+			authz:       authz,
 		},
 		Product: &ProductService{
 			products:      st.Product,

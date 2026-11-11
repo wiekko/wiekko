@@ -257,7 +257,7 @@ func (c *PageAdminController) CreateInvitation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result, err := c.invitation.Create(r.Context(), currentUser.ID, email, "", "")
+	result, err := c.invitation.Create(r.Context(), currentUser, email, "", "")
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = admin.InviteResult(err.Error(), "", false).Render(r.Context(), w)

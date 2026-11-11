@@ -3,6 +3,7 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,12 +16,26 @@ func Logging(next http.Handler) http.Handler {
 		next.ServeHTTP(rw, r)
 		slog.LogAttrs(r.Context(), slog.LevelInfo, "http request",
 			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
+			slog.String("path", loggablePath(r.URL.Path)),
 			slog.Int("status", rw.status),
 			slog.Duration("duration", time.Since(start)),
 			slog.String("request_id", RequestIDFromContext(r.Context())),
 		)
 	})
+}
+
+// secretPathPrefixes are routes whose next path segment is a secret token.
+// Logging it would let anyone who reads the log use the link (SC-303).
+var secretPathPrefixes = []string{"/accept-invite/"}
+
+// loggablePath returns path with secret tokens replaced.
+func loggablePath(path string) string {
+	for _, prefix := range secretPathPrefixes {
+		if strings.HasPrefix(path, prefix) && len(path) > len(prefix) {
+			return prefix + "[redacted]"
+		}
+	}
+	return path
 }
 
 // responseWriter wraps http.ResponseWriter to capture the status code.

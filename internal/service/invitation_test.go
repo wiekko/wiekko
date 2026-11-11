@@ -11,14 +11,17 @@ import (
 )
 
 func TestInvitationCreate(t *testing.T) {
+	admin := testutil.MakeUser(func(u *model.User) { u.ID = "admin-1"; u.IsAdmin = true })
+
 	t.Run("valid", func(t *testing.T) {
 		var stored *model.Invitation
 		svc := &InvitationService{
 			invitations: &testutil.MockInvitationStore{
 				CreateFunc: func(_ context.Context, inv *model.Invitation) error { stored = inv; return nil },
 			},
+			authz: &Authorizer{productRoles: &testutil.MockProductRoleStore{}},
 		}
-		result, err := svc.Create(context.Background(), "admin-1", "new@example.com", "prod-1", "developer")
+		result, err := svc.Create(context.Background(), admin, "new@example.com", "prod-1", "developer")
 		if err != nil {
 			t.Fatalf("Create: %v", err)
 		}
@@ -62,11 +65,68 @@ func TestInvitationCreate(t *testing.T) {
 				CreateFunc: func(_ context.Context, _ *model.Invitation) error { return errors.New("db error") },
 			},
 		}
-		_, err := svc.Create(context.Background(), "admin", "a@b.com", "", "")
+		_, err := svc.Create(context.Background(), admin, "a@b.com", "", "")
 		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
+}
+
+// A product invitation hands out a role, so only that product's owners (and
+// administrators) may create one; anyone else could invite themselves in.
+func TestInvitationCreateAuthorization(t *testing.T) {
+	roles := map[string]string{"owner-1": model.RoleOwner, "dev-1": model.RoleDeveloper}
+	newSvc := func() *InvitationService {
+		return &InvitationService{
+			invitations: &testutil.MockInvitationStore{
+				CreateFunc: func(_ context.Context, _ *model.Invitation) error { return nil },
+			},
+			authz: &Authorizer{productRoles: &testutil.MockProductRoleStore{
+				GetByUserAndProductFunc: func(_ context.Context, userID, productID string) (*model.ProductRole, error) {
+					if role, ok := roles[userID]; ok && productID == "prod-1" {
+						return &model.ProductRole{UserID: userID, ProductID: productID, Role: role}, nil
+					}
+					return nil, errors.New("not found")
+				},
+			}},
+		}
+	}
+	user := func(id string, admin bool) *model.User {
+		return testutil.MakeUser(func(u *model.User) { u.ID = id; u.IsAdmin = admin })
+	}
+
+	tests := []struct {
+		name      string
+		inviter   *model.User
+		email     string
+		productID string
+		role      string
+		wantErr   bool
+		forbidden bool
+	}{
+		{"owner invites to own product", user("owner-1", false), "a@b.com", "prod-1", model.RoleOwner, false, false},
+		{"developer may not invite", user("dev-1", false), "a@b.com", "prod-1", model.RoleViewer, true, true},
+		{"non-member may not invite", user("stranger", false), "a@b.com", "prod-1", model.RoleViewer, true, true},
+		{"owner of another product may not invite", user("owner-1", false), "a@b.com", "prod-2", model.RoleViewer, true, true},
+		{"admin invites to any product", user("root", true), "a@b.com", "prod-2", model.RoleTester, false, false},
+		{"unknown role", user("owner-1", false), "a@b.com", "prod-1", "superuser", true, false},
+		{"product without role", user("owner-1", false), "a@b.com", "prod-1", "", true, false},
+		{"admin invites without product", user("root", true), "a@b.com", "", "", false, false},
+		{"non-admin may not invite without product", user("owner-1", false), "a@b.com", "", "", true, true},
+		{"role without product", user("root", true), "a@b.com", "", model.RoleViewer, true, false},
+		{"empty email", user("root", true), "  ", "", "", true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newSvc().Create(context.Background(), tt.inviter, tt.email, tt.productID, tt.role)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.forbidden && !errors.Is(err, ErrForbidden) {
+				t.Fatalf("err = %v, want ErrForbidden", err)
+			}
+		})
+	}
 }
 
 func TestInvitationList(t *testing.T) {

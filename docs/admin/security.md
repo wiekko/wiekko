@@ -78,6 +78,23 @@ Once users exist, both variables are ignored and can be removed.
   new passwords for users from the user's detail page.
 - **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default).
 
+## New accounts
+
+People get an account in one of two ways:
+
+- **Invitation:** a product owner invites someone to their product with a role (on the product's Team
+  page), or an administrator invites someone to the installation (`/admin/invitations`). nexmap shows a
+  link, which the inviter passes on. Whoever holds the link can create the account, so treat it as a
+  secret: it works once, expires after 7 days, and is never written to the log. Accounts created from an
+  invitation skip moderation.
+- **Self-registration**, if *self-registration* is enabled in the instance settings: anyone who can reach
+  the server can create an account on `/register`. With *moderation* enabled, such accounts wait for an
+  administrator's approval under `/admin/users` before they can sign in. A self-registered account
+  belongs to no product until a product owner adds it.
+
+Only product owners (and administrators) can invite to a product, and only administrators can invite to
+the installation without a product.
+
 ## Access tokens
 
 Personal access tokens, which the CLI, CI jobs and AI agents use, carry every right of the user who

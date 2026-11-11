@@ -191,8 +191,9 @@ func (c *AuthController) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
 	}
-	if req.Token == "" || req.Username == "" || req.Email == "" || req.Password == "" {
-		httputil.Error(w, http.StatusBadRequest, "MISSING_FIELDS", "Token, username, email, and password are required")
+	// Email may be left out: the account then gets the invited address.
+	if req.Token == "" || req.Username == "" || req.Password == "" {
+		httputil.Error(w, http.StatusBadRequest, "MISSING_FIELDS", "Token, username and password are required")
 		return
 	}
 

@@ -1061,7 +1061,7 @@ func (c *PageProductController) InviteMember(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	result, err := c.invitation.Create(r.Context(), user.ID, email, productID, role)
+	result, err := c.invitation.Create(r.Context(), user, email, productID, role)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.InviteFormOOB(productID, err.Error()).Render(r.Context(), w)
