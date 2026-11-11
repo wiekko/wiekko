@@ -40,7 +40,7 @@ templ ProfilePage(props ProfileProps) {
 			<!-- Edit profile -->
 			@ProfileCard(props.User, "")
 			<!-- Change password -->
-			@PasswordCard("")
+			@PasswordCard("", false)
 			<!-- Two-factor authentication -->
 			@TwoFactorCard(props.TwoFactor)
 			<!-- Theme preference -->
@@ -121,7 +121,7 @@ templ ProfileCard(user *model.User, feedback string) {
 }
 
 // PasswordCard renders the password change form. Returned as fragment on htmx update.
-templ PasswordCard(feedback string) {
+templ PasswordCard(feedback string, isError bool) {
 	<div id="password-card">
 		@ui.Card() {
 			@ui.CardHeader("Change Password") {
@@ -149,7 +149,7 @@ templ PasswordCard(feedback string) {
 						Type:     "password",
 						Required: true,
 					})
-					@Feedback(feedback, feedback != "")
+					@Feedback(feedback, isError)
 					<div class="flex justify-end">
 						@ui.Button(ui.ButtonProps{
 							Label:   "Change Password",

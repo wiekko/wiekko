@@ -125,7 +125,7 @@ func (c *PageAdminController) SetPassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := c.user.AdminSetPassword(r.Context(), targetID, password); err != nil {
+	if err := c.user.AdminSetPassword(r.Context(), targetID, password, currentSessionID(r)); err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = admin.PasswordResetForm(targetID, err.Error()).Render(r.Context(), w)
 		return

@@ -94,6 +94,7 @@ func TestAdminSetPassword(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		env := newTestEnv(t)
 		env.Users.UpdatePasswordFunc = func(_ context.Context, _, _ string) error { return nil }
+		env.Sessions.DeleteByUserIDFunc = func(_ context.Context, _ string) error { return nil }
 
 		ctrl := controller.NewAdmin(env.Services.User, env.Services.Setting)
 		admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })

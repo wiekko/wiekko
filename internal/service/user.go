@@ -275,8 +275,11 @@ func (s *UserService) UpdateProfile(ctx context.Context, id string, input Update
 	return user, nil
 }
 
-// ChangePassword changes a user's own password.
-func (s *UserService) ChangePassword(ctx context.Context, id, oldPassword, newPassword string) error {
+// ChangePassword changes a user's own password and signs the user out
+// everywhere else: whoever may have known the old password could also hold a
+// session. keepSessionID is the session the change was made from, which stays
+// valid; pass "" when there is none (a request with an access token).
+func (s *UserService) ChangePassword(ctx context.Context, id, oldPassword, newPassword, keepSessionID string) error {
 	user, err := s.users.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -288,7 +291,25 @@ func (s *UserService) ChangePassword(ctx context.Context, id, oldPassword, newPa
 	if err != nil {
 		return err
 	}
-	return s.users.UpdatePassword(ctx, id, hash)
+	if err := s.users.UpdatePassword(ctx, id, hash); err != nil {
+		return err
+	}
+	return s.endSessions(ctx, id, keepSessionID)
+}
+
+// endSessions deletes the user's web sessions except keepSessionID (none if
+// empty), after a password change. Access tokens are not affected.
+func (s *UserService) endSessions(ctx context.Context, userID, keepSessionID string) error {
+	var err error
+	if keepSessionID == "" {
+		err = s.sessions.DeleteByUserID(ctx, userID)
+	} else {
+		err = s.sessions.DeleteByUserIDExcept(ctx, userID, keepSessionID)
+	}
+	if err != nil {
+		return fmt.Errorf("the password was changed, but signing out other sessions failed: %w", err)
+	}
+	return nil
 }
 
 // RequestDeletion marks a user's account for deletion.
@@ -301,13 +322,19 @@ func (s *UserService) RequestDeletion(ctx context.Context, id string) error {
 	return s.users.Delete(ctx, id)
 }
 
-// AdminSetPassword sets a new password for any user (admin only).
-func (s *UserService) AdminSetPassword(ctx context.Context, targetID, newPassword string) error {
+// AdminSetPassword sets a new password for any user (admin only) and ends all
+// of that user's sessions. keepSessionID is the administrator's own session:
+// it only matches when administrators reset their own password, which then
+// does not sign them out.
+func (s *UserService) AdminSetPassword(ctx context.Context, targetID, newPassword, keepSessionID string) error {
 	hash, err := s.validateAndHashPassword(ctx, newPassword)
 	if err != nil {
 		return err
 	}
-	return s.users.UpdatePassword(ctx, targetID, hash)
+	if err := s.users.UpdatePassword(ctx, targetID, hash); err != nil {
+		return err
+	}
+	return s.endSessions(ctx, targetID, keepSessionID)
 }
 
 // AdminLockUser locks a user account.

@@ -15,6 +15,8 @@ type SessionStore interface {
 	GetByID(ctx context.Context, id string) (*model.Session, error)
 	Delete(ctx context.Context, id string) error
 	DeleteByUserID(ctx context.Context, userID string) error
+	// DeleteByUserIDExcept deletes the user's sessions except keepID.
+	DeleteByUserIDExcept(ctx context.Context, userID, keepID string) error
 	DeleteExpired(ctx context.Context) error
 }
 
@@ -55,6 +57,11 @@ func (s *sessionStore) Delete(ctx context.Context, id string) error {
 
 func (s *sessionStore) DeleteByUserID(ctx context.Context, userID string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	return err
+}
+
+func (s *sessionStore) DeleteByUserIDExcept(ctx context.Context, userID, keepID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND id <> ?`, userID, keepID)
 	return err
 }
 

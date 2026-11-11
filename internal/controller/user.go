@@ -64,7 +64,7 @@ func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := c.user.ChangePassword(r.Context(), user.ID, req.OldPassword, req.NewPassword); err != nil {
+	if err := c.user.ChangePassword(r.Context(), user.ID, req.OldPassword, req.NewPassword, currentSessionID(r)); err != nil {
 		httputil.Error(w, http.StatusBadRequest, "PASSWORD_CHANGE_FAILED", err.Error())
 		return
 	}

@@ -281,3 +281,64 @@ func TestLoginRateLimit(t *testing.T) {
 		}
 	})
 }
+
+// TestPasswordChangeEndsOtherSessions signs in twice, changes the password
+// from the first session and checks that only the second one was ended.
+func TestPasswordChangeEndsOtherSessions(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		inv, err := e.svc.Invitation.Create(ctx, e.admin, "pat@example.com", e.product.ID, model.RoleTester)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.svc.User.AcceptInvitation(ctx, inv.RawToken, service.RegisterInput{
+			Username: "pat", Password: goodPassword,
+		}); err != nil {
+			t.Fatalf("accept invitation: %v", err)
+		}
+
+		signIn := func() *http.Cookie {
+			t.Helper()
+			resp, _ := e.post("/login", url.Values{"username": {"pat"}, "password": {goodPassword}})
+			for _, c := range resp.Cookies() {
+				if c.Name == "nexmap_session" && c.Value != "" {
+					return c
+				}
+			}
+			t.Fatalf("no session cookie, status %d", resp.StatusCode)
+			return nil
+		}
+		first, second := signIn(), signIn()
+
+		do := func(method, path string, cookie *http.Cookie, form url.Values) (*http.Response, string) {
+			t.Helper()
+			req, err := http.NewRequest(method, e.srv.URL+path, strings.NewReader(form.Encode()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(cookie)
+			resp, err := e.client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return resp, readBody(t, resp)
+		}
+
+		newPassword := "Battery-Staple-7"
+		resp, body := do(http.MethodPost, "/user/profile/password", first, url.Values{
+			"old_password": {goodPassword}, "new_password": {newPassword}, "confirm_password": {newPassword},
+		})
+		if resp.StatusCode != http.StatusOK || !strings.Contains(body, "signed out on all other devices") {
+			t.Fatalf("change password: status %d, body: %s", resp.StatusCode, body)
+		}
+
+		if resp, _ := do(http.MethodGet, "/user/profile", first, nil); resp.StatusCode != http.StatusOK {
+			t.Errorf("current session: status %d, want 200", resp.StatusCode)
+		}
+		if resp, _ := do(http.MethodGet, "/user/profile", second, nil); resp.StatusCode != http.StatusSeeOther {
+			t.Errorf("other session: status %d, want a redirect to sign in", resp.StatusCode)
+		}
+	})
+}

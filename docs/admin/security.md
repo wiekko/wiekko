@@ -77,7 +77,10 @@ Once users exist, both variables are ignored and can be removed.
   settings can require uppercase and lowercase letters, digits and special characters in new passwords.
 - **Email is not implemented yet**: there are no password reset or invitation emails. Administrators set
   new passwords for users from the user's detail page.
-- **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default).
+- **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default). Changing a password ends the
+  user's other sessions, keeping only the one the change was made from; an administrator setting a new
+  password ends all of that user's sessions. Personal access tokens stay valid either way; revoke them
+  separately if they may have leaked. Locking an account blocks its sessions and tokens at once.
 - **Failed logins are limited** per client address: after 5 wrong passwords for the same username, or
   20 for any usernames, within 15 minutes, that address has to wait until the 15 minutes are over. The
   web form says so and the API answers `429 TOO_MANY_ATTEMPTS` with a `Retry-After` header. A correct

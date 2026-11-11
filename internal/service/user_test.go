@@ -291,21 +291,55 @@ func TestChangePassword(t *testing.T) {
 	user := testutil.MakeUser(func(u *model.User) { u.PasswordHash = "oldhash" })
 
 	t.Run("success", func(t *testing.T) {
-		var updatedHash string
+		var updatedHash, keptSession string
 		svc := newUserService(
 			&testutil.MockUserStore{
 				GetByIDFunc:        func(_ context.Context, _ string) (*model.User, error) { return user, nil },
 				UpdatePasswordFunc: func(_ context.Context, _, h string) error { updatedHash = h; return nil },
-			}, nil,
+			},
+			&testutil.MockSessionStore{
+				DeleteByUserIDExceptFunc: func(_ context.Context, userID, keepID string) error {
+					if userID != user.ID {
+						t.Errorf("sessions deleted for %q, want %q", userID, user.ID)
+					}
+					keptSession = keepID
+					return nil
+				},
+			},
 			&testutil.MockSettingStore{
 				GetFunc: settingsGetFunc(map[string]string{}),
 			}, nil, noopProvider(),
 		)
-		if err := svc.ChangePassword(context.Background(), user.ID, "old", "new"); err != nil {
+		if err := svc.ChangePassword(context.Background(), user.ID, "old", "new", "current-session"); err != nil {
 			t.Fatalf("ChangePassword: %v", err)
 		}
 		if updatedHash != "hashed" {
 			t.Fatalf("hash = %q, want %q", updatedHash, "hashed")
+		}
+		if keptSession != "current-session" {
+			t.Fatalf("kept session = %q, want the current one", keptSession)
+		}
+	})
+
+	t.Run("without a session ends all sessions", func(t *testing.T) {
+		var ended string
+		svc := newUserService(
+			&testutil.MockUserStore{
+				GetByIDFunc:        func(_ context.Context, _ string) (*model.User, error) { return user, nil },
+				UpdatePasswordFunc: func(_ context.Context, _, _ string) error { return nil },
+			},
+			&testutil.MockSessionStore{
+				DeleteByUserIDFunc: func(_ context.Context, userID string) error { ended = userID; return nil },
+			},
+			&testutil.MockSettingStore{
+				GetFunc: settingsGetFunc(map[string]string{}),
+			}, nil, noopProvider(),
+		)
+		if err := svc.ChangePassword(context.Background(), user.ID, "old", "new", ""); err != nil {
+			t.Fatalf("ChangePassword: %v", err)
+		}
+		if ended != user.ID {
+			t.Fatalf("sessions ended for %q, want %q", ended, user.ID)
 		}
 	})
 
@@ -317,7 +351,7 @@ func TestChangePassword(t *testing.T) {
 				GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return user, nil },
 			}, nil, nil, nil, provider,
 		)
-		err := svc.ChangePassword(context.Background(), user.ID, "wrong", "new")
+		err := svc.ChangePassword(context.Background(), user.ID, "wrong", "new", "")
 		if err == nil || err.Error() != "current password is incorrect" {
 			t.Fatalf("err = %v, want 'current password is incorrect'", err)
 		}
@@ -336,7 +370,7 @@ func TestChangePassword(t *testing.T) {
 				GetFunc: settingsGetFunc(map[string]string{}),
 			}, nil, provider,
 		)
-		err := svc.ChangePassword(context.Background(), user.ID, "old", "weak")
+		err := svc.ChangePassword(context.Background(), user.ID, "old", "weak", "")
 		if err == nil || err.Error() != "too weak" {
 			t.Fatalf("err = %v, want 'too weak'", err)
 		}
@@ -533,20 +567,29 @@ func TestAdminDeleteUser(t *testing.T) {
 }
 
 func TestAdminSetPassword(t *testing.T) {
-	var updatedHash string
+	var updatedHash, ended, kept string
 	svc := newUserService(
 		&testutil.MockUserStore{
 			UpdatePasswordFunc: func(_ context.Context, _, h string) error { updatedHash = h; return nil },
-		}, nil,
+		},
+		&testutil.MockSessionStore{
+			DeleteByUserIDExceptFunc: func(_ context.Context, userID, keepID string) error {
+				ended, kept = userID, keepID
+				return nil
+			},
+		},
 		&testutil.MockSettingStore{
 			GetFunc: settingsGetFunc(map[string]string{}),
 		}, nil, noopProvider(),
 	)
-	if err := svc.AdminSetPassword(context.Background(), "u1", "NewPass1!"); err != nil {
+	if err := svc.AdminSetPassword(context.Background(), "u1", "NewPass1!", "admin-session"); err != nil {
 		t.Fatalf("AdminSetPassword: %v", err)
 	}
 	if updatedHash != "hashed" {
 		t.Fatalf("hash = %q, want %q", updatedHash, "hashed")
+	}
+	if ended != "u1" || kept != "admin-session" {
+		t.Fatalf("sessions ended for %q keeping %q, want u1 keeping admin-session", ended, kept)
 	}
 }
 

@@ -47,6 +47,19 @@ func tooManyAttemptsMessage(wait time.Duration) string {
 	return fmt.Sprintf("Too many failed sign-in attempts. Try again in %d %s.", minutes, unit)
 }
 
+// currentSessionID returns the web session the request was made with, or ""
+// for requests authenticated otherwise (access tokens).
+func currentSessionID(r *http.Request) string {
+	if middleware.AuthMethodFromContext(r.Context()) != "session" {
+		return ""
+	}
+	cookie, err := r.Cookie("nexmap_session")
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+
 // AuthController handles authentication endpoints.
 type AuthController struct {
 	auth         *service.AuthService

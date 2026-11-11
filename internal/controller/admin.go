@@ -80,7 +80,7 @@ func (c *AdminController) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := c.user.AdminSetPassword(r.Context(), userID, req.Password); err != nil {
+	if err := c.user.AdminSetPassword(r.Context(), userID, req.Password, currentSessionID(r)); err != nil {
 		httputil.Error(w, http.StatusBadRequest, "PASSWORD_SET_FAILED", err.Error())
 		return
 	}

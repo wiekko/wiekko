@@ -62,6 +62,7 @@ func TestChangePassword(t *testing.T) {
 		user := testutil.MakeUser()
 		env.Users.GetByIDFunc = func(_ context.Context, _ string) (*model.User, error) { return user, nil }
 		env.Users.UpdatePasswordFunc = func(_ context.Context, _, _ string) error { return nil }
+		env.Sessions.DeleteByUserIDFunc = func(_ context.Context, _ string) error { return nil }
 
 		ctrl := controller.NewUser(env.Services.User)
 		w, r := authedRequest(http.MethodPost, "/user/me/password",

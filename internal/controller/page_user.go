@@ -73,23 +73,23 @@ func (c *PageUserController) ChangePassword(w http.ResponseWriter, r *http.Reque
 
 	if oldPassword == "" || newPassword == "" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.PasswordCard("All password fields are required.").Render(r.Context(), w)
+		_ = userpage.PasswordCard("All password fields are required.", true).Render(r.Context(), w)
 		return
 	}
 	if newPassword != confirmPassword {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.PasswordCard("New passwords do not match.").Render(r.Context(), w)
+		_ = userpage.PasswordCard("New passwords do not match.", true).Render(r.Context(), w)
 		return
 	}
 
-	if err := c.user.ChangePassword(r.Context(), user.ID, oldPassword, newPassword); err != nil {
+	if err := c.user.ChangePassword(r.Context(), user.ID, oldPassword, newPassword, currentSessionID(r)); err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.PasswordCard(err.Error()).Render(r.Context(), w)
+		_ = userpage.PasswordCard(err.Error(), true).Render(r.Context(), w)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = userpage.PasswordCard("Password changed successfully.").Render(r.Context(), w)
+	_ = userpage.PasswordCard("Password changed successfully. You were signed out on all other devices.", false).Render(r.Context(), w)
 }
 
 // RequestDeletion handles POST /user/profile/delete.

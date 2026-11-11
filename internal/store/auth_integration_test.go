@@ -179,6 +179,29 @@ func TestSessionStore(t *testing.T) {
 			t.Errorf("live session deleted: %v", err)
 		}
 
+		// Deleting all but one session keeps that one and the sessions of
+		// other users.
+		other := &model.Session{ID: "other-session-token", UserID: u.ID, CSRFToken: "csrf3", CreatedAt: ts(0), ExpiresAt: ts(time.Hour)}
+		stranger := makeUser(t, users, "erin", false)
+		foreign := &model.Session{ID: "foreign-session-token", UserID: stranger.ID, CSRFToken: "csrf4", CreatedAt: ts(0), ExpiresAt: ts(time.Hour)}
+		for _, sess := range []*model.Session{other, foreign} {
+			if err := s.Create(ctx, sess); err != nil {
+				t.Fatalf("create session: %v", err)
+			}
+		}
+		if err := s.DeleteByUserIDExcept(ctx, u.ID, live.ID); err != nil {
+			t.Fatalf("delete by user except: %v", err)
+		}
+		if _, err := s.GetByID(ctx, other.ID); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("other session survived delete by user except: %v", err)
+		}
+		if _, err := s.GetByID(ctx, live.ID); err != nil {
+			t.Errorf("kept session deleted: %v", err)
+		}
+		if _, err := s.GetByID(ctx, foreign.ID); err != nil {
+			t.Errorf("another user's session deleted: %v", err)
+		}
+
 		if err := s.DeleteByUserID(ctx, u.ID); err != nil {
 			t.Fatalf("delete by user: %v", err)
 		}

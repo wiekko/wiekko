@@ -71,6 +71,8 @@ type MockSessionStore struct {
 	DeleteFunc         func(ctx context.Context, id string) error
 	DeleteByUserIDFunc func(ctx context.Context, userID string) error
 	DeleteExpiredFunc  func(ctx context.Context) error
+
+	DeleteByUserIDExceptFunc func(ctx context.Context, userID, keepID string) error
 }
 
 func (m *MockSessionStore) Create(ctx context.Context, session *model.Session) error {
@@ -84,6 +86,9 @@ func (m *MockSessionStore) Delete(ctx context.Context, id string) error {
 }
 func (m *MockSessionStore) DeleteByUserID(ctx context.Context, userID string) error {
 	return m.DeleteByUserIDFunc(ctx, userID)
+}
+func (m *MockSessionStore) DeleteByUserIDExcept(ctx context.Context, userID, keepID string) error {
+	return m.DeleteByUserIDExceptFunc(ctx, userID, keepID)
 }
 func (m *MockSessionStore) DeleteExpired(ctx context.Context) error {
 	return m.DeleteExpiredFunc(ctx)
