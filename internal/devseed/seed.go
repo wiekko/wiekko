@@ -147,6 +147,9 @@ type productSeed struct {
 	reqs       map[string]string // handle -> requirement id
 	defects    map[string]string // handle -> defect id
 	testCases  map[string]string // handle -> test case id
+	// kanban products activate by column, so spec.active is ignored there:
+	// the item's status decides (FR-318).
+	kanban bool
 }
 
 // newProduct creates a product owned by the admin and loads the defaults
@@ -154,6 +157,7 @@ type productSeed struct {
 func (s *seeder) newProduct(name, description, estimation, workflow string) *productSeed {
 	p := &productSeed{
 		s:          s,
+		kanban:     workflow == model.WorkflowModeKanban,
 		statuses:   map[string]map[string]string{},
 		categories: map[string]map[string]string{},
 		levels:     map[string]string{},
@@ -385,7 +389,7 @@ func (p *productSeed) requirement(spec reqSpec) {
 
 	// IsActive is not part of the create input — activation is a deliberate
 	// step in the UI too. Items created in a sprint are already active (FR-318).
-	if spec.active {
+	if spec.active && !p.kanban {
 		active := true
 		_, err := p.s.svc.Backlog.UpdateRequirement(p.s.ctx, p.s.admin, p.id, r.ID, service.UpdateRequirementInput{
 			IsActive: &active,
@@ -449,7 +453,7 @@ func (p *productSeed) defect(spec defectSpec) {
 		p.defects[spec.handle] = d.ID
 	}
 
-	if spec.active {
+	if spec.active && !p.kanban {
 		active := true
 		_, err := p.s.svc.Backlog.UpdateDefect(p.s.ctx, p.s.admin, p.id, d.ID, service.UpdateDefectInput{
 			IsActive: &active,

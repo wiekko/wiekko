@@ -25,11 +25,14 @@ type BacklogService struct {
 	defects      store.DefectStore
 	categories   store.CategoryStore
 	statuses     store.StatusStore
-	comments     ownerPurger
-	retester     campaignRetester
-	audit        store.AuditStore
-	authz        *Authorizer
-	owns         *ownership
+	// products tells kanban from scrum products, which activate items
+	// differently (FR-318). nil is treated as scrum.
+	products store.ProductStore
+	comments ownerPurger
+	retester campaignRetester
+	audit    store.AuditStore
+	authz    *Authorizer
+	owns     *ownership
 }
 
 // --- Requirements ---
@@ -125,6 +128,9 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 	if err := s.requirements.Create(ctx, r); err != nil {
 		return nil, fmt.Errorf("create %s: %w", input.Kind, err)
 	}
+	if s.kanbanMode(ctx, input.ProductID) {
+		r.IsActive = s.columnActive(ctx, r.StatusID)
+	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
@@ -145,8 +151,9 @@ func (s *BacklogService) GetRequirement(ctx context.Context, user *model.User, p
 	return s.requirements.GetByID(ctx, id)
 }
 
-// UpdateRequirement modifies a requirement. Developer can update status/is_active (FR-407);
-// full field updates require owner.
+// UpdateRequirement modifies a requirement. Developers can change the status of
+// an activated item (FR-407); activating it and full field updates require the
+// owner role.
 func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User, productID, id string, input UpdateRequirementInput) (*model.Requirement, error) {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
 	if err != nil {
@@ -165,6 +172,10 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 	}
 
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+	kanban := s.kanbanMode(ctx, productID)
+	if err := checkActivationChange(r.Kind, isDeveloper, kanban, r.IsActive, input.IsActive); err != nil {
+		return nil, err
+	}
 	if isDeveloper {
 		if err := requireActivatedForStatus(r.Kind, r.IsActive, r.StatusID, input.StatusID); err != nil {
 			return nil, err
@@ -224,6 +235,9 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 		if input.IsCoarse != nil {
 			r.IsCoarse = *input.IsCoarse
 		}
+	}
+	if kanban {
+		r.IsActive = s.columnActive(ctx, r.StatusID)
 	}
 	r.UpdatedAt = now
 
@@ -519,6 +533,9 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 	if err := s.defects.Create(ctx, d); err != nil {
 		return nil, fmt.Errorf("create defect: %w", err)
 	}
+	if s.kanbanMode(ctx, input.ProductID) {
+		d.IsActive = s.columnActive(ctx, d.StatusID)
+	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
@@ -539,8 +556,9 @@ func (s *BacklogService) GetDefect(ctx context.Context, user *model.User, produc
 	return s.defects.GetByID(ctx, id)
 }
 
-// UpdateDefect modifies a defect. Developer can update status/is_active (FR-407);
-// full field updates require owner.
+// UpdateDefect modifies a defect. Developers can change the status of an
+// activated defect (FR-405, FR-407); activating it and full field updates
+// require the owner role.
 func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, productID, id string, input UpdateDefectInput) (*model.Defect, error) {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
 	if err != nil {
@@ -559,6 +577,10 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 	}
 
 	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+	kanban := s.kanbanMode(ctx, productID)
+	if err := checkActivationChange("defect", isDeveloper, kanban, d.IsActive, input.IsActive); err != nil {
+		return nil, err
+	}
 	if isDeveloper {
 		if err := requireActivatedForStatus("defect", d.IsActive, d.StatusID, input.StatusID); err != nil {
 			return nil, err
@@ -607,6 +629,9 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 			d.Priority = *input.Priority
 		}
 	}
+	if kanban {
+		d.IsActive = s.columnActive(ctx, d.StatusID)
+	}
 	d.UpdatedAt = now
 
 	if err := s.defects.Update(ctx, d); err != nil {
@@ -641,12 +666,14 @@ func activationAfterSprintMove(oldSprintID, newSprintID string, isActive, explic
 }
 
 // requireActivatedForStatus enforces FR-407 for developers: they may change the
-// status of a backlog item only if it was activated upfront. is_active is the
-// single record of activation: it is set directly (kanban) or when the item is
-// planned into a sprint, and cleared when it leaves one (FR-318).
-// "Upfront" means the stored state before this update, so activating and
-// moving an item in the same request is refused. Re-sending the current status
-// is not a change.
+// status of a backlog item only if it was activated upfront. isActive is the
+// item's activation as read from the store: in kanban mode, whether its
+// current column is active; in scrum mode, the stored flag, set when the item
+// is planned into a sprint and cleared when it leaves one (FR-318). So a
+// developer may move an item out of an active column to any column, but not
+// out of an inactive one. "Upfront" means the state before this update, so
+// activating and moving an item in the same request is refused. Re-sending the
+// current status is not a change.
 func requireActivatedForStatus(kind string, isActive bool, currentStatusID string, newStatusID *string) error {
 	if newStatusID == nil || *newStatusID == currentStatusID {
 		return nil
@@ -654,7 +681,43 @@ func requireActivatedForStatus(kind string, isActive bool, currentStatusID strin
 	if isActive {
 		return nil
 	}
-	return fmt.Errorf("%w: the %s must be activated before a developer can change its status", ErrForbidden, kind)
+	return fmt.Errorf("%w: the %s has not been activated for work, so only a product owner can change its status", ErrForbidden, kind)
+}
+
+// checkActivationChange decides whether is_active may be set directly to
+// requested (FR-318). Re-sending the current value is not a change. Only
+// owners activate; in kanban mode not even they set the flag, since an item is
+// active exactly while it sits in an active column.
+func checkActivationChange(kind string, isDeveloper, kanban, current bool, requested *bool) error {
+	if requested == nil || *requested == current {
+		return nil
+	}
+	if isDeveloper {
+		return fmt.Errorf("%w: only a product owner can activate or deactivate a %s", ErrForbidden, kind)
+	}
+	if kanban {
+		return fmt.Errorf("in kanban mode a %s is active while it is in an active column: move it into one instead of setting is_active", kind)
+	}
+	return nil
+}
+
+// kanbanMode reports whether the product activates items by column.
+func (s *BacklogService) kanbanMode(ctx context.Context, productID string) bool {
+	if s.products == nil {
+		return false
+	}
+	p, err := s.products.GetByID(ctx, productID)
+	return err == nil && p.WorkflowMode == model.WorkflowModeKanban
+}
+
+// columnActive reports whether the status is an active column; an item
+// without a status, or with one that cannot be read, is not active.
+func (s *BacklogService) columnActive(ctx context.Context, statusID string) bool {
+	if statusID == "" || s.statuses == nil {
+		return false
+	}
+	st, err := s.statuses.GetByID(ctx, statusID)
+	return err == nil && st.IsActive
 }
 
 // defectJustClosed reports whether a status change moved a defect into a closed

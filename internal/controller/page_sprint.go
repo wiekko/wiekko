@@ -493,7 +493,7 @@ func (c *PageProductController) buildSprintBoard(r *http.Request, user *model.Us
 	items, defects := c.loadSprintItems(r, user, p.ID, sprintID)
 	prefixes := c.buildBacklogPrefixMap(r, user, p.ID)
 
-	return buildBoardSurface(p.ID, p, canMoveCards(user, role),
+	return buildBoardSurface(p.ID, p, canMoveCards(user, role), canMoveInactive(user, role),
 		reqStatuses, defStatuses, items, defects, prefixes, "sprint")
 }
 

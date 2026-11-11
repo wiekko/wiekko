@@ -24,7 +24,9 @@ enabled product creation; administrators always can. You become the product's ow
   Settle the prefixes early, before identifiers like `FR-12` appear in commit messages.
 - **Statuses:** the workflow columns. New products start with *New*, *In Progress*, *In Review* and
   *Done*. One status is the default for new items; statuses marked **closed** (like *Done*) count as
-  finished, so their items drop out of "open" lists. At first, requirements, tasks and defects share one
+  finished, so their items drop out of "open" lists. In kanban mode, statuses marked **active** (at first
+  *In Progress* and *In Review*) are where developers may work on items; see
+  [Activation](backlog.md#activation-what-developers-may-move). At first, requirements, tasks and defects share one
   set of statuses. If defects need a different workflow, split the sets; **splitting cannot be undone**.
 - **Environments:** the runtime environments tests run in, such as `linux`, `windows` or `firefox`.
   Name them the way your CI jobs will (see [CI integration](../cli/ci-integration.md)).

@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS statuses (
     position    INTEGER NOT NULL DEFAULT 0,
     is_default  BOOLEAN NOT NULL DEFAULT FALSE,
     is_closed   BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Kanban: items in an active column are activated for work (FR-318, FR-323a)
+    is_active   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ NOT NULL,
     UNIQUE(product_id, entity_type, name)
 );

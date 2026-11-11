@@ -12,10 +12,12 @@ import (
 // buildBoardSurface projects requirements, tasks and defects onto columns,
 // honouring the product's StatusSync setting (one merged board vs two tabbed
 // ones). Pass nil for either entity slice to leave that type off the board.
+// canMove says whether the viewer may move cards at all, moveInactive whether
+// that includes items not activated for work (owners only, FR-407).
 func buildBoardSurface(
 	productID string,
 	p *model.Product,
-	canMove bool,
+	canMove, moveInactive bool,
 	reqStatuses, defStatuses []*model.Status,
 	items []*model.Requirement,
 	defects []*model.Defect,
@@ -28,8 +30,8 @@ func buildBoardSurface(
 		GroupPrefix: groupPrefix,
 	}
 
-	reqCards, strandedReq, strandedTask := buildBacklogCards(productID, items, prefixes)
-	defCards, strandedDef := buildDefectCards(productID, defects)
+	reqCards, strandedReq, strandedTask := buildBacklogCards(productID, items, prefixes, moveInactive)
+	defCards, strandedDef := buildDefectCards(productID, defects, moveInactive)
 	props.StrandedReq = strandedReq
 	props.StrandedTask = strandedTask
 	props.StrandedDef = strandedDef
@@ -42,7 +44,26 @@ func buildBoardSurface(
 		props.ReqColumns = entityBoardColumns(reqStatuses, reqCards, true)
 		props.DefColumns = entityBoardColumns(defStatuses, defCards, false)
 	}
+	if p.WorkflowMode == model.WorkflowModeKanban {
+		showActiveColumns(props.Columns, props.ReqColumns, props.DefColumns)
+	}
 	return props
+}
+
+// showActiveColumns turns on the active-column marker, which only means
+// something on a kanban board.
+func showActiveColumns(sets ...[]templates.BoardColumn) {
+	for _, cols := range sets {
+		for i := range cols {
+			cols[i].ShowActive = true
+		}
+	}
+}
+
+// canMoveInactive reports whether the viewer may move items that are not
+// activated for work, which is what activates them on a kanban board.
+func canMoveInactive(user *model.User, role string) bool {
+	return user.IsAdmin || role == model.RoleOwner
 }
 
 func canMoveCards(user *model.User, role string) bool {
@@ -55,10 +76,11 @@ func canMoveCards(user *model.User, role string) bool {
 // buildBacklogCards turns requirements and tasks into board cards. Both kinds
 // carry requirement status IDs, so they land in one map and share the columns;
 // the card's EntityType is what tells them apart on screen.
-func buildBacklogCards(productID string, items []*model.Requirement, prefixes map[string]string) (byStatus map[string][]templates.BoardCard, strandedReq, strandedTask []templates.BoardCard) {
+func buildBacklogCards(productID string, items []*model.Requirement, prefixes map[string]string, moveInactive bool) (byStatus map[string][]templates.BoardCard, strandedReq, strandedTask []templates.BoardCard) {
 	byStatus = make(map[string][]templates.BoardCard)
 	for _, item := range items {
 		card := backlogCard(productID, item, prefixes)
+		card.Locked = !moveInactive && !item.IsActive
 		if item.StatusID == "" {
 			if item.Kind == model.RequirementKindTask {
 				strandedTask = append(strandedTask, card)
@@ -90,10 +112,11 @@ func backlogCard(productID string, item *model.Requirement, prefixes map[string]
 	}
 }
 
-func buildDefectCards(productID string, defects []*model.Defect) (byStatus map[string][]templates.BoardCard, stranded []templates.BoardCard) {
+func buildDefectCards(productID string, defects []*model.Defect, moveInactive bool) (byStatus map[string][]templates.BoardCard, stranded []templates.BoardCard) {
 	byStatus = make(map[string][]templates.BoardCard)
 	for _, d := range defects {
 		card := defectCard(productID, d)
+		card.Locked = !moveInactive && !d.IsActive
 		if d.StatusID == "" {
 			stranded = append(stranded, card)
 			continue
@@ -127,6 +150,7 @@ func mergedBoardColumns(reqStatuses, defStatuses []*model.Status, reqCards, defC
 			Name:        rs.Name,
 			ReqStatusID: rs.ID,
 			IsClosed:    rs.IsClosed,
+			IsActive:    rs.IsActive,
 		}
 		if ds, ok := defByPosition[rs.Position]; ok {
 			col.DefectStatusID = ds.ID
@@ -145,6 +169,7 @@ func entityBoardColumns(statuses []*model.Status, cards map[string][]templates.B
 		col := templates.BoardColumn{
 			Name:     s.Name,
 			IsClosed: s.IsClosed,
+			IsActive: s.IsActive,
 			Cards:    cards[s.ID],
 		}
 		if forRequirements {

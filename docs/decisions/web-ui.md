@@ -99,7 +99,7 @@ stays one implementation.
 ## Sprint planning requires owner role
 
 Assigning an item to a sprint is a full requirement update, which the service layer restricts to
-owners (developers may only change status and activation, FR-407). The Planning tab therefore gates
+owners (developers may only change the status of activated items, FR-407). The Planning tab therefore gates
 drag on owner-or-admin, unlike the board, which developers can also use.
 
 ## Settings pages use auto-save (UC-006)

@@ -16,6 +16,10 @@ type ProductStore interface {
 	Update(ctx context.Context, product *model.Product) error
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context) ([]*model.Product, error)
+	// ResetActivationToSprints sets the stored is_active of the product's
+	// requirements, tasks and defects to whether they are planned into a
+	// sprint: what activation means once a product switches to scrum (FR-318).
+	ResetActivationToSprints(ctx context.Context, productID string) error
 }
 
 type productStore struct {
@@ -55,6 +59,16 @@ func (s *productStore) Update(ctx context.Context, product *model.Product) error
 		product.UpdatedAt, product.ID,
 	)
 	return err
+}
+
+func (s *productStore) ResetActivationToSprints(ctx context.Context, productID string) error {
+	for _, table := range []string{"requirements", "defects"} {
+		if _, err := s.db.ExecContext(ctx,
+			`UPDATE `+table+` SET is_active = (sprint_id IS NOT NULL) WHERE product_id = ?`, productID); err != nil {
+			return fmt.Errorf("reset %s activation: %w", table, err)
+		}
+	}
+	return nil
 }
 
 func (s *productStore) Delete(ctx context.Context, id string) error {

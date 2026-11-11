@@ -65,7 +65,8 @@ The product's workflow mode decides how work is organised.
 
 **Board** shows all requirements, tasks and defects in one column per status. Drag a card to another
 column to change its status. If the product's statuses have been split, requirements and defects get
-separate boards. **Defects** also has a board of its own.
+separate boards. **Defects** also has a board of its own. Columns marked *Active* hold the work that is
+activated for developers; see [Activation](#activation-what-developers-may-move) for who may move what.
 
 ### Scrum
 
@@ -85,16 +86,17 @@ plan them into the next sprint.
 ## Activation: what developers may move
 
 Developers may change the status of a requirement, task or defect only once a product owner has
-**activated** it. This keeps the product owner in charge of what gets worked on. Product owners can always
-change statuses.
+**activated** it. This keeps the product owner in charge of what gets worked on. Only product owners
+activate items, and they can always change statuses.
 
+- In **kanban** mode, activation belongs to the board's columns. Under *Settings → Statuses*, each column
+  can be marked **Active**; the board shows those columns with an *Active* badge. An item is active while
+  it sits in an active column. A product owner activates an item by moving it into an active column, and
+  from there developers can move it to any column, including back to an inactive one such as *Done*.
+  Items in inactive columns show a lock to developers and cannot be dragged by them. A new product starts
+  with *New* and *Done* inactive and *In Progress* and *In Review* active.
 - In **scrum** mode, planning an item into a sprint activates it, and taking it out of the sprint
-  deactivates it again.
-- In **kanban** mode, items are meant to be activated directly, but **the web UI has no control for this
-  yet**. Until it does, a product owner can activate an item with the [CLI](../cli/setup.md):
-
-  ```sh
-  nexmap api PATCH /products/{product}/requirements/FR-12 --data '{"is_active": true}'
-  ```
+  deactivates it again. A product owner can also activate an item directly through the API. The column
+  flags are not used. Switching a product from kanban to scrum resets activation to the sprint plan.
 
 The detail page shows whether an item is active.

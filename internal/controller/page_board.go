@@ -63,7 +63,7 @@ func (c *PageProductController) Board(w http.ResponseWriter, r *http.Request) {
 		DisplayName: user.DisplayName,
 		IsAdmin:     user.IsAdmin,
 		Product:     p,
-		Surface: buildBoardSurface(productID, p, canMoveCards(user, role),
+		Surface: buildBoardSurface(productID, p, canMoveCards(user, role), canMoveInactive(user, role),
 			reqStatuses, defStatuses, backlogItems, defects, prefixes, ""),
 	}).Render(r.Context(), w)
 }
@@ -93,7 +93,11 @@ func (c *PageProductController) DefectsBoard(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	defCards, strandedDef := buildDefectCards(productID, defects)
+	defCards, strandedDef := buildDefectCards(productID, defects, canMoveInactive(user, role))
+	defColumns := entityBoardColumns(defStatuses, defCards, false)
+	if p.WorkflowMode == model.WorkflowModeKanban {
+		showActiveColumns(defColumns)
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectsBoardPage(productpage.DefectsBoardPageProps{
@@ -107,7 +111,7 @@ func (c *PageProductController) DefectsBoard(w http.ResponseWriter, r *http.Requ
 		Surface: templates.BoardSurfaceProps{
 			ProductID:   productID,
 			CanMove:     canMoveCards(user, role),
-			Columns:     entityBoardColumns(defStatuses, defCards, false),
+			Columns:     defColumns,
 			StrandedDef: strandedDef,
 			GroupPrefix: "defects",
 		},

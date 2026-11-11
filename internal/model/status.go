@@ -10,5 +10,10 @@ type Status struct {
 	Position   int
 	IsDefault  bool
 	IsClosed   bool
-	CreatedAt  string // RFC 3339
+	// IsActive marks a kanban column as activated for work (FR-318, FR-407):
+	// developers may move items out of it. Only owners move items into an
+	// active column from an inactive one. Ignored in scrum mode, where
+	// planning an item into a sprint activates it.
+	IsActive  bool
+	CreatedAt string // RFC 3339
 }

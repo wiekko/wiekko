@@ -271,6 +271,7 @@ func (c *PlanningController) CreateStatus(w http.ResponseWriter, r *http.Request
 		Position   int    `json:"position"`
 		IsDefault  bool   `json:"is_default"`
 		IsClosed   bool   `json:"is_closed"`
+		IsActive   bool   `json:"is_active"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -283,6 +284,7 @@ func (c *PlanningController) CreateStatus(w http.ResponseWriter, r *http.Request
 		Position:   req.Position,
 		IsDefault:  req.IsDefault,
 		IsClosed:   req.IsClosed,
+		IsActive:   req.IsActive,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -318,6 +320,7 @@ func (c *PlanningController) UpdateStatus(w http.ResponseWriter, r *http.Request
 		Position  *int    `json:"position"`
 		IsDefault *bool   `json:"is_default"`
 		IsClosed  *bool   `json:"is_closed"`
+		IsActive  *bool   `json:"is_active"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -328,6 +331,7 @@ func (c *PlanningController) UpdateStatus(w http.ResponseWriter, r *http.Request
 		Position:  req.Position,
 		IsDefault: req.IsDefault,
 		IsClosed:  req.IsClosed,
+		IsActive:  req.IsActive,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -545,6 +549,7 @@ func statusToJSON(s *model.Status) map[string]any {
 		"position":    s.Position,
 		"is_default":  s.IsDefault,
 		"is_closed":   s.IsClosed,
+		"is_active":   s.IsActive,
 		"created_at":  s.CreatedAt,
 	}
 }

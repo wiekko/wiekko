@@ -134,7 +134,12 @@ type BoardColumn struct {
 	ReqStatusID    string
 	DefectStatusID string
 	IsClosed       bool
-	Cards          []BoardCard
+	// IsActive marks a kanban column whose items are activated for work;
+	// shown only when ShowActive is set (kanban boards), since scrum
+	// activates by sprint instead.
+	IsActive   bool
+	ShowActive bool
+	Cards      []BoardCard
 }
 
 // BoardCard carries the minimum info needed to display and move a card.
@@ -145,4 +150,7 @@ type BoardCard struct {
 	Title      string
 	Priority   int
 	MoveURL    string
+	// Locked is set when the viewer may move cards in general but not this
+	// one: it has not been activated, and only owners move those (FR-407).
+	Locked bool
 }

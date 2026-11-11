@@ -222,6 +222,8 @@ type MockProductStore struct {
 	UpdateFunc  func(ctx context.Context, product *model.Product) error
 	DeleteFunc  func(ctx context.Context, id string) error
 	ListFunc    func(ctx context.Context) ([]*model.Product, error)
+
+	ResetActivationToSprintsFunc func(ctx context.Context, productID string) error
 }
 
 func (m *MockProductStore) Create(ctx context.Context, product *model.Product) error {
@@ -232,6 +234,12 @@ func (m *MockProductStore) GetByID(ctx context.Context, id string) (*model.Produ
 		return nil, fmt.Errorf("product not found")
 	}
 	return m.GetByIDFunc(ctx, id)
+}
+func (m *MockProductStore) ResetActivationToSprints(ctx context.Context, productID string) error {
+	if m.ResetActivationToSprintsFunc == nil {
+		return nil
+	}
+	return m.ResetActivationToSprintsFunc(ctx, productID)
 }
 func (m *MockProductStore) Update(ctx context.Context, product *model.Product) error {
 	return m.UpdateFunc(ctx, product)

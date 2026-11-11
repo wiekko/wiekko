@@ -222,7 +222,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-306**: Product owners shall be able to transfer ownership to another user account. If the account has not yet been created (pending invitation), the transfer shall be pending as well, and only be completed once the new account is fully established.
 * **FR-307**: Product owners shall be able to create, update and delete components and capabilities
 * **FR-308**: Product owners shall be able to create, update and delete requirements (including definition of done).
-* **FR-308a**: Product owners shall be able to create, update and delete tasks. Tasks carry the same authorization as requirements: owners for full edits, developers for status and activation only (FR-407).
+* **FR-308a**: Product owners shall be able to create, update and delete tasks. Tasks carry the same authorization as requirements: owners for full edits and activation (FR-318), developers for status only (FR-407).
 * **FR-309**: Product owners shall be able to update the product roadmap (create, update, delete milestones).
 * **FR-310**: Product owners shall be able to create, update and delete test cases
 * **FR-311**: Product owners shall define which conditions re-set a test case (mainly for the webhook API, e.g. a new push to branch main or similar)
@@ -232,12 +232,13 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-315**: Product owners shall be able to create, update and delete defects.
 * **FR-316**: Product owners shall be able to prioritize requirements and defects
 * **FR-317**: Product owners shall be able to schedule sprints (optional feature)
-* **FR-318**: Product owners shall be able to activate requirements and defects by adding them to a sprint, or by activating them directly (kanban approach)
+* **FR-318**: Product owners shall be able to activate requirements, tasks and defects. In scrum mode, adding an item to a sprint activates it (and taking it out deactivates it); product owners may also activate an item directly. In kanban mode, an item is active exactly while it sits in an active column (FR-323a), so product owners activate it by moving it into one. Only product owners activate items.
 * **FR-319**: Product owners shall be able to import and export requirements via the CLI ("To Do Markdown format")
 * **FR-320**: Product owners shall be able to schedule a testing campaign. Campaigns have a status (draft, active, closed) and optional planned start and end dates.
 * **FR-321**: When creating a testing campaign, the product owner explicitly selects the `test cases` in scope. The selection is a snapshot taken at creation; test cases created afterwards do not join a running campaign. The scope remains editable while the campaign is draft and is locked once it is active.
 * **FR-322**: At most one testing campaign per product may be active at a time
 * **FR-323**: Product owners shall be able to define status (columns) for requirements and defects
+* **FR-323a**: Product owners shall be able to mark status columns as active (kanban). Items in an active column count as activated for work. New products start with the default (entry) column and the closed columns inactive, and the columns between them active.
 * **FR-324**: Product owners can decide whether they want to use sprints (scrum) or a continuous flow (kanban)
 * **FR-325**: Product owners shall be able to mark backlog items as coarse (requiring refinement)
 * **FR-326**: Product owners shall be able to refine a requirement (break down into child requirements or into child tasks)
@@ -255,9 +256,9 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-402**: Developers shall be able to create, update and delete test cases
 * **FR-403**: Developers shall be able to define which conditions re-set a test case (mainly for the webhook API)
 * **FR-404**: Developers shall be able to manually re-set a test case (slate for re-testing after a change)
-* **FR-405**: Developers shall be able to create, update, close and reject defects.
+* **FR-405**: Developers shall be able to create, update, close and reject defects. Changing a defect's status, which includes closing and rejecting it, requires it to be activated first (FR-407).
 * **FR-406**: Developers shall be able to add comments and attachments to defects.
-* **FR-407**: Developers shall be able to update the status of defects, requirements and tasks if they have been activated upfront
+* **FR-407**: Developers shall be able to update the status of defects, requirements and tasks if they have been activated upfront (FR-318). In kanban mode, a developer may move an item out of an active column into any column, including an inactive one, but not out of an inactive column.
 * **FR-408**: Developers shall be able to mark backlog items as coarse (requiring refinement)
 * **FR-409**: Developers shall be able to ingest unit test results via the CLI (e.g. `go test -v ./... | nexmap utest`) or via CI pipeline webhook
 

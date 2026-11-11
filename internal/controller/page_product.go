@@ -303,6 +303,7 @@ func (c *PageProductController) CreateStatus(w http.ResponseWriter, r *http.Requ
 
 	isDefault := r.FormValue("is_default") == "on"
 	isClosed := r.FormValue("is_closed") == "on"
+	isActive := r.FormValue("is_active") == "on"
 
 	_, err := c.milestone.CreateStatus(r.Context(), user, service.CreateStatusInput{
 		ProductID:  productID,
@@ -311,6 +312,7 @@ func (c *PageProductController) CreateStatus(w http.ResponseWriter, r *http.Requ
 		Position:   position,
 		IsDefault:  isDefault,
 		IsClosed:   isClosed,
+		IsActive:   isActive,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
@@ -343,6 +345,10 @@ func (c *PageProductController) UpdateStatus(w http.ResponseWriter, r *http.Requ
 		if _, ok := r.Form["is_closed"]; ok {
 			val := r.FormValue("is_closed") == "on"
 			input.IsClosed = &val
+		}
+		if _, ok := r.Form["is_active"]; ok {
+			val := r.FormValue("is_active") == "on"
+			input.IsActive = &val
 		}
 	}
 

@@ -38,7 +38,7 @@ func TestBuildBacklogCards_StrandsItemsWithoutStatus(t *testing.T) {
 		{ID: "r2", Kind: model.RequirementKindRequirement, CategoryID: "cat-a", SequenceNumber: 2, Title: "Stranded", StatusID: "", Priority: 5},
 	}
 
-	byStatus, stranded, strandedTask := buildBacklogCards("p1", reqs, prefixes)
+	byStatus, stranded, strandedTask := buildBacklogCards("p1", reqs, prefixes, true)
 
 	if len(byStatus["s1"]) != 1 || byStatus["s1"][0].ID != "r1" {
 		t.Errorf("expected r1 bucketed under s1, got %+v", byStatus)
@@ -67,7 +67,7 @@ func TestBuildBacklogCards_TasksShareColumnsWithRequirements(t *testing.T) {
 		{ID: "t2", Kind: model.RequirementKindTask, CategoryID: "cat-t", SequenceNumber: 3, Title: "Stranded task", StatusID: ""},
 	}
 
-	byStatus, strandedReq, strandedTask := buildBacklogCards("p1", items, prefixes)
+	byStatus, strandedReq, strandedTask := buildBacklogCards("p1", items, prefixes, true)
 
 	if len(byStatus["s1"]) != 2 {
 		t.Fatalf("expected requirement and task in the same column, got %+v", byStatus["s1"])
@@ -96,7 +96,7 @@ func TestBuildDefectCards_StrandsItemsWithoutStatus(t *testing.T) {
 		{ID: "d2", Title: "Stranded", StatusID: "", Priority: 4},
 	}
 
-	byStatus, stranded := buildDefectCards("p1", defects)
+	byStatus, stranded := buildDefectCards("p1", defects, true)
 
 	if len(byStatus["s1"]) != 1 || byStatus["s1"][0].ID != "d1" {
 		t.Errorf("expected d1 bucketed under s1, got %+v", byStatus)
@@ -201,7 +201,7 @@ func TestBuildBoardSurface(t *testing.T) {
 
 	t.Run("sync mode merges both entity types into one column set", func(t *testing.T) {
 		p := &model.Product{ID: "p1", StatusSync: true}
-		surface := buildBoardSurface("p1", p, true, reqStatuses, defStatuses, items, defects, nil, "")
+		surface := buildBoardSurface("p1", p, true, true, reqStatuses, defStatuses, items, defects, nil, "")
 
 		if surface.Split {
 			t.Fatal("Split should be false when StatusSync is on")
@@ -219,7 +219,7 @@ func TestBuildBoardSurface(t *testing.T) {
 
 	t.Run("split mode keeps the entity types apart", func(t *testing.T) {
 		p := &model.Product{ID: "p1", StatusSync: false}
-		surface := buildBoardSurface("p1", p, true, reqStatuses, defStatuses, items, defects, nil, "sprint")
+		surface := buildBoardSurface("p1", p, true, true, reqStatuses, defStatuses, items, defects, nil, "sprint")
 
 		if !surface.Split {
 			t.Fatal("Split should be true when StatusSync is off")
@@ -240,10 +240,55 @@ func TestBuildBoardSurface(t *testing.T) {
 		stray := []*model.Requirement{
 			{ID: "r9", Kind: model.RequirementKindTask, Title: "No status"},
 		}
-		surface := buildBoardSurface("p1", p, true, reqStatuses, defStatuses, stray, nil, nil, "")
+		surface := buildBoardSurface("p1", p, true, true, reqStatuses, defStatuses, stray, nil, nil, "")
 
 		if len(surface.StrandedTask) != 1 || surface.StrandedTask[0].ID != "r9" {
 			t.Errorf("expected r9 in stranded tasks, got %+v", surface.StrandedTask)
 		}
 	})
+}
+
+// FR-407: developers see inactive cards locked; owners can move every card.
+// Kanban boards mark the active columns, scrum boards do not.
+func TestBoardActivation(t *testing.T) {
+	reqStatuses := []*model.Status{
+		{ID: "new", Name: "New", Position: 1, IsDefault: true},
+		{ID: "doing", Name: "Doing", Position: 2, IsActive: true},
+	}
+	items := []*model.Requirement{
+		{ID: "idle", Kind: model.RequirementKindRequirement, StatusID: "new"},
+		{ID: "busy", Kind: model.RequirementKindRequirement, StatusID: "doing", IsActive: true},
+	}
+	defects := []*model.Defect{{ID: "bug", StatusID: "new"}}
+	kanban := &model.Product{ID: "p1", StatusSync: true, WorkflowMode: model.WorkflowModeKanban}
+
+	locked := func(s templates.BoardSurfaceProps) map[string]bool {
+		out := map[string]bool{}
+		for _, col := range s.Columns {
+			for _, c := range col.Cards {
+				out[c.ID] = c.Locked
+			}
+		}
+		return out
+	}
+
+	dev := buildBoardSurface("p1", kanban, true, false, reqStatuses, reqStatuses, items, defects, nil, "")
+	if got := locked(dev); !got["idle"] || got["busy"] || !got["bug"] {
+		t.Errorf("developer locks = %v, want idle and bug locked, busy movable", got)
+	}
+	if !dev.Columns[1].ShowActive || !dev.Columns[1].IsActive || dev.Columns[0].IsActive {
+		t.Errorf("kanban columns = %+v, want Doing marked active", dev.Columns)
+	}
+
+	owner := buildBoardSurface("p1", kanban, true, true, reqStatuses, reqStatuses, items, defects, nil, "")
+	for id, l := range locked(owner) {
+		if l {
+			t.Errorf("card %s locked for an owner", id)
+		}
+	}
+
+	scrum := &model.Product{ID: "p1", StatusSync: true, WorkflowMode: model.WorkflowModeScrum}
+	if s := buildBoardSurface("p1", scrum, true, false, reqStatuses, reqStatuses, items, nil, nil, "sprint"); s.Columns[1].ShowActive {
+		t.Error("scrum board marks active columns")
+	}
 }

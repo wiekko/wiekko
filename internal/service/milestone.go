@@ -452,6 +452,7 @@ type CreateStatusInput struct {
 	Position   int
 	IsDefault  bool
 	IsClosed   bool
+	IsActive   bool
 }
 
 // UpdateStatusInput contains the fields that can be updated on a status.
@@ -460,6 +461,7 @@ type UpdateStatusInput struct {
 	Position  *int
 	IsDefault *bool
 	IsClosed  *bool
+	IsActive  *bool
 }
 
 // CreateStatus creates a new status. Requires owner role.
@@ -484,6 +486,7 @@ func (s *MilestoneService) CreateStatus(ctx context.Context, user *model.User, i
 		Position:   input.Position,
 		IsDefault:  input.IsDefault,
 		IsClosed:   input.IsClosed,
+		IsActive:   input.IsActive,
 		CreatedAt:  now,
 	}
 	if err := s.statuses.Create(ctx, status); err != nil {
@@ -506,6 +509,7 @@ func (s *MilestoneService) CreateStatus(ctx context.Context, user *model.User, i
 			Position:   input.Position,
 			IsDefault:  input.IsDefault,
 			IsClosed:   input.IsClosed,
+			IsActive:   input.IsActive,
 			CreatedAt:  now,
 		}
 		if err := s.statuses.Create(ctx, sibling); err != nil {
@@ -561,6 +565,9 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 	if input.IsClosed != nil {
 		status.IsClosed = *input.IsClosed
 	}
+	if input.IsActive != nil {
+		status.IsActive = *input.IsActive
+	}
 
 	if err := s.statuses.Update(ctx, status); err != nil {
 		return nil, fmt.Errorf("update status: %w", err)
@@ -584,6 +591,7 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 			sibling.Position = status.Position
 			sibling.IsDefault = status.IsDefault
 			sibling.IsClosed = status.IsClosed
+			sibling.IsActive = status.IsActive
 			if err := s.statuses.Update(ctx, sibling); err != nil {
 				slog.Warn("status sync: failed to update sibling", "error", err)
 			} else {

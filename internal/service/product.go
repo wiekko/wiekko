@@ -101,15 +101,19 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 // seedDefaults creates default statuses and pyramid levels for a new product.
 func (s *ProductService) seedDefaults(ctx context.Context, productID, now string) {
 	// Default statuses (synced: same for both entity types).
+	// New items land in "New", which is not active: an owner activates them
+	// by moving them on (kanban, FR-318). "Done" is not active either, so
+	// only owners reopen finished work.
 	defaultStatuses := []struct {
 		Name      string
 		Position  int
 		IsDefault bool
 		IsClosed  bool
+		IsActive  bool
 	}{
 		{Name: "New", Position: 1, IsDefault: true},
-		{Name: "In Progress", Position: 2},
-		{Name: "In Review", Position: 3},
+		{Name: "In Progress", Position: 2, IsActive: true},
+		{Name: "In Review", Position: 3, IsActive: true},
 		{Name: "Done", Position: 4, IsClosed: true},
 	}
 
@@ -123,6 +127,7 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 				Position:   ds.Position,
 				IsDefault:  ds.IsDefault,
 				IsClosed:   ds.IsClosed,
+				IsActive:   ds.IsActive,
 				CreatedAt:  now,
 			})
 		}
@@ -249,13 +254,22 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 	if input.EstimationMode != nil {
 		product.EstimationMode = *input.EstimationMode
 	}
+	switchesToScrum := false
 	if input.WorkflowMode != nil {
+		switchesToScrum = *input.WorkflowMode == model.WorkflowModeScrum && product.WorkflowMode != model.WorkflowModeScrum
 		product.WorkflowMode = *input.WorkflowMode
 	}
 	product.UpdatedAt = now
 
 	if err := s.products.Update(ctx, product); err != nil {
 		return nil, fmt.Errorf("update product: %w", err)
+	}
+	// In kanban mode an item's column decides its activation; in scrum mode
+	// the stored flag does, so it has to start from the sprint plan.
+	if switchesToScrum {
+		if err := s.products.ResetActivationToSprints(ctx, product.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	_ = s.audit.Create(ctx, &model.AuditEntry{

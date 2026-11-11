@@ -51,7 +51,8 @@ Prefer the tools over the CLI.
 Writes are limited by your role in the product; a refusal (exit 2, "role")
 means the user has to do it or grant the role, not that you should retry.
 Developers may only change the status of items a product owner has activated
-(directly or by planning them into a sprint).
+(in kanban, by moving them into an active column; in scrum, by planning them
+into a sprint). An item's `active` field says whether it is.
 
 | Command | Purpose | Role |
 | --- | --- | --- |

@@ -74,6 +74,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		defects:      st.Defect,
 		categories:   st.Category,
 		statuses:     st.Status,
+		products:     st.Product,
 		comments:     discussionSvc,
 		retester:     testingSvc,
 		audit:        st.Audit,

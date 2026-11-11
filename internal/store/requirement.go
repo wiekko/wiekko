@@ -215,9 +215,11 @@ func (s *requirementStore) CountByCategoryID(ctx context.Context, categoryID str
 	return count, err
 }
 
-const requirementColumns = `id, product_id, kind, parent_id, category_id, sequence_number, title, description,
+// requirementColumns reads is_active through activeColumn, so in kanban mode
+// it reports the activation of the item's column rather than the stored flag.
+var requirementColumns = `id, product_id, kind, parent_id, category_id, sequence_number, title, description,
 	definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
-	is_coarse, is_active, created_at, updated_at`
+	is_coarse, ` + activeColumn("requirements") + `, created_at, updated_at`
 
 func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement

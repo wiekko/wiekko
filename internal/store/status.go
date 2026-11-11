@@ -26,10 +26,10 @@ type statusStore struct {
 
 func (s *statusStore) Create(ctx context.Context, status *model.Status) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO statuses (id, product_id, entity_type, name, position, is_default, is_closed, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO statuses (id, product_id, entity_type, name, position, is_default, is_closed, is_active, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		status.ID, status.ProductID, status.EntityType, status.Name,
-		status.Position, status.IsDefault, status.IsClosed,
+		status.Position, status.IsDefault, status.IsClosed, status.IsActive,
 		status.CreatedAt,
 	)
 	return err
@@ -37,7 +37,7 @@ func (s *statusStore) Create(ctx context.Context, status *model.Status) error {
 
 func (s *statusStore) GetByID(ctx context.Context, id string) (*model.Status, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, created_at
+		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, is_active, created_at
 		 FROM statuses WHERE id = ?`, id)
 	st, err := scanStatus(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -48,10 +48,10 @@ func (s *statusStore) GetByID(ctx context.Context, id string) (*model.Status, er
 
 func (s *statusStore) Update(ctx context.Context, status *model.Status) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE statuses SET name = ?, position = ?, is_default = ?, is_closed = ?
+		`UPDATE statuses SET name = ?, position = ?, is_default = ?, is_closed = ?, is_active = ?
 		 WHERE id = ?`,
 		status.Name, status.Position,
-		status.IsDefault, status.IsClosed,
+		status.IsDefault, status.IsClosed, status.IsActive,
 		status.ID,
 	)
 	return err
@@ -64,7 +64,7 @@ func (s *statusStore) Delete(ctx context.Context, id string) error {
 
 func (s *statusStore) ListByProductID(ctx context.Context, productID, entityType string) ([]*model.Status, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, created_at
+		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, is_active, created_at
 		 FROM statuses WHERE product_id = ? AND entity_type = ? ORDER BY position`,
 		productID, entityType)
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *statusStore) ListByProductID(ctx context.Context, productID, entityType
 
 func (s *statusStore) GetDefault(ctx context.Context, productID, entityType string) (*model.Status, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, created_at
+		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, is_active, created_at
 		 FROM statuses WHERE product_id = ? AND entity_type = ? AND is_default = TRUE
 		 LIMIT 1`, productID, entityType)
 	st, err := scanStatus(row)
@@ -97,7 +97,7 @@ func (s *statusStore) GetDefault(ctx context.Context, productID, entityType stri
 
 func (s *statusStore) GetByProductAndName(ctx context.Context, productID, entityType, name string) (*model.Status, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, created_at
+		`SELECT id, product_id, entity_type, name, position, is_default, is_closed, is_active, created_at
 		 FROM statuses WHERE product_id = ? AND entity_type = ? AND name = ?
 		 LIMIT 1`, productID, entityType, name)
 	st, err := scanStatus(row)
@@ -110,7 +110,7 @@ func (s *statusStore) GetByProductAndName(ctx context.Context, productID, entity
 func scanStatus(sc scanner) (*model.Status, error) {
 	var st model.Status
 	err := sc.Scan(&st.ID, &st.ProductID, &st.EntityType, &st.Name,
-		&st.Position, &st.IsDefault, &st.IsClosed, &st.CreatedAt)
+		&st.Position, &st.IsDefault, &st.IsClosed, &st.IsActive, &st.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

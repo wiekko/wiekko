@@ -410,7 +410,8 @@ func TestUpdateRequirement(t *testing.T) {
 			// is_active is the only record of activation.
 			{"sprint without is_active refused", testutil.MakeRequirement(func(r *model.Requirement) { r.SprintID = "sprint-001" }), UpdateRequirementInput{StatusID: &newStatus}, true},
 			{"active item allowed", testutil.MakeRequirement(func(r *model.Requirement) { r.IsActive = true }), UpdateRequirementInput{StatusID: &newStatus}, false},
-			{"activation alone allowed", testutil.MakeRequirement(), UpdateRequirementInput{IsActive: &active}, false},
+			{"activation alone refused (owners activate)", testutil.MakeRequirement(), UpdateRequirementInput{IsActive: &active}, true},
+			{"re-sending the current activation allowed", testutil.MakeRequirement(func(r *model.Requirement) { r.IsActive = true }), UpdateRequirementInput{IsActive: &active}, false},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {

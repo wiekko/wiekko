@@ -314,15 +314,16 @@ func (s *defectStore) listDefects(ctx context.Context, query string, args ...any
 	return defects, rows.Err()
 }
 
-const defectColumns = `id, product_id, title, description, criticality,
-	status_id, milestone_id, sprint_id, environment_id, estimation, priority, is_active,
+// defectColumns reads is_active through activeColumn, like requirementColumns.
+var defectColumns = `id, product_id, title, description, criticality,
+	status_id, milestone_id, sprint_id, environment_id, estimation, priority, ` + activeColumn("defects") + `,
 	created_at, updated_at`
 
 // defectColumnsQualified is defectColumns for the joined list query, where bare
 // column names would be ambiguous. Both feed the same scanDefect, so the column
 // order has to stay identical.
-const defectColumnsQualified = `d.id, d.product_id, d.title, d.description, d.criticality,
-	d.status_id, d.milestone_id, d.sprint_id, d.environment_id, d.estimation, d.priority, d.is_active,
+var defectColumnsQualified = `d.id, d.product_id, d.title, d.description, d.criticality,
+	d.status_id, d.milestone_id, d.sprint_id, d.environment_id, d.estimation, d.priority, ` + activeColumn("d") + `,
 	d.created_at, d.updated_at`
 
 func scanDefect(sc scanner) (*model.Defect, error) {

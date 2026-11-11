@@ -296,6 +296,7 @@ templ StatusesTabContent(productID string, statusSync bool, reqStatuses, defStat
 			<div>
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Statuses</h3>
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Define workflow columns for requirements and defects. Changes apply to both.</p>
+				@activeColumnsHint()
 				<div class="mt-4">
 					@SyncedStatusListFragment(productID, reqStatuses)
 				</div>
@@ -323,6 +324,7 @@ templ StatusesTabContent(productID string, statusSync bool, reqStatuses, defStat
 			<div>
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Requirement Statuses</h3>
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Define workflow columns for requirements.</p>
+				@activeColumnsHint()
 				<div class="mt-4">
 					@StatusListFragment(productID, "requirement", reqStatuses)
 				</div>
@@ -370,6 +372,10 @@ templ SyncedStatusListFragment(productID string, statuses []*model.Status) {
 						<input type="checkbox" name="is_closed" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"/>
 						Closed
 					</label>
+					<label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400" title={ activeColumnTitle }>
+						<input type="checkbox" name="is_active" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"/>
+						Active
+					</label>
 					<button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
 						@ui.Icon("plus", "sm")
 						Add
@@ -412,6 +418,10 @@ templ StatusListFragment(productID, entityType string, statuses []*model.Status)
 						<input type="checkbox" name="is_closed" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"/>
 						Closed
 					</label>
+					<label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400" title={ activeColumnTitle }>
+						<input type="checkbox" name="is_active" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"/>
+						Active
+					</label>
 					<button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
 						@ui.Icon("plus", "sm")
 						Add
@@ -434,32 +444,9 @@ templ statusRow(productID string, s *model.Status, targetID string, isFirst, isL
 			hx-swap="outerHTML"
 			hx-trigger="change"
 		/>
-		<label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-			<input
-				type="checkbox"
-				name="is_default"
-				checked?={ s.IsDefault }
-				class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
-				hx-patch={ "/products/" + productID + "/settings/statuses/" + s.ID }
-				hx-target={ "#" + targetID }
-				hx-swap="outerHTML"
-				hx-trigger="change"
-			/>
-			Default
-		</label>
-		<label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-			<input
-				type="checkbox"
-				name="is_closed"
-				checked?={ s.IsClosed }
-				class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
-				hx-patch={ "/products/" + productID + "/settings/statuses/" + s.ID }
-				hx-target={ "#" + targetID }
-				hx-swap="outerHTML"
-				hx-trigger="change"
-			/>
-			Closed
-		</label>
+		@statusFlagToggle(productID, s, targetID, "is_default", "Default", s.IsDefault, "New items start in this column")
+		@statusFlagToggle(productID, s, targetID, "is_closed", "Closed", s.IsClosed, "Items in this column count as finished")
+		@statusFlagToggle(productID, s, targetID, "is_active", "Active", s.IsActive, activeColumnTitle)
 		<div class="flex items-center gap-0.5">
 			<button
 				type="button"
@@ -744,4 +731,44 @@ templ settingSelect(productID, field, label string, options []templates.SelectOp
 			}
 		</select>
 	</div>
+}
+
+// activeColumnTitle explains the Active flag where it is set.
+const activeColumnTitle = "Kanban: items here are activated for work, so developers can move them on. Only owners move items into an active column."
+
+// activeColumnsHint explains active columns on the statuses tab.
+templ activeColumnsHint() {
+	<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+		In kanban mode, items in an <span class="font-medium text-gray-700 dark:text-gray-300">active</span> column are
+		activated for work: developers can move them to any column. Items in other columns can only be moved by product
+		owners, so moving an item into an active column is how an owner activates it. In scrum mode, planning an item into a
+		sprint activates it instead.
+	</p>
+}
+
+// statusFlagToggle renders one flag checkbox of a status row. It sends the
+// new value explicitly: an unchecked checkbox submits nothing, which the
+// handler would read as "unchanged".
+templ statusFlagToggle(productID string, s *model.Status, targetID, field, label string, checked bool, title string) {
+	<label class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400" title={ title }>
+		<input
+			type="checkbox"
+			checked?={ checked }
+			class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
+			hx-patch={ "/products/" + productID + "/settings/statuses/" + s.ID }
+			hx-vals={ statusFlagVals(field, !checked) }
+			hx-target={ "#" + targetID }
+			hx-swap="outerHTML"
+			hx-trigger="change"
+		/>
+		{ label }
+	</label>
+}
+
+func statusFlagVals(field string, on bool) string {
+	value := "off"
+	if on {
+		value = "on"
+	}
+	return `{"` + field + `":"` + value + `"}`
 }

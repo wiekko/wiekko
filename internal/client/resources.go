@@ -74,6 +74,7 @@ type Status struct {
 	Position   int    `json:"position"`
 	IsDefault  bool   `json:"is_default"`
 	IsClosed   bool   `json:"is_closed"`
+	IsActive   bool   `json:"is_active"`
 }
 
 // Component is a structural part of the product.

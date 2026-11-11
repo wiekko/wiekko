@@ -53,7 +53,7 @@ Writes are checked by the server against the token user's role in the product, e
 
 | Action | Role needed |
 |---|---|
-| Set the status of a requirement, task or defect | developer, and only on items a product owner has activated (directly or by planning them into a sprint) |
+| Set the status of a requirement, task or defect | developer, and only on items a product owner has activated (kanban: by moving them into an active column; scrum: by planning them into a sprint) |
 | Comment | developer; tester on defects and test cases |
 | Report a defect | tester |
 | Create a task | product owner |
