@@ -18,10 +18,15 @@ Create the application with the **Dockerfile** build pack and:
   [generating a key](security.md#the-encryption-key)), and `NEXMAP_ADMIN_USER` / `NEXMAP_ADMIN_PASSWORD`
   for the first start; `NEXMAP_PUBLIC_URL` with the application's domain; for PostgreSQL, `NEXMAP_DB_DRIVER=postgres` and `NEXMAP_DB_DSN`. All variables are
   listed in the [configuration reference](configuration.md);
-- nothing for the version: the build reads it from the repository's git tags, as `go build` does
-  locally (`v0.1.0` on a tagged commit, `v0.1.1-0.<date>-<commit>` after it). If the checkout has no
-  tags (a shallow clone), it reports `v0.0.0-<date>-<commit>`; set the build variable `VERSION` to
-  override it.
+- the build variable `VERSION` with the release you deploy (`v0.9.0`), and update it with each
+  release. Coolify builds from the working tree without `.git`, so the build cannot read the version
+  from the git tags. Without `VERSION`, the server reports `dev-<commit>` (when Coolify passes
+  `SOURCE_COMMIT` to the build) or just `dev`. This only affects the version shown, not how the server
+  works.
+
+Local builds with `.git` in the context (`just container-build`, `podman build .`) need no `VERSION`:
+they take it from the git tags as `go build` does, `v0.9.0` on a tagged commit and a pseudo-version
+(`v0.9.1-0.<date>-<commit>`) after it.
 
 Ports (8080) and the health check come from the image. Coolify's proxy terminates TLS; see
 [Security](security.md#tls-and-the-reverse-proxy) for what the server expects from it.
