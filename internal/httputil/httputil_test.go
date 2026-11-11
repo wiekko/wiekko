@@ -127,3 +127,19 @@ func TestDecodeJSON(t *testing.T) {
 		}
 	})
 }
+
+func TestRequestBaseURL(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "http://nexmap.internal:8080/x", nil)
+	if got := httputil.RequestBaseURL(r); got != "http://nexmap.internal:8080" {
+		t.Errorf("plain: %q", got)
+	}
+	r.Header.Set("X-Forwarded-Proto", "https")
+	r.Header.Set("X-Forwarded-Host", "nexmap.example.com, other")
+	if got := httputil.RequestBaseURL(r); got != "https://nexmap.example.com" {
+		t.Errorf("forwarded: %q", got)
+	}
+	r.Header.Set("X-Forwarded-Proto", "javascript")
+	if got := httputil.RequestBaseURL(r); got != "http://nexmap.example.com" {
+		t.Errorf("bad proto: %q", got)
+	}
+}

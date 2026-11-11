@@ -9,6 +9,7 @@ import (
 
 	"github.com/a-h/templ"
 
+	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
@@ -1068,7 +1069,7 @@ func (c *PageProductController) InviteMember(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	inviteURL := fmt.Sprintf("/accept-invite/%s", result.RawToken)
+	inviteURL := c.invitation.AcceptURL(result.RawToken, httputil.RequestBaseURL(r))
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.InviteSuccessOOB(productID, inviteURL).Render(r.Context(), w)

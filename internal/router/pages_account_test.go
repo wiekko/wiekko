@@ -248,3 +248,36 @@ func TestRegisterPage(t *testing.T) {
 		})
 	})
 }
+
+func TestLoginRateLimit(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		wrong := url.Values{"username": {"ghost"}, "password": {"wrong"}}
+
+		for i := 0; i < 5; i++ {
+			resp, _ := e.post("/login", wrong)
+			if resp.StatusCode != http.StatusUnprocessableEntity {
+				t.Fatalf("attempt %d: status = %d, want 422", i+1, resp.StatusCode)
+			}
+		}
+
+		resp, body := e.post("/login", wrong)
+		if resp.StatusCode != http.StatusTooManyRequests || !strings.Contains(body, "Too many failed sign-in attempts") {
+			t.Fatalf("web: status = %d, body: %s", resp.StatusCode, body)
+		}
+		if resp.Header.Get("Retry-After") == "" {
+			t.Error("web: no Retry-After header")
+		}
+
+		// The API shares the counters.
+		apiResp, err := e.client().Post(e.srv.URL+"/api/v1/auth/login", "application/json",
+			strings.NewReader(`{"username":"ghost","password":"wrong"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		apiBody := readBody(t, apiResp)
+		if apiResp.StatusCode != http.StatusTooManyRequests || !strings.Contains(apiBody, "TOO_MANY_ATTEMPTS") {
+			t.Fatalf("api: status = %d, body: %s", apiResp.StatusCode, apiBody)
+		}
+	})
+}

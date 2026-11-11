@@ -19,6 +19,20 @@ const invitationTTL = 7 * 24 * time.Hour // 7 days
 type InvitationService struct {
 	invitations store.InvitationStore
 	authz       *Authorizer
+	// publicURL is the configured server address (NEXMAP_PUBLIC_URL), or
+	// empty to build invitation links from the request.
+	publicURL string
+}
+
+// AcceptURL returns the full link an invited person opens to create their
+// account. requestBase ("https://host") is used when no public URL is
+// configured; it should come from the request the inviter made.
+func (s *InvitationService) AcceptURL(rawToken, requestBase string) string {
+	base := s.publicURL
+	if base == "" {
+		base = requestBase
+	}
+	return strings.TrimRight(base, "/") + "/accept-invite/" + rawToken
 }
 
 // CreateInvitationResult contains the raw token (shown once) and the invitation record.

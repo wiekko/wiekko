@@ -14,6 +14,12 @@ The container image sets some variables differently from the built-in defaults; 
 |---|---|---|---|---|
 | `NEXMAP_HOST` | `--host` | `localhost` | `0.0.0.0` | Address to listen on. `0.0.0.0` listens on all interfaces |
 | `NEXMAP_PORT` | `--port` | `8080` | `8080` | Port to listen on |
+| `NEXMAP_PUBLIC_URL` | `--public-url` | empty | | The address users open nexmap at, such as `https://nexmap.example.com`. Used for the links nexmap hands out (invitations) |
+
+Without `NEXMAP_PUBLIC_URL`, invitation links are built from the address the inviter's browser used,
+taking the scheme from the proxy's `X-Forwarded-Proto` header. That is right behind a typical proxy, but
+set the variable if nexmap is reachable under more than one name, or if links come out with `http://`.
+The server does not start if the value is not an absolute `http` or `https` URL.
 
 `nexmapd` serves plain HTTP. Put it behind a reverse proxy that terminates TLS; see
 [Security](security.md#tls-and-the-reverse-proxy).

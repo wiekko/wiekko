@@ -90,6 +90,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			cfg:            cfg,
 			twoFactor:      twoFactorSvc,
 			twoFactorStore: st.TwoFactor,
+			limiter:        newLoginLimiter(),
 		},
 		TwoFactor: twoFactorSvc,
 		User: &UserService{
@@ -108,6 +109,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		Invitation: &InvitationService{
 			invitations: st.Invitation,
 			authz:       authz,
+			publicURL:   cfg.PublicURL,
 		},
 		Product: &ProductService{
 			products:      st.Product,

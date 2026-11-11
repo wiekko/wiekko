@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 type dataEnvelope struct {
@@ -61,4 +62,31 @@ func ErrorWithDetails(w http.ResponseWriter, status int, code, message string, d
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		slog.Error("failed to encode JSON error response", "err", err)
 	}
+}
+
+// RequestBaseURL returns the scheme and host the client used to reach the
+// server ("https://nexmap.example.com"). Behind a TLS-terminating proxy the
+// scheme comes from X-Forwarded-Proto and the host from X-Forwarded-Host if
+// set, else from the Host header the proxy passes on.
+func RequestBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := firstHeaderValue(r.Header.Get("X-Forwarded-Proto")); proto == "https" || proto == "http" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwd := firstHeaderValue(r.Header.Get("X-Forwarded-Host")); fwd != "" {
+		host = fwd
+	}
+	return scheme + "://" + host
+}
+
+// firstHeaderValue returns the first entry of a comma-separated header value.
+func firstHeaderValue(v string) string {
+	if i := strings.IndexByte(v, ','); i >= 0 {
+		v = v[:i]
+	}
+	return strings.ToLower(strings.TrimSpace(v))
 }

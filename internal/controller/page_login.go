@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/service"
@@ -51,6 +52,11 @@ func (c *PageLoginController) Login(w http.ResponseWriter, r *http.Request) {
 	result, err := c.auth.Login(r.Context(), username, password, ip, r.UserAgent())
 	if err != nil {
 		logFailedLogin(r, username, ip, err)
+		if wait, blocked := loginBlocked(err); blocked {
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())))
+			c.renderLoginErrorStatus(w, r, tooManyAttemptsMessage(wait), http.StatusTooManyRequests)
+			return
+		}
 		c.renderLoginError(w, r, "Invalid username or password")
 		return
 	}
@@ -169,6 +175,12 @@ func clientIP(r *http.Request) string {
 }
 
 func (c *PageLoginController) renderLoginError(w http.ResponseWriter, r *http.Request, message string) {
+	c.renderLoginErrorStatus(w, r, message, http.StatusUnprocessableEntity)
+}
+
+// renderLoginErrorStatus is renderLoginError with the status of a full-page
+// answer; the htmx fragment is always sent with 200 (see below).
+func (c *PageLoginController) renderLoginErrorStatus(w http.ResponseWriter, r *http.Request, message string, status int) {
 	selfReg, _ := c.settings.Get(r.Context(), "self_registration_enabled")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -179,7 +191,7 @@ func (c *PageLoginController) renderLoginError(w http.ResponseWriter, r *http.Re
 		_ = login.LoginForm(selfReg == "true", message).Render(r.Context(), w)
 		return
 	}
-	w.WriteHeader(http.StatusUnprocessableEntity)
+	w.WriteHeader(status)
 	_ = login.LoginPage(selfReg == "true", message).Render(r.Context(), w)
 }
 

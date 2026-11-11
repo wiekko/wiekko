@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
+	"strconv"
+	"time"
 
 	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
@@ -23,6 +26,25 @@ func logFailedLogin(r *http.Request, username, ip string, err error) {
 		"reason", err.Error(),
 		"request_id", middleware.RequestIDFromContext(r.Context()),
 	)
+}
+
+// loginBlocked reports whether err means the client has to wait before the
+// next login attempt, and for how long (rounded up to whole seconds).
+func loginBlocked(err error) (time.Duration, bool) {
+	var blocked *service.LoginBlockedError
+	if !errors.As(err, &blocked) {
+		return 0, false
+	}
+	return blocked.RetryAfter.Round(time.Second) + time.Second, true
+}
+
+func tooManyAttemptsMessage(wait time.Duration) string {
+	minutes := int(math.Ceil(wait.Minutes()))
+	unit := "minutes"
+	if minutes == 1 {
+		unit = "minute"
+	}
+	return fmt.Sprintf("Too many failed sign-in attempts. Try again in %d %s.", minutes, unit)
 }
 
 // AuthController handles authentication endpoints.
@@ -60,6 +82,11 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 	result, err := c.auth.Login(r.Context(), req.Username, req.Password, ip, r.UserAgent())
 	if err != nil {
 		logFailedLogin(r, req.Username, ip, err)
+		if wait, blocked := loginBlocked(err); blocked {
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())))
+			httputil.Error(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", tooManyAttemptsMessage(wait))
+			return
+		}
 		httputil.Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password")
 		return
 	}

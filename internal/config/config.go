@@ -35,4 +35,7 @@ type Config struct {
 	UploadDir        string
 	MaxUploadBytes   int64
 	AllowedUploads   string
+	// PublicURL is the address users reach the server at ("https://nexmap.example.com"),
+	// without a trailing slash. Empty: links are built from the request.
+	PublicURL string
 }

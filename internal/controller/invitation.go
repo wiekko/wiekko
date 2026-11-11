@@ -43,6 +43,7 @@ func (c *InvitationController) Create(w http.ResponseWriter, r *http.Request) {
 
 	resp := invitationToJSON(result.Invitation)
 	resp["raw_token"] = result.RawToken
+	resp["url"] = c.invitation.AcceptURL(result.RawToken, httputil.RequestBaseURL(r))
 	httputil.JSON(w, http.StatusCreated, resp)
 }
 

@@ -3,8 +3,10 @@ package config
 import (
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,6 +18,12 @@ func Load(args []string) (*Config, error) {
 	if err := applyFlags(cfg, args); err != nil {
 		return nil, err
 	}
+
+	publicURL, err := normalizePublicURL(cfg.PublicURL)
+	if err != nil {
+		return nil, err
+	}
+	cfg.PublicURL = publicURL
 
 	return cfg, nil
 }
@@ -93,6 +101,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("NEXMAP_ALLOWED_UPLOAD_TYPES"); v != "" {
 		cfg.AllowedUploads = v
 	}
+	if v := os.Getenv("NEXMAP_PUBLIC_URL"); v != "" {
+		cfg.PublicURL = v
+	}
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -111,6 +122,7 @@ func applyFlags(cfg *Config, args []string) error {
 	uploadDir := fs.String("upload-dir", "", "")
 	maxUpload := fs.String("max-upload-bytes", "", "")
 	allowedUploads := fs.String("allowed-upload-types", "", "")
+	publicURL := fs.String("public-url", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("config: flags: %w", err)
@@ -148,8 +160,27 @@ func applyFlags(cfg *Config, args []string) error {
 			}
 		case "allowed-upload-types":
 			cfg.AllowedUploads = *allowedUploads
+		case "public-url":
+			cfg.PublicURL = *publicURL
 		}
 	})
 
 	return nil
+}
+
+// normalizePublicURL checks that raw is an absolute http(s) URL and returns it
+// without a trailing slash. Empty stays empty.
+func normalizePublicURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("config: public URL %q must be an absolute http or https URL, like https://nexmap.example.com", raw)
+	}
+	if u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return "", fmt.Errorf("config: public URL %q must not contain credentials, a query or a fragment", raw)
+	}
+	return strings.TrimRight(u.String(), "/"), nil
 }

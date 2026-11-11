@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
@@ -265,7 +266,7 @@ func (c *PageAdminController) CreateInvitation(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = admin.InviteResult("", result.RawToken, true).Render(r.Context(), w)
+	_ = admin.InviteResult("", c.invitation.AcceptURL(result.RawToken, httputil.RequestBaseURL(r)), true).Render(r.Context(), w)
 }
 
 // DeleteInvitation handles DELETE /admin/invitations/{id}.

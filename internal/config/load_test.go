@@ -12,6 +12,7 @@ func clearNexmapEnv(t *testing.T) {
 		"NEXMAP_DB_DRIVER", "NEXMAP_DB_DSN", "NEXMAP_SESSION_TTL",
 		"NEXMAP_PBKDF2_ITERATIONS", "NEXMAP_COOKIE_SECURE",
 		"NEXMAP_ENCRYPTION_KEY", "NEXMAP_ADMIN_USER", "NEXMAP_ADMIN_PASSWORD",
+		"NEXMAP_PUBLIC_URL",
 	} {
 		t.Setenv(key, "")
 	}
@@ -270,5 +271,33 @@ func TestFlagsInvalid(t *testing.T) {
 	_, err := Load([]string{"-unknown-flag"})
 	if err == nil {
 		t.Fatal("expected error for unknown flag")
+	}
+}
+
+func TestPublicURL(t *testing.T) {
+	clearNexmapEnv(t)
+
+	t.Setenv("NEXMAP_PUBLIC_URL", "https://nexmap.example.com/")
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.PublicURL != "https://nexmap.example.com" {
+		t.Errorf("PublicURL = %q, want trailing slash removed", cfg.PublicURL)
+	}
+
+	cfg, err = Load([]string{"--public-url", "http://localhost:8080"})
+	if err != nil {
+		t.Fatalf("Load with flag: %v", err)
+	}
+	if cfg.PublicURL != "http://localhost:8080" {
+		t.Errorf("flag PublicURL = %q", cfg.PublicURL)
+	}
+
+	for _, bad := range []string{"nexmap.example.com", "ftp://nexmap.example.com", "https://", "https://u:p@nexmap.example.com", "https://x.example.com/?a=b"} {
+		t.Setenv("NEXMAP_PUBLIC_URL", bad)
+		if _, err := Load(nil); err == nil {
+			t.Errorf("Load accepted public URL %q", bad)
+		}
 	}
 }

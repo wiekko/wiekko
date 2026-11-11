@@ -34,6 +34,9 @@ type AuthService struct {
 
 	twoFactor      *TwoFactorService
 	twoFactorStore store.TwoFactorStore
+
+	// limiter blocks clients after repeated wrong passwords; nil disables it.
+	limiter *loginLimiter
 }
 
 // LoginResult contains the data returned after a login attempt. When the user
@@ -62,10 +65,16 @@ var ErrLoginChallengeInvalid = errors.New("login expired; please sign in again")
 // Login authenticates a user and creates a session, or, for users with
 // two-factor authentication, a pending login challenge.
 func (s *AuthService) Login(ctx context.Context, username, password, ip, userAgent string) (*LoginResult, error) {
-	identity, err := s.provider.Authenticate(ctx, username, password)
-	if err != nil {
+	// Checked before the password, so a blocked client costs no hashing.
+	if err := s.limiter.check(ip, username); err != nil {
 		return nil, err
 	}
+	identity, err := s.provider.Authenticate(ctx, username, password)
+	if err != nil {
+		s.limiter.fail(ip, username)
+		return nil, err
+	}
+	s.limiter.succeed(ip, username)
 
 	user, err := s.users.GetByID(ctx, identity.UserID)
 	if err != nil {
