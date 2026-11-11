@@ -80,6 +80,65 @@ test-pg *args="./...":
     export NEXMAP_TEST_POSTGRES=required
     go test {{ args }}
 
+# From main or a release/* branch: checks and tests, commits VERSION as the
+# release and tags it, then commits "<version>+dev" for the work after it.
+# Pass `push` as second argument to also push both commits and the tag.
+# See CONTRIBUTING.md, "Releasing".
+# Release a version, e.g. `just release v0.9.1` or `just release v0.9.1 push`
+release version push="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    file=internal/buildinfo/VERSION
+    version='{{ version }}'
+    semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+    fail() { echo "release: $*" >&2; exit 1; }
+
+    case '{{ push }}' in ""|push) ;; *) fail "second argument must be 'push' or nothing" ;; esac
+    [[ $version =~ $semver ]] || fail "$version is not a version like v1.2.3 or v1.2.3-rc.1"
+    new=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+    new_pre=${BASH_REMATCH[4]}
+
+    branch=$(git symbolic-ref --quiet --short HEAD) || fail "not on a branch"
+    [[ $branch == main || $branch == release/* ]] || fail "releases are made from main or release/*, not $branch"
+    [ -z "$(git status --porcelain)" ] || fail "the working tree has uncommitted changes"
+    ! git rev-parse -q --verify "refs/tags/$version" >/dev/null || fail "tag $version exists already"
+
+    # The new version must be higher than the release the tree is based on.
+    base=$(tr -d '[:space:]' < "$file")
+    base=${base%+dev}
+    [[ $base =~ $semver ]] || fail "$file holds '$base', not a version"
+    old=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")
+    old_pre=${BASH_REMATCH[4]}
+    higher=
+    # Same core version: only a pre-release may move on (rc.1 -> rc.2 compares
+    # as text, so rc.10 needs care) or become the release.
+    for i in 0 1 2; do
+        if (( new[i] > old[i] )); then higher=1; break; fi
+        if (( new[i] < old[i] )); then break; fi
+        if (( i == 2 )) && [[ -n $old_pre && $version != "$base" ]] && [[ -z $new_pre || $new_pre > $old_pre ]]; then higher=1; fi
+    done
+    [ -n "$higher" ] || fail "$version is not higher than $base, the release this tree is based on"
+
+    echo "release: testing"
+    just generate css >/dev/null 2>&1
+    go vet ./...
+    go test ./... >/dev/null
+
+    printf '%s\n' "$version" > "$file"
+    git add "$file"
+    git commit -q -m "bump version to $version"
+    git tag -a "$version" -m "$version"
+    printf '%s+dev\n' "$version" > "$file"
+    git add "$file"
+    git commit -q -m "start development after $version"
+    echo "release: tagged $version on $branch"
+
+    if [ '{{ push }}' = push ]; then
+        git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$version"
+    else
+        echo "release: nothing pushed; to publish: git push --atomic origin HEAD:refs/heads/$branch refs/tags/$version"
+    fi
+
 # Build release binaries in a container with the pinned Go toolchain, templ and
 # Tailwind; nothing but a container engine is needed on the host. Binaries land
 # in build/<os>-<arch>/.

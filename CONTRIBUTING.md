@@ -32,6 +32,33 @@ For release binaries, `just container-build [os] [arch]` builds in a container (
 override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Dockerfile`, and
 writes the binaries to `build/<os>-<arch>/`. The host needs only the container engine and `just`.
 
+## Releasing
+
+The version lives in `internal/buildinfo/VERSION`, so every build has it, with or without `.git` and
+without access to the repository's tags. It holds either a release (`v0.9.1`), on the commit tagged
+with it, or the release the work is based on, marked `+dev` (`v0.9.1+dev`), on every commit after it.
+Builds between releases add the commit when they know it (`v0.9.1+dev.4161949abcde`, `.dirty` for a
+modified tree). The `+dev` marks what a build is based on, not what comes next: whether the next release
+is a patch or a minor one is decided when it is made.
+
+```sh
+just release v0.9.2          # check, test, commit, tag; push nothing
+just release v0.9.2 push     # the same, then push both commits and the tag
+```
+
+The recipe refuses to run outside `main` or a `release/*` branch, with uncommitted changes, for an
+existing tag or for a version not higher than the one in `VERSION`. It runs `go vet` and the tests
+(SQLite only; run `just test-pg` first for SQL changes), then makes two commits: "bump version to
+v0.9.2", tagged `v0.9.2`, and "start development after v0.9.2", which sets `VERSION` to `v0.9.2+dev`.
+
+Branches: `main` can always be deployed, and releases are made from it. A version that needs fixes
+after newer releases gets a `release/<major>.<minor>` branch from its last tag when that need arises,
+not before; fixes are cherry-picked onto it and released there with the same recipe.
+
+The tags still matter: the documentation site publishes one version per tag (see below). The
+`VERSION` build argument of the `Dockerfile` overrides the version from the source tree, for special
+builds only.
+
 ## Testing
 
 Integration tests run on both SQLite and PostgreSQL to catch dialect differences. The PostgreSQL runs need

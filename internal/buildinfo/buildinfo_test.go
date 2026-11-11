@@ -1,51 +1,49 @@
 package buildinfo
 
 import (
+	"regexp"
 	"runtime/debug"
+	"strings"
 	"testing"
 )
 
-func TestFromBuildInfo(t *testing.T) {
+func TestCompose(t *testing.T) {
+	rev := debug.BuildSetting{Key: "vcs.revision", Value: "4161949abcdef0123456789"}
+	dirty := debug.BuildSetting{Key: "vcs.modified", Value: "true"}
 	tests := []struct {
-		name string
-		info debug.BuildInfo
-		want string
+		name     string
+		src      string
+		settings []debug.BuildSetting
+		linkRev  string
+		want     string
 	}{
-		{
-			name: "module version wins",
-			info: debug.BuildInfo{Main: debug.Module{Version: "v1.4.0"}},
-			want: "v1.4.0",
-		},
-		{
-			name: "devel without vcs",
-			info: debug.BuildInfo{Main: debug.Module{Version: "(devel)"}},
-			want: "dev",
-		},
-		{
-			name: "vcs revision shortened",
-			info: debug.BuildInfo{
-				Main:     debug.Module{Version: "(devel)"},
-				Settings: []debug.BuildSetting{{Key: "vcs.revision", Value: "4161949abcdef0123456789"}},
-			},
-			want: "dev-4161949abcde",
-		},
-		{
-			name: "dirty tree",
-			info: debug.BuildInfo{
-				Settings: []debug.BuildSetting{
-					{Key: "vcs.revision", Value: "4161949"},
-					{Key: "vcs.modified", Value: "true"},
-				},
-			},
-			want: "dev-4161949-dirty",
-		},
+		{name: "release", src: "v1.2.3\n", settings: []debug.BuildSetting{rev}, want: "v1.2.3"},
+		{name: "release from a modified tree", src: "v1.2.3", settings: []debug.BuildSetting{rev, dirty}, want: "v1.2.3+dirty"},
+		{name: "pre-release", src: "v1.0.0-rc.1", want: "v1.0.0-rc.1"},
+		{name: "dev without vcs", src: "v1.2.3+dev\n", want: "v1.2.3+dev"},
+		{name: "dev with vcs", src: "v1.2.3+dev", settings: []debug.BuildSetting{rev}, want: "v1.2.3+dev.4161949abcde"},
+		{name: "dev modified", src: "v1.2.3+dev", settings: []debug.BuildSetting{rev, dirty}, want: "v1.2.3+dev.4161949abcde.dirty"},
+		{name: "dev with link-time revision", src: "v1.2.3+dev", linkRev: "abc123def4567890", want: "v1.2.3+dev.abc123def456"},
+		{name: "vcs wins over link-time revision", src: "v1.2.3+dev", settings: []debug.BuildSetting{rev}, linkRev: "abc123", want: "v1.2.3+dev.4161949abcde"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := fromBuildInfo(&tt.info); got != tt.want {
-				t.Fatalf("fromBuildInfo() = %q, want %q", got, tt.want)
+			if got := compose(tt.src, tt.settings, tt.linkRev); got != tt.want {
+				t.Fatalf("compose() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// versionPattern is a release version as written by `just release`: SemVer
+// with a "v" prefix and an optional pre-release, without build metadata.
+var versionPattern = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
+
+// The release recipe writes VERSION; a hand edit must keep it parseable.
+func TestSourceVersionIsValid(t *testing.T) {
+	v := strings.TrimSuffix(strings.TrimSpace(source), devSuffix)
+	if !versionPattern.MatchString(v) {
+		t.Fatalf("VERSION = %q: want vMAJOR.MINOR.PATCH[-pre-release], optionally followed by %q", strings.TrimSpace(source), devSuffix)
 	}
 }
 

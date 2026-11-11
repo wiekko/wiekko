@@ -54,13 +54,11 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG GOOS
 ARG GOARCH
-# The version the binaries report, first match wins:
-#   1. VERSION, if passed as a build argument;
-#   2. with .git in the context, what Go derives from it: v0.1.0 on a tagged
-#      commit, a pseudo-version (v0.1.1-0.<date>-<commit>) after it, v0.0.0-...
-#      when the checkout has no tags (e.g. a shallow clone);
-#   3. dev-<commit> from SOURCE_COMMIT (Coolify can pass it);
-#   4. "dev".
+# The version the binaries report comes from internal/buildinfo/VERSION
+# ("v0.9.0" on a release commit, "v0.9.0+dev" after it). Builds between
+# releases append the commit: Go reads it from .git when the context has it,
+# else it comes from SOURCE_COMMIT (Coolify can pass it). VERSION, if passed
+# as a build argument, overrides all of this.
 ARG VERSION
 ARG SOURCE_COMMIT
 
@@ -70,19 +68,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     goos="${GOOS:-${TARGETOS:-linux}}"; \
     goarch="${GOARCH:-${TARGETARCH:-amd64}}"; \
     git config --global --add safe.directory /src; \
-    version="${VERSION:-}"; \
-    if [ -z "$version" ] && git rev-parse --verify -q HEAD >/dev/null 2>&1; then \
-        version=vcs; \
-    elif [ -z "$version" ] && [ -n "${SOURCE_COMMIT:-}" ]; then \
-        version="dev-$(printf %.12s "$SOURCE_COMMIT")"; \
-    fi; \
-    version="${version:-dev}"; \
     ldflags="-s -w"; \
-    if [ "$version" = vcs ]; then \
-        echo "version: from git ($(git describe --tags --always --dirty))"; \
-    else \
-        echo "version: $version"; \
-        ldflags="$ldflags -X nexmap.net/internal/buildinfo.Version=${version}"; \
+    if [ -n "${VERSION:-}" ]; then \
+        ldflags="$ldflags -X nexmap.net/internal/buildinfo.Version=${VERSION}"; \
+    elif [ -n "${SOURCE_COMMIT:-}" ]; then \
+        ldflags="$ldflags -X nexmap.net/internal/buildinfo.Revision=${SOURCE_COMMIT}"; \
     fi; \
     just generate css; \
     go vet ./...; \

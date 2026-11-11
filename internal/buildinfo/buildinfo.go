@@ -4,6 +4,7 @@
 package buildinfo
 
 import (
+	_ "embed"
 	"runtime/debug"
 	"strings"
 )
@@ -13,35 +14,50 @@ import (
 // surface the CLI depends on; removing or changing surface needs /api/v2.
 const APILevel = 1
 
-// Version may be set at link time:
+// source is the version recorded in the source tree. `just release vX.Y.Z`
+// writes "vX.Y.Z" for the tagged release commit and "vX.Y.Z+dev" for the
+// commit right after it, so a build between releases names the release it is
+// based on rather than guessing the next one.
+//
+//go:embed VERSION
+var source string
+
+// Version overrides everything when set at link time:
 //
 //	go build -ldflags "-X nexmap.net/internal/buildinfo.Version=v1.2.3" ./cmd/nexmap
-//
-// When it is empty, String derives a version from the module and VCS metadata
-// the Go toolchain embeds.
 var Version = ""
 
-// String returns the version of the running binary: the link-time Version if
-// set, else the module version, else the short VCS revision (with a "-dirty"
-// suffix for modified trees), else "dev".
+// Revision is the commit a build without VCS metadata was made from, set at
+// link time (the Dockerfile passes Coolify's SOURCE_COMMIT). VCS metadata the
+// Go toolchain embeds takes precedence.
+var Revision = ""
+
+// devSuffix marks a version as "based on this release, plus later changes".
+// It is SemVer build metadata: version ordering ignores it.
+const devSuffix = "+dev"
+
+// String returns the version of the running binary:
+//
+//   - the link-time Version, if set;
+//   - for a release ("v1.2.3"), that version, with "+dirty" when built from a
+//     modified tree;
+//   - between releases ("v1.2.3+dev"), that version followed by the short
+//     commit ("v1.2.3+dev.4161949abcde") and ".dirty" when known.
 func String() string {
 	if Version != "" {
 		return Version
 	}
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return "dev"
+	var settings []debug.BuildSetting
+	if info, ok := debug.ReadBuildInfo(); ok {
+		settings = info.Settings
 	}
-	return fromBuildInfo(info)
+	return compose(source, settings, Revision)
 }
 
-func fromBuildInfo(info *debug.BuildInfo) string {
-	if v := info.Main.Version; v != "" && v != "(devel)" {
-		return v
-	}
-	var revision string
-	var dirty bool
-	for _, s := range info.Settings {
+func compose(src string, settings []debug.BuildSetting, linkRevision string) string {
+	v := strings.TrimSpace(src)
+	revision, dirty := strings.TrimSpace(linkRevision), false
+	for _, s := range settings {
 		switch s.Key {
 		case "vcs.revision":
 			revision = s.Value
@@ -49,17 +65,20 @@ func fromBuildInfo(info *debug.BuildInfo) string {
 			dirty = s.Value == "true"
 		}
 	}
-	if revision == "" {
-		return "dev"
-	}
 	if len(revision) > 12 {
 		revision = revision[:12]
 	}
-	var b strings.Builder
-	b.WriteString("dev-")
-	b.WriteString(revision)
-	if dirty {
-		b.WriteString("-dirty")
+	if !strings.HasSuffix(v, devSuffix) {
+		if dirty {
+			v += "+dirty"
+		}
+		return v
 	}
-	return b.String()
+	if revision != "" {
+		v += "." + revision
+	}
+	if dirty {
+		v += ".dirty"
+	}
+	return v
 }
