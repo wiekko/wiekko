@@ -32,8 +32,18 @@ RUN set -eu; \
 
 WORKDIR /src
 COPY . .
+
+# Read-only access token for fetching the release tags when the context has no
+# .git (Coolify). Preferably a BuildKit secret: `--secret id=DOCS_GIT_TOKEN`,
+# which Coolify passes when its build secrets are set to Docker BuildKit
+# secrets. The build argument is the fallback Coolify uses without BuildKit;
+# it stays in this build stage, which is not part of the published image.
+ARG DOCS_GIT_TOKEN=""
+ARG DOCS_GIT_URL=""
+
 # The context's files belong to another user than the one running git here.
-RUN git config --global --add safe.directory /src \
+RUN --mount=type=secret,id=DOCS_GIT_TOKEN \
+    git config --global --add safe.directory /src \
     && sh docs-site/build.sh /site
 
 FROM ${RUNTIME_IMAGE} AS runtime

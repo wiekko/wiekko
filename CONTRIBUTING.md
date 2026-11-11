@@ -58,8 +58,8 @@ tooling, so none of it is published.
 
 - **What gets published:** only the pages listed in [docs/SUMMARY.md](docs/SUMMARY.md), which is also the
   site's navigation. Add new pages there. `docs/spec/`, `docs/decisions/` and `docs/tmp/` are left out
-  on purpose; published pages link to them, and to files outside `docs/`, with absolute URLs into the
-  repository.
+  on purpose. The repository is private, so published pages must not link to it: mention such files by
+  path (`docs/spec/`, `CONTRIBUTING.md`) instead.
 - **Versions:** the site serves `main` as `/latest/` (with a banner saying it may describe unreleased
   features), every release tag `v*` as `/<tag>/`, and the newest release that is not a pre-release as
   `/stable/`, where the site's root redirects. A menu in the header switches between versions. Tags from
@@ -69,8 +69,15 @@ tooling, so none of it is published.
   the deployed image on port 8080.
 
 `docs-site/build.sh` builds the versions, `docs-site/Dockerfile` runs it (mdBook pinned by version and
-checksum) and serves the result with nginx on port 8080. The build reads the release tags from `.git`
-in the build context, which `.dockerignore` keeps for this purpose.
+checksum) and serves the result with nginx on port 8080.
+
+The release tags come from git. Locally, the build uses the checkout's `.git`. Coolify, however, hands
+the build only the working tree without `.git`, so there the build clones the repository over HTTPS
+(`DOCS_GIT_URL`, by default `https://forge.my-universe.com/daemotron/nexmap.git`). The repository is
+private, so this needs a read-only access token, `DOCS_GIT_TOKEN`: preferably a BuildKit secret, which
+the build reads from `/run/secrets/DOCS_GIT_TOKEN`; otherwise a build argument. A build argument stays
+in the build stage, which is not part of the published image. Without `.git` and without a token, the
+build publishes `/latest/` only and says so; with a token that fails, the build fails.
 
 ### Deployment on Coolify
 
@@ -78,8 +85,8 @@ The site is a second Coolify application next to the server, built from the same
 
 1. Create an application from the repository, in the same way as the server's, on branch `main`.
 2. Choose the **Dockerfile** build pack, with base directory `/` and Dockerfile location
-   `/docs-site/Dockerfile`. The base directory has to be the repository root: the build needs `docs/`
-   and `.git`, not only `docs-site/`.
+   `/docs-site/Dockerfile`. The base directory has to be the repository root: the build needs `docs/`,
+   not only `docs-site/`.
 3. Set the exposed port to `8080` and the domain to `https://docs.nexmap.net`. Point the DNS record of
    `docs.nexmap.net` at the Coolify server.
 4. Enable automatic deployment. The repository is not on GitHub, so add a webhook in Forgejo
@@ -87,13 +94,25 @@ The site is a second Coolify application next to the server, built from the same
    settings in Coolify, triggered by push events on `main`.
 5. If your Coolify version offers watch paths, set them to `docs/**` and `docs-site/**`, so changes to
    the server code do not rebuild the site.
+6. Give the build read access to the repository for the release tags:
+   1. In Forgejo, create a user for it (e.g. `nexmap-docs`) and add it to the repository as a
+      collaborator with **Read** access. Signed in as that user, create an access token under
+      **Settings → Applications** with only the `read:repository` scope. A dedicated user keeps the
+      token from reaching any other repository.
+   2. In the Coolify application, add the environment variable `DOCS_GIT_TOKEN` with the token, available
+      during build, and lock it so the value stays hidden.
+   3. Set the application's build secrets to **Docker BuildKit secrets**, so the token reaches the build
+      as a secret rather than a build argument.
 
-Every push to `main` then rebuilds and deploys the site. The deployment log ends with a line such as
-`docs-site: built latest v0.2.0 v0.1.0 (stable: v0.2.0)`; check it after the first deployment and after
-each release:
+Every push to `main` then rebuilds and deploys the site. In the debug log (**Show Debug Logs**), the
+build prints `docs-site: release tags: …` and ends with a line such as
+`docs-site: built latest v0.2.0 v0.1.0 (stable: v0.2.0)`. Check it after setting up and after each
+release:
 
-- **A new release tag alone may not trigger a deployment**, since Coolify deploys on pushes to the
-  branch. The release then appears with the next push to `main`, or redeploy the site in Coolify after
-  tagging.
-- **If the log warns about a shallow clone or lists no releases**, Coolify cloned without the tags and
-  the site only shows `/latest/`.
+- **Releases need a forced rebuild.** A release tag usually points at a commit that is already
+  deployed, and Coolify skips the build for a commit it has built before. After tagging, redeploy the
+  site with the option to force a rebuild without cache.
+- **`no .git and no DOCS_GIT_TOKEN`** means the token did not reach the build: check the variable and
+  that it is available during build.
+- **`cannot clone`** means the token was refused: check that it is valid, has the `read:repository`
+  scope, and that its user can read the repository.

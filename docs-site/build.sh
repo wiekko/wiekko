@@ -42,28 +42,64 @@ built="latest"
 stable=""
 versions=""
 tags=""
-# Release tags come from .git in the build context. Say exactly why they are
-# unavailable, since the site then silently shrinks to /latest/.
-if [ ! -e "$repo/.git" ]; then
-    echo "docs-site: warning: no .git in $repo (not in the build context?); building /latest/ only" >&2
-elif ! git_err=$(git -C "$repo" rev-parse --git-dir 2>&1); then
-    echo "docs-site: warning: git cannot read $repo/.git: $git_err" >&2
-    echo "docs-site: warning: building /latest/ only" >&2
-else
-    if [ "$(git -C "$repo" rev-parse --is-shallow-repository)" = "true" ]; then
-        echo "docs-site: warning: shallow clone; release tags may be missing" >&2
-    fi
-    # Newest first; pre-releases (v1.0.0-rc.1) sort before their release.
-    tags=$(git -C "$repo" -c versionsort.suffix=- tag --list 'v*' --sort=-v:refname)
-    echo "docs-site: commit $(git -C "$repo" rev-parse --short HEAD), release tags: ${tags:-none}" | tr '\n' ' '
-    echo
+
+# The release tags come from the git repository: the checkout's own .git if
+# there is one (local builds), otherwise a fresh clone of the repository.
+# Coolify passes the build only the working tree, so the clone is the normal
+# case there; the repository is private, so it needs a read-only access token,
+# given as the BuildKit secret DOCS_GIT_TOKEN (preferred: a file in
+# /run/secrets) or the environment variable DOCS_GIT_TOKEN.
+remote=${DOCS_GIT_URL:-https://forge.my-universe.com/daemotron/nexmap.git}
+token=${DOCS_GIT_TOKEN:-}
+token_file=${DOCS_GIT_TOKEN_FILE:-/run/secrets/DOCS_GIT_TOKEN}
+if [ -z "$token" ] && [ -s "$token_file" ]; then
+    token=$(cat "$token_file")
 fi
+
+gitdir=""
+if [ -e "$repo/.git" ]; then
+    if gd=$(git -C "$repo" rev-parse --absolute-git-dir 2>&1); then
+        gitdir=$gd
+        if [ "$(git -C "$repo" rev-parse --is-shallow-repository)" = "true" ]; then
+            echo "docs-site: warning: shallow clone; release tags may be missing" >&2
+        fi
+    else
+        echo "docs-site: warning: git cannot read $repo/.git: $gd" >&2
+    fi
+fi
+if [ -z "$gitdir" ] && [ -n "$token" ]; then
+    echo "docs-site: no usable .git; fetching release tags from $remote"
+    # The token travels in a header set through the environment, so it shows
+    # up neither in the command line nor in git's error messages. No
+    # credential helper: a rejected token must fail, not prompt.
+    auth=$(printf 'docs-build:%s' "$token" | base64 | tr -d '\n')
+    if ! GIT_TERMINAL_PROMPT=0 GIT_CONFIG_COUNT=2 \
+        GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+        GIT_CONFIG_KEY_1=credential.helper GIT_CONFIG_VALUE_1= \
+        git clone --quiet --bare "$remote" "$work/remote.git" 2>"$work/clone.err"; then
+        # A token was given, so versions are expected: fail rather than
+        # silently publishing a site without them.
+        echo "docs-site: error: cannot clone $remote: $(cat "$work/clone.err")" >&2
+        echo "docs-site: error: check that DOCS_GIT_TOKEN is valid and can read the repository" >&2
+        exit 1
+    fi
+    gitdir="$work/remote.git"
+fi
+
+if [ -n "$gitdir" ]; then
+    # Newest first; pre-releases (v1.0.0-rc.1) sort before their release.
+    tags=$(git --git-dir="$gitdir" -c versionsort.suffix=- tag --list 'v*' --sort=-v:refname)
+    echo "docs-site: release tags: $(echo ${tags:-none})"
+else
+    echo "docs-site: warning: no .git and no DOCS_GIT_TOKEN; building /latest/ only" >&2
+fi
+
 for tag in $tags; do
-    if ! git -C "$repo" cat-file -e "$tag:docs-site/book.toml" 2>/dev/null; then
+    if ! git --git-dir="$gitdir" cat-file -e "$tag:docs-site/book.toml" 2>/dev/null; then
         continue # released before the documentation site existed
     fi
     mkdir -p "$work/$tag"
-    git -C "$repo" archive "$tag" docs docs-site | tar -x -C "$work/$tag"
+    git --git-dir="$gitdir" archive "$tag" docs docs-site | tar -x -C "$work/$tag"
     build_version "$work/$tag" "$tag"
     built="$built $tag"
     versions="$versions${versions:+,}\"$tag\""

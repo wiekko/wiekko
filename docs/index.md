@@ -32,13 +32,9 @@ Developers, CI pipelines and AI agents working with the `nexmap` command line cl
 
 ## Contributing
 
-nexmap is developed in its [repository](https://forge.my-universe.com/daemotron/nexmap), which also holds
-the material for contributors that this documentation leaves out:
+The source repository holds the material for contributors that this documentation leaves out:
 
-- the [specification](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/docs/spec): what
-  nexmap *shall* do, with requirement identifiers. It describes targets, not necessarily the current
-  behaviour;
-- the [design decisions](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/docs/decisions)
-  and their reasoning;
-- [CONTRIBUTING.md](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/CONTRIBUTING.md):
-  building, testing, and how this documentation is organised and published.
+- `docs/spec/`, the specification: what nexmap *shall* do, with requirement identifiers. It describes
+  targets, not necessarily the current behaviour;
+- `docs/decisions/`, the design decisions and their reasoning;
+- `CONTRIBUTING.md`: building, testing, and how this documentation is organised and published.

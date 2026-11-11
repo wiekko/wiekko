@@ -12,7 +12,7 @@ src = "../docs"
 create-missing = false
 
 [output.html]
-git-repository-url = "https://forge.my-universe.com/daemotron/nexmap"
+# No git-repository-url: the repository is private, so readers could not open it.
 # Version switcher and the banner on unreleased docs; build.sh copies the
 # current versions of these files into every version it builds.
 additional-css = ["theme/version.css"]
