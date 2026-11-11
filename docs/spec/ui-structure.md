@@ -55,7 +55,7 @@ Dashboard > [Product Name] > [Section] > [Entity Title]
 |-----------------|----------------|----------------------------------------------------------------------|
 | `/`             | Dashboard      | Product cards with key metrics; doubles as product switcher          |
 | `/products/new` | Create Product | New product form (if globally enabled or admin)                      |
-| `/user/profile` | User Profile   | Display name, email, password, TOTP setup, theme preference (UR-009) |
+| `/user/profile` | User Profile   | Display name, email, password, TOTP setup, theme preference (UC-009) |
 | `/user/tokens`  | API Tokens     | List, create, revoke personal access tokens                          |
 
 The **Dashboard** shows all products the user has access to. Each product card displays:
@@ -89,7 +89,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 | Route                                  | Page               | Purpose                                                   |
 |----------------------------------------|--------------------|-----------------------------------------------------------|
-| `/products/:id/requirements`           | Requirements List  | Table view with filters, sort, multi-select (UR-103..105) |
+| `/products/:id/requirements`           | Requirements List  | Table view with filters, sort, multi-select (UC-103..105) |
 | `/products/:id/requirements/new`       | Create Requirement | Form                                                      |
 | `/products/:id/requirements/:rid`      | Requirement Detail | Tabbed detail page (see below)                            |
 | `/products/:id/requirements/:rid/edit` | Edit Requirement   | Form                                                      |
@@ -106,7 +106,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/constraints/new`        | Create Constraint  | Form                                                      |
 | `/products/:id/constraints/:cid`       | Constraint Detail  | Tabbed detail page                                        |
 | `/products/:id/constraints/:cid/edit`  | Edit Constraint    | Form                                                      |
-| `/products/:id/board`                  | Backlog Board      | Kanban board view (only in kanban mode) (UR-101..102)     |
+| `/products/:id/board`                  | Backlog Board      | Kanban board view (only in kanban mode) (UC-101..102)     |
 | `/products/:id/sprints`                | Sprints List       | Table (only in scrum mode)                                |
 | `/products/:id/sprints/new`            | Create Sprint      | Form                                                      |
 | `/products/:id/sprints/:sid`           | Sprint Detail      | Tabbed detail page, board first (see below)               |
@@ -272,7 +272,7 @@ would need per-day snapshots persisted alongside the sprint.
 |----------------------|-------------------|------------------------------------------------------------------------|
 | `/admin/users`       | Users List        | All users with status, filter by status                                |
 | `/admin/users/:uid`  | User Detail       | Account status, roles, actions (lock, reset password, delete)          |
-| `/admin/settings`    | Instance Settings | Registration, moderation, product creation toggles (UR-006: auto-save) |
+| `/admin/settings`    | Instance Settings | Registration, moderation, product creation toggles (UC-006: auto-save) |
 | `/admin/invitations` | Invitations       | List + create new invitations                                          |
 
 ### Development (dev mode only)
@@ -383,6 +383,6 @@ Assigning an item to a sprint is a full requirement update, which the service la
 owners (developers may only change status and activation, FR-407). The Planning tab therefore gates
 drag on owner-or-admin, unlike the board, which developers can also use.
 
-### Settings pages use auto-save (UR-006)
+### Settings pages use auto-save (UC-006)
 
 Product settings (statuses, environments, pyramid levels) and admin instance settings use auto-save on change. Entity create/edit forms use explicit submit buttons. This distinction is reflected in the form patterns used on each page.

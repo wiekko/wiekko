@@ -2,7 +2,7 @@
 
 ## Color Scheme
 
-All colors use standard Tailwind CSS palettes. The scheme is designed to work for a future dark mode without rework.
+All colors use standard Tailwind CSS palettes. The tables below give the light mode values; dark mode (UC-009) uses Tailwind's `dark:` variant on the same palettes.
 
 ### Primary: Indigo
 
@@ -95,7 +95,7 @@ All static assets are embedded into the Go binary via `//go:embed` (see `web/emb
 ### Build Pipeline
 
 1. `templ generate` — convert `.templ` templates to Go code
-2. `make copy-assets` — copy fonts, JS, images to `web/dist/`
+2. `just copy-assets` — copy fonts, JS, images to `web/dist/`
 3. `tailwindcss` — compile `web/static/css/input.css` to `web/dist/css/styles.css`
 4. `go build` — compile binary with embedded `web/dist/`
 

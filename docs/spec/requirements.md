@@ -20,7 +20,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 #### Deployment
 
 * **AC-101**: The server component shall ship as single executable
-* **AC-102**: The server component shall be deployed via Docker (e.g. using [Nixpacks](https://nixpacks.com/) on [Coolify](https://coolify.io/))
+* **AC-102**: The server component shall be deployed as a container image built from the repository's `Dockerfile` (e.g. on [Coolify](https://coolify.io/))
 * **AC-103**: The server component shall adhere to the [twelve factor app methodology](https://12factor.net/).
 * **AC-104**: The server component shall support sending transactional emails, configurable via either SMTP relay (host, port, credentials) or a bulk mailer API (e.g. Mailgun, SendGrid, AWS SES).
 
@@ -46,7 +46,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 
 ##### Server
 
-* **AC-401**: The server shall be written in Go 1.24
+* **AC-401**: The server shall be written in Go 1.26
 * **AC-402**: The server shall use the Go standard library web server (`net/http`)
 
 ##### Database

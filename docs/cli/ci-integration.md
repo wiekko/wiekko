@@ -26,7 +26,7 @@ Each status change is recorded in the result history with the token's user, the 
 
 ## Setting up
 
-1. **Create a CI user** with the *tester* role in the product (tokens carry their user's full rights, so do not use a personal token), sign in as that user and create a personal access token under *Settings → Tokens*.
+1. **Create a CI user** with the *tester* role in the product (tokens carry their user's full rights, so do not use a personal token), sign in as that user and create a personal access token under *API Tokens* in the user menu (`/user/tokens`).
 2. **Register the tests** as automatic test cases with a test identifier. `nexmap test sync` creates the missing ones from a report (developer role):
    ```sh
    go test -json ./... | nexmap test sync --dry-run   # review first
@@ -83,7 +83,7 @@ For a build matrix, pass the matrix value: `--env ${{ matrix.os }}`, with one ru
 
 ```yaml
 test:
-  image: golang:1.25
+  image: golang:1.26
   variables:
     NEXMAP_SERVER: https://nexmap.example.com
     NEXMAP_PRODUCT: "<product id>"
@@ -103,7 +103,7 @@ jobs:
   test:
     runs-on: docker
     container:
-      image: golang:1.25
+      image: golang:1.26
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v4
       - run: go install nexmap.net/cmd/nexmap@latest
@@ -126,23 +126,4 @@ exit $status
 
 With the default `package` style, pytest identifiers look like `tests.test_calc.test_add` and Surefire ones like `com.example.CalcTest.testAdd`; jest-junit's default (classname equal to name) yields the test title.
 
-## API
-
-`POST /api/v1/products/{productId}/test-runs` (tester role) takes
-
-```json
-{
-  "source": "go-test",
-  "campaign_id": "",
-  "environment": "linux-amd64",
-  "revision": "4161949",
-  "branch": "main",
-  "dry_run": false,
-  "results": [
-    {"test_identifier": "pkg.TestA", "status": "passed", "duration_ms": 12},
-    {"test_identifier": "pkg.TestB", "status": "failed", "output": "b_test.go:9: got 1, want 2"}
-  ]
-}
-```
-
-and answers with `recorded`, `campaign`, `environment`, a `summary` (counts per status, per outcome, `defects_created`, `defects_reused`, `total`) and per-test `results` with `outcome` (`updated`, `unchanged`, `unknown_test_case`, `not_in_campaign`, `environment_required`, `not_recorded`) and `defect` (`created`, `reused`). Uploads are limited to 32 MiB and 50,000 results; statuses are `passed`, `failed` and `skipped`.
+The upload endpoint behind `nexmap utest` is described in the [REST API reference](../api/rest.md#test-runs).

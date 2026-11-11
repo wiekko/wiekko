@@ -2,68 +2,16 @@
 
 Nexmap Product Management Solution
 
-## Building
+nexmap keeps a product's requirements, constraints, backlog, test cases, testing campaigns and defects in
+one place. It consists of a server (`nexmapd`) with a web UI and REST API, and a command line client
+(`nexmap`) for repositories, CI pipelines and AI agents.
 
-nexmap needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is
-built and tested with. Older distribution packages work as well: since Go 1.21, `go` reads that line,
-fetches the named toolchain once (from the Go module proxy, verified against the Go checksum database)
-and uses it for this repository, `gopls` included. This needs automatic toolchain switching, which some
-distributions turn off:
+- Deploying and running nexmap: [docs/admin/installation.md](docs/admin/installation.md)
+- Recording test results from CI: [docs/cli/ci-integration.md](docs/cli/ci-integration.md)
+- All documentation: [docs/index.md](docs/index.md)
+- Building and testing nexmap itself: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-```sh
-go env GOTOOLCHAIN              # "auto" or "path+auto": nothing to do
-go env -w GOTOOLCHAIN=auto      # if it prints "local"
-```
-
-Local builds need `just` and the Tailwind CSS v4 standalone CLI (`tailwindcss`) on the `PATH`. The templ
-generator needs no install: the `justfile` runs it at the version pinned in `go.mod`.
-
-```sh
-just build     # vet and build nexmapd and nexmap
-just dev       # regenerate templates and CSS on change, run the server
-just test      # SQLite only: PostgreSQL subtests skip without a server
-just test-pg   # also PostgreSQL, on a throwaway server in a container
-```
-
-Integration tests run on both SQLite and PostgreSQL to catch dialect differences. The PostgreSQL runs need
-a server named by `NEXMAP_TEST_POSTGRES_DSN` (a `postgres://` URL whose role may create databases);
-`just test-pg` starts one with podman or docker and removes it afterwards. Without a server those subtests
-are skipped, not failed; set `NEXMAP_TEST_POSTGRES=required` where PostgreSQL coverage must not be
-skipped silently, such as CI.
-
-For release binaries, `just container-build [os] [arch]` builds in a container (podman, else docker;
-override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Dockerfile`, and
-writes the binaries to `build/<os>-<arch>/`. The host needs only the container engine and `just`.
-
-## Deployment
-
-The `Dockerfile`'s default stage is the server image: `nexmapd` alone on a distroless base, running as a
-non-root user, listening on port 8080 on all interfaces, with a `HEALTHCHECK` (`nexmapd healthcheck`).
-It keeps the SQLite database and attachments in `/data`, so mount persistent storage there. Migrations
-run automatically when the server starts.
-
-On Coolify, create the application with the **Dockerfile** build pack and:
-
-- add persistent storage (a volume) with destination path `/data`;
-- set the environment variables, at least `NEXMAP_ENCRYPTION_KEY`, and `NEXMAP_ADMIN_USER` /
-  `NEXMAP_ADMIN_PASSWORD` for the first start; for PostgreSQL, `NEXMAP_DB_DRIVER=postgres` and
-  `NEXMAP_DB_DSN`;
-- nothing for the version: the build reads it from the repository's git tags, as `go build` does
-  locally (`v0.1.0` on a tagged commit, `v0.1.1-0.<date>-<commit>` after it). If the checkout has no
-  tags (a shallow clone), it reports `v0.0.0-<date>-<commit>`; set the build variable `VERSION` to
-  override it.
-
-Ports (8080) and the health check come from the image. When building with podman, pass
-`--format docker`: the default OCI image format drops the `HEALTHCHECK`.
-
-## Binaries
-
-| Binary    | Source          | Purpose                                                      |
-|-----------|-----------------|--------------------------------------------------------------|
-| `nexmapd` | `cmd/nexmapd`   | The server: web UI and REST API (`just build`, `just dev`)   |
-| `nexmap`  | `cmd/nexmap`    | The command line client, talking to the server via REST only |
-
-Quick start with the CLI (see `docs/tmp/40_cli_plan.md`):
+## CLI quick start
 
 ```sh
 nexmap login --server https://nexmap.example.com   # paste a token from /user/tokens
@@ -73,8 +21,7 @@ nexmap api /products/{product}/requirements -o json
 ```
 
 In CI, set `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and `NEXMAP_TOKEN` instead of logging in, and pipe test output into
-`nexmap utest` to record it in the active testing campaign (`go test -json ./... | nexmap utest --env linux`);
-see `docs/50_ci_integration.md` for setup and CI snippets.
+`nexmap utest` to record it in the active testing campaign (`go test -json ./... | nexmap utest --env linux`).
 
 For AI agents working in a repository, `nexmap agent-guide` prints a usage guide to paste into
 `AGENTS.md` / `CLAUDE.md`; `nexmap context -o md` gives a product briefing, and `nexmap req show FR-12`,
