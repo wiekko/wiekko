@@ -1,10 +1,15 @@
 # Documentation site (docs.nexmap.net): mdBook pages for main and every release
-# tag, served by nginx on port 8080. Build from the repository root, with .git
-# in the context so the release tags can be built too:
+# tag, served by nginx on port 8080. Build from the repository root:
 #
-#   podman build --format docker -f docs-site/Dockerfile -t nexmap-docs .
+#   docker build -f docs-site/Dockerfile -t nexmap-docs .   (or: just docs-container)
 #
-# See CONTRIBUTING.md, "Documentation site".
+# The release tags come from .git in the build context. Without it (Coolify),
+# build.sh clones the repository with a read-only token, passed as the BuildKit
+# secret DOCS_GIT_TOKEN:
+#
+#   DOCS_GIT_TOKEN=... docker build --secret id=DOCS_GIT_TOKEN,env=DOCS_GIT_TOKEN ...
+#
+# See CONTRIBUTING.md, "Documentation site", and docs-site/DEPLOYMENT.md.
 
 ARG BUILD_IMAGE=docker.io/library/alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 ARG RUNTIME_IMAGE=docker.io/nginxinc/nginx-unprivileged:1.31.7-alpine3.24@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e
@@ -33,14 +38,11 @@ RUN set -eu; \
 WORKDIR /src
 COPY . .
 
-# Read-only access token for fetching the release tags when the context has no
-# .git (Coolify). Preferably a BuildKit secret: `--secret id=DOCS_GIT_TOKEN`,
-# which Coolify passes when its build secrets are set to Docker BuildKit
-# secrets. The build argument is the fallback Coolify uses without BuildKit;
-# it stays in this build stage, which is not part of the published image.
-ARG DOCS_GIT_TOKEN=""
+# Where to clone from when the context has no .git; build.sh has the default.
 ARG DOCS_GIT_URL=""
 
+# The token is only accepted as a secret, mounted at /run/secrets/DOCS_GIT_TOKEN,
+# never as a build argument: those end up in the image's build history.
 # The context's files belong to another user than the one running git here.
 RUN --mount=type=secret,id=DOCS_GIT_TOKEN \
     git config --global --add safe.directory /src \
