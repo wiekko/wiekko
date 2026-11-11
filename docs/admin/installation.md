@@ -28,7 +28,11 @@ Local builds with `.git` in the context (`just container-build`, `podman build .
 they take it from the git tags as `go build` does, `v0.9.0` on a tagged commit and a pseudo-version
 (`v0.9.1-0.<date>-<commit>`) after it.
 
-Ports (8080) and the health check come from the image. Coolify's proxy terminates TLS; see
+Ports (8080) and the health check come from the image. Leave Coolify's own health check (in the
+application's **Healthcheck** settings) turned off: Coolify runs it through `/bin/sh` and, for the HTTP
+type, `curl` or `wget` inside the container, and the distroless image has none of them, so it fails
+with `stat /bin/sh: no such file or directory`. The image's `HEALTHCHECK` runs `nexmapd healthcheck`
+directly and needs no shell. Coolify's proxy terminates TLS; see
 [Security](security.md#tls-and-the-reverse-proxy) for what the server expects from it.
 
 ## After the first start
