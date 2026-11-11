@@ -8,6 +8,15 @@ Deploying, configuring and running a nexmap server.
 - [Configuration](admin/configuration.md): every environment variable and flag of `nexmapd`
 - [Security](admin/security.md): TLS, the encryption key, the first administrator, accounts and tokens
 
+## Users
+
+Working with nexmap in the browser.
+
+- [Concepts](guide/concepts.md): products, structure, requirements, tasks, constraints, defects, tests, roles
+- [Getting started](guide/getting-started.md): creating a product, settings, team, structure
+- [Backlog](guide/backlog.md): requirements, tasks, constraints, defects, boards and sprints
+- [Testing](guide/testing.md): test cases, campaigns, recording results
+
 ## CLI users
 
 Developers, CI pipelines and AI agents working with the `nexmap` command line client.

@@ -6,6 +6,8 @@ nexmap keeps a product's requirements, constraints, backlog, test cases, testing
 one place. It consists of a server (`nexmapd`) with a web UI and REST API, and a command line client
 (`nexmap`) for repositories, CI pipelines and AI agents.
 
+- Using nexmap: [docs/guide/concepts.md](docs/guide/concepts.md), then
+  [getting started](docs/guide/getting-started.md)
 - Deploying and running nexmap: [docs/admin/installation.md](docs/admin/installation.md)
 - Setting up the CLI: [docs/cli/setup.md](docs/cli/setup.md)
 - Recording test results from CI: [docs/cli/ci-integration.md](docs/cli/ci-integration.md)
