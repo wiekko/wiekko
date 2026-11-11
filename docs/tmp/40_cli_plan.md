@@ -11,13 +11,13 @@ What exists today and matters for the CLI:
 
 | Area | State | Consequence for the CLI |
 |---|---|---|
-| REST API `/api/v1` (`internal/router/api_v1.go`) | Full CRUD for products, components, capabilities, requirements, constraints, defects, test cases, campaigns, comments, attachments, audit | The CLI is a pure API client; no business logic in the CLI (AC-201, AC-224) |
-| Auth (`internal/middleware/authenticate.go`, `csrf.go`) | Bearer PATs accepted; PAT requests are CSRF-exempt | CLI auth works today with `Authorization: Bearer <pat>` |
-| Response envelope (`internal/httputil`) | `{"data": …}` / `{"error": {"code","message"}}` | One generic decode path in the client |
+| REST API `/api/v1` (`../../internal/router/api_v1.go`) | Full CRUD for products, components, capabilities, requirements, constraints, defects, test cases, campaigns, comments, attachments, audit | The CLI is a pure API client; no business logic in the CLI (AC-201, AC-224) |
+| Auth (`../../internal/middleware/authenticate.go`, `csrf.go`) | Bearer PATs accepted; PAT requests are CSRF-exempt | CLI auth works today with `Authorization: Bearer <pat>` |
+| Response envelope (`../../internal/httputil`) | `{"data": …}` / `{"error": {"code","message"}}` | One generic decode path in the client |
 | Test cases (`model.TestCase`) | `execution_mode=automatic` + `test_identifier` | The mapping key for ingestion already exists, but nothing looks it up |
 | Campaign results (`TestingService.SetResultStatus`) | Per-result PATCH; tester role; **failed requires a defect** (FR-502); **only in active campaigns** (FR-505) | Ingestion can't be built from the existing per-result endpoint alone (see §3.1) |
 | JSON shapes (`requirementToJSON` etc.) | UUIDs only; no `FR-12` identifier, no status / category names | Agents and humans think in `FR-12` and "In Progress", not UUIDs (see §3.2) |
-| `cmd/nexmap` | Is the **server**; `config.Load(os.Args[1:])` owns the flag namespace | Naming collision with the `nexmap utest` command from FR-409 (see §2.1) |
+| `../../cmd/nexmap` | Is the **server**; `config.Load(os.Args[1:])` owns the flag namespace | Naming collision with the `nexmap utest` command from FR-409 (see §2.1) |
 
 ## 2. Architecture
 
@@ -25,10 +25,10 @@ What exists today and matters for the CLI:
 
 **Decided:** two binaries from one module.
 
-- `cmd/nexmapd` — the server (renamed from `cmd/nexmap`; Justfile, nixpacks, `.gitignore` and docs follow).
-- `cmd/nexmap` — the CLI, matching the `go test -v ./... | nexmap utest` wording of FR-409.
+- `../../cmd/nexmapd` — the server (renamed from `cmd/nexmap`; Justfile, nixpacks, `.gitignore` and docs follow).
+- `../../cmd/nexmap` — the CLI, matching the `go test -v ./... | nexmap utest` wording of FR-409.
 
-Rationale: the server binary embeds web assets, templ output, both SQL drivers and the migration set; CI runners and agent sandboxes should download a small, static, cgo-free client. AC-101 ("server ships as single executable") stays satisfied. The CLI must **not** import `internal/store`, `internal/service`, `internal/database` or `web/` — enforce with a test that inspects `go list -deps ./cmd/nexmap`.
+Rationale: the server binary embeds web assets, templ output, both SQL drivers and the migration set; CI runners and agent sandboxes should download a small, static, cgo-free client. AC-101 ("server ships as single executable") stays satisfied. The CLI must **not** import `../../internal/store`, `internal/service`, `internal/database` or `web/` — enforce with a test that inspects `go list -deps ./cmd/nexmap`.
 
 ### 2.2 Packages
 
@@ -43,7 +43,7 @@ internal/ingest/gotest/     `go test -json` and `go test -v` text
 internal/ingest/junit/      JUnit XML (pytest, jest, maven, gotestsum, …)
 ```
 
-- `internal/client` defines its own DTOs mirroring the JSON contract instead of reusing `internal/model` — the wire format is the contract, and this keeps the client free of server internals. Request structs used by both controller and client can move to a shared `internal/api` package later if duplication hurts.
+- `../../internal/client` defines its own DTOs mirroring the JSON contract instead of reusing `internal/model` — the wire format is the contract, and this keeps the client free of server internals. Request structs used by both controller and client can move to a shared `internal/api` package later if duplication hurts.
 - Command dispatch uses the standard library (`flag.FlagSet` per subcommand + a small router) to stay in line with the dependency-light codebase. Revisit only if shell completion becomes a requirement.
 
 ### 2.3 Configuration and credentials
@@ -121,13 +121,13 @@ Implemented in phases 0–1:
 Still open:
 
 - Defects have no human identifier today. Add a per-product sequence (prefix e.g. `DF`) so agents and commit messages can say `DF-7`. Needs a migration + backfill; the CLI uses 8-character ID prefixes meanwhile.
-- ~~Product scoping of entity IDs~~ — fixed: every service method that takes an entity ID (path IDs and references inside create/update payloads, link targets, audit queries) now checks that the entity belongs to the product in the URL via a shared ownership checker (`internal/service/ownership.go`), answering 404 otherwise. Covered by `TestCrossProductIsolation` (both engines) and an API-level e2e test.
+- ~~Product scoping of entity IDs~~ — fixed: every service method that takes an entity ID (path IDs and references inside create/update payloads, link targets, audit queries) now checks that the entity belongs to the product in the URL via a shared ownership checker (`../../internal/service/ownership.go`), answering 404 otherwise. Covered by `TestCrossProductIsolation` (both engines) and an API-level e2e test.
 
 ### 3.3 Later (not blocking v1)
 
 - `GET /products/{p}/search?q=` (FR-701) → `nexmap search`.
 - PAT scopes (read-only, product-bound). Today a PAT carries the full power of its user; a CI token or an agent token should be narrower. Until then, document "use a dedicated tester-role CI user".
-- Server-side pagination on API lists (`ListParams` already exists in `internal/store/list.go`) once products grow.
+- Server-side pagination on API lists (`ListParams` already exists in `../../internal/store/list.go`) once products grow.
 - Campaign scope endpoint (`AddCampaignTestCases` exists in the service but has no API route).
 
 ## 4. Command set
@@ -159,7 +159,7 @@ nexmap utest --format junit reports/*.xml
 - `--revision` / `--branch` default from `GITHUB_SHA`, `CI_COMMIT_SHA`, `GITHUB_REF_NAME`, … or `git rev-parse`.
 - `nexmap test sync --format go-json` (developer role): create missing automatic test cases from a run, so a repo can bootstrap its test catalogue instead of typing identifiers into the UI. Opt-in only.
 
-Ship copy-paste snippets for GitHub Actions, GitLab CI and Forgejo Actions in `docs/`.
+Ship copy-paste snippets for GitHub Actions, GitLab CI and Forgejo Actions in `..`.
 
 ### 4.3 Agent access (primary use case)
 
@@ -193,13 +193,13 @@ Agent ergonomics:
 
 ### 4.4 MCP server (first release)
 
-`nexmap mcp` runs a stdio Model Context Protocol server exposing the same read/write operations as tools (`get_context`, `get_requirement`, `list_requirements`, `list_defects`, `get_test_case`, `campaign_status`, `set_requirement_status`, `create_task`, `create_defect`, `add_comment`) on top of `internal/client`. This gives Claude Code and other MCP-capable agents typed tools instead of shelling out.
+`nexmap mcp` runs a stdio Model Context Protocol server exposing the same read/write operations as tools (`get_context`, `get_requirement`, `list_requirements`, `list_defects`, `get_test_case`, `campaign_status`, `set_requirement_status`, `create_task`, `create_defect`, `add_comment`) on top of `../../internal/client`. This gives Claude Code and other MCP-capable agents typed tools instead of shelling out.
 
-- **One operation layer, two front ends.** Each agent operation lives once in `internal/cli/ops` (input struct → result struct, using `internal/client` + `internal/cli/resolve`). CLI commands and MCP tools are thin adapters over it, so they cannot drift apart, and MCP tool input schemas are generated from the same input structs.
+- **One operation layer, two front ends.** Each agent operation lives once in `../../internal/cli/ops` (input struct → result struct, using `internal/client` + `internal/cli/resolve`). CLI commands and MCP tools are thin adapters over it, so they cannot drift apart, and MCP tool input schemas are generated from the same input structs.
 - Results are returned as markdown text (the `-o md` renderer) plus structured JSON content, so agents get readable context and exact fields.
 - Config and token resolution are identical to the CLI (§2.3), so a repo with `.nexmap.json` needs only `{"command": "nexmap", "args": ["mcp"]}` in `.mcp.json`; `nexmap init --agents` writes that entry.
 - `--read-only` flag hides all write tools — the recommended default until PAT scopes (§3.3) exist.
-- Implementation: the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk`) — protocol details (capability negotiation, schema, transport) are not worth hand-rolling. It is the only new dependency of the CLI and is confined to `internal/cli/mcp` (enforced by `cmd/nexmap/deps_test.go`). It requires Go 1.25, so `go.mod` moved from 1.24.
+- Implementation: the official Go MCP SDK (`github.com/modelcontextprotocol/go-sdk`) — protocol details (capability negotiation, schema, transport) are not worth hand-rolling. It is the only new dependency of the CLI and is confined to `../../internal/cli/mcp` (enforced by `cmd/nexmap/deps_test.go`). It requires Go 1.25, so `go.mod` moved from 1.24.
 
 Phase 2 as built:
 
@@ -232,16 +232,16 @@ Ordered by priority: agent access first, CI ingestion after. Phases 0–4 make u
 
 | Phase | Scope | Done when |
 |---|---|---|
-| **0 — Groundwork** ✅ | Binary split (§2.1); `internal/client` with auth, envelope decoding, typed errors, retry on 429/5xx for idempotent calls; config + `init/login/whoami/version/api`; `GET /version` | `nexmap whoami` works against a dev server with a PAT; dependency-guard test green |
-| **1 — Agent reads** ✅ | §3.2 identifiers + ref resolution; `internal/cli/ops` read operations; `context`, `req/constraint/capability/component/defect/test/campaign` list+show; md/json renderers; `agent-guide` | An agent given only `agent-guide` can answer "what does FR-12 require and which tests cover it" |
+| **0 — Groundwork** ✅ | Binary split (§2.1); `../../internal/client` with auth, envelope decoding, typed errors, retry on 429/5xx for idempotent calls; config + `init/login/whoami/version/api`; `GET /version` | `nexmap whoami` works against a dev server with a PAT; dependency-guard test green |
+| **1 — Agent reads** ✅ | §3.2 identifiers + ref resolution; `../../internal/cli/ops` read operations; `context`, `req/constraint/capability/component/defect/test/campaign` list+show; md/json renderers; `agent-guide` | An agent given only `agent-guide` can answer "what does FR-12 require and which tests cover it" |
 | **2 — MCP (read-only)** ✅ | `nexmap mcp --read-only` over the phase-1 ops; `init --agents` writes `.mcp.json` | Claude Code in a repo with `.nexmap.json` can call `get_context` / `get_requirement` without further setup |
 | **3 — Agent writes** ✅ | Write ops (`req status/create`, `defect create`, `comment add`) in CLI and MCP | Role checks verified for viewer/tester/developer tokens; `--read-only` hides them |
-| **4 — CI ingestion** ✅ | §3.1 endpoint + service + migration; `internal/ingest` parsers with output capture; `nexmap utest` incl. `--dry-run`, `--exit-code`, env/revision detection; `test sync`; CI snippets | Nexmap's own `go test -json ./...` lands in a campaign of a dev-seed product; repeated runs produce no duplicate events; a failure creates/reuses a defect containing the test output; closing it and re-running green ends passed; with no active campaign nothing is written |
+| **4 — CI ingestion** ✅ | §3.1 endpoint + service + migration; `../../internal/ingest` parsers with output capture; `nexmap utest` incl. `--dry-run`, `--exit-code`, env/revision detection; `test sync`; CI snippets | Nexmap's own `go test -json ./...` lands in a campaign of a dev-seed product; repeated runs produce no duplicate events; a failure creates/reuses a defect containing the test output; closing it and re-running green ends passed; with no active campaign nothing is written |
 | **5 — Later** | FR-319 import/export, FR-701 search (server + CLI + MCP), PAT scopes, defect identifiers | — |
 
-Phase 4 as built (user guide: [50_ci_integration.md](50_ci_integration.md)):
+Phase 4 as built (user guide: [50_ci_integration.md](../50_ci_integration.md)):
 
-- `POST /products/{p}/test-runs` → `TestRunService.IngestRun` (`internal/service/testrun.go`), tester role. Behaves as §3.1, with these decisions:
+- `POST /products/{p}/test-runs` → `TestRunService.IngestRun` (`../../internal/service/testrun.go`), tester role. Behaves as §3.1, with these decisions:
   - **No single transaction.** The store has no cross-store transactions; results are applied one by one instead, and every step is idempotent (unchanged statuses are skipped, an open defect on the result is reused). A run that fails half way is completed by sending it again. Two concurrent uploads failing the same new test could both file a defect.
   - Identifiers are matched in memory against the product's automatic test cases (no `ListByIdentifiers` store method needed at current sizes). Manual test cases are never touched.
   - An unknown environment name, an explicit campaign that is not active, an unknown status (only `passed`/`failed`/`skipped`) or an empty run is a 400, not a silent no-op.
@@ -250,7 +250,7 @@ Phase 4 as built (user guide: [50_ci_integration.md](50_ci_integration.md)):
   - Defects are filed through `BacklogService.CreateDefect`/`AddDefectLink`, so they get the default status, audit entries and the same validation as manual ones.
   - Body limit 32 MiB, at most 50,000 results; defect output keeps the last 64 KiB, inside a code fence longer than any backtick run in the output.
 - `campaign_result_events` gained `source`, `revision`, `branch` (NOT NULL DEFAULT ''), folded into `00003_products.sql` for both dialects while the project is pre-release.
-- Parsers in `internal/ingest` (`gotest`: `-json` and `-v` text, `junit`), tested against a real `go test` run (subtests, skip, parallel interleaving, a panic, a build failure) and pytest / jest-junit / Surefire XML. Build failures and package crashes are reported as run errors (they count for `--exit-code`, match no test case).
+- Parsers in `../../internal/ingest` (`gotest`: `-json` and `-v` text, `junit`), tested against a real `go test` run (subtests, skip, parallel interleaving, a panic, a build failure) and pytest / jest-junit / Surefire XML. Build failures and package crashes are reported as run errors (they count for `--exit-code`, match no test case).
 - `nexmap utest` and `nexmap test sync` as in §4.2. `utest` copies stdin to stdout unless `--quiet` or `-o json`. `test sync` skips subtests and titles new cases `TestName (pkg)`.
 - Verified end to end against the seeded Aviary campaign (dry run, recording, defect filing with output and revision, unchanged repeat, environment matrix, `--exit-code`, viewer refusal, no-campaign upload). Not run against Nexmap's own test suite: none of the dev-seed products registers Nexmap's tests.
 
@@ -258,10 +258,10 @@ Phase 4 as built (user guide: [50_ci_integration.md](50_ci_integration.md)):
 
 - **Parsers**: table tests over committed fixtures (`internal/ingest/testdata/`): real `go test -json` and `-v` output incl. subtests, panics, build failures, skips, parallel interleaving; JUnit from pytest, jest, maven surefire.
 - **Client**: `httptest.Server` tests for envelope/error decoding, auth header, retries, timeouts.
-- **Ingestion service**: integration tests on both dialects via `internal/database/dbtest` (as the store layer does): no active campaign writes nothing (no results, events or defects), unknown identifiers and out-of-scope test cases create no defects, subtest roll-up, environment matrix, unchanged-status no-op, defect reuse vs creation, captured output and truncation in the defect description, FR-504 retest loop.
+- **Ingestion service**: integration tests on both dialects via `../../internal/database/dbtest` (as the store layer does): no active campaign writes nothing (no results, events or defects), unknown identifiers and out-of-scope test cases create no defects, subtest roll-up, environment matrix, unchanged-status no-op, defect reuse vs creation, captured output and truncation in the defect description, FR-504 retest loop.
 - **MCP**: drive `nexmap mcp` in-process over an in-memory transport against the same e2e server; assert tool listing (with and without `--read-only`) and tool results match the CLI's json output for the same op.
 - **End-to-end**: spin up `router.New` on an in-memory SQLite with a seeded product and a PAT, run CLI commands in-process (command entry point takes `args, stdin, stdout, stderr`), assert on json output. Covers AC-224 for real.
-- **Dependency guard**: `cmd/nexmap` must not depend on `internal/store|service|database`, `web/`.
+- **Dependency guard**: `../../cmd/nexmap` must not depend on `internal/store|service|database`, `web/`.
 
 ## 7. Decisions
 

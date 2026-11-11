@@ -63,7 +63,7 @@ Ports (8080) and the health check come from the image. When building with podman
 | `nexmapd` | `cmd/nexmapd`   | The server: web UI and REST API (`just build`, `just dev`)   |
 | `nexmap`  | `cmd/nexmap`    | The command line client, talking to the server via REST only |
 
-Quick start with the CLI (see `docs/40_cli_plan.md`):
+Quick start with the CLI (see `docs/tmp/40_cli_plan.md`):
 
 ```sh
 nexmap login --server https://nexmap.example.com   # paste a token from /user/tokens
