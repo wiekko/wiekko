@@ -200,7 +200,7 @@ func (c *PageLoginController) renderLoginErrorStatus(w http.ResponseWriter, r *h
 func (c *PageLoginController) Logout(w http.ResponseWriter, r *http.Request) {
 	// Validate CSRF token from form body.
 	expected := middleware.CSRFTokenFromContext(r.Context())
-	provided := r.FormValue("csrf_token")
+	provided := r.FormValue("_csrf")
 	if expected == "" || provided == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) != 1 {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return

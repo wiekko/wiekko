@@ -38,6 +38,7 @@ templ CreatePage(props CreateProps) {
 			@ui.Card() {
 				@ui.CardBody() {
 					<form method="POST" action="/products/new" class="space-y-6">
+						<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
 						@patterns.FormError(props.Error)
 						@ui.TextInput(ui.InputProps{
 							ID:          "name",

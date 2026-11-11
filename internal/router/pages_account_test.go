@@ -1,15 +1,18 @@
 package router
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -319,6 +322,9 @@ func TestPasswordChangeEndsOtherSessions(t *testing.T) {
 			}
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			req.AddCookie(cookie)
+			if method != http.MethodGet {
+				req.Header.Set("X-CSRF-Token", csrfToken(t, e, cookie))
+			}
 			resp, err := e.client().Do(req)
 			if err != nil {
 				t.Fatal(err)
@@ -339,6 +345,126 @@ func TestPasswordChangeEndsOtherSessions(t *testing.T) {
 		}
 		if resp, _ := do(http.MethodGet, "/user/profile", second, nil); resp.StatusCode != http.StatusSeeOther {
 			t.Errorf("other session: status %d, want a redirect to sign in", resp.StatusCode)
+		}
+	})
+}
+
+var csrfTokenPattern = regexp.MustCompile(`X-CSRF-Token(?:&#34;|&quot;|")\s*:\s*(?:&#34;|&quot;|")([^&"]+)`)
+
+// csrfToken reads the CSRF token of the session from a page, where the app
+// layout hands it to htmx.
+func csrfToken(t *testing.T, e *accountEnv, cookie *http.Cookie) string {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, e.srv.URL+"/user/profile", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(cookie)
+	resp, err := e.client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := csrfTokenPattern.FindStringSubmatch(readBody(t, resp))
+	if m == nil {
+		t.Fatal("no CSRF token on /user/profile")
+	}
+	return m[1]
+}
+
+var pageRoutePattern = regexp.MustCompile(`mux\.Handle\("(POST|PUT|PATCH|DELETE) ([^"]+)",\s*(\w+)\(`)
+
+// TestPageRoutesRequireCSRF sends every state-changing page route a request
+// from a signed-in administrator without a CSRF token, and expects the CSRF
+// check to refuse it. Routes are read from pages.go, so a new route that
+// skips the check fails here. (The public routes — sign-in, registration —
+// are registered with HandleFunc and have no session to protect.)
+func TestPageRoutesRequireCSRF(t *testing.T) {
+	src, err := os.ReadFile("pages.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes := pageRoutePattern.FindAllStringSubmatch(string(src), -1)
+	if len(routes) < 100 {
+		t.Fatalf("found only %d routes in pages.go; is the pattern still right?", len(routes))
+	}
+	placeholder := regexp.MustCompile(`\{[^}]+\}`)
+
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		hash, err := builtin.New(e.st.User, 1).HashPassword(goodPassword)
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC().Format(time.RFC3339)
+		if err := e.st.User.Create(ctx, &model.User{
+			ID: uuid.New().String(), Username: "ops", Email: "ops@example.com", DisplayName: "Ops",
+			PasswordHash: hash, IsAdmin: true, Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		resp, _ := e.post("/login", url.Values{"username": {"ops"}, "password": {goodPassword}})
+		var session *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" {
+				session = c
+			}
+		}
+		if session == nil {
+			t.Fatalf("sign-in failed: status %d", resp.StatusCode)
+		}
+
+		// Upload routes read the multipart body before the CSRF check (see
+		// pageUpload), so they get one; anything else is refused before that.
+		send := func(method, path string, form url.Values, header map[string]string, multi bool) (*http.Response, string) {
+			t.Helper()
+			var body bytes.Buffer
+			contentType := "application/x-www-form-urlencoded"
+			if multi {
+				mw := multipart.NewWriter(&body)
+				for k, vs := range form {
+					for _, v := range vs {
+						_ = mw.WriteField(k, v)
+					}
+				}
+				_ = mw.Close()
+				contentType = mw.FormDataContentType()
+			} else {
+				body.WriteString(form.Encode())
+			}
+			req, err := http.NewRequest(method, e.srv.URL+path, &body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", contentType)
+			for k, v := range header {
+				req.Header.Set(k, v)
+			}
+			req.AddCookie(session)
+			resp, err := e.client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return resp, readBody(t, resp)
+		}
+
+		for _, m := range routes {
+			method, path, multi := m[1], placeholder.ReplaceAllString(m[2], "x"), m[3] == "upload"
+			resp, body := send(method, path, url.Values{"name": {"x"}}, nil, multi)
+			if resp.StatusCode != http.StatusForbidden || !strings.Contains(body, "CSRF_INVALID") {
+				t.Errorf("%s %s without token: status %d, want 403 CSRF_INVALID", m[1], m[2], resp.StatusCode)
+			}
+			resp, body = send(method, path, url.Values{"_csrf": {"wrong"}}, map[string]string{"X-CSRF-Token": "wrong"}, multi)
+			if resp.StatusCode != http.StatusForbidden || !strings.Contains(body, "CSRF_INVALID") {
+				t.Errorf("%s %s with a wrong token: status %d, want 403 CSRF_INVALID", m[1], m[2], resp.StatusCode)
+			}
+		}
+
+		// The real token in a plain form's _csrf field passes (sign-out form).
+		token := csrfToken(t, e, session)
+		resp, _ = send(http.MethodPost, "/logout", url.Values{"_csrf": {token}}, nil, false)
+		if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
+			t.Errorf("logout with token: status %d, location %q", resp.StatusCode, resp.Header.Get("Location"))
 		}
 	})
 }

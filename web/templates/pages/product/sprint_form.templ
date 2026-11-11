@@ -49,7 +49,7 @@ templ SprintFormPage(props SprintFormProps) {
 			@ui.Card() {
 				@ui.CardBody() {
 					<form method="post" action={ templ.SafeURL(sprintFormAction(props)) } class="space-y-6">
-						<input type="hidden" name="csrf_token" value={ props.Meta.CSRFToken }/>
+						<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
 						if props.ReturnTo != "" {
 							<input type="hidden" name="return" value={ props.ReturnTo }/>
 						}

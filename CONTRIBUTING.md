@@ -40,6 +40,14 @@ a server named by `NEXMAP_TEST_POSTGRES_DSN` (a `postgres://` URL whose role may
 are skipped, not failed; set `NEXMAP_TEST_POSTGRES=required` where PostgreSQL coverage must not be
 skipped silently, such as CI.
 
+## Web UI routes and forms
+
+Register signed-in page routes with `pageAuthed` or `pageAdmin` (uploads: `pageUpload`) in
+`internal/router/pages.go`; both check the CSRF token on `POST`, `PUT`, `PATCH` and `DELETE`, and
+`TestPageRoutesRequireCSRF` fails for a mutating route that skips it. htmx requests send the token as a
+header from the app layout. A plain HTML form (no `hx-post`) must carry it itself:
+`<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>`.
+
 ## Specification and documentation
 
 `docs/spec/` holds the specification: what nexmap *shall* do, with requirement identifiers (FR-…, AC-…).
