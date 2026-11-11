@@ -1,0 +1,65 @@
+# CLI decisions
+
+Decisions behind the `nexmap` command line client and its MCP server: what was chosen, and why.
+
+## Two binaries: `nexmap` is the CLI, `nexmapd` the server
+
+The server binary embeds the web assets, templ output, both SQL drivers and the migrations. CI runners and
+agent sandboxes should download a small client instead, so the CLI is a separate binary. The CLI name
+matches the `nexmap utest` wording of FR-409; the server, previously `cmd/nexmap`, became `nexmapd`.
+AC-101 (the server ships as a single executable) still holds.
+
+The CLI is a pure REST client (AC-224) with no business logic of its own (AC-201). It must not import the
+server's `internal/store`, `internal/service`, `internal/database` or `web/` packages; `cmd/nexmap/deps_test.go`
+enforces this.
+
+## Agent access first, CI ingestion second
+
+The CLI has two jobs: giving AI coding agents access to the product definition, QA state and backlog, and
+recording test results from CI. Agent access is the primary use case, so it was built first, and the MCP
+server shipped in the first release rather than later.
+
+## Configuration in JSON, tokens never in the repository
+
+The repository file `.nexmap.json` holds only the server and product and is meant to be committed. Tokens
+live in the user configuration file (mode 0600) or in `NEXMAP_TOKEN`. JSON keeps the CLI free of
+dependencies; TOML can be added later as a second decoder for the same structure if JSON proves
+impractical.
+
+There is no `--token` flag, since a token on the command line leaks through shell history and process
+listings; `nexmap login` reads it from a hidden prompt or stdin. Password login is not offered: the CLI
+authenticates with personal access tokens only (SC-105).
+
+## Plain HTTP only to the local machine
+
+`http://` servers are refused unless they are on the local machine, so a token never crosses the network
+unencrypted (SC-001). `--allow-http` overrides this deliberately.
+
+## Output does not depend on the terminal
+
+The default output is a table even when stdout is not a terminal. Scripts and agents must ask for
+`-o json` (or `-o md`) explicitly, so a command's output never changes with the environment it runs in.
+Exit codes (0 ok, 1 usage, 2 API, 3 not found, 4 tests failed) are part of the same contract.
+
+## One operation layer, two front ends
+
+Each agent operation exists once, in `internal/cli/ops`, as an input struct and a result struct on top of
+the REST client. CLI commands and MCP tools are thin adapters over it, so they cannot drift apart, and the
+MCP tools' input schemas are generated from the same structs.
+
+The MCP server uses the official Go SDK (`github.com/modelcontextprotocol/go-sdk`) rather than a
+hand-rolled protocol implementation, and it is confined to `internal/cli/mcp`. Each tool call gets a fresh session, so a long-running server never serves stale
+status or category names.
+
+## Read-only MCP by default
+
+`nexmap init --agents` registers the MCP server with `--read-only`. Tokens cannot yet be narrowed to fewer
+rights than their user has, so writes through an agent are opt-in. All writes are still checked by the
+server against the user's product role; the CLI enforces nothing on its own.
+
+## Identifiers instead of UUIDs
+
+Agents and people think in `FR-12` and "In Progress", not in UUIDs. The API therefore returns identifiers
+alongside IDs and accepts them wherever a requirement or constraint ID appears in a path. An identifier
+only resolves when its prefix matches the item's category, so `MT-12` never aliases `FR-12`. Defects
+have no human identifier yet; the CLI references them by the first 8 characters of their ID meanwhile.

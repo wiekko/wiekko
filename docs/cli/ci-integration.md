@@ -34,8 +34,8 @@ Each status change is recorded in the result history with the token's user, the 
    ```
    New test cases join campaigns created afterwards; an active campaign keeps the scope it was created with.
 3. **Check the mapping** before wiring CI: `go test -json ./... | nexmap utest --dry-run` shows how each test maps to a test case and what would change.
-4. **Install the CLI** in the job: a release binary, or `go install nexmap.net/cmd/nexmap@<version>` where your Go proxy can reach the module (the snippets below assume the latter).
-5. **Configure the job** with `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and the secret `NEXMAP_TOKEN` (or commit `.nexmap.json` from `nexmap init` and only set the token).
+4. **Install the CLI** in the job (see [Setup](setup.md#installing)): a release binary, or `go install nexmap.net/cmd/nexmap@<version>` where your Go proxy can reach the module (the snippets below assume the latter).
+5. **Configure the job** with `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and the secret `NEXMAP_TOKEN` (or commit `.nexmap.json` from `nexmap init` and only set the token; see [Setup](setup.md#configuration)).
 
 ## Options
 

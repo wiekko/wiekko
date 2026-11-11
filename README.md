@@ -7,7 +7,9 @@ one place. It consists of a server (`nexmapd`) with a web UI and REST API, and a
 (`nexmap`) for repositories, CI pipelines and AI agents.
 
 - Deploying and running nexmap: [docs/admin/installation.md](docs/admin/installation.md)
+- Setting up the CLI: [docs/cli/setup.md](docs/cli/setup.md)
 - Recording test results from CI: [docs/cli/ci-integration.md](docs/cli/ci-integration.md)
+- Giving AI agents access: [docs/cli/ai-agents.md](docs/cli/ai-agents.md)
 - All documentation: [docs/index.md](docs/index.md)
 - Building and testing nexmap itself: [CONTRIBUTING.md](CONTRIBUTING.md)
 
