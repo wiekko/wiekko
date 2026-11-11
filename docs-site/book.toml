@@ -1,0 +1,19 @@
+# mdBook configuration of the documentation site (docs.nexmap.net).
+# The pages live in ../docs; this directory only holds the site tooling, so
+# none of it ends up on the site. See CONTRIBUTING.md, "Documentation site".
+
+[book]
+title = "Nexmap documentation"
+language = "en"
+src = "../docs"
+
+[build]
+# A page missing from docs/ is a mistake in SUMMARY.md, not a page to create.
+create-missing = false
+
+[output.html]
+git-repository-url = "https://forge.my-universe.com/daemotron/nexmap"
+# Version switcher and the banner on unreleased docs; build.sh copies the
+# current versions of these files into every version it builds.
+additional-css = ["theme/version.css"]
+additional-js = ["theme/version.js"]

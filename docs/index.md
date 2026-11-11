@@ -30,23 +30,15 @@ Developers, CI pipelines and AI agents working with the `nexmap` command line cl
 
 - [REST API](api/rest.md): authentication, response format, endpoints
 
-## Specification
-
-What nexmap *shall* do. Normative, with requirement identifiers; it describes targets, not necessarily
-the current behaviour.
-
-- [Requirements & constraints](spec/requirements.md)
-- [Design system](spec/design-system.md): colours, typography, logo, asset bundling
-- [UI structure](spec/ui-structure.md): page tree, navigation, UI design decisions
-
-## Decisions
-
-Why things are the way they are: design decisions with their reasoning.
-
-- [Web UI](decisions/web-ui.md)
-- [CLI](decisions/cli.md)
-- [Test ingestion](decisions/test-ingestion.md)
-
 ## Contributing
 
-Building, testing and how these docs are organised: [CONTRIBUTING.md](../CONTRIBUTING.md).
+nexmap is developed in its [repository](https://forge.my-universe.com/daemotron/nexmap), which also holds
+the material for contributors that this documentation leaves out:
+
+- the [specification](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/docs/spec): what
+  nexmap *shall* do, with requirement identifiers. It describes targets, not necessarily the current
+  behaviour;
+- the [design decisions](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/docs/decisions)
+  and their reasoning;
+- [CONTRIBUTING.md](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/CONTRIBUTING.md):
+  building, testing, and how this documentation is organised and published.

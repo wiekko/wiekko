@@ -1,0 +1,22 @@
+/* Version switcher and "unreleased" banner; see version.js. Colours come from
+   mdBook's theme variables, so both follow the light and dark themes. */
+
+.version-switcher {
+    margin-inline-start: 10px;
+    padding: 2px 6px;
+    font-size: 1.4rem;
+    color: var(--fg);
+    background-color: var(--bg);
+    border: 1px solid var(--searchbar-border-color);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.version-banner {
+    margin: 0 0 1.5em;
+    padding: 0.75em 1em;
+    font-size: 0.9em;
+    background-color: var(--quote-bg);
+    border-inline-start: 4px solid var(--warning-border, #f0b400);
+    border-radius: 4px;
+}

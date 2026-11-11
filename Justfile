@@ -92,3 +92,19 @@ container-build os="linux" arch="amd64":
     id=`{{ CONTAINER }} create nexmap-build:{{ os }}-{{ arch }} /none` && \
         {{ CONTAINER }} cp "$id:/out/." build/{{ os }}-{{ arch }}/; rc=$?; \
         {{ CONTAINER }} rm "$id" >/dev/null; exit $rc
+
+# Needs mdbook on the PATH. Shows the working tree only, without other versions.
+# Serve the documentation with live reload on http://localhost:3000
+docs:
+    mdbook serve docs-site
+
+# Needs git and mdbook on the PATH; the result equals the docs container's.
+# Build the documentation site with all versions into build/docs-site
+docs-build:
+    sh docs-site/build.sh
+
+# Stop it with Ctrl+C.
+# Build the documentation site image and serve it on http://localhost:8080
+docs-container:
+    {{ CONTAINER }} build -f docs-site/Dockerfile -t nexmap-docs .
+    {{ CONTAINER }} run --rm -p 8080:8080 nexmap-docs

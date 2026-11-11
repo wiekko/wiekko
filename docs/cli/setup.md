@@ -12,7 +12,7 @@ go install nexmap.net/cmd/nexmap@<version>
 ```
 
 Alternatively, build it from a checkout (`just build`, or `just container-build` for release binaries;
-see [CONTRIBUTING.md](../../CONTRIBUTING.md)). The binary has no runtime dependencies.
+see [CONTRIBUTING.md](https://forge.my-universe.com/daemotron/nexmap/src/branch/main/CONTRIBUTING.md)). The binary has no runtime dependencies.
 
 ## Logging in
 
