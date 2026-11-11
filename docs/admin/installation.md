@@ -32,3 +32,6 @@ Sign in as the administrator created from `NEXMAP_ADMIN_USER` / `NEXMAP_ADMIN_PA
 generated password from the log, see [the first administrator](security.md#the-first-administrator)).
 Then change the administrator's email address on the profile page, and review the instance settings under
 `/admin/settings`: self-registration, moderation, product creation, enforced 2FA and password rules.
+
+nexmap makes no backups itself: set them up before relying on the instance, see
+[Backup and restore](backup.md).

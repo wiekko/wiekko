@@ -34,7 +34,7 @@ Treat the key like a database password: keep it in your platform's secret store,
 
 **Back up the key separately from the database.** Without it, the personal data in a database backup
 cannot be decrypted, and nexmap has no way to recover it. Conversely, a database backup stored together
-with its key protects nothing.
+with its key protects nothing. See [Backup and restore](backup.md).
 
 ### Rotating the key
 

@@ -20,6 +20,7 @@ See CONTRIBUTING.md, "Documentation site".
 - [Installation](admin/installation.md)
 - [Configuration](admin/configuration.md)
 - [Security](admin/security.md)
+- [Backup and restore](admin/backup.md)
 
 # Command line
 

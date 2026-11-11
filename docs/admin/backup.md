@@ -1,0 +1,83 @@
+# Backup and restore
+
+nexmap does not make backups itself. A complete backup has three parts:
+
+| Part | Where | Notes |
+|---|---|---|
+| Database | `NEXMAP_DB_DSN`: the SQLite file (container: `/data/nexmap.db`) or the PostgreSQL database | Everything except attachment contents |
+| Attachments | `NEXMAP_UPLOAD_DIR` (container: `/data/uploads`) | One directory per product, one file per attachment |
+| Encryption key | `NEXMAP_ENCRYPTION_KEY` | Needed to read personal data in the database |
+
+**Keep the key apart from the database backups.** Without the key, the email addresses and display names
+in a backup cannot be decrypted, and nexmap has no way to recover them. A backup stored together with
+its key, on the other hand, protects nothing. Store the key once, in a password manager or your
+platform's secret store, and again whenever you [rotate it](security.md#rotating-the-key): a backup
+needs every key that was in the list when it was taken.
+
+Back up the database first, then the attachments. An attachment uploaded in between is then just an
+unused file in the backup. The other order could leave a database that references files the backup
+lacks.
+
+## SQLite
+
+The database runs in WAL mode, so the file on disk alone is not a consistent copy while the server
+runs: recent changes may still sit in `nexmap.db-wal`. Do not copy the files with `cp` while the server
+runs. Use SQLite's online backup instead, which produces a consistent single file without stopping the
+server:
+
+```sh
+sqlite3 /path/to/nexmap.db ".backup '/backups/nexmap-$(date +%F).db'"
+```
+
+The container image has no `sqlite3`. Run it on the host, against the file in the volume mounted at
+`/data` (for Docker volumes, typically `/var/lib/docker/volumes/<volume>/_data/nexmap.db`). The host
+and the container must share the same file system; this does not work over a network share.
+
+Alternatively, stop the server and copy `nexmap.db` together with any `nexmap.db-wal` and
+`nexmap.db-shm` next to it.
+
+Then the attachments:
+
+```sh
+tar -czf /backups/nexmap-uploads-$(date +%F).tar.gz -C /path/to/data uploads
+```
+
+## PostgreSQL
+
+Use `pg_dump`, which takes a consistent snapshot while the server runs:
+
+```sh
+pg_dump --format=custom --file=/backups/nexmap-$(date +%F).dump "$NEXMAP_DB_DSN"
+```
+
+Back up the attachment directory as for SQLite.
+
+## Restoring
+
+1. Stop `nexmapd`.
+2. Put the database back:
+   - SQLite: replace `nexmap.db` with the backup file and delete any `nexmap.db-wal` and
+     `nexmap.db-shm` left next to it, as they belong to the replaced database.
+   - PostgreSQL: `pg_restore --clean --if-exists --no-owner --dbname="$NEXMAP_DB_DSN" nexmap.dump`
+     drops the existing tables and restores those of the backup.
+3. Replace the attachment directory with the one from the backup.
+4. Make sure `NEXMAP_ENCRYPTION_KEY` contains the key (or keys) the backup was written with.
+5. Start `nexmapd`.
+
+A restored database is as it was at the time of the backup, sessions included: everyone signed in
+then may still be signed in, and later password changes are undone. After restoring because of a
+security incident, have users change their passwords, and revoke API tokens that may have leaked.
+
+A backup from an older nexmap version can be restored into a newer one: the missing migrations run at
+startup. The reverse is refused: `nexmapd` does not start on a database migrated by a newer version.
+
+## Upgrades
+
+Migrations run automatically when a new version starts and cannot be undone. Back up before every
+upgrade. To go back to the previous version, restore that backup and start the previous version on it.
+
+## Test the restore
+
+Before relying on the backups, restore one into a separate instance (another directory or container,
+with the same encryption key) and check that you can sign in, open a product and download an
+attachment. Repeat this after changing how backups are taken.

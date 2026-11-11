@@ -7,6 +7,7 @@ Deploying, configuring and running a nexmap server.
 - [Installation](admin/installation.md): container image, Coolify, first start
 - [Configuration](admin/configuration.md): every environment variable and flag of `nexmapd`
 - [Security](admin/security.md): TLS, the encryption key, the first administrator, accounts and tokens
+- [Backup and restore](admin/backup.md): what to back up, SQLite and PostgreSQL, restoring, upgrades
 
 ## Users
 
