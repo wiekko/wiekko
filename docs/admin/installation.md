@@ -1,5 +1,19 @@
 # Installation
 
+## Which version to deploy
+
+Deploy the branch `stable` or a release tag, never `main`:
+
+| Ref | Holds | Use it for |
+|---|---|---|
+| `stable` | The newest release; it moves only when a release is made | Deployments that update with each release, such as Coolify watching the branch |
+| `v0.9.1`, … | One release, unchanged | Deployments pinned to a version, updated by hand |
+| `main` | Development work between releases, reporting `v0.9.1+dev` | Development only |
+
+Pre-releases (`v1.0.0-rc.1`) and fix releases for older versions are tagged, but do not move `stable`;
+deploy them by their tag. Updating to a new release runs its database migrations, which cannot be
+undone, so [back up](backup.md#upgrades) before a release reaches your instance.
+
 ## Container image
 
 The `Dockerfile`'s default stage is the server image: `nexmapd` alone on a distroless base, running as a
@@ -13,6 +27,8 @@ When building with podman, pass `--format docker`: the default OCI image format 
 
 Create the application with the **Dockerfile** build pack and:
 
+- set the branch to `stable` (see [which version to deploy](#which-version-to-deploy)). With
+  automatic deployment on, every release then updates the instance, and nothing else does;
 - add persistent storage (a volume) with destination path `/data`;
 - set the environment variables, at least `NEXMAP_ENCRYPTION_KEY` (see
   [generating a key](security.md#the-encryption-key)), and `NEXMAP_ADMIN_USER` / `NEXMAP_ADMIN_PASSWORD`

@@ -8,6 +8,12 @@
 # tags that commit, then commits VERSION+dev ("start development after
 # VERSION"). With "push", pushes both commits and the tag.
 #
+# A final release (no pre-release suffix) made from main also moves the branch
+# "stable" to the release commit, so deployments that track stable get exactly
+# the tagged release, never the +dev commit after it. Pre-releases and
+# releases from release/* branches leave stable alone; the push is a
+# fast-forward, so it fails rather than move stable back or sideways.
+#
 # Plain POSIX sh: `just` runs it with the same sh as its other recipes, which
 # on Windows is Git's.
 set -eu
@@ -75,13 +81,22 @@ printf '%s\n' "$version" >"$file"
 git add "$file"
 git commit -q -m "bump version to $version"
 git tag -a "$version" -m "$version"
+release_commit=$(git rev-parse HEAD)
 printf '%s+dev\n' "$version" >"$file"
 git add "$file"
 git commit -q -m "start development after $version"
 echo "release: tagged $version on $branch"
 
+refs="HEAD:refs/heads/$branch refs/tags/$version"
+if [ "$branch" = main ] && [ -z "$npre" ]; then
+    refs="$refs $release_commit:refs/heads/stable"
+    echo "release: stable moves to $version"
+fi
+
 if [ "$push" = push ]; then
-    git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$version"
+    # shellcheck disable=SC2086 # refs is a list of refspecs without spaces
+    git push --atomic origin $refs ||
+        fail "push refused, nothing was pushed; the commits and tag $version are made locally. Fix the cause, then: git push --atomic origin $refs"
 else
-    echo "release: nothing pushed; to publish: git push --atomic origin HEAD:refs/heads/$branch refs/tags/$version"
+    echo "release: nothing pushed; to publish: git push --atomic origin $refs"
 fi

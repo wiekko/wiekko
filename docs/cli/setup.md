@@ -11,8 +11,9 @@ Where your Go module proxy can reach the module:
 go install nexmap.net/cmd/nexmap@<version>
 ```
 
-Alternatively, build it from a checkout (`just build`, or `just container-build` for release binaries;
-see `CONTRIBUTING.md` in the repository). The binary has no runtime dependencies.
+Alternatively, build it from a checkout of the `stable` branch or a release tag (`just build`, or
+`just container-build` for release binaries; see `CONTRIBUTING.md` in the repository). The binary has
+no runtime dependencies.
 
 ## Logging in
 

@@ -55,6 +55,12 @@ Branches: `main` can always be deployed, and releases are made from it. A versio
 after newer releases gets a `release/<major>.<minor>` branch from its last tag when that need arises,
 not before; fixes are cherry-picked onto it and released there with the same recipe.
 
+`stable` points to the newest final release: a release from `main` without pre-release suffix moves it
+to the release commit (the tagged one, not the `+dev` commit after it), in the same atomic push as the
+commits and the tag. Deployments track `stable`, so they get releases only; pre-releases and releases
+from `release/*` branches leave it alone. The push only fast-forwards `stable`: never commit to it or
+move it by hand, or the next release's push fails.
+
 The tags still matter: the documentation site publishes one version per tag (see below). The
 `VERSION` build argument of the `Dockerfile` overrides the version from the source tree, for special
 builds only.

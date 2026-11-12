@@ -74,7 +74,9 @@ startup. The reverse is refused: `nexmapd` does not start on a database migrated
 ## Upgrades
 
 Migrations run automatically when a new version starts and cannot be undone. Back up before every
-upgrade. To go back to the previous version, restore that backup and start the previous version on it.
+upgrade. An instance that deploys the `stable` branch automatically upgrades as soon as a release is
+made, so schedule its backups accordingly, or deploy a release tag and upgrade by hand. To go back to
+the previous version, restore that backup and start the previous version on it.
 
 ## Test the restore
 
