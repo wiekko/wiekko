@@ -57,6 +57,12 @@ type PAT struct {
 	ExpiresAt   string // empty if no expiry
 	CreatedAt   string
 	RevokedAt   string // empty if not revoked
+
+	// Restrictions (SC-401 – SC-406), interpreted by package access.
+	Scopes             string   // space-separated "scope:level" grants
+	RoleCap            string   // empty if the token's role is not capped
+	ProductsRestricted bool     // true if the token reaches only ProductIDs
+	ProductIDs         []string // products the token is restricted to
 }
 
 // ProductRole represents a user's role within a product.
@@ -75,6 +81,23 @@ const (
 	RoleTester    = "tester"
 	RoleViewer    = "viewer"
 )
+
+// RoleRank returns a numeric rank for comparing product roles: a higher rank
+// means more permissions. Unknown roles rank -1.
+func RoleRank(role string) int {
+	switch role {
+	case RoleViewer:
+		return 0
+	case RoleTester:
+		return 1
+	case RoleDeveloper:
+		return 2
+	case RoleOwner:
+		return 3
+	default:
+		return -1
+	}
+}
 
 // Invitation represents an invitation to register.
 type Invitation struct {

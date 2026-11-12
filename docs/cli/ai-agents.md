@@ -47,7 +47,9 @@ agent is told. In short:
 
 `init --agents` registers the MCP server with `--read-only`, which leaves out all tools that change
 data. To let agents write through MCP, remove `--read-only` from the entry in `.mcp.json`. The CLI's
-write commands are always available to an agent that can run shell commands.
+write commands are always available to an agent that can run shell commands, so `--read-only` is a
+convenience, not a guarantee: give an agent that should only read a token created with the *Agent,
+read-only* preset, and the server refuses its writes.
 
 Writes are checked by the server against the token user's role in the product, exactly as in the web UI:
 
@@ -61,5 +63,6 @@ Writes are checked by the server against the token user's role in the product, e
 Each role includes the ones below it (product owner, developer, tester, viewer), and administrators may
 do everything.
 
-A token carries every right of its user, and tokens cannot be narrowed yet. Give agents their own user
-with the lowest role that covers what they should do, rather than your personal token.
+A token's restriction applies on top: the server also refuses writes outside the token's scopes, above
+its role cap, or in products it is not restricted to. Give an agent its own token, narrowed to what it
+should do, rather than the token you use yourself.

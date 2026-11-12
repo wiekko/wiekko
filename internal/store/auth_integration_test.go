@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -219,9 +220,14 @@ func TestPATStore(t *testing.T) {
 		u := makeUser(t, users, "erin", false)
 
 		older := &model.PAT{ID: uuid.NewString(), UserID: u.ID, Name: "ci", TokenHash: "h1", TokenPrefix: "nx_1",
-			CreatedAt: ts(-time.Hour)}
+			CreatedAt: ts(-time.Hour), Scopes: "tests:write"}
+		p1, p2 := seedSprintProduct(t, db, "pat-a"), seedSprintProduct(t, db, "pat-b")
 		newer := &model.PAT{ID: uuid.NewString(), UserID: u.ID, Name: "cli", TokenHash: "h2", TokenPrefix: "nx_2",
-			CreatedAt: ts(0), ExpiresAt: ts(24 * time.Hour)}
+			CreatedAt: ts(0), ExpiresAt: ts(24 * time.Hour), Scopes: "defects:read", RoleCap: model.RoleTester,
+			ProductsRestricted: true, ProductIDs: []string{p1, p2}}
+		if p1 > p2 { // products are returned in ID order
+			newer.ProductIDs = []string{p2, p1}
+		}
 		for _, p := range []*model.PAT{older, newer} {
 			if err := s.Create(ctx, p); err != nil {
 				t.Fatalf("create pat: %v", err)
@@ -232,7 +238,7 @@ func TestPATStore(t *testing.T) {
 		if err != nil {
 			t.Fatalf("get: %v", err)
 		}
-		if *got != *newer {
+		if !reflect.DeepEqual(got, newer) {
 			t.Errorf("got %+v, want %+v", got, newer)
 		}
 
@@ -251,6 +257,18 @@ func TestPATStore(t *testing.T) {
 		got, _ = s.GetByTokenHash(ctx, "h1")
 		if got.LastUsedAt != used || got.RevokedAt != revoked || got.ExpiresAt != "" {
 			t.Errorf("after update got %+v", got)
+		}
+		if got.RoleCap != "" || got.ProductsRestricted || got.ProductIDs != nil || got.Scopes != "tests:write" {
+			t.Errorf("unrestricted token got %+v", got)
+		}
+
+		// Deleting a product drops it from the token, which stays restricted.
+		if _, err := db.Exec(`DELETE FROM products WHERE id = ?`, p1); err != nil {
+			t.Fatalf("delete product: %v", err)
+		}
+		got, _ = s.GetByTokenHash(ctx, "h2")
+		if !got.ProductsRestricted || len(got.ProductIDs) != 1 || got.ProductIDs[0] != p2 {
+			t.Errorf("after product delete got %+v", got)
 		}
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/storage"
 	"nexmap.net/internal/testutil"
@@ -830,6 +831,54 @@ func TestCreateAttachmentEnforcesTheUploadPolicy(t *testing.T) {
 		stored := string(blobs.files[created.StoragePath])
 		if stored != body {
 			t.Fatalf("stored content differs from the upload (len %d vs %d)", len(stored), len(body))
+		}
+	})
+}
+
+// --- Token scopes (SC-405) ---
+
+func TestDiscussionOwnerScope(t *testing.T) {
+	ctx := access.WithRestriction(context.Background(),
+		&access.Restriction{Grants: access.Grants{access.Discussion: access.Write, access.Backlog: access.Read}})
+
+	t.Run("create on an item outside the token's scopes", func(t *testing.T) {
+		svc := newDiscussionService(&testutil.MockCommentStore{
+			CreateFunc: func(_ context.Context, _ *model.Comment) error { t.Fatal("comment created"); return nil },
+		}, nil, noopAudit(), testerRoles())
+		_, err := svc.CreateComment(ctx, testutil.MakeUser(), "product-001", "defect", "defect-001", "x")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+
+	t.Run("create on an item within the token's scopes", func(t *testing.T) {
+		svc := newDiscussionService(&testutil.MockCommentStore{
+			CreateFunc: func(_ context.Context, _ *model.Comment) error { return nil },
+		}, nil, noopAudit(), developerRoles())
+		if _, err := svc.CreateComment(ctx, testutil.MakeUser(), "product-001", "requirement", "req-001", "x"); err != nil {
+			t.Fatalf("CreateComment: %v", err)
+		}
+	})
+
+	t.Run("get a comment on an item outside the token's scopes", func(t *testing.T) {
+		svc := newDiscussionService(&testutil.MockCommentStore{
+			GetByIDFunc: func(_ context.Context, _ string) (*model.Comment, error) {
+				return testutil.MakeComment(func(c *model.Comment) { c.OwnerType = "test_case" }), nil
+			},
+		}, nil, nil, viewerRoles())
+		_, err := svc.GetComment(ctx, testutil.MakeUser(), "product-001", "comment-001")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
+		}
+	})
+
+	t.Run("listing all owner types needs every owner scope", func(t *testing.T) {
+		svc := newDiscussionService(&testutil.MockCommentStore{
+			ListByOwnerFunc: func(_ context.Context, _, _, _ string) ([]*model.Comment, error) { return nil, nil },
+		}, nil, nil, viewerRoles())
+		_, err := svc.ListComments(ctx, testutil.MakeUser(), "product-001", "", "")
+		if !errors.Is(err, ErrForbidden) {
+			t.Fatalf("err = %v, want ErrForbidden", err)
 		}
 	})
 }

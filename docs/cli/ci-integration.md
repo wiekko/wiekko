@@ -26,7 +26,7 @@ Each status change is recorded in the result history with the token's user, the 
 
 ## Setting up
 
-1. **Create a CI user** with the *tester* role in the product (tokens carry their user's full rights, so do not use a personal token), sign in as that user and create a personal access token under *API Tokens* in the user menu (`/user/tokens`).
+1. **Create a token for CI** under *API Tokens* in the user menu (`/user/tokens`) with the *CI ingestion* preset (`tests:write` only), restricted to the product, and with a role cap of *tester*. The job then cannot touch anything but test results, even with a token from a product owner. A dedicated CI user with the *tester* role works as well.
 2. **Register the tests** as automatic test cases with a test identifier. `nexmap test sync` creates the missing ones from a report (developer role):
    ```sh
    go test -json ./... | nexmap test sync --dry-run   # review first

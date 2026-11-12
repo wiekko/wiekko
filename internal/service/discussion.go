@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/storage"
 	"nexmap.net/internal/store"
@@ -39,12 +40,32 @@ func minRoleForOwnerType(ownerType string) string {
 	}
 }
 
+// requireOwnerScope checks that a token may read the item a comment or
+// attachment belongs to (SC-405). The discussion scope itself is checked per
+// route. An empty owner type stands for items of every type.
+func requireOwnerScope(ctx context.Context, ownerType string) error {
+	r := access.FromContext(ctx)
+	scopes := []access.Scope{access.ScopeForOwnerType(ownerType)}
+	if ownerType == "" {
+		scopes = []access.Scope{access.Structure, access.Backlog, access.Defects, access.Tests}
+	}
+	for _, sc := range scopes {
+		if !r.Allows(sc, access.Read) {
+			return fmt.Errorf("%w: token lacks the %s scope", ErrForbidden, sc)
+		}
+	}
+	return nil
+}
+
 // CreateComment creates a new comment. Minimum role depends on owner type.
 func (s *DiscussionService) CreateComment(ctx context.Context, user *model.User, productID, ownerType, ownerID, body string) (*model.Comment, error) {
 	if !model.ValidOwnerType(ownerType) {
 		return nil, fmt.Errorf("invalid comment owner type: %q", ownerType)
 	}
 	if _, err := s.authz.RequireRole(ctx, user, productID, minRoleForOwnerType(ownerType)); err != nil {
+		return nil, err
+	}
+	if err := requireOwnerScope(ctx, ownerType); err != nil {
 		return nil, err
 	}
 	if err := s.owns.require(ctx, productID, ref{ownerType, ownerID}); err != nil {
@@ -94,6 +115,9 @@ func (s *DiscussionService) GetComment(ctx context.Context, user *model.User, pr
 	if c.ProductID != productID {
 		return nil, fmt.Errorf("%w: comment", ErrNotFound)
 	}
+	if err := requireOwnerScope(ctx, c.OwnerType); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -142,6 +166,9 @@ func (s *DiscussionService) DeleteComment(ctx context.Context, user *model.User,
 	if c.ProductID != productID {
 		return fmt.Errorf("%w: comment", ErrNotFound)
 	}
+	if err := requireOwnerScope(ctx, c.OwnerType); err != nil {
+		return err
+	}
 
 	if c.UserID != user.ID && roleRank(role) < roleRank(model.RoleOwner) {
 		return fmt.Errorf("%w: only the author or product owner can delete a comment", ErrForbidden)
@@ -165,6 +192,9 @@ func (s *DiscussionService) ListComments(ctx context.Context, user *model.User, 
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
 	}
+	if err := requireOwnerScope(ctx, ownerType); err != nil {
+		return nil, err
+	}
 	return s.comments.ListByOwner(ctx, productID, ownerType, ownerID)
 }
 
@@ -185,6 +215,9 @@ func (s *DiscussionService) CreateAttachment(ctx context.Context, user *model.Us
 		return nil, fmt.Errorf("invalid attachment owner type: %q", input.OwnerType)
 	}
 	if _, err := s.authz.RequireRole(ctx, user, productID, minRoleForOwnerType(input.OwnerType)); err != nil {
+		return nil, err
+	}
+	if err := requireOwnerScope(ctx, input.OwnerType); err != nil {
 		return nil, err
 	}
 	if err := s.owns.require(ctx, productID, ref{input.OwnerType, input.OwnerID}); err != nil {
@@ -263,6 +296,9 @@ func (s *DiscussionService) GetAttachment(ctx context.Context, user *model.User,
 	if a.ProductID != productID {
 		return nil, fmt.Errorf("%w: attachment", ErrNotFound)
 	}
+	if err := requireOwnerScope(ctx, a.OwnerType); err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 
@@ -294,6 +330,9 @@ func (s *DiscussionService) DeleteAttachment(ctx context.Context, user *model.Us
 	}
 	if a.ProductID != productID {
 		return fmt.Errorf("%w: attachment", ErrNotFound)
+	}
+	if err := requireOwnerScope(ctx, a.OwnerType); err != nil {
+		return err
 	}
 
 	if a.UserID != user.ID && roleRank(role) < roleRank(model.RoleOwner) {
@@ -379,6 +418,9 @@ func (s *DiscussionService) purgeBlobs(ctx context.Context, attachments []*model
 // ListAttachments returns attachments for an entity. Requires viewer role.
 func (s *DiscussionService) ListAttachments(ctx context.Context, user *model.User, productID, ownerType, ownerID string) ([]*model.Attachment, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := requireOwnerScope(ctx, ownerType); err != nil {
 		return nil, err
 	}
 	return s.attachments.ListByOwner(ctx, productID, ownerType, ownerID)

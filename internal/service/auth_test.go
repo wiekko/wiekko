@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/model"
@@ -240,7 +241,7 @@ func TestValidatePAT(t *testing.T) {
 				GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return activeUser, nil },
 			}, nil, makePATStore(pat), nil,
 		)
-		user, err := svc.ValidatePAT(context.Background(), rawToken)
+		user, _, err := svc.ValidatePAT(context.Background(), rawToken)
 		if err != nil {
 			t.Fatalf("ValidatePAT: %v", err)
 		}
@@ -256,7 +257,7 @@ func TestValidatePAT(t *testing.T) {
 
 	t.Run("missing prefix", func(t *testing.T) {
 		svc := newAuthService(nil, nil, nil, nil)
-		_, err := svc.ValidatePAT(context.Background(), "badprefix_token")
+		_, _, err := svc.ValidatePAT(context.Background(), "badprefix_token")
 		if err == nil || err.Error() != "invalid token format" {
 			t.Fatalf("err = %v, want 'invalid token format'", err)
 		}
@@ -270,7 +271,7 @@ func TestValidatePAT(t *testing.T) {
 				},
 			}, nil,
 		)
-		_, err := svc.ValidatePAT(context.Background(), "nxm_unknown")
+		_, _, err := svc.ValidatePAT(context.Background(), "nxm_unknown")
 		if err == nil || err.Error() != "invalid token" {
 			t.Fatalf("err = %v, want 'invalid token'", err)
 		}
@@ -282,7 +283,7 @@ func TestValidatePAT(t *testing.T) {
 			p.RevokedAt = testutil.PastRFC3339(time.Hour)
 		})
 		svc := newAuthService(nil, nil, makePATStore(pat), nil)
-		_, err := svc.ValidatePAT(context.Background(), rawToken)
+		_, _, err := svc.ValidatePAT(context.Background(), rawToken)
 		if err == nil || err.Error() != "token revoked" {
 			t.Fatalf("err = %v, want 'token revoked'", err)
 		}
@@ -294,7 +295,7 @@ func TestValidatePAT(t *testing.T) {
 			p.ExpiresAt = testutil.PastRFC3339(time.Hour)
 		})
 		svc := newAuthService(nil, nil, makePATStore(pat), nil)
-		_, err := svc.ValidatePAT(context.Background(), rawToken)
+		_, _, err := svc.ValidatePAT(context.Background(), rawToken)
 		if err == nil || err.Error() != "token expired" {
 			t.Fatalf("err = %v, want 'token expired'", err)
 		}
@@ -308,6 +309,58 @@ func TestValidatePAT(t *testing.T) {
 		assertValidPAT(t, pat)
 	})
 
+	t.Run("restriction is returned", func(t *testing.T) {
+		pat := testutil.MakePAT(func(p *model.PAT) {
+			p.TokenHash = tokenHash
+			p.Scopes = "defects:read"
+			p.RoleCap = model.RoleTester
+			p.ProductsRestricted = true
+			p.ProductIDs = []string{"p1"}
+		})
+		svc := newAuthService(&testutil.MockUserStore{
+			GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return activeUser, nil },
+		}, nil, makePATStore(pat), nil)
+		_, r, err := svc.ValidatePAT(context.Background(), rawToken)
+		if err != nil {
+			t.Fatalf("ValidatePAT: %v", err)
+		}
+		if !r.Allows(access.Defects, access.Read) || r.Allows(access.Defects, access.Write) ||
+			r.CapRole(model.RoleOwner) != model.RoleTester || r.AllowsProduct("p2") || !r.AllowsProduct("p1") {
+			t.Errorf("restriction = %+v", r)
+		}
+	})
+
+	t.Run("invalid scopes reject the token", func(t *testing.T) {
+		pat := testutil.MakePAT(func(p *model.PAT) { p.TokenHash = tokenHash; p.Scopes = "bogus:write" })
+		svc := newAuthService(nil, nil, makePATStore(pat), nil)
+		if _, _, err := svc.ValidatePAT(context.Background(), rawToken); err == nil {
+			t.Fatal("token with unknown scope accepted")
+		}
+	})
+
+	for _, tc := range []struct {
+		scopes    string
+		wantAdmin bool
+	}{{"backlog:write", false}, {"admin:read", true}} {
+		t.Run("admin rights need the admin scope: "+tc.scopes, func(t *testing.T) {
+			admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
+			pat := testutil.MakePAT(func(p *model.PAT) { p.TokenHash = tokenHash; p.Scopes = tc.scopes })
+			svc := newAuthService(&testutil.MockUserStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return admin, nil },
+			}, nil, makePATStore(pat), nil)
+			user, _, err := svc.ValidatePAT(context.Background(), rawToken)
+			if err != nil {
+				t.Fatalf("ValidatePAT: %v", err)
+			}
+			if user.IsAdmin != tc.wantAdmin {
+				t.Errorf("IsAdmin = %v, want %v", user.IsAdmin, tc.wantAdmin)
+			}
+			if !admin.IsAdmin {
+				t.Error("the stored user must not be modified")
+			}
+		})
+	}
+
 	t.Run("user not active", func(t *testing.T) {
 		lockedUser := testutil.MakeUser(func(u *model.User) { u.Status = model.UserStatusLocked })
 		pat := testutil.MakePAT(func(p *model.PAT) { p.TokenHash = tokenHash })
@@ -316,7 +369,7 @@ func TestValidatePAT(t *testing.T) {
 				GetByIDFunc: func(_ context.Context, _ string) (*model.User, error) { return lockedUser, nil },
 			}, nil, makePATStore(pat), nil,
 		)
-		_, err := svc.ValidatePAT(context.Background(), rawToken)
+		_, _, err := svc.ValidatePAT(context.Background(), rawToken)
 		if err == nil || err.Error() != "account is not active" {
 			t.Fatalf("err = %v, want 'account is not active'", err)
 		}
@@ -329,5 +382,5 @@ var _ interface {
 } = (*AuthService)(nil)
 
 var _ interface {
-	ValidatePAT(ctx context.Context, rawToken string) (*model.User, error)
+	ValidatePAT(ctx context.Context, rawToken string) (*model.User, *access.Restriction, error)
 } = (*AuthService)(nil)

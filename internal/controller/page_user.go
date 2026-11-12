@@ -2,9 +2,13 @@ package controller
 
 import (
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/middleware"
+	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
 	"nexmap.net/web/templates"
 	userpage "nexmap.net/web/templates/pages/user"
@@ -15,11 +19,12 @@ type PageUserController struct {
 	user      *service.UserService
 	pat       *service.PATService
 	twoFactor *service.TwoFactorService
+	product   *service.ProductService
 }
 
 // NewPageUser creates a PageUserController.
-func NewPageUser(user *service.UserService, pat *service.PATService, twoFactor *service.TwoFactorService) *PageUserController {
-	return &PageUserController{user: user, pat: pat, twoFactor: twoFactor}
+func NewPageUser(user *service.UserService, pat *service.PATService, twoFactor *service.TwoFactorService, product *service.ProductService) *PageUserController {
+	return &PageUserController{user: user, pat: pat, twoFactor: twoFactor, product: product}
 }
 
 // Profile renders GET /user/profile.
@@ -110,25 +115,8 @@ func (c *PageUserController) Tokens(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 
-	pats, err := c.pat.List(r.Context(), user.ID)
-	if err != nil {
-		pats = nil
-	}
-
-	now := time.Now().UTC()
-	views := make([]userpage.TokenView, 0, len(pats))
-	for _, p := range pats {
-		expired := false
-		if p.ExpiresAt != "" {
-			if t, err := time.Parse(time.RFC3339, p.ExpiresAt); err == nil {
-				expired = now.After(t)
-			}
-		}
-		views = append(views, userpage.TokenView{
-			Token:     p,
-			IsExpired: expired,
-		})
-	}
+	form := c.tokenForm(r, user)
+	form.Grants = access.FullAccess()
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = userpage.TokensPage(userpage.TokensProps{
@@ -138,35 +126,110 @@ func (c *PageUserController) Tokens(w http.ResponseWriter, r *http.Request) {
 		},
 		DisplayName: user.DisplayName,
 		IsAdmin:     user.IsAdmin,
-		Tokens:      views,
+		Tokens:      c.tokenViews(r, user),
+		Form:        form,
 	}).Render(r.Context(), w)
+}
+
+// tokenViews lists the user's tokens for display.
+func (c *PageUserController) tokenViews(r *http.Request, user *model.User) []userpage.TokenView {
+	pats, err := c.pat.List(r.Context(), user.ID)
+	if err != nil {
+		pats = nil
+	}
+	now := time.Now().UTC()
+	views := make([]userpage.TokenView, 0, len(pats))
+	for _, p := range pats {
+		expired := false
+		if p.ExpiresAt != "" {
+			if t, err := time.Parse(time.RFC3339, p.ExpiresAt); err == nil {
+				expired = now.After(t)
+			}
+		}
+		views = append(views, userpage.TokenView{Token: p, IsExpired: expired})
+	}
+	return views
+}
+
+// tokenForm prepares the create token form: the products the user can
+// restrict a token to and the instance's lifetime limit.
+func (c *PageUserController) tokenForm(r *http.Request, user *model.User) userpage.CreateTokenFormProps {
+	form := userpage.CreateTokenFormProps{IsAdmin: user.IsAdmin, Grants: access.Grants{}}
+	if products, err := c.product.ListWithRoles(r.Context(), user); err == nil {
+		for _, p := range products {
+			form.Products = append(form.Products, userpage.ProductOption{ID: p.Product.ID, Name: p.Product.Name})
+		}
+	}
+	if days := c.pat.MaxLifetimeDays(r.Context()); days > 0 {
+		form.MaxLifetimeDays = days
+		form.MaxExpiry = time.Now().UTC().AddDate(0, 0, days).Format(time.DateOnly)
+	}
+	return form
 }
 
 // CreateToken handles POST /user/tokens.
 func (c *PageUserController) CreateToken(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
-
-	name := r.FormValue("name")
-	if name == "" {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.CreateTokenForm("Token name is required.").Render(r.Context(), w)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
 		return
 	}
 
-	var expiresAt *string
-	if v := r.FormValue("expires_at"); v != "" {
-		exp := v + "T23:59:59Z"
-		expiresAt = &exp
+	form := c.tokenForm(r, user)
+	form.Name = r.FormValue("name")
+	form.ExpiresAt = r.FormValue("expires_at")
+	form.RoleCap = r.FormValue("role_cap")
+	form.RestrictProducts = r.FormValue("products_mode") == "selected"
+	selected := r.Form["product_ids"]
+	for i := range form.Products {
+		form.Products[i].Selected = slices.Contains(selected, form.Products[i].ID)
 	}
 
-	result, err := c.pat.Create(r.Context(), user.ID, name, expiresAt)
-	if err != nil {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.CreateTokenForm(err.Error()).Render(r.Context(), w)
-		return
+	in := service.CreatePATInput{Name: form.Name, RoleCap: form.RoleCap, Grants: access.Grants{}}
+	var formErr string
+	for _, sc := range access.AllScopes {
+		level, err := access.ParseLevel(r.FormValue("scope_" + string(sc)))
+		if err != nil {
+			formErr = err.Error()
+			continue
+		}
+		if level > access.None {
+			in.Grants[sc] = level
+		}
+	}
+	form.Grants = in.Grants
+	if form.ExpiresAt != "" {
+		in.ExpiresAt = form.ExpiresAt + "T23:59:59Z"
+	}
+	if form.RestrictProducts {
+		in.ProductsRestricted = true
+		in.ProductIDs = selected
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	switch {
+	case form.Name == "":
+		formErr = "Token name is required."
+	case formErr == "" && len(in.Grants) == 0:
+		formErr = "Grant the token at least one scope."
+	}
+	if formErr != "" {
+		form.Error = formErr
+		_ = userpage.CreateTokenForm(form).Render(r.Context(), w)
+		return
+	}
+
+	result, err := c.pat.Create(r.Context(), user, in)
+	if err != nil {
+		msg := strings.TrimPrefix(err.Error(), service.ErrForbidden.Error()+": ")
+		if msg != "" {
+			msg = strings.ToUpper(msg[:1]) + msg[1:] + "."
+		}
+		form.Error = msg
+		_ = userpage.CreateTokenForm(form).Render(r.Context(), w)
+		return
+	}
+
 	_ = userpage.TokenCreated(result.RawToken).Render(r.Context(), w)
 }
 
@@ -181,26 +244,7 @@ func (c *PageUserController) RevokeToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Return updated token table.
-	pats, err := c.pat.List(r.Context(), user.ID)
-	if err != nil {
-		pats = nil
-	}
-
-	now := time.Now().UTC()
-	views := make([]userpage.TokenView, 0, len(pats))
-	for _, p := range pats {
-		expired := false
-		if p.ExpiresAt != "" {
-			if t, err := time.Parse(time.RFC3339, p.ExpiresAt); err == nil {
-				expired = now.After(t)
-			}
-		}
-		views = append(views, userpage.TokenView{
-			Token:     p,
-			IsExpired: expired,
-		})
-	}
-
+	views := c.tokenViews(r, user)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = userpage.TokenTableBody(views).Render(r.Context(), w)
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/model"
@@ -232,44 +233,56 @@ func (s *AuthService) ValidateSession(ctx context.Context, sessionID string) (*m
 	return user, session.CSRFToken, nil
 }
 
-// ValidatePAT checks a raw personal access token and returns the associated user.
-func (s *AuthService) ValidatePAT(ctx context.Context, rawToken string) (*model.User, error) {
+// ValidatePAT checks a raw personal access token and returns the associated
+// user and the token's restriction (SC-401 – SC-406). Unless the token carries
+// the admin scope, the user is returned as a copy without administrator
+// rights, so no admin check anywhere can be reached through the token.
+func (s *AuthService) ValidatePAT(ctx context.Context, rawToken string) (*model.User, *access.Restriction, error) {
 	if !strings.HasPrefix(rawToken, patPrefix) {
-		return nil, errors.New("invalid token format")
+		return nil, nil, errors.New("invalid token format")
 	}
 
 	hash := hashPATToken(rawToken)
 	pat, err := s.pats.GetByTokenHash(ctx, hash)
 	if err != nil {
-		return nil, errors.New("invalid token")
+		return nil, nil, errors.New("invalid token")
 	}
 
 	if pat.RevokedAt != "" {
-		return nil, errors.New("token revoked")
+		return nil, nil, errors.New("token revoked")
 	}
 	if pat.ExpiresAt != "" {
 		expiresAt, err := time.Parse(time.RFC3339, pat.ExpiresAt)
 		if err != nil {
-			return nil, errors.New("invalid token expiry")
+			return nil, nil, errors.New("invalid token expiry")
 		}
 		if time.Now().UTC().After(expiresAt) {
-			return nil, errors.New("token expired")
+			return nil, nil, errors.New("token expired")
 		}
+	}
+	restriction, err := access.FromPAT(pat)
+	if err != nil {
+		return nil, nil, errors.New("invalid token scopes")
 	}
 
 	user, err := s.users.GetByID(ctx, pat.UserID)
 	if err != nil {
-		return nil, errors.New("user not found")
+		return nil, nil, errors.New("user not found")
 	}
 	if user.Status != model.UserStatusActive {
-		return nil, errors.New("account is not active")
+		return nil, nil, errors.New("account is not active")
+	}
+	if user.IsAdmin && !restriction.Allows(access.Admin, access.Read) {
+		u := *user
+		u.IsAdmin = false
+		user = &u
 	}
 
-	// Update last-used timestamp asynchronously (best-effort).
+	// Record the last use (best-effort; SC-409).
 	now := time.Now().UTC().Format(time.RFC3339)
 	_ = s.pats.UpdateLastUsed(ctx, pat.ID, now)
 
-	return user, nil
+	return user, restriction, nil
 }
 
 func generateToken(n int) (string, error) {

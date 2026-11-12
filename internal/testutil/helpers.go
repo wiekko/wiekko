@@ -3,6 +3,7 @@ package testutil
 import (
 	"time"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/model"
 )
 
@@ -54,6 +55,7 @@ func MakePAT(overrides ...func(*model.PAT)) *model.PAT {
 		TokenHash:   "somehash",
 		TokenPrefix: "nxm_abcd",
 		CreatedAt:   now,
+		Scopes:      access.FullAccess().String(),
 	}
 	for _, fn := range overrides {
 		fn(p)

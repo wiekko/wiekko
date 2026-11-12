@@ -22,6 +22,16 @@ CREATE TABLE IF NOT EXISTS product_roles (
 CREATE INDEX IF NOT EXISTS idx_product_roles_user_id ON product_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_product_roles_product_id ON product_roles(product_id);
 
+-- Products a restricted personal access token reaches (SC-402). Deleting a
+-- product removes it here while the token stays restricted, so the token
+-- reaches less rather than more.
+CREATE TABLE IF NOT EXISTS personal_access_token_products (
+    token_id   TEXT NOT NULL REFERENCES personal_access_tokens(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    PRIMARY KEY (token_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pat_products_product_id ON personal_access_token_products(product_id);
+
 -- Milestones: product roadmap (FR-011, FR-012)
 CREATE TABLE IF NOT EXISTS milestones (
     id          TEXT PRIMARY KEY,

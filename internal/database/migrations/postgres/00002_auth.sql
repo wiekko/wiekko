@@ -12,6 +12,7 @@ INSERT INTO settings (key, value) VALUES ('password_require_lowercase', 'true');
 INSERT INTO settings (key, value) VALUES ('password_require_digit', 'true');
 INSERT INTO settings (key, value) VALUES ('password_require_special', 'false');
 INSERT INTO settings (key, value) VALUES ('product_creation_enabled', 'true');
+INSERT INTO settings (key, value) VALUES ('pat_max_lifetime_days', '0');
 
 CREATE TABLE IF NOT EXISTS users (
     id            UUID PRIMARY KEY,
@@ -70,7 +71,13 @@ CREATE TABLE IF NOT EXISTS personal_access_tokens (
     last_used_at TIMESTAMPTZ,
     expires_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL,
-    revoked_at   TIMESTAMPTZ
+    revoked_at   TIMESTAMPTZ,
+    -- Restrictions (SC-401 – SC-406): space-separated "scope:level" grants,
+    -- an optional role cap, and whether only the products listed in
+    -- personal_access_token_products (00003) are reachable.
+    scopes       TEXT NOT NULL,
+    role_cap     TEXT,
+    products_restricted BOOLEAN NOT NULL DEFAULT FALSE
 );
 CREATE INDEX IF NOT EXISTS idx_pat_user_id ON personal_access_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_pat_token_hash ON personal_access_tokens(token_hash);

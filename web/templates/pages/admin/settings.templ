@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"strconv"
+
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
 	"nexmap.net/web/templates/ui"
@@ -39,13 +41,23 @@ templ SettingsPage(props SettingsProps) {
 					</div>
 				}
 			}
+			<!-- API Tokens -->
+			@ui.Card() {
+				@ui.CardHeader("API Tokens") {
+				}
+				@ui.CardBody() {
+					<div class="space-y-4">
+						@SettingNumber(NumberSetting("pat_max_lifetime_days", "Maximum Token Lifetime (days)", "Personal access tokens must expire within this many days. 0 allows tokens without expiry.", props.Settings["pat_max_lifetime_days"]))
+					</div>
+				}
+			}
 			<!-- Password Policy -->
 			@ui.Card() {
 				@ui.CardHeader("Password Policy") {
 				}
 				@ui.CardBody() {
 					<div class="space-y-4">
-						@SettingNumber("password_min_length", "Minimum Length", props.Settings["password_min_length"])
+						@SettingNumber(NumberSetting("password_min_length", "Minimum Length", "", props.Settings["password_min_length"]))
 						@SettingToggle("password_require_uppercase", "Require Uppercase", "At least one uppercase letter.", props.Settings["password_require_uppercase"] == "true")
 						@SettingToggle("password_require_lowercase", "Require Lowercase", "At least one lowercase letter.", props.Settings["password_require_lowercase"] == "true")
 						@SettingToggle("password_require_digit", "Require Digit", "At least one numeric digit.", props.Settings["password_require_digit"] == "true")
@@ -83,24 +95,52 @@ templ SettingToggle(key, label, description string, checked bool) {
 }
 
 // SettingNumber renders a numeric setting input. Returned as fragment after update.
-templ SettingNumber(key, label, value string) {
+// NumberSettingProps describes a numeric setting input.
+type NumberSettingProps struct {
+	Key         string
+	Label       string
+	Description string
+	Value       string
+	Min, Max    int
+	Fallback    string
+}
+
+// NumberSetting returns the input props of a numeric setting, with the range
+// that setting accepts.
+func NumberSetting(key, label, description, value string) NumberSettingProps {
+	p := NumberSettingProps{Key: key, Label: label, Description: description, Value: value,
+		Min: 1, Max: 128, Fallback: "8"}
+	if key == "pat_max_lifetime_days" {
+		p.Min, p.Max, p.Fallback = 0, 3650, "0"
+	}
+	return p
+}
+
+// SettingNumber renders a numeric setting. Returned as fragment after update.
+templ SettingNumber(props NumberSettingProps) {
 	<div
-		id={ "setting-" + key }
-		class="flex items-center justify-between"
+		id={ "setting-" + props.Key }
+		class="flex items-center justify-between gap-4"
 		hx-target="this"
 		hx-swap="outerHTML"
 	>
-		<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ label }</p>
+		<div>
+			<label for={ "setting-input-" + props.Key } class="text-sm font-medium text-gray-900 dark:text-gray-100">{ props.Label }</label>
+			if props.Description != "" {
+				<p class="text-sm text-gray-500 dark:text-gray-400">{ props.Description }</p>
+			}
+		</div>
 		<input
 			type="number"
-			min="1"
-			max="128"
+			id={ "setting-input-" + props.Key }
+			min={ strconv.Itoa(props.Min) }
+			max={ strconv.Itoa(props.Max) }
 			name="value"
-			value={ settingValue(value, "8") }
-			class="w-20 rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+			value={ settingValue(props.Value, props.Fallback) }
+			class="w-24 shrink-0 rounded-md border-0 px-3 py-1.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
 			hx-patch="/admin/settings"
 			hx-include="this"
-			hx-vals={ `{"key":"` + key + `"}` }
+			hx-vals={ `{"key":"` + props.Key + `"}` }
 			hx-trigger="change"
 		/>
 	</div>

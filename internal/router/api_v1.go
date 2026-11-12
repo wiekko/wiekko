@@ -3,14 +3,18 @@ package router
 import (
 	"net/http"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/controller"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
 )
 
-func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
+// mountAPIv1 registers the REST API and returns the token scopes each
+// authenticated route needs, keyed by route pattern.
+func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) map[string][]access.Need {
 	apiV1 := http.NewServeMux()
+	api := &apiRoutes{mux: apiV1, needs: map[string][]access.Need{}}
 
 	authCtrl := controller.NewAuth(svc.Auth, svc.User, cookieSecure)
 	userCtrl := controller.NewUser(svc.User)
@@ -46,221 +50,250 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) {
 	apiV1.HandleFunc("POST /auth/accept-invite", authCtrl.AcceptInvite)
 
 	// Auth (authenticated).
-	apiV1.Handle("POST /auth/logout", authed(csrf(http.HandlerFunc(authCtrl.Logout))))
+	api.authed("POST /auth/logout", noScope, csrf(http.HandlerFunc(authCtrl.Logout)))
 
 	// Current user (authenticated).
-	apiV1.Handle("GET /user/me", authed(http.HandlerFunc(userCtrl.GetMe)))
-	apiV1.Handle("PATCH /user/me", authed(csrf(http.HandlerFunc(userCtrl.UpdateMe))))
-	apiV1.Handle("POST /user/me/password", authed(csrf(http.HandlerFunc(userCtrl.ChangePassword))))
-	apiV1.Handle("POST /user/me/delete", authed(csrf(http.HandlerFunc(userCtrl.RequestDeletion))))
+	api.authed("GET /user/me", noScope, http.HandlerFunc(userCtrl.GetMe))
+	api.authed("PATCH /user/me", need(access.W(access.Account)), csrf(http.HandlerFunc(userCtrl.UpdateMe)))
+	api.authed("POST /user/me/password", need(access.W(access.Account)), csrf(http.HandlerFunc(userCtrl.ChangePassword)))
+	api.authed("POST /user/me/delete", need(access.W(access.Account)), csrf(http.HandlerFunc(userCtrl.RequestDeletion)))
 
 	// Personal access tokens (authenticated).
 	// Two-factor authentication (authenticated).
-	apiV1.Handle("GET /user/me/totp", authed(http.HandlerFunc(totpCtrl.Status)))
-	apiV1.Handle("POST /user/me/totp", authed(csrf(http.HandlerFunc(totpCtrl.Begin))))
-	apiV1.Handle("POST /user/me/totp/confirm", authed(csrf(http.HandlerFunc(totpCtrl.Confirm))))
-	apiV1.Handle("POST /user/me/totp/recovery-codes", authed(csrf(http.HandlerFunc(totpCtrl.Regenerate))))
-	apiV1.Handle("DELETE /user/me/totp", authed(csrf(http.HandlerFunc(totpCtrl.Disable))))
+	api.authed("GET /user/me/totp", need(access.R(access.Account)), http.HandlerFunc(totpCtrl.Status))
+	api.authed("POST /user/me/totp", need(access.W(access.Account)), csrf(http.HandlerFunc(totpCtrl.Begin)))
+	api.authed("POST /user/me/totp/confirm", need(access.W(access.Account)), csrf(http.HandlerFunc(totpCtrl.Confirm)))
+	api.authed("POST /user/me/totp/recovery-codes", need(access.W(access.Account)), csrf(http.HandlerFunc(totpCtrl.Regenerate)))
+	api.authed("DELETE /user/me/totp", need(access.W(access.Account)), csrf(http.HandlerFunc(totpCtrl.Disable)))
 
-	apiV1.Handle("GET /user/me/tokens", authed(http.HandlerFunc(patCtrl.List)))
-	apiV1.Handle("POST /user/me/tokens", authed(csrf(http.HandlerFunc(patCtrl.Create))))
-	apiV1.Handle("DELETE /user/me/tokens/{id}", authed(csrf(http.HandlerFunc(patCtrl.Revoke))))
+	api.authed("GET /user/me/tokens", need(access.R(access.Account)), http.HandlerFunc(patCtrl.List))
+	api.authed("POST /user/me/tokens", need(access.W(access.Account)), csrf(http.HandlerFunc(patCtrl.Create)))
+	api.authed("DELETE /user/me/tokens/{id}", need(access.W(access.Account)), csrf(http.HandlerFunc(patCtrl.Revoke)))
 
 	// Admin: users (admin only).
-	apiV1.Handle("GET /admin/users", admin(http.HandlerFunc(adminCtrl.ListUsers)))
-	apiV1.Handle("GET /admin/users/{id}", admin(http.HandlerFunc(adminCtrl.GetUser)))
-	apiV1.Handle("POST /admin/users/{id}/lock", admin(csrf(http.HandlerFunc(adminCtrl.LockUser))))
-	apiV1.Handle("POST /admin/users/{id}/unlock", admin(csrf(http.HandlerFunc(adminCtrl.UnlockUser))))
-	apiV1.Handle("POST /admin/users/{id}/password", admin(csrf(http.HandlerFunc(adminCtrl.SetPassword))))
-	apiV1.Handle("POST /admin/users/{id}/approve", admin(csrf(http.HandlerFunc(adminCtrl.ApproveUser))))
-	apiV1.Handle("DELETE /admin/users/{id}/totp", admin(csrf(http.HandlerFunc(totpCtrl.AdminReset))))
-	apiV1.Handle("DELETE /admin/users/{id}", admin(csrf(http.HandlerFunc(adminCtrl.DeleteUser))))
+	api.admin("GET /admin/users", need(access.R(access.Admin)), http.HandlerFunc(adminCtrl.ListUsers))
+	api.admin("GET /admin/users/{id}", need(access.R(access.Admin)), http.HandlerFunc(adminCtrl.GetUser))
+	api.admin("POST /admin/users/{id}/lock", need(access.W(access.Admin)), csrf(http.HandlerFunc(adminCtrl.LockUser)))
+	api.admin("POST /admin/users/{id}/unlock", need(access.W(access.Admin)), csrf(http.HandlerFunc(adminCtrl.UnlockUser)))
+	api.admin("POST /admin/users/{id}/password", need(access.W(access.Admin)), csrf(http.HandlerFunc(adminCtrl.SetPassword)))
+	api.admin("POST /admin/users/{id}/approve", need(access.W(access.Admin)), csrf(http.HandlerFunc(adminCtrl.ApproveUser)))
+	api.admin("DELETE /admin/users/{id}/totp", need(access.W(access.Admin)), csrf(http.HandlerFunc(totpCtrl.AdminReset)))
+	api.admin("DELETE /admin/users/{id}", need(access.W(access.Admin)), csrf(http.HandlerFunc(adminCtrl.DeleteUser)))
 
 	// Admin: settings (admin only).
-	apiV1.Handle("GET /admin/settings", admin(http.HandlerFunc(adminCtrl.GetSettings)))
-	apiV1.Handle("PATCH /admin/settings", admin(csrf(http.HandlerFunc(adminCtrl.UpdateSettings))))
+	api.admin("GET /admin/settings", need(access.R(access.Admin)), http.HandlerFunc(adminCtrl.GetSettings))
+	api.admin("PATCH /admin/settings", need(access.W(access.Admin)), csrf(http.HandlerFunc(adminCtrl.UpdateSettings)))
 
 	// Admin: invitations (admin only).
-	apiV1.Handle("POST /admin/invitations", admin(csrf(http.HandlerFunc(invCtrl.Create))))
-	apiV1.Handle("GET /admin/invitations", admin(http.HandlerFunc(invCtrl.List)))
-	apiV1.Handle("DELETE /admin/invitations/{id}", admin(csrf(http.HandlerFunc(invCtrl.Delete))))
+	api.admin("POST /admin/invitations", need(access.W(access.Admin)), csrf(http.HandlerFunc(invCtrl.Create)))
+	api.admin("GET /admin/invitations", need(access.R(access.Admin)), http.HandlerFunc(invCtrl.List))
+	api.admin("DELETE /admin/invitations/{id}", need(access.W(access.Admin)), csrf(http.HandlerFunc(invCtrl.Delete)))
 
 	// Products.
-	apiV1.Handle("GET /products", authed(http.HandlerFunc(productCtrl.List)))
-	apiV1.Handle("POST /products", authed(csrf(http.HandlerFunc(productCtrl.Create))))
-	apiV1.Handle("GET /products/{productId}", authed(http.HandlerFunc(productCtrl.Get)))
-	apiV1.Handle("PATCH /products/{productId}", authed(csrf(http.HandlerFunc(productCtrl.Update))))
-	apiV1.Handle("DELETE /products/{productId}", authed(csrf(http.HandlerFunc(productCtrl.Delete))))
+	api.authed("GET /products", noScope, http.HandlerFunc(productCtrl.List))
+	api.authed("POST /products", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.Create)))
+	api.authed("GET /products/{productId}", noScope, http.HandlerFunc(productCtrl.Get))
+	api.authed("PATCH /products/{productId}", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.Update)))
+	api.authed("DELETE /products/{productId}", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.Delete)))
 
 	// Product members.
-	apiV1.Handle("GET /products/{productId}/members", authed(http.HandlerFunc(productCtrl.ListMembers)))
-	apiV1.Handle("POST /products/{productId}/members", authed(csrf(http.HandlerFunc(productCtrl.AddMember))))
-	apiV1.Handle("PATCH /products/{productId}/members/{userId}", authed(csrf(http.HandlerFunc(productCtrl.UpdateMember))))
-	apiV1.Handle("DELETE /products/{productId}/members/{userId}", authed(csrf(http.HandlerFunc(productCtrl.RemoveMember))))
-	apiV1.Handle("POST /products/{productId}/transfer-ownership", authed(csrf(http.HandlerFunc(productCtrl.TransferOwnership))))
+	api.authed("GET /products/{productId}/members", need(access.R(access.Settings)), http.HandlerFunc(productCtrl.ListMembers))
+	api.authed("POST /products/{productId}/members", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.AddMember)))
+	api.authed("PATCH /products/{productId}/members/{userId}", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.UpdateMember)))
+	api.authed("DELETE /products/{productId}/members/{userId}", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.RemoveMember)))
+	api.authed("POST /products/{productId}/transfer-ownership", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.TransferOwnership)))
 
 	// Components.
-	apiV1.Handle("GET /products/{productId}/components", authed(http.HandlerFunc(componentCtrl.ListComponents)))
-	apiV1.Handle("POST /products/{productId}/components", authed(csrf(http.HandlerFunc(componentCtrl.CreateComponent))))
-	apiV1.Handle("GET /products/{productId}/components/{id}", authed(http.HandlerFunc(componentCtrl.GetComponent)))
-	apiV1.Handle("PATCH /products/{productId}/components/{id}", authed(csrf(http.HandlerFunc(componentCtrl.UpdateComponent))))
-	apiV1.Handle("DELETE /products/{productId}/components/{id}", authed(csrf(http.HandlerFunc(componentCtrl.DeleteComponent))))
+	api.authed("GET /products/{productId}/components", need(access.R(access.Structure)), http.HandlerFunc(componentCtrl.ListComponents))
+	api.authed("POST /products/{productId}/components", need(access.W(access.Structure)), csrf(http.HandlerFunc(componentCtrl.CreateComponent)))
+	api.authed("GET /products/{productId}/components/{id}", need(access.R(access.Structure)), http.HandlerFunc(componentCtrl.GetComponent))
+	api.authed("PATCH /products/{productId}/components/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(componentCtrl.UpdateComponent)))
+	api.authed("DELETE /products/{productId}/components/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(componentCtrl.DeleteComponent)))
 
 	// Capabilities.
-	apiV1.Handle("GET /products/{productId}/capabilities", authed(http.HandlerFunc(componentCtrl.ListCapabilities)))
-	apiV1.Handle("POST /products/{productId}/capabilities", authed(csrf(http.HandlerFunc(componentCtrl.CreateCapability))))
-	apiV1.Handle("GET /products/{productId}/capabilities/{id}", authed(http.HandlerFunc(componentCtrl.GetCapability)))
-	apiV1.Handle("PATCH /products/{productId}/capabilities/{id}", authed(csrf(http.HandlerFunc(componentCtrl.UpdateCapability))))
-	apiV1.Handle("DELETE /products/{productId}/capabilities/{id}", authed(csrf(http.HandlerFunc(componentCtrl.DeleteCapability))))
+	api.authed("GET /products/{productId}/capabilities", need(access.R(access.Structure)), http.HandlerFunc(componentCtrl.ListCapabilities))
+	api.authed("POST /products/{productId}/capabilities", need(access.W(access.Structure)), csrf(http.HandlerFunc(componentCtrl.CreateCapability)))
+	api.authed("GET /products/{productId}/capabilities/{id}", need(access.R(access.Structure)), http.HandlerFunc(componentCtrl.GetCapability))
+	api.authed("PATCH /products/{productId}/capabilities/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(componentCtrl.UpdateCapability)))
+	api.authed("DELETE /products/{productId}/capabilities/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(componentCtrl.DeleteCapability)))
 
 	// Capability-requirement links.
-	apiV1.Handle("GET /products/{productId}/capabilities/{id}/requirements", authed(http.HandlerFunc(componentCtrl.ListCapabilityRequirements)))
-	apiV1.Handle("POST /products/{productId}/capabilities/{id}/requirements", authed(csrf(http.HandlerFunc(componentCtrl.LinkCapabilityRequirement))))
-	apiV1.Handle("DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}", authed(reqParamRef(csrf(http.HandlerFunc(componentCtrl.UnlinkCapabilityRequirement)))))
-	apiV1.Handle("GET /products/{productId}/capabilities/{id}/test-cases", authed(http.HandlerFunc(testingCtrl.ListCapabilityTestCases)))
-	apiV1.Handle("GET /products/{productId}/capabilities/{id}/defects", authed(backlogCtrl.LinkedDefects(model.DefectLinkTargetCapability)))
+	api.authed("GET /products/{productId}/capabilities/{id}/requirements", need(access.R(access.Structure), access.R(access.Backlog)), http.HandlerFunc(componentCtrl.ListCapabilityRequirements))
+	api.authed("POST /products/{productId}/capabilities/{id}/requirements", need(access.W(access.Structure), access.R(access.Backlog)), csrf(http.HandlerFunc(componentCtrl.LinkCapabilityRequirement)))
+	api.authed("DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}", need(access.W(access.Structure), access.R(access.Backlog)), reqParamRef(csrf(http.HandlerFunc(componentCtrl.UnlinkCapabilityRequirement))))
+	api.authed("GET /products/{productId}/capabilities/{id}/test-cases", need(access.R(access.Structure), access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListCapabilityTestCases))
+	api.authed("GET /products/{productId}/capabilities/{id}/defects", need(access.R(access.Structure), access.R(access.Defects)), backlogCtrl.LinkedDefects(model.DefectLinkTargetCapability))
 
 	// Requirement-capability links.
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/capabilities", authed(reqRef(http.HandlerFunc(componentCtrl.ListRequirementCapabilities))))
-	apiV1.Handle("POST /products/{productId}/requirements/{id}/capabilities", authed(reqRef(csrf(http.HandlerFunc(componentCtrl.LinkRequirementCapability)))))
-	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/capabilities/{capId}", authed(reqRef(csrf(http.HandlerFunc(componentCtrl.UnlinkRequirementCapability)))))
+	api.authed("GET /products/{productId}/requirements/{id}/capabilities", need(access.R(access.Backlog), access.R(access.Structure)), reqRef(http.HandlerFunc(componentCtrl.ListRequirementCapabilities)))
+	api.authed("POST /products/{productId}/requirements/{id}/capabilities", need(access.W(access.Backlog), access.R(access.Structure)), reqRef(csrf(http.HandlerFunc(componentCtrl.LinkRequirementCapability))))
+	api.authed("DELETE /products/{productId}/requirements/{id}/capabilities/{capId}", need(access.W(access.Backlog), access.R(access.Structure)), reqRef(csrf(http.HandlerFunc(componentCtrl.UnlinkRequirementCapability))))
 
 	// Milestones.
-	apiV1.Handle("GET /products/{productId}/milestones", authed(http.HandlerFunc(planningCtrl.ListMilestones)))
-	apiV1.Handle("POST /products/{productId}/milestones", authed(csrf(http.HandlerFunc(planningCtrl.CreateMilestone))))
-	apiV1.Handle("GET /products/{productId}/milestones/{id}", authed(http.HandlerFunc(planningCtrl.GetMilestone)))
-	apiV1.Handle("PATCH /products/{productId}/milestones/{id}", authed(csrf(http.HandlerFunc(planningCtrl.UpdateMilestone))))
-	apiV1.Handle("DELETE /products/{productId}/milestones/{id}", authed(csrf(http.HandlerFunc(planningCtrl.DeleteMilestone))))
+	api.authed("GET /products/{productId}/milestones", need(access.R(access.Structure)), http.HandlerFunc(planningCtrl.ListMilestones))
+	api.authed("POST /products/{productId}/milestones", need(access.W(access.Structure)), csrf(http.HandlerFunc(planningCtrl.CreateMilestone)))
+	api.authed("GET /products/{productId}/milestones/{id}", need(access.R(access.Structure)), http.HandlerFunc(planningCtrl.GetMilestone))
+	api.authed("PATCH /products/{productId}/milestones/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(planningCtrl.UpdateMilestone)))
+	api.authed("DELETE /products/{productId}/milestones/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(planningCtrl.DeleteMilestone)))
 
 	// Sprints.
-	apiV1.Handle("GET /products/{productId}/sprints", authed(http.HandlerFunc(planningCtrl.ListSprints)))
-	apiV1.Handle("POST /products/{productId}/sprints", authed(csrf(http.HandlerFunc(planningCtrl.CreateSprint))))
-	apiV1.Handle("GET /products/{productId}/sprints/{id}", authed(http.HandlerFunc(planningCtrl.GetSprint)))
-	apiV1.Handle("PATCH /products/{productId}/sprints/{id}", authed(csrf(http.HandlerFunc(planningCtrl.UpdateSprint))))
-	apiV1.Handle("DELETE /products/{productId}/sprints/{id}", authed(csrf(http.HandlerFunc(planningCtrl.DeleteSprint))))
+	api.authed("GET /products/{productId}/sprints", need(access.R(access.Structure)), http.HandlerFunc(planningCtrl.ListSprints))
+	api.authed("POST /products/{productId}/sprints", need(access.W(access.Structure)), csrf(http.HandlerFunc(planningCtrl.CreateSprint)))
+	api.authed("GET /products/{productId}/sprints/{id}", need(access.R(access.Structure)), http.HandlerFunc(planningCtrl.GetSprint))
+	api.authed("PATCH /products/{productId}/sprints/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(planningCtrl.UpdateSprint)))
+	api.authed("DELETE /products/{productId}/sprints/{id}", need(access.W(access.Structure)), csrf(http.HandlerFunc(planningCtrl.DeleteSprint)))
 
 	// Statuses.
-	apiV1.Handle("GET /products/{productId}/statuses", authed(http.HandlerFunc(planningCtrl.ListStatuses)))
-	apiV1.Handle("POST /products/{productId}/statuses", authed(csrf(http.HandlerFunc(planningCtrl.CreateStatus))))
-	apiV1.Handle("GET /products/{productId}/statuses/{id}", authed(http.HandlerFunc(planningCtrl.GetStatus)))
-	apiV1.Handle("PATCH /products/{productId}/statuses/{id}", authed(csrf(http.HandlerFunc(planningCtrl.UpdateStatus))))
-	apiV1.Handle("DELETE /products/{productId}/statuses/{id}", authed(csrf(http.HandlerFunc(planningCtrl.DeleteStatus))))
+	api.authed("GET /products/{productId}/statuses", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.ListStatuses))
+	api.authed("POST /products/{productId}/statuses", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.CreateStatus)))
+	api.authed("GET /products/{productId}/statuses/{id}", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.GetStatus))
+	api.authed("PATCH /products/{productId}/statuses/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.UpdateStatus)))
+	api.authed("DELETE /products/{productId}/statuses/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.DeleteStatus)))
 
 	// Pyramid levels.
-	apiV1.Handle("GET /products/{productId}/pyramid-levels", authed(http.HandlerFunc(planningCtrl.ListPyramidLevels)))
-	apiV1.Handle("POST /products/{productId}/pyramid-levels", authed(csrf(http.HandlerFunc(planningCtrl.CreatePyramidLevel))))
-	apiV1.Handle("GET /products/{productId}/pyramid-levels/{id}", authed(http.HandlerFunc(planningCtrl.GetPyramidLevel)))
-	apiV1.Handle("PATCH /products/{productId}/pyramid-levels/{id}", authed(csrf(http.HandlerFunc(planningCtrl.UpdatePyramidLevel))))
-	apiV1.Handle("DELETE /products/{productId}/pyramid-levels/{id}", authed(csrf(http.HandlerFunc(planningCtrl.DeletePyramidLevel))))
+	api.authed("GET /products/{productId}/pyramid-levels", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.ListPyramidLevels))
+	api.authed("POST /products/{productId}/pyramid-levels", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.CreatePyramidLevel)))
+	api.authed("GET /products/{productId}/pyramid-levels/{id}", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.GetPyramidLevel))
+	api.authed("PATCH /products/{productId}/pyramid-levels/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.UpdatePyramidLevel)))
+	api.authed("DELETE /products/{productId}/pyramid-levels/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.DeletePyramidLevel)))
 
 	// Runtime environments.
-	apiV1.Handle("GET /products/{productId}/runtime-environments", authed(http.HandlerFunc(planningCtrl.ListRuntimeEnvironments)))
-	apiV1.Handle("POST /products/{productId}/runtime-environments", authed(csrf(http.HandlerFunc(planningCtrl.CreateRuntimeEnvironment))))
-	apiV1.Handle("DELETE /products/{productId}/runtime-environments/{id}", authed(csrf(http.HandlerFunc(planningCtrl.DeleteRuntimeEnvironment))))
+	api.authed("GET /products/{productId}/runtime-environments", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.ListRuntimeEnvironments))
+	api.authed("POST /products/{productId}/runtime-environments", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.CreateRuntimeEnvironment)))
+	api.authed("DELETE /products/{productId}/runtime-environments/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.DeleteRuntimeEnvironment)))
 
 	// Categories.
-	apiV1.Handle("GET /products/{productId}/categories", authed(http.HandlerFunc(categoryCtrl.ListCategories)))
-	apiV1.Handle("POST /products/{productId}/categories", authed(csrf(http.HandlerFunc(categoryCtrl.CreateCategory))))
-	apiV1.Handle("GET /products/{productId}/categories/{id}", authed(http.HandlerFunc(categoryCtrl.GetCategory)))
-	apiV1.Handle("PATCH /products/{productId}/categories/{id}", authed(csrf(http.HandlerFunc(categoryCtrl.UpdateCategory))))
-	apiV1.Handle("DELETE /products/{productId}/categories/{id}", authed(csrf(http.HandlerFunc(categoryCtrl.DeleteCategory))))
+	api.authed("GET /products/{productId}/categories", need(access.R(access.Settings)), http.HandlerFunc(categoryCtrl.ListCategories))
+	api.authed("POST /products/{productId}/categories", need(access.W(access.Settings)), csrf(http.HandlerFunc(categoryCtrl.CreateCategory)))
+	api.authed("GET /products/{productId}/categories/{id}", need(access.R(access.Settings)), http.HandlerFunc(categoryCtrl.GetCategory))
+	api.authed("PATCH /products/{productId}/categories/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(categoryCtrl.UpdateCategory)))
+	api.authed("DELETE /products/{productId}/categories/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(categoryCtrl.DeleteCategory)))
 
 	// Requirements.
-	apiV1.Handle("GET /products/{productId}/requirements", authed(http.HandlerFunc(backlogCtrl.ListRequirements)))
-	apiV1.Handle("POST /products/{productId}/requirements", authed(csrf(http.HandlerFunc(backlogCtrl.CreateRequirement))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}", authed(reqRef(http.HandlerFunc(backlogCtrl.GetRequirement))))
-	apiV1.Handle("PATCH /products/{productId}/requirements/{id}", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.UpdateRequirement)))))
-	apiV1.Handle("DELETE /products/{productId}/requirements/{id}", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.DeleteRequirement)))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/children", authed(reqRef(http.HandlerFunc(backlogCtrl.ListChildRequirements))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/assignees", authed(reqRef(http.HandlerFunc(backlogCtrl.ListRequirementAssignees))))
-	apiV1.Handle("POST /products/{productId}/requirements/{id}/assignees", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.AssignRequirement)))))
-	apiV1.Handle("DELETE /products/{productId}/requirements/{id}/assignees/{userId}", authed(reqRef(csrf(http.HandlerFunc(backlogCtrl.UnassignRequirement)))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/test-cases", authed(reqRef(http.HandlerFunc(testingCtrl.ListRequirementTestCases))))
-	apiV1.Handle("GET /products/{productId}/requirements/{id}/defects", authed(reqRef(backlogCtrl.LinkedDefects(model.DefectLinkTargetRequirement))))
+	api.authed("GET /products/{productId}/requirements", need(access.R(access.Backlog)), http.HandlerFunc(backlogCtrl.ListRequirements))
+	api.authed("POST /products/{productId}/requirements", need(access.W(access.Backlog)), csrf(http.HandlerFunc(backlogCtrl.CreateRequirement)))
+	api.authed("GET /products/{productId}/requirements/{id}", need(access.R(access.Backlog)), reqRef(http.HandlerFunc(backlogCtrl.GetRequirement)))
+	api.authed("PATCH /products/{productId}/requirements/{id}", need(access.W(access.Backlog)), reqRef(csrf(http.HandlerFunc(backlogCtrl.UpdateRequirement))))
+	api.authed("DELETE /products/{productId}/requirements/{id}", need(access.W(access.Backlog)), reqRef(csrf(http.HandlerFunc(backlogCtrl.DeleteRequirement))))
+	api.authed("GET /products/{productId}/requirements/{id}/children", need(access.R(access.Backlog)), reqRef(http.HandlerFunc(backlogCtrl.ListChildRequirements)))
+	api.authed("GET /products/{productId}/requirements/{id}/assignees", need(access.R(access.Backlog)), reqRef(http.HandlerFunc(backlogCtrl.ListRequirementAssignees)))
+	api.authed("POST /products/{productId}/requirements/{id}/assignees", need(access.W(access.Backlog)), reqRef(csrf(http.HandlerFunc(backlogCtrl.AssignRequirement))))
+	api.authed("DELETE /products/{productId}/requirements/{id}/assignees/{userId}", need(access.W(access.Backlog)), reqRef(csrf(http.HandlerFunc(backlogCtrl.UnassignRequirement))))
+	api.authed("GET /products/{productId}/requirements/{id}/test-cases", need(access.R(access.Backlog), access.R(access.Tests)), reqRef(http.HandlerFunc(testingCtrl.ListRequirementTestCases)))
+	api.authed("GET /products/{productId}/requirements/{id}/defects", need(access.R(access.Backlog), access.R(access.Defects)), reqRef(backlogCtrl.LinkedDefects(model.DefectLinkTargetRequirement)))
 
 	// Constraints.
-	apiV1.Handle("GET /products/{productId}/constraints", authed(http.HandlerFunc(constraintCtrl.ListConstraints)))
-	apiV1.Handle("POST /products/{productId}/constraints", authed(csrf(http.HandlerFunc(constraintCtrl.CreateConstraint))))
-	apiV1.Handle("GET /products/{productId}/constraints/{id}", authed(conRef(http.HandlerFunc(constraintCtrl.GetConstraint))))
-	apiV1.Handle("PATCH /products/{productId}/constraints/{id}", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.UpdateConstraint)))))
-	apiV1.Handle("DELETE /products/{productId}/constraints/{id}", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.DeleteConstraint)))))
-	apiV1.Handle("GET /products/{productId}/constraints/{id}/capabilities", authed(conRef(http.HandlerFunc(constraintCtrl.ListConstraintCapabilities))))
-	apiV1.Handle("POST /products/{productId}/constraints/{id}/capabilities", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.LinkConstraintCapability)))))
-	apiV1.Handle("DELETE /products/{productId}/constraints/{id}/capabilities/{capId}", authed(conRef(csrf(http.HandlerFunc(constraintCtrl.UnlinkConstraintCapability)))))
+	api.authed("GET /products/{productId}/constraints", need(access.R(access.Backlog)), http.HandlerFunc(constraintCtrl.ListConstraints))
+	api.authed("POST /products/{productId}/constraints", need(access.W(access.Backlog)), csrf(http.HandlerFunc(constraintCtrl.CreateConstraint)))
+	api.authed("GET /products/{productId}/constraints/{id}", need(access.R(access.Backlog)), conRef(http.HandlerFunc(constraintCtrl.GetConstraint)))
+	api.authed("PATCH /products/{productId}/constraints/{id}", need(access.W(access.Backlog)), conRef(csrf(http.HandlerFunc(constraintCtrl.UpdateConstraint))))
+	api.authed("DELETE /products/{productId}/constraints/{id}", need(access.W(access.Backlog)), conRef(csrf(http.HandlerFunc(constraintCtrl.DeleteConstraint))))
+	api.authed("GET /products/{productId}/constraints/{id}/capabilities", need(access.R(access.Backlog), access.R(access.Structure)), conRef(http.HandlerFunc(constraintCtrl.ListConstraintCapabilities)))
+	api.authed("POST /products/{productId}/constraints/{id}/capabilities", need(access.W(access.Backlog), access.R(access.Structure)), conRef(csrf(http.HandlerFunc(constraintCtrl.LinkConstraintCapability))))
+	api.authed("DELETE /products/{productId}/constraints/{id}/capabilities/{capId}", need(access.W(access.Backlog), access.R(access.Structure)), conRef(csrf(http.HandlerFunc(constraintCtrl.UnlinkConstraintCapability))))
 
 	// Defects.
-	apiV1.Handle("GET /products/{productId}/defects", authed(http.HandlerFunc(backlogCtrl.ListDefects)))
-	apiV1.Handle("POST /products/{productId}/defects", authed(csrf(http.HandlerFunc(backlogCtrl.CreateDefect))))
-	apiV1.Handle("GET /products/{productId}/defects/{id}", authed(http.HandlerFunc(backlogCtrl.GetDefect)))
-	apiV1.Handle("PATCH /products/{productId}/defects/{id}", authed(csrf(http.HandlerFunc(backlogCtrl.UpdateDefect))))
-	apiV1.Handle("DELETE /products/{productId}/defects/{id}", authed(csrf(http.HandlerFunc(backlogCtrl.DeleteDefect))))
-	apiV1.Handle("GET /products/{productId}/defects/{id}/assignees", authed(http.HandlerFunc(backlogCtrl.ListDefectAssignees)))
-	apiV1.Handle("POST /products/{productId}/defects/{id}/assignees", authed(csrf(http.HandlerFunc(backlogCtrl.AssignDefect))))
-	apiV1.Handle("DELETE /products/{productId}/defects/{id}/assignees/{userId}", authed(csrf(http.HandlerFunc(backlogCtrl.UnassignDefect))))
-	apiV1.Handle("GET /products/{productId}/defects/{id}/links", authed(http.HandlerFunc(backlogCtrl.ListDefectLinks)))
-	apiV1.Handle("POST /products/{productId}/defects/{id}/links", authed(csrf(http.HandlerFunc(backlogCtrl.AddDefectLink))))
-	apiV1.Handle("DELETE /products/{productId}/defects/{id}/links/{linkId}", authed(csrf(http.HandlerFunc(backlogCtrl.RemoveDefectLink))))
+	api.authed("GET /products/{productId}/defects", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefects))
+	api.authed("POST /products/{productId}/defects", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.CreateDefect)))
+	api.authed("GET /products/{productId}/defects/{id}", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.GetDefect))
+	api.authed("PATCH /products/{productId}/defects/{id}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.UpdateDefect)))
+	api.authed("DELETE /products/{productId}/defects/{id}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.DeleteDefect)))
+	api.authed("GET /products/{productId}/defects/{id}/assignees", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefectAssignees))
+	api.authed("POST /products/{productId}/defects/{id}/assignees", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.AssignDefect)))
+	api.authed("DELETE /products/{productId}/defects/{id}/assignees/{userId}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.UnassignDefect)))
+	api.authed("GET /products/{productId}/defects/{id}/links", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefectLinks))
+	api.authed("POST /products/{productId}/defects/{id}/links", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.AddDefectLink)))
+	api.authed("DELETE /products/{productId}/defects/{id}/links/{linkId}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.RemoveDefectLink)))
 
 	// Test cases.
-	apiV1.Handle("GET /products/{productId}/test-cases", authed(http.HandlerFunc(testingCtrl.ListTestCases)))
-	apiV1.Handle("POST /products/{productId}/test-cases", authed(csrf(http.HandlerFunc(testingCtrl.CreateTestCase))))
-	apiV1.Handle("GET /products/{productId}/test-cases/{id}", authed(http.HandlerFunc(testingCtrl.GetTestCase)))
-	apiV1.Handle("PATCH /products/{productId}/test-cases/{id}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateTestCase))))
-	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}", authed(csrf(http.HandlerFunc(testingCtrl.DeleteTestCase))))
-	apiV1.Handle("GET /products/{productId}/test-cases/{id}/requirements", authed(http.HandlerFunc(testingCtrl.ListTestCaseRequirements)))
-	apiV1.Handle("POST /products/{productId}/test-cases/{id}/requirements", authed(csrf(http.HandlerFunc(testingCtrl.LinkRequirement))))
-	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}/requirements/{reqId}", authed(reqParamRef(csrf(http.HandlerFunc(testingCtrl.UnlinkRequirement)))))
-	apiV1.Handle("GET /products/{productId}/test-cases/{id}/environments", authed(http.HandlerFunc(testingCtrl.ListTestCaseEnvironments)))
-	apiV1.Handle("POST /products/{productId}/test-cases/{id}/environments", authed(csrf(http.HandlerFunc(testingCtrl.AddEnvironment))))
-	apiV1.Handle("DELETE /products/{productId}/test-cases/{id}/environments/{envId}", authed(csrf(http.HandlerFunc(testingCtrl.RemoveEnvironment))))
-	apiV1.Handle("GET /products/{productId}/test-cases/{id}/results", authed(http.HandlerFunc(testingCtrl.ListTestCaseResults)))
-	apiV1.Handle("GET /products/{productId}/test-cases/{id}/defects", authed(backlogCtrl.LinkedDefects(model.DefectLinkTargetTestCase)))
+	api.authed("GET /products/{productId}/test-cases", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListTestCases))
+	api.authed("POST /products/{productId}/test-cases", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.CreateTestCase)))
+	api.authed("GET /products/{productId}/test-cases/{id}", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.GetTestCase))
+	api.authed("PATCH /products/{productId}/test-cases/{id}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.UpdateTestCase)))
+	api.authed("DELETE /products/{productId}/test-cases/{id}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.DeleteTestCase)))
+	api.authed("GET /products/{productId}/test-cases/{id}/requirements", need(access.R(access.Tests), access.R(access.Backlog)), http.HandlerFunc(testingCtrl.ListTestCaseRequirements))
+	api.authed("POST /products/{productId}/test-cases/{id}/requirements", need(access.W(access.Tests), access.R(access.Backlog)), csrf(http.HandlerFunc(testingCtrl.LinkRequirement)))
+	api.authed("DELETE /products/{productId}/test-cases/{id}/requirements/{reqId}", need(access.W(access.Tests), access.R(access.Backlog)), reqParamRef(csrf(http.HandlerFunc(testingCtrl.UnlinkRequirement))))
+	api.authed("GET /products/{productId}/test-cases/{id}/environments", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListTestCaseEnvironments))
+	api.authed("POST /products/{productId}/test-cases/{id}/environments", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.AddEnvironment)))
+	api.authed("DELETE /products/{productId}/test-cases/{id}/environments/{envId}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.RemoveEnvironment)))
+	api.authed("GET /products/{productId}/test-cases/{id}/results", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListTestCaseResults))
+	api.authed("GET /products/{productId}/test-cases/{id}/defects", need(access.R(access.Tests), access.R(access.Defects)), backlogCtrl.LinkedDefects(model.DefectLinkTargetTestCase))
 
 	// Campaigns.
-	apiV1.Handle("GET /products/{productId}/campaigns", authed(http.HandlerFunc(testingCtrl.ListCampaigns)))
-	apiV1.Handle("POST /products/{productId}/campaigns", authed(csrf(http.HandlerFunc(testingCtrl.CreateCampaign))))
-	apiV1.Handle("GET /products/{productId}/campaigns/{id}", authed(http.HandlerFunc(testingCtrl.GetCampaign)))
-	apiV1.Handle("PATCH /products/{productId}/campaigns/{id}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateCampaign))))
-	apiV1.Handle("DELETE /products/{productId}/campaigns/{id}", authed(csrf(http.HandlerFunc(testingCtrl.DeleteCampaign))))
-	apiV1.Handle("POST /products/{productId}/campaigns/{id}/activate", authed(csrf(http.HandlerFunc(testingCtrl.ActivateCampaign))))
-	apiV1.Handle("POST /products/{productId}/campaigns/{id}/close", authed(csrf(http.HandlerFunc(testingCtrl.CloseCampaign))))
-	apiV1.Handle("GET /products/{productId}/campaigns/{id}/progress", authed(http.HandlerFunc(testingCtrl.Progress)))
-	apiV1.Handle("GET /products/{productId}/campaigns/{id}/events", authed(http.HandlerFunc(testingCtrl.ListResultEvents)))
-	apiV1.Handle("GET /products/{productId}/campaigns/{id}/results", authed(http.HandlerFunc(testingCtrl.ListCampaignResults)))
-	apiV1.Handle("PATCH /products/{productId}/campaigns/{id}/results/{resultId}", authed(csrf(http.HandlerFunc(testingCtrl.UpdateResult))))
+	api.authed("GET /products/{productId}/campaigns", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListCampaigns))
+	api.authed("POST /products/{productId}/campaigns", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.CreateCampaign)))
+	api.authed("GET /products/{productId}/campaigns/{id}", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.GetCampaign))
+	api.authed("PATCH /products/{productId}/campaigns/{id}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.UpdateCampaign)))
+	api.authed("DELETE /products/{productId}/campaigns/{id}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.DeleteCampaign)))
+	api.authed("POST /products/{productId}/campaigns/{id}/activate", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.ActivateCampaign)))
+	api.authed("POST /products/{productId}/campaigns/{id}/close", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.CloseCampaign)))
+	api.authed("GET /products/{productId}/campaigns/{id}/progress", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.Progress))
+	api.authed("GET /products/{productId}/campaigns/{id}/events", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListResultEvents))
+	api.authed("GET /products/{productId}/campaigns/{id}/results", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListCampaignResults))
+	api.authed("PATCH /products/{productId}/campaigns/{id}/results/{resultId}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.UpdateResult)))
 
 	// Automated test runs (FR-409): CI uploads results into the active campaign.
-	apiV1.Handle("POST /products/{productId}/test-runs", authed(csrf(http.HandlerFunc(testRunCtrl.Ingest))))
+	api.authed("POST /products/{productId}/test-runs", need(access.W(access.Tests)), csrf(http.HandlerFunc(testRunCtrl.Ingest)))
 
 	// Comments.
-	apiV1.Handle("GET /products/{productId}/comments", authed(http.HandlerFunc(discussionCtrl.ListComments)))
-	apiV1.Handle("POST /products/{productId}/comments", authed(csrf(http.HandlerFunc(discussionCtrl.CreateComment))))
-	apiV1.Handle("GET /products/{productId}/comments/{id}", authed(http.HandlerFunc(discussionCtrl.GetComment)))
-	apiV1.Handle("PATCH /products/{productId}/comments/{id}", authed(csrf(http.HandlerFunc(discussionCtrl.UpdateComment))))
-	apiV1.Handle("DELETE /products/{productId}/comments/{id}", authed(csrf(http.HandlerFunc(discussionCtrl.DeleteComment))))
+	api.authed("GET /products/{productId}/comments", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.ListComments))
+	api.authed("POST /products/{productId}/comments", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.CreateComment)))
+	api.authed("GET /products/{productId}/comments/{id}", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.GetComment))
+	api.authed("PATCH /products/{productId}/comments/{id}", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.UpdateComment)))
+	api.authed("DELETE /products/{productId}/comments/{id}", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.DeleteComment)))
 
 	// Attachments.
-	apiV1.Handle("GET /products/{productId}/attachments", authed(http.HandlerFunc(discussionCtrl.ListAttachments)))
-	apiV1.Handle("POST /products/{productId}/attachments", authed(csrf(http.HandlerFunc(discussionCtrl.CreateAttachment))))
-	apiV1.Handle("GET /products/{productId}/attachments/{id}", authed(http.HandlerFunc(discussionCtrl.GetAttachment)))
-	apiV1.Handle("GET /products/{productId}/attachments/{id}/download", authed(http.HandlerFunc(discussionCtrl.DownloadAttachment)))
-	apiV1.Handle("DELETE /products/{productId}/attachments/{id}", authed(csrf(http.HandlerFunc(discussionCtrl.DeleteAttachment))))
+	api.authed("GET /products/{productId}/attachments", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.ListAttachments))
+	api.authed("POST /products/{productId}/attachments", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.CreateAttachment)))
+	api.authed("GET /products/{productId}/attachments/{id}", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.GetAttachment))
+	api.authed("GET /products/{productId}/attachments/{id}/download", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.DownloadAttachment))
+	api.authed("DELETE /products/{productId}/attachments/{id}", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.DeleteAttachment)))
 
 	// Audit trail.
-	apiV1.Handle("GET /products/{productId}/audit", authed(http.HandlerFunc(auditCtrl.List)))
+	api.authed("GET /products/{productId}/audit", readAll, http.HandlerFunc(auditCtrl.List))
 
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1))
+	return api.needs
 }
 
-// authed wraps a handler with RequireAuth middleware.
-func authed(h http.Handler) http.Handler {
-	return middleware.RequireAuth(h)
+// apiRoutes registers authenticated API routes together with the token scopes
+// they need (SC-404, SC-405). Every authenticated route declares its scopes,
+// so a route cannot be added without deciding what a token needs for it.
+//
+// The rule: every resource named in the path needs read, and a state-changing
+// method needs write on the first resource of the path. TestAPIRouteScopes
+// checks every route against it.
+type apiRoutes struct {
+	mux   *http.ServeMux
+	needs map[string][]access.Need
 }
 
-// admin wraps a handler with RequireAuth + RequireAdmin middleware.
-func admin(h http.Handler) http.Handler {
-	return middleware.RequireAdmin(middleware.RequireAuth(h))
+// authed registers a route that requires authentication; a token must hold
+// every scope in need.
+func (a *apiRoutes) authed(pattern string, need []access.Need, h http.Handler) {
+	a.needs[pattern] = need
+	a.mux.Handle(pattern, middleware.RequireAuth(middleware.RequireScopes(need...)(h)))
 }
+
+// admin registers a route that requires an administrator; a token must hold
+// every scope in need (always the admin scope, SC-406).
+func (a *apiRoutes) admin(pattern string, need []access.Need, h http.Handler) {
+	a.needs[pattern] = need
+	a.mux.Handle(pattern, middleware.RequireAuth(middleware.RequireScopes(need...)(middleware.RequireAdmin(h))))
+}
+
+// need lists the scopes a route needs.
+func need(n ...access.Need) []access.Need { return n }
+
+var (
+	// noScope marks routes any authenticated token may call.
+	noScope = need()
+	// readAll needs read on every product scope, for views across all of a
+	// product's data (the audit trail).
+	readAll = need(access.R(access.Structure), access.R(access.Backlog), access.R(access.Defects),
+		access.R(access.Tests), access.R(access.Discussion), access.R(access.Settings))
+)
 
 // csrf wraps a handler with CSRF middleware.
 func csrf(h http.Handler) http.Handler {

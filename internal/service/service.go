@@ -104,7 +104,9 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			provider:     provider,
 		},
 		PAT: &PATService{
-			pats: st.PAT,
+			pats:         st.PAT,
+			productRoles: st.ProductRole,
+			settings:     st.Setting,
 		},
 		Setting: settingSvc,
 		Invitation: &InvitationService{

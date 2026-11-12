@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/store"
 )
@@ -44,6 +45,10 @@ type UpdateProductInput struct {
 // Create creates a new product and assigns the creator as owner (FR-303).
 // Checks product_creation_enabled setting unless user is admin (FR-301, FR-302).
 func (s *ProductService) Create(ctx context.Context, user *model.User, input CreateProductInput) (*model.Product, error) {
+	// A product-restricted token could not reach the product it creates.
+	if r := access.FromContext(ctx); r != nil && r.ProductsRestricted {
+		return nil, fmt.Errorf("%w: this token is restricted to existing products", ErrForbidden)
+	}
 	if !user.IsAdmin {
 		enabled, err := s.settings.Get(ctx, "product_creation_enabled")
 		if err != nil || enabled != "true" {
@@ -354,7 +359,7 @@ func (s *ProductService) ListWithRoles(ctx context.Context, user *model.User) ([
 			}
 			result = append(result, ProductWithRole{Product: p, Role: role})
 		}
-		return result, nil
+		return restrictProductRoles(ctx, result), nil
 	}
 
 	var result []ProductWithRole
@@ -365,7 +370,32 @@ func (s *ProductService) ListWithRoles(ctx context.Context, user *model.User) ([
 		}
 		result = append(result, ProductWithRole{Product: p, Role: role.Role})
 	}
-	return result, nil
+	return restrictProductRoles(ctx, result), nil
+}
+
+// restrictProductRoles applies a token's restriction to a product listing:
+// only the token's products are listed, with their roles capped (SC-402,
+// SC-403). An administrator's "admin" pseudo-role counts as owner.
+func restrictProductRoles(ctx context.Context, list []ProductWithRole) []ProductWithRole {
+	r := access.FromContext(ctx)
+	if r == nil {
+		return list
+	}
+	out := make([]ProductWithRole, 0, len(list))
+	for _, pr := range list {
+		if !r.AllowsProduct(pr.Product.ID) {
+			continue
+		}
+		if r.RoleCap != "" {
+			role := pr.Role
+			if role == "admin" {
+				role = model.RoleOwner
+			}
+			pr.Role = r.CapRole(role)
+		}
+		out = append(out, pr)
+	}
+	return out
 }
 
 // AddMember adds a user to a product with the given role (FR-304).

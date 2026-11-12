@@ -172,6 +172,28 @@ func whoamiCommand() *command {
 				output.Field{Label: "Product", Value: productValue},
 				output.Field{Label: "Token from", Value: a.settings.TokenSource},
 			)
+			if t := me.Token; t != nil {
+				scopes := strings.Join(t.Scopes, " ")
+				if scopes == "" {
+					scopes = "none"
+				}
+				roleCap := t.RoleCap
+				if roleCap == "" {
+					roleCap = "none"
+				}
+				products := "all"
+				if t.Products != nil {
+					products = strings.Join(t.Products, ", ")
+					if products == "" {
+						products = "none"
+					}
+				}
+				fields = append(fields,
+					output.Field{Label: "Token scopes", Value: scopes},
+					output.Field{Label: "Token role cap", Value: roleCap},
+					output.Field{Label: "Token products", Value: products},
+				)
+			}
 			return output.Record(a.io.Stdout, a.format, "Identity", fields, data)
 		},
 	}

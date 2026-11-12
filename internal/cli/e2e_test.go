@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/auth/builtin"
 	"nexmap.net/internal/buildinfo"
 	"nexmap.net/internal/cli"
@@ -44,6 +45,8 @@ type e2e struct {
 	// tokens holds PATs of the demo users (ada viewer, bo tester, cy
 	// developer in Aviary) in seeded environments.
 	tokens map[string]string
+	// mint creates a token for a user ("root" or a demo user).
+	mint func(user string, in service.CreatePATInput) string
 }
 
 func newE2E(t *testing.T) *e2e { return newEnv(t, false) }
@@ -101,7 +104,12 @@ func newEnv(t *testing.T, seed bool) *e2e {
 			products = append(products, p)
 		}
 	}
-	pat, err := svc.PAT.Create(ctx, admin.ID, "cli e2e", nil)
+	// The administrator's token keeps every right, as before tokens could be
+	// restricted; the demo users' tokens get the default (full product access).
+	adminGrants := access.FullAccess()
+	adminGrants[access.Account] = access.Write
+	adminGrants[access.Admin] = access.Write
+	pat, err := svc.PAT.Create(ctx, admin, service.CreatePATInput{Name: "cli e2e", Grants: adminGrants})
 	if err != nil {
 		t.Fatalf("create PAT: %v", err)
 	}
@@ -112,7 +120,7 @@ func newEnv(t *testing.T, seed bool) *e2e {
 			if err != nil {
 				t.Fatalf("demo user %s: %v", name, err)
 			}
-			p, err := svc.PAT.Create(ctx, u.ID, "cli e2e", nil)
+			p, err := svc.PAT.Create(ctx, u, service.CreatePATInput{Name: "cli e2e"})
 			if err != nil {
 				t.Fatalf("create PAT for %s: %v", name, err)
 			}
@@ -128,11 +136,24 @@ func newEnv(t *testing.T, seed bool) *e2e {
 		t.Fatal(err)
 	}
 	configDir := t.TempDir()
+	mint := func(name string, in service.CreatePATInput) string {
+		t.Helper()
+		u, err := st.User.GetByUsername(ctx, name)
+		if err != nil {
+			t.Fatalf("user %s: %v", name, err)
+		}
+		p, err := svc.PAT.Create(ctx, u, in)
+		if err != nil {
+			t.Fatalf("create PAT for %s: %v", name, err)
+		}
+		return p.RawToken
+	}
 	return &e2e{
 		t: t, serverURL: srv.URL, token: pat.RawToken, products: products,
 		configDir: configDir, repoDir: repoDir,
 		env:    map[string]string{cliconfig.EnvConfigDir: configDir},
 		tokens: tokens,
+		mint:   mint,
 	}
 }
 

@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/service"
@@ -19,9 +20,16 @@ func NewUser(user *service.UserService) *UserController {
 }
 
 // GetMe handles GET /user/me.
+//
+// For token-authenticated requests the response carries a "token" object
+// with the token's restriction (SC-401 – SC-406).
 func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
-	httputil.JSON(w, http.StatusOK, userToJSON(user))
+	resp := userToJSON(user)
+	if restriction := access.FromContext(r.Context()); restriction != nil {
+		resp["token"] = restrictionJSON(restriction)
+	}
+	httputil.JSON(w, http.StatusOK, resp)
 }
 
 // UpdateMe handles PATCH /user/me.

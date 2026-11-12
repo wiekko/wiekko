@@ -107,10 +107,19 @@ the installation without a product.
 
 ## Access tokens
 
-Personal access tokens, which the CLI, CI jobs and AI agents use, carry every right of the user who
-created them; they cannot be restricted to reading or to one product yet. For automation, create a
-dedicated user with the lowest product role that does the job (usually *tester* for CI), and revoke
-tokens that are no longer used under *API Tokens* (`/user/tokens`).
+Personal access tokens are what the CLI, CI jobs and AI agents use. They are accepted only by the REST
+API, never by the web UI's pages. Users can narrow a token to some products, to read or write access per
+area, and to a lower role (see [Restricted tokens](../api/rest.md#restricted-tokens)); a token never grants
+more than its user holds at the time of the request.
+
+Two rights are never granted by default: managing the user's own account and tokens (`account`), and
+administration (`admin`). An administrator's token without the `admin` scope has no administrator rights,
+so a leaked CI token cannot reach the instance settings. A token can create further tokens only with the
+`account` scope, and only narrower than itself.
+
+Under *Instance Settings*, **Maximum Token Lifetime** forces every new token to expire within the given
+number of days (0, the default, allows tokens without expiry). The token list shows when each token was
+last used; revoke those that are no longer needed under *API Tokens* (`/user/tokens`).
 
 ## Attachments
 

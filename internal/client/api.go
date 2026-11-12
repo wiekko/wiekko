@@ -20,6 +20,16 @@ type User struct {
 	DisplayName string `json:"display_name"`
 	IsAdmin     bool   `json:"is_admin"`
 	Status      string `json:"status"`
+	// Token is the restriction of the token used, if the request was
+	// token-authenticated.
+	Token *TokenRestriction `json:"token,omitempty"`
+}
+
+// TokenRestriction is what a personal access token is limited to.
+type TokenRestriction struct {
+	Scopes   []string `json:"scopes"`   // "scope:level" grants
+	RoleCap  string   `json:"role_cap"` // empty if the role is not capped
+	Products []string `json:"products"` // nil if the token reaches all products
 }
 
 // Product is a product as returned by the product endpoints.

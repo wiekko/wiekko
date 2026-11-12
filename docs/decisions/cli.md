@@ -53,9 +53,10 @@ status or category names.
 
 ## Read-only MCP by default
 
-`nexmap init --agents` registers the MCP server with `--read-only`. Tokens cannot yet be narrowed to fewer
-rights than their user has, so writes through an agent are opt-in. All writes are still checked by the
-server against the user's product role; the CLI enforces nothing on its own.
+`nexmap init --agents` registers the MCP server with `--read-only`, so writes through an agent are
+opt-in. This is a default, not a guarantee: an agent that runs shell commands can call the CLI's write
+commands. The guarantee is a read-only token ([access tokens](access-tokens.md)), which the server
+enforces. The CLI enforces nothing on its own.
 
 ## Identifiers instead of UUIDs
 

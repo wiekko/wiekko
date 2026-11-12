@@ -33,8 +33,10 @@ no runtime dependencies.
 removes it again; `nexmap whoami` shows the user, server and product in effect and where each value
 came from.
 
-A token carries all the rights of the user who created it. For CI jobs and AI agents, create a dedicated
-user with only the product role the job needs.
+When you create a token, narrow it to what it is for: pick a preset, or set the scopes, a role cap and
+the products yourself. *CI ingestion* suits `nexmap utest`, *Agent, read-only* suits an AI agent that only
+reads. A token never grants more than its user holds; `nexmap whoami` shows its restriction. See
+[Restricted tokens](../api/rest.md#restricted-tokens) for what each scope covers.
 
 ## Connecting a repository
 

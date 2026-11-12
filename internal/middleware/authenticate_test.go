@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 )
@@ -20,11 +21,16 @@ func (m *mockSessionValidator) ValidateSession(ctx context.Context, sessionID st
 }
 
 type mockPATValidator struct {
-	fn func(ctx context.Context, rawToken string) (*model.User, error)
+	fn          func(ctx context.Context, rawToken string) (*model.User, error)
+	restriction *access.Restriction
 }
 
-func (m *mockPATValidator) ValidatePAT(ctx context.Context, rawToken string) (*model.User, error) {
-	return m.fn(ctx, rawToken)
+func (m *mockPATValidator) ValidatePAT(ctx context.Context, rawToken string) (*model.User, *access.Restriction, error) {
+	u, err := m.fn(ctx, rawToken)
+	if err != nil {
+		return nil, nil, err
+	}
+	return u, m.restriction, nil
 }
 
 func TestAuthenticate_SessionCookie(t *testing.T) {
@@ -82,16 +88,19 @@ func TestAuthenticate_BearerToken(t *testing.T) {
 			}
 			return nil, errors.New("invalid")
 		},
+		restriction: &access.Restriction{Grants: access.Grants{access.Defects: access.Read}},
 	}
 
 	var ctxUser *model.User
 	var ctxMethod string
+	var ctxRestriction *access.Restriction
 	handler := middleware.Authenticate(sessions, pats)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		ctxUser = middleware.UserFromContext(r.Context())
 		ctxMethod = middleware.AuthMethodFromContext(r.Context())
+		ctxRestriction = access.FromContext(r.Context())
 	}))
 
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/user/me", nil)
 	r.Header.Set("Authorization", "Bearer nxm_valid")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -101,6 +110,18 @@ func TestAuthenticate_BearerToken(t *testing.T) {
 	}
 	if ctxMethod != "pat" {
 		t.Fatalf("method = %q, want %q", ctxMethod, "pat")
+	}
+	if ctxRestriction != pats.restriction {
+		t.Fatalf("restriction = %v, want the token's", ctxRestriction)
+	}
+
+	// Page routes ignore tokens: the web UI only accepts sessions.
+	ctxUser = nil
+	r = httptest.NewRequest(http.MethodPost, "/user/tokens", nil)
+	r.Header.Set("Authorization", "Bearer nxm_valid")
+	handler.ServeHTTP(httptest.NewRecorder(), r)
+	if ctxUser != nil {
+		t.Fatalf("token accepted on a page route: user = %v", ctxUser)
 	}
 }
 

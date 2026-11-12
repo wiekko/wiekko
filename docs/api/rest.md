@@ -11,8 +11,59 @@ Requests authenticate with a personal access token, created in the web UI under 
 Authorization: Bearer <token>
 ```
 
-A token carries the full rights of the user who created it. For automation, create a dedicated user with
-the role the job needs rather than using a personal token.
+Tokens are accepted only under `/api/`; the web UI's pages ignore them.
+
+### Restricted tokens
+
+A token can be narrowed when it is created, and never grants more than its user holds at the time of the
+request:
+
+- **Scopes.** Each scope is granted as `read` or `write`; `write` includes `read`. Without scopes, a token
+  gets `write` on every product scope, but never `account` or `admin`.
+
+  | Scope | Covers |
+  |---|---|
+  | `structure` | components, capabilities, milestones, sprints |
+  | `backlog` | requirements, tasks, constraints |
+  | `defects` | defects |
+  | `tests` | test cases, campaigns and their results, test runs |
+  | `discussion` | comments and attachments |
+  | `settings` | product settings, members, categories, statuses, pyramid levels, runtime environments |
+  | `account` | `/user/me/*`: your profile, password, two-factor setup and tokens |
+  | `admin` | `/admin/*`; without it, an administrator's token has no administrator rights |
+
+  A request needs `read` on every resource named in its path, and `write` on the first one if it changes
+  data: `POST /products/{p}/capabilities/{id}/requirements` needs `structure:write` and `backlog:read`. Side
+  effects belong to the request's own scope, so uploading a test run needs only `tests:write` although it
+  files defects. Comments and attachments also need `read` on the item they belong to. The audit trail
+  needs `read` on every product scope. `GET /user/me` is open to every token. A missing scope is answered
+  with `403` and the code `TOKEN_SCOPE`.
+- **Role cap.** The token acts with the lower of its user's role and the cap (`developer`, `tester` or
+  `viewer`).
+- **Products.** The token reaches only the listed products, and `GET /products` lists only those. Such a
+  token cannot create products.
+
+`GET /api/v1/user/me` shows the restriction of the token in use as `token`.
+
+### Tokens
+
+`POST /api/v1/user/me/tokens` (`account:write`) creates a token:
+
+```json
+{
+  "name": "CI",
+  "expires_at": "2027-01-31T23:59:59Z",
+  "scopes": ["tests:write"],
+  "role_cap": "tester",
+  "products": ["7d1c…"]
+}
+```
+
+All fields but `name` are optional; leave out `products` for a token that reaches every product of its
+user. The response contains the token once, as `raw_token`. A request made with a token can only create
+tokens that are narrower than its own. If the instance limits the token lifetime, `expires_at` is required
+and must lie within the limit. `GET /api/v1/user/me/tokens` lists the tokens with their restrictions, and
+`DELETE /api/v1/user/me/tokens/{id}` revokes one.
 
 ## Responses
 

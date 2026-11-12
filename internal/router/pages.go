@@ -13,7 +13,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	registerCtrl := controller.NewPageRegister(svc.User, loginCtrl)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor)
-	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor)
+	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product)
 	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes)
 	upload := pageUpload(productCtrl)
 

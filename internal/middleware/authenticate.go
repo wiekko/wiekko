@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/model"
 )
 
@@ -18,13 +19,20 @@ type SessionValidator interface {
 	ValidateSession(ctx context.Context, sessionID string) (*model.User, string, error)
 }
 
-// PATValidator validates a personal access token and returns the user.
+// PATValidator validates a personal access token and returns the user and the
+// token's restriction.
 type PATValidator interface {
-	ValidatePAT(ctx context.Context, rawToken string) (*model.User, error)
+	ValidatePAT(ctx context.Context, rawToken string) (*model.User, *access.Restriction, error)
 }
 
+// apiPrefix is where personal access tokens are accepted. Page routes only
+// accept sessions: the web UI is not covered by token scopes, and its CSRF
+// protection exempts non-session requests.
+const apiPrefix = "/api/"
+
 // Authenticate extracts identity from a session cookie or Bearer token
-// and stores it in the request context. Unauthenticated requests pass through.
+// and stores it in the request context. Bearer tokens are honoured only for
+// API routes. Unauthenticated requests pass through.
 func Authenticate(sessions SessionValidator, pats PATValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,11 +47,13 @@ func Authenticate(sessions SessionValidator, pats PATValidator) func(http.Handle
 				}
 			}
 
-			// Try Bearer token.
-			if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, bearerPrefix) {
+			// Try Bearer token (API routes only).
+			if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, bearerPrefix) &&
+				strings.HasPrefix(r.URL.Path, apiPrefix) {
 				rawToken := strings.TrimPrefix(authHeader, bearerPrefix)
-				if user, err := pats.ValidatePAT(ctx, rawToken); err == nil {
+				if user, restriction, err := pats.ValidatePAT(ctx, rawToken); err == nil {
 					ctx = WithUser(ctx, user, "pat", "")
+					ctx = access.WithRestriction(ctx, restriction)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}

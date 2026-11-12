@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -207,7 +208,11 @@ func (c *PageAdminController) UpdateSetting(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := c.setting.Update(r.Context(), map[string]string{key: value}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		status := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidSetting) {
+			status = http.StatusBadRequest
+		}
+		http.Error(w, err.Error(), status)
 		return
 	}
 
@@ -221,8 +226,8 @@ func (c *PageAdminController) UpdateSetting(w http.ResponseWriter, r *http.Reque
 		label, description := settingMeta(key)
 		_ = admin.SettingToggle(key, label, description, checked).Render(r.Context(), w)
 	} else {
-		label, _ := settingMeta(key)
-		_ = admin.SettingNumber(key, label, value).Render(r.Context(), w)
+		label, description := settingMeta(key)
+		_ = admin.SettingNumber(admin.NumberSetting(key, label, description, value)).Render(r.Context(), w)
 	}
 }
 
@@ -309,6 +314,8 @@ func settingMeta(key string) (label, description string) {
 		return "Enforce 2FA", "Require two-factor authentication for all users."
 	case "password_min_length":
 		return "Minimum Length", ""
+	case "pat_max_lifetime_days":
+		return "Maximum Token Lifetime (days)", "Personal access tokens must expire within this many days. 0 allows tokens without expiry."
 	case "password_require_uppercase":
 		return "Require Uppercase", "At least one uppercase letter."
 	case "password_require_lowercase":
