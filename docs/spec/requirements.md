@@ -75,7 +75,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **SC-103**: Session cookies shall be HttpOnly, Secure and SameSite=Strict.
 * **SC-104**: The web UI shall implement CSRF protection for all state-changing requests.
 * **SC-105**: The CLI shall use personal access tokens (PAT) to authenticate API requests.
-* **SC-106**: Users shall be able to create, list and revoke personal access tokens via the web UI.
+* **SC-106**: Users shall be able to create, list and revoke personal access tokens via the web UI, optionally restricting them (SC-401 to SC-409).
 * **SC-107**: Two-Factor-Authentication shall be an option, either available to the user, or enforced at instance level.
 * **SC-108**: The authentication system shall use a pluggable provider interface to allow future integration of LDAP and OIDC (OpenID Connect) providers (e.g. Google, GitHub, OneLogin).
 * **SC-109**: Invitation links (for user registration or product membership) shall be delivered via email.
@@ -99,6 +99,18 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **SC-304**: Passwords shall be stored as salted hash (bcrypt or pbkdf2) with high computation cost
 * **SC-305**: Data subject access (GDPR Art. 15) and right to erasure (GDPR Art. 17) shall be supported by centralising all personal data in the `personal_data` table.
 * **SC-306**: Usernames of Nexmap's built-in authentication provider are considered as pseudonyms and thus excluded from application level encryption
+
+#### Access Tokens
+
+* **SC-401**: Personal access tokens can be restricted when they are created. An unrestricted token acts with all rights of its user, within the limits of SC-406.
+* **SC-402**: A token can be restricted to a set of products. It shall not reach any other product, and product listings made with it shall show only the products it is restricted to.
+* **SC-403**: A token can carry a role cap. On every product it reaches, the token acts with the lower of its user's role and the cap.
+* **SC-404**: A token can be restricted to scopes, each granted as `read` or `write` (`write` includes `read`): `structure` (components, capabilities, milestones, sprints), `backlog` (requirements, tasks, constraints), `defects`, `tests` (test cases, campaigns, results, test runs), `discussion` (comments, attachments) and `settings` (members, categories, statuses, pyramid levels, runtime environments).
+* **SC-405**: A request needs the scope of the item it addresses. Side effects that an operation causes by design are covered by that scope: uploading a test run needs `tests: write` even though it files defects (FR-502). Comments and attachments need the `discussion` scope plus `read` on the item they belong to.
+* **SC-406**: Account and token management and the administration endpoints shall be closed to tokens unless they carry the `account` or `admin` scope. A token can therefore never create a token with more rights than its own. An administrator's token without the `admin` scope acts with the administrator's product roles only.
+* **SC-407**: Token restrictions shall be evaluated on every request against the user's current rights, so a token never grants more than its user holds at that moment.
+* **SC-408**: The web UI shall offer restriction presets for common purposes, e.g. *CI ingestion* (`tests: write`) and *agent, read-only* (`read` on all product scopes).
+* **SC-409**: Administrators shall be able to set a maximum token lifetime for the instance. Tokens shall record when they were last used.
 
 ### User Experience
 
@@ -191,6 +203,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-040**: `categories` shall be configurable per product, with separate sets for requirements, tasks and constraints. Each category has a name and a prefix used in human-readable identifiers (e.g. FR-1, MT-18, AC-42). Identifier sequence numbers are drawn from one counter per product, shared across requirements and tasks, so identifiers can never collide.
 * **FR-041**: A `testing campaign` is complete when none of its results is pending, blocked or awaiting re-test. Skipped results do not influence the campaign outcome. A campaign passes when every non-skipped result is passed.
 * **FR-042**: Every change to a campaign result status shall be recorded as an immutable event capturing the user, timestamp, previous status, new status and any linked `defect`.
+* **FR-043**: `defects` shall have a human-readable identifier (e.g. DF-17), with a prefix configurable per product (default DF) and sequence numbers from a per-product counter of their own. The REST API and the CLI shall accept it wherever a defect ID is expected.
 
 #### Administration
 
@@ -233,7 +246,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-316**: Product owners shall be able to prioritize requirements and defects
 * **FR-317**: Product owners shall be able to schedule sprints (optional feature)
 * **FR-318**: Product owners shall be able to activate requirements, tasks and defects. In scrum mode, adding an item to a sprint activates it (and taking it out deactivates it); product owners may also activate an item directly. In kanban mode, an item is active exactly while it sits in an active column (FR-323a), so product owners activate it by moving it into one. Only product owners activate items.
-* **FR-319**: Product owners shall be able to import and export requirements via the CLI ("To Do Markdown format")
+* **FR-319**: Product owners shall be able to export the product specification via the CLI (FR-905). Importing a specification is not provided (FR-906).
 * **FR-320**: Product owners shall be able to schedule a testing campaign. Campaigns have a status (draft, active, closed) and optional planned start and end dates.
 * **FR-321**: When creating a testing campaign, the product owner explicitly selects the `test cases` in scope. The selection is a snapshot taken at creation; test cases created afterwards do not join a running campaign. The scope remains editable while the campaign is draft and is locked once it is active.
 * **FR-322**: At most one testing campaign per product may be active at a time
@@ -261,6 +274,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-407**: Developers shall be able to update the status of defects, requirements and tasks if they have been activated upfront (FR-318). In kanban mode, a developer may move an item out of an active column into any column, including an inactive one, but not out of an inactive column.
 * **FR-408**: Developers shall be able to mark backlog items as coarse (requiring refinement)
 * **FR-409**: Developers shall be able to ingest unit test results via the CLI (e.g. `go test -v ./... | nexmap utest`) or via CI pipeline webhook
+* **FR-409a**: Developers shall be able to create automatic `test cases` from a unit test report via the CLI (`nexmap test sync`), for every test identifier that has no test case yet. Subtests roll up to their parent and get no test case of their own. New test cases can be filed under a `component` or `capability`, given a `pyramid level`, and linked to `requirements`. A dry run shall list the test cases without creating them.
 
 #### Testing
 
@@ -286,3 +300,12 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-801**: Bulk status changes shall be supported for requirements and defects (e.g. multi-select in table view)
 * **FR-802**: Bulk assignment to users, sprints or milestones shall be supported
 * **FR-803**: Bulk operations shall respect the same role-based permissions as individual operations
+
+#### Command Line Interface
+
+* **FR-901**: Everything a role can create, update or delete in the web UI shall also be possible via the REST API (AC-224), with the same role-based permissions.
+* **FR-902**: The CLI shall support creating, updating and deleting `components` and `capabilities` (FR-307), and linking `requirements`, `constraints` and `test cases` to `capabilities`, and `test cases` to `requirements` (FR-005a, FR-016, FR-038).
+* **FR-903**: The CLI shall support creating and updating `constraints`, including setting their `compliance_state` (FR-037).
+* **FR-904**: The CLI's MCP server shall offer the same create, update and link operations as the CLI. Deletions shall not be offered via MCP.
+* **FR-905**: The CLI shall export a product's structure (`components`, `capabilities`), `constraints` and `requirements` as a Markdown specification in the style of this document: grouped by category, each item carrying its identifier, in a stable order so that exports committed to a repository diff cleanly. `tasks` shall be included only on request.
+* **FR-906**: Importing a specification is out of scope. Users turn their own documents into `requirements` and `constraints` with their own tooling (e.g. an AI agent) via the CLI or REST API. Since exports carry identifiers (FR-905), such tooling can update existing items instead of duplicating them.
