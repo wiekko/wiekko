@@ -103,6 +103,10 @@ func main() {
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
 	svc := service.New(st, provider, cfg, blobs)
 
+	// Read the 2FA enforcement setting once, so that it is known even if the
+	// database cannot be reached later (see TwoFactorService.Enforced).
+	svc.TwoFactor.Enforced(context.Background())
+
 	// Bootstrap admin account if no users exist.
 	admin, err := bootstrapAdmin(st, provider, cfg.InitialAdminUser, cfg.InitialAdminPass)
 	if err != nil {

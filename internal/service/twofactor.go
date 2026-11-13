@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"nexmap.net/internal/auth"
@@ -52,6 +53,11 @@ type TwoFactorService struct {
 	// limiter blocks a user's second factor after repeated wrong codes; nil
 	// disables it.
 	limiter *attemptLimiter
+
+	// enforcedKnown is the enforcement setting as last read successfully;
+	// enforcedStale is set while reading it fails. See Enforced.
+	enforcedKnown atomic.Bool
+	enforcedStale atomic.Bool
 }
 
 // TOTPSetup is what a user needs to add the account to an authenticator app.
@@ -70,11 +76,28 @@ func (s *TwoFactorService) clock() time.Time {
 }
 
 // Enforced reports whether the instance requires two-factor authentication.
-// It fails open (false) if the setting cannot be read, so a database hiccup
-// does not lock every user out of the web UI.
+//
+// The setting is read on every call, so a change takes effect at once. If it
+// cannot be read (a database hiccup), the answer is the last one that could:
+// an instance that enforces 2FA keeps doing so, rather than letting users who
+// have not enrolled in with a password alone for as long as the fault lasts,
+// and one that does not enforce it does not lock anyone out. Only before the
+// first successful read is there nothing to go by, and the answer is false;
+// nexmapd reads the setting once at startup, so that does not arise there.
 func (s *TwoFactorService) Enforced(ctx context.Context) bool {
 	v, err := s.settings.Get(ctx, SettingTwoFactorEnforced)
-	return err == nil && v == "true"
+	if err != nil {
+		// Log once per fault, not once per request.
+		if s.enforcedStale.CompareAndSwap(false, true) {
+			slog.Warn("cannot read the 2FA enforcement setting; keeping the last known value",
+				"enforced", s.enforcedKnown.Load(), "err", err)
+		}
+		return s.enforcedKnown.Load()
+	}
+	enforced := v == "true"
+	s.enforcedKnown.Store(enforced)
+	s.enforcedStale.Store(false)
+	return enforced
 }
 
 // BeginSetup generates a new pending secret for the user. Calling it again

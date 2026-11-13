@@ -106,7 +106,8 @@ Once users exist, both variables are ignored and can be removed.
 - **Two-factor authentication:** users can set up TOTP on their profile page. *Enforce 2FA* in the
   instance settings (`/admin/settings`) requires it for everyone. An administrator can reset a user's
   2FA from the user's detail page, after which that user can sign in with the password alone until they
-  set it up again.
+  set it up again. Should the server be unable to read the *Enforce 2FA* setting for a while (a database
+  fault), it keeps acting on the value it read last, so enforcement does not lapse in the meantime.
 - **Usernames and email addresses** are unique regardless of case: `Admin` cannot be registered next to
   `admin`, and signing in accepts either spelling.
 - **Passwords** are stored as salted PBKDF2-SHA256 hashes (`NEXMAP_PBKDF2_ITERATIONS`). The instance
