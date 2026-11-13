@@ -56,3 +56,8 @@ recording nothing.
 A subtest (`TestX/case`) without a test case of its own counts towards `TestX`: any failing subtest fails
 the parent, and the failing subtests' output goes into its defect. Test catalogues therefore do not need
 an entry for every table-driven case.
+
+`nexmap test sync` follows the same rule when it creates test cases: an identifier is a subtest only if
+its parent is in the same report. A slash alone does not decide it, because package-qualified
+identifiers (`example.com/app.TestX`) contain slashes of their own, and Go always reports the parent of
+a subtest.

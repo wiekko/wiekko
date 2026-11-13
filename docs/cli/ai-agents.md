@@ -64,7 +64,7 @@ Writes are checked by the server against the token user's role in the product, e
 | Set the status of a requirement, task or defect | developer, and only on items a product owner has activated (kanban: by moving them into an active column; scrum: by planning them into a sprint) |
 | Comment | developer; tester on defects and test cases |
 | Report a defect | tester |
-| Link a test case to a requirement, capability or component | developer |
+| Link a test case to a requirement, capability or component; create test cases from a test run | developer |
 | Create a task | product owner |
 | Create or update a constraint, component or capability; link capabilities | product owner |
 

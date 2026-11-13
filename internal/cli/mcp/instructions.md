@@ -16,7 +16,7 @@ and defects.
   rather than inventing scope.
 - Write tools (absent when the server runs read-only) are limited by the
   user's product role: set statuses (developer, only on items a product owner has activated), comment (developer; tester on
-  defects and test cases), report defects (tester), link test cases (developer), create tasks, constraints, components
+  defects and test cases), report defects (tester), link test cases and create them from a test run (developer), create tasks, constraints, components
   and capabilities, update them and link capabilities (owner). There are no tools that delete. A
   role refusal is final; tell the user instead of retrying. Only change what
   the task calls for, check `list_defects` before reporting a defect, and tell

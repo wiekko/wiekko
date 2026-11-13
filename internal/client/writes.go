@@ -148,6 +148,7 @@ type TestCaseCreate struct {
 	TestIdentifier string `json:"test_identifier,omitempty"`
 	CapabilityID   string `json:"capability_id,omitempty"`
 	ComponentID    string `json:"component_id,omitempty"`
+	PyramidLevelID string `json:"pyramid_level_id,omitempty"`
 }
 
 // CreateTestCase creates a test case (developer role).

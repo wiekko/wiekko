@@ -15,6 +15,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"nexmap.net/internal/cli/ops"
 	"nexmap.net/internal/cli/output"
 	"nexmap.net/internal/client"
 	"nexmap.net/internal/ingest"
@@ -375,16 +376,18 @@ func shortID(id string) string {
 
 func testSyncCommand() *command {
 	var rf reportFlags
-	var capability string
-	var dryRun bool
+	var in ops.TestSync
 	return &command{
 		name:    "test sync",
 		args:    "[report files…]",
 		summary: "create automatic test cases for tests in a report that have none (developer role)",
 		flags: func(fs *flag.FlagSet) {
 			rf.bind(fs)
-			fs.StringVar(&capability, "capability", "", "capability (name or ID) to file new test cases under")
-			fs.BoolVar(&dryRun, "dry-run", false, "list the test cases that would be created")
+			fs.StringVar(&in.Capability, "capability", "", "capability (name or ID) to file new test cases under")
+			fs.StringVar(&in.Component, "component", "", "component (name or ID) to file new test cases under")
+			fs.StringVar(&in.PyramidLevel, "pyramid-level", "", "pyramid level (name or ID) of new test cases, e.g. unit")
+			fs.StringVar(&in.Requirement, "req", "", "requirement the new test cases verify, e.g. FR-12")
+			fs.BoolVar(&in.DryRun, "dry-run", false, "list the test cases that would be created")
 		},
 		run: func(ctx context.Context, a *app, files []string) error {
 			s, err := a.session()
@@ -399,11 +402,10 @@ func testSyncCommand() *command {
 			if len(p.results) == 0 {
 				return usageErr(errors.New("the report contains no tests"))
 			}
-			ids := make([]string, 0, len(p.results))
 			for _, r := range p.results {
-				ids = append(ids, r.Identifier)
+				in.Identifiers = append(in.Identifiers, r.Identifier)
 			}
-			res, err := s.SyncTestCases(ctx, ids, capability, dryRun)
+			res, err := s.SyncTestCases(ctx, in)
 			if err != nil {
 				return usageIfInput(err)
 			}
@@ -411,14 +413,14 @@ func testSyncCommand() *command {
 				return output.WriteJSON(a.io.Stdout, res)
 			}
 			verb := "created"
-			if dryRun {
+			if in.DryRun {
 				verb = "would create"
 			}
 			fmt.Fprintf(a.io.Stdout, "%d test cases %s, %d already existed\n", len(res.Created), verb, res.Existing)
 			for _, tc := range res.Created {
 				fmt.Fprintf(a.io.Stdout, "  %s  %s\n", tc.TestIdentifier, tc.Title)
 			}
-			if len(res.Created) > 0 && !dryRun {
+			if len(res.Created) > 0 && !in.DryRun {
 				fmt.Fprintln(a.io.Stdout, "New test cases join campaigns created from now on; an active campaign keeps its scope.")
 			}
 			return nil

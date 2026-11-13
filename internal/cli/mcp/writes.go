@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -139,6 +140,33 @@ func registerStructureWriteTools(s *sdk.Server, h *handlers) {
 			in.Unlink = true
 			v, err := sess.LinkTestCase(ctx, in)
 			return v, func(w io.Writer) error { return render.TestCase(w, v) }, err
+		})
+	writeTool(s, h, "sync_test_cases", "Create test cases from a test run",
+		"Create an automatic test case for every test in a run that has none yet, from a test report (go test -json or -v "+
+			"output, JUnit XML) or a list of test identifiers. Subtests roll up into their parent. Optionally files the new "+
+			"test cases under a capability or component, gives them a pyramid level, and links them to a requirement. "+
+			"Use dry_run first to review. Requires the developer role.",
+		false,
+		func(ctx context.Context, sess *ops.Session, in ops.TestSync) (*ops.SyncResult, func(io.Writer) error, error) {
+			v, err := sess.SyncTestCases(ctx, in)
+			if err != nil {
+				return nil, nil, err
+			}
+			return v, func(w io.Writer) error {
+				verb := "created"
+				if v.DryRun {
+					verb = "would be created"
+				}
+				if _, err := fmt.Fprintf(w, "%d test cases %s, %d already existed.\n", len(v.Created), verb, v.Existing); err != nil {
+					return err
+				}
+				for _, tc := range v.Created {
+					if _, err := fmt.Fprintf(w, "- `%s` %s\n", tc.TestIdentifier, tc.Title); err != nil {
+						return err
+					}
+				}
+				return nil
+			}, nil
 		})
 	writeTool(s, h, "create_constraint", "Create a constraint",
 		"Create a constraint, a rule the product must keep following (architecture, security, UX). "+

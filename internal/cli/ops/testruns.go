@@ -1,11 +1,15 @@
 package ops
 
 import (
+	"cmp"
 	"context"
+	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
 	"nexmap.net/internal/client"
+	"nexmap.net/internal/ingest"
 )
 
 // CampaignID resolves a campaign by name, ID or ID prefix.
@@ -30,20 +34,86 @@ type SyncResult struct {
 	Existing int               `json:"existing"` // identifiers that already had a test case
 }
 
+// TestSync describes which test cases SyncTestCases creates and where it
+// files them (FR-409a).
+type TestSync struct {
+	// Identifiers are the test identifiers of a run. The MCP tool may give a
+	// Report instead, which is parsed like `nexmap test sync` input.
+	Identifiers     []string `json:"test_identifiers,omitempty" jsonschema:"test identifiers from a test run, e.g. example.com/app.TestAdd; give these or report"`
+	Report          string   `json:"report,omitempty" jsonschema:"a test report to read the identifiers from: go test -json or -v output, or JUnit XML"`
+	IdentifierStyle string   `json:"identifier_style,omitempty" jsonschema:"package (default: pkg/path.TestName) or name (TestName); must match how the CI uploads results"`
+	Capability      string   `json:"capability,omitempty" jsonschema:"capability (name or ID) to file the new test cases under"`
+	Component       string   `json:"component,omitempty" jsonschema:"component (name or ID) to file the new test cases under"`
+	PyramidLevel    string   `json:"pyramid_level,omitempty" jsonschema:"pyramid level (name or ID) of the new test cases, e.g. unit"`
+	Requirement     string   `json:"requirement,omitempty" jsonschema:"requirement the new test cases verify, e.g. FR-12"`
+	DryRun          bool     `json:"dry_run,omitempty" jsonschema:"only list the test cases that would be created"`
+}
+
 // SyncTestCases creates an automatic test case for every identifier that has
 // none yet (developer role), so a repository can bootstrap its test catalogue
-// from a test run. Subtests ("TestX/case") are left out: they roll up into
-// their parent. capability optionally files the new test cases under a
-// capability (name or ID).
-func (s *Session) SyncTestCases(ctx context.Context, identifiers []string, capability string, dryRun bool) (*SyncResult, error) {
-	capID := ""
-	if capability != "" {
-		c, err := s.findCapability(ctx, capability)
+// from a test run (FR-409a). Subtests roll up into their parent and get no
+// test case of their own. Every option is resolved before the first test case
+// is created, so a bad name creates nothing.
+func (s *Session) SyncTestCases(ctx context.Context, in TestSync) (*SyncResult, error) {
+	identifiers := in.Identifiers
+	if strings.TrimSpace(in.Report) != "" {
+		if len(identifiers) > 0 {
+			return nil, errors.New("give test identifiers or a report, not both")
+		}
+		style := cmp.Or(in.IdentifierStyle, ingest.StylePackage)
+		if style != ingest.StylePackage && style != ingest.StyleName {
+			return nil, errors.New(`identifier_style must be "package" or "name"`)
+		}
+		rep, _, err := ingest.Parse(strings.NewReader(in.Report), ingest.Options{Format: ingest.FormatAuto, IdentifierStyle: style})
+		if err != nil {
+			return nil, fmt.Errorf("read the report: %w", err)
+		}
+		for _, r := range rep.Results {
+			identifiers = append(identifiers, r.Identifier)
+		}
+	}
+	if len(identifiers) == 0 {
+		return nil, errors.New("the report contains no tests")
+	}
+
+	base := client.TestCaseCreate{ExecutionMode: "automatic"}
+	if in.Capability != "" {
+		c, err := s.findCapability(ctx, in.Capability)
 		if err != nil {
 			return nil, err
 		}
-		capID = c.ID
+		base.CapabilityID = c.ID
 	}
+	if in.Component != "" {
+		c, err := s.findComponent(ctx, in.Component)
+		if err != nil {
+			return nil, err
+		}
+		base.ComponentID = c.ID
+	}
+	if in.PyramidLevel != "" {
+		levels, err := s.pyramidLevels(ctx)
+		if err != nil {
+			return nil, err
+		}
+		l, err := match("pyramid level", in.PyramidLevel, levels,
+			func(l client.PyramidLevel) string { return l.ID },
+			func(l client.PyramidLevel) string { return l.Name },
+			func(l client.PyramidLevel) bool { return strings.EqualFold(l.Name, strings.TrimSpace(in.PyramidLevel)) })
+		if err != nil {
+			return nil, err
+		}
+		base.PyramidLevelID = l.ID
+	}
+	reqID := ""
+	if in.Requirement != "" {
+		r, err := s.requirement(ctx, in.Requirement, "requirement")
+		if err != nil {
+			return nil, err
+		}
+		reqID = r.ID
+	}
+
 	existing, err := s.C.TestCases(ctx, s.ProductID, "")
 	if err != nil {
 		return nil, err
@@ -55,11 +125,16 @@ func (s *Session) SyncTestCases(ctx context.Context, identifiers []string, capab
 		}
 	}
 
-	res := &SyncResult{DryRun: dryRun, Created: []TestCaseSummary{}}
+	res := &SyncResult{DryRun: in.DryRun, Created: []TestCaseSummary{}}
+	reported := map[string]bool{}
+	for _, id := range identifiers {
+		reported[strings.TrimSpace(id)] = true
+	}
 	seen := map[string]bool{}
 	var missing []string
 	for _, id := range identifiers {
-		if strings.Contains(id, "/") || seen[id] {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] || isSubtest(id, reported) {
 			continue
 		}
 		seen[id] = true
@@ -71,14 +146,20 @@ func (s *Session) SyncTestCases(ctx context.Context, identifiers []string, capab
 	}
 	sort.Strings(missing)
 	for _, id := range missing {
-		in := client.TestCaseCreate{Title: testTitle(id), ExecutionMode: "automatic", TestIdentifier: id, CapabilityID: capID}
-		if dryRun {
-			res.Created = append(res.Created, TestCaseSummary{Title: in.Title, Mode: in.ExecutionMode, TestIdentifier: id})
+		body := base
+		body.Title, body.TestIdentifier = testTitle(id), id
+		if in.DryRun {
+			res.Created = append(res.Created, TestCaseSummary{Title: body.Title, Mode: body.ExecutionMode, TestIdentifier: id})
 			continue
 		}
-		tc, err := s.C.CreateTestCase(ctx, s.ProductID, in)
+		tc, err := s.C.CreateTestCase(ctx, s.ProductID, body)
 		if err != nil {
 			return res, err
+		}
+		if reqID != "" {
+			if err := s.C.LinkTestCaseRequirement(ctx, s.ProductID, tc.ID, reqID); err != nil {
+				return res, fmt.Errorf("test case %s was created, but linking it to %s failed: %w", id, in.Requirement, err)
+			}
 		}
 		sums, err := s.testCaseSummaries(ctx, []client.TestCase{*tc})
 		if err != nil {
@@ -87,6 +168,20 @@ func (s *Session) SyncTestCases(ctx context.Context, identifiers []string, capab
 		res.Created = append(res.Created, sums[0])
 	}
 	return res, nil
+}
+
+// isSubtest reports whether id is a subtest of another reported test. Go
+// reports a subtest as "<parent>/<case>" next to its parent; package
+// identifiers contain slashes of their own (example.com/app.TestX), so an
+// identifier only counts as a subtest when its parent was reported too.
+func isSubtest(id string, reported map[string]bool) bool {
+	for p := id; strings.Contains(p, "/"); {
+		p = p[:strings.LastIndex(p, "/")]
+		if reported[p] {
+			return true
+		}
+	}
+	return false
 }
 
 // testTitle derives a readable title from an identifier:

@@ -62,6 +62,7 @@ into a sprint). An item's `active` field says whether it is.
 | `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; works for `DF-17` too; `--type test_case` etc. for test cases and capabilities) | developer (tester on defects and test cases) |
 | `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
 | `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |
+| `go test -json ./... \| nexmap test sync [--req FR-12] [--capability <name>] [--pyramid-level unit] --dry-run` | Register new tests as test cases (drop `--dry-run` once the list looks right) | developer |
 | `nexmap test link <test identifier> --req FR-12 [--capability <name>]` / `test unlink …` | Record which requirement a test verifies and which capability it belongs to | developer |
 | `nexmap constraint update AC-3 --compliance met\|violated` | Record whether a constraint holds after checking it | owner |
 | `nexmap constraint create --title … [--category SC] [--compliance …]` | Add a rule the product must follow | owner |
