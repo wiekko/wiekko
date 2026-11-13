@@ -39,7 +39,11 @@ referenced, and working rules such as treating constraints as binding. Run it to
 agent is told. In short:
 
 - **Read:** `nexmap context -o md` (or the `get_context` tool) for a product briefing, then requirements,
-  tasks, constraints, structure, defects, test cases and the campaign status as needed.
+  tasks, constraints, structure, defects, test cases and the campaign status as needed. `nexmap export`
+  gives the whole specification in one Markdown document.
+- **Turn documents into requirements:** nexmap has no import. An agent can read a document you give it
+  and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
+  existing ones instead of duplicating them.
 - **Write:** set the status of requirements, tasks and defects, add comments, report defects, and create
   tasks, each only as far as the user's role allows (see below).
 

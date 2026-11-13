@@ -465,3 +465,20 @@ func (c *Client) CampaignProgress(ctx context.Context, productID, id string) (*C
 func (c *Client) CampaignResults(ctx context.Context, productID, id string) ([]CampaignResult, error) {
 	return getList[CampaignResult](ctx, c, productPath(productID, "campaigns", id, "results"))
 }
+
+// Specification returns the product's specification as Markdown (FR-905),
+// with tasks if asked for.
+func (c *Client) Specification(ctx context.Context, productID string, tasks bool) (string, error) {
+	path := productPath(productID, "specification")
+	if tasks {
+		path += "?tasks=true"
+	}
+	resp, err := c.Raw(ctx, http.MethodGet, path, nil, "")
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return "", parseAPIError(resp)
+	}
+	return string(resp.Body), nil
+}

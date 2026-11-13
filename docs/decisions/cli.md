@@ -70,3 +70,19 @@ Defects number from a counter of their own rather than the backlog's: a defect i
 specification, and automated test runs can file many of them, which would otherwise eat into the
 requirement numbering. Their prefix is a product setting, not a category, because defects have no
 categories; it shares the category prefixes' namespace so that no identifier is ambiguous.
+
+## The specification export is rendered by the server
+
+`nexmap export` fetches a finished Markdown document from `GET /products/{p}/specification` rather than
+assembling it from the list endpoints. Choosing what goes in and in which order is product logic (AC-201),
+one request is cheaper than dozens, and other clients of the REST API get the same document.
+
+The document is made for version control: categories in their configured order, items by number, the
+structure by name (compared in Go, not by the database's collation), normalised line endings and
+whitespace, and no timestamp, status, priority or compliance state, all of which change without the
+specification changing. An item is nested below its parent only within one category; across categories
+it stands alone and says which item it refines, so every item stays in its own category's section.
+
+There is no import (FR-906). Turning prose into formal requirements needs judgement that an AI agent
+brings and a parser does not; the agent creates items through the CLI or REST API, and the identifiers
+in an export let it update items instead of duplicating them.

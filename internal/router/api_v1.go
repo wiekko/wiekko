@@ -32,6 +32,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	testRunCtrl := controller.NewTestRun(svc.TestRun)
 	discussionCtrl := controller.NewDiscussion(svc.Discussion, svc.Backlog.ResolveDefectRef)
 	auditCtrl := controller.NewAudit(svc.Audit)
+	specCtrl := controller.NewSpecification(svc.Spec)
 
 	// Requirement and constraint routes accept identifiers ("FR-12", "AC-42")
 	// wherever they take an ID in the path.
@@ -251,6 +252,9 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/attachments/{id}", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.GetAttachment))
 	api.authed("GET /products/{productId}/attachments/{id}/download", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.DownloadAttachment))
 	api.authed("DELETE /products/{productId}/attachments/{id}", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.DeleteAttachment)))
+
+	// Specification export (FR-905): the structure and the backlog, as Markdown.
+	api.authed("GET /products/{productId}/specification", need(access.R(access.Structure), access.R(access.Backlog)), http.HandlerFunc(specCtrl.Export))
 
 	// Audit trail.
 	api.authed("GET /products/{productId}/audit", readAll, http.HandlerFunc(auditCtrl.List))

@@ -26,6 +26,7 @@ type Services struct {
 	Discussion *DiscussionService
 	Audit      *AuditService
 	Dashboard  *DashboardService
+	Spec       *SpecificationService
 }
 
 // New creates the application service layer.
@@ -155,6 +156,15 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			owns:         owns,
 		},
 		Backlog: backlogSvc,
+		Spec: &SpecificationService{
+			products:     st.Product,
+			components:   st.Component,
+			capabilities: st.Capability,
+			categories:   st.Category,
+			requirements: st.Requirement,
+			constraints:  st.Constraint,
+			authz:        authz,
+		},
 		Constraint: &ConstraintService{
 			constraints: st.Constraint,
 			categories:  st.Category,

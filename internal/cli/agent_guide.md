@@ -44,6 +44,7 @@ Prefer the tools over the CLI.
 | `nexmap defect list [--open] [--criticality high]` / `defect show <DF-17>` | Known bugs |
 | `nexmap test list [--automatic]` / `test show <test identifier>` | Test cases and their results |
 | `nexmap campaign status` | Active testing campaign: verdict and failing tests |
+| `nexmap export [--tasks]` | The whole specification as one Markdown document |
 | `nexmap api [METHOD] <path>` | Raw REST call for anything else (`{product}` is replaced) |
 
 ### Changing things

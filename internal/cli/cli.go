@@ -100,6 +100,7 @@ func commands() []*command {
 		campaignGroup(),
 		commentGroup(),
 		utestCommand(),
+		exportCommand(),
 		agentGuideCommand(),
 		mcpCommand(),
 	}

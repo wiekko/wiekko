@@ -51,8 +51,11 @@ func expectedNeeds(t *testing.T, method, path string) []access.Need {
 		t.Fatalf("%s %s: no scope rule for this path", method, path)
 	}
 	segs := strings.Split(rest, "/")
-	if segs[0] == "audit" {
+	switch segs[0] {
+	case "audit":
 		return readAll
+	case "specification": // the export covers the structure and the backlog
+		return []access.Need{access.R(access.Structure), access.R(access.Backlog)}
 	}
 	if _, ok := resourceScopes[segs[0]]; !ok {
 		t.Fatalf("%s %s: unknown resource %q; add it to resourceScopes", method, path, segs[0])

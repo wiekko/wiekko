@@ -109,6 +109,7 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `campaign` | `status` of the active testing campaign |
 | `comment` | `add` a comment to any commentable item |
 | `utest` | Record test results from CI, see [CI integration](ci-integration.md) |
+| `export` | The product's specification as Markdown, see [below](#exporting-the-specification) |
 | `api` | Raw REST call, see [Scripting](scripting.md#raw-api-calls) |
 | `agent-guide`, `mcp` | For AI agents, see [AI agents](ai-agents.md) |
 
@@ -117,3 +118,23 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 Requirements, tasks, constraints and defects are referenced by their identifier (`FR-12`, `MT-3`,
 `AC-42`, `DF-17`), test cases by their short ID (the first 8 characters of the ID, shown in lists) or
 their test identifier, and capabilities by name.
+
+## Exporting the specification
+
+`nexmap export` writes the product's structure (components and capabilities), constraints and
+requirements as one Markdown document: grouped by category, each item with its identifier, its
+description, definition of done and linked capabilities, and refinements nested below the item they
+refine. `--tasks` adds the tasks, `--file docs/spec.md` writes the document to a file instead of stdout.
+
+```sh
+nexmap export --file docs/spec.md
+```
+
+The order is fixed (categories as configured, items by number, structure by name) and the document
+contains no date, status or priority, so exporting an unchanged product gives the same file, and a
+committed export shows real changes in a diff. Anyone who can read the product can export it; a
+restricted token needs `read` on both `structure` and `backlog`.
+
+There is no import. To turn an existing document into requirements, let an AI agent read it and create
+the items with `nexmap req create` or the REST API. Since the export carries identifiers, the agent can
+change existing items by identifier instead of creating duplicates.

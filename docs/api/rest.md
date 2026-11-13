@@ -86,6 +86,14 @@ human-readable `message`:
 
 ## Endpoints
 
+### Specification export
+
+`GET /api/v1/products/{productId}/specification` (viewer role; tokens need `structure:read` and
+`backlog:read`) returns the product's specification as Markdown (`text/markdown`), not wrapped in
+`data`: the structure, constraints and requirements, and with `?tasks=true` the tasks. The document is
+ordered by stable keys and contains no timestamps, so an unchanged product exports identically. Errors
+are JSON as usual.
+
 ### Test runs
 
 `POST /api/v1/products/{productId}/test-runs` (tester role) takes
