@@ -12,7 +12,7 @@
 # toolchain line in go.mod in step with Go). To update Tailwind, take the
 # digests from the release's assets on GitHub.
 
-ARG GO_IMAGE=docker.io/library/golang:1.26.10-trixie@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb
+ARG GO_IMAGE=docker.io/library/golang:1.26.11-trixie@sha256:fa340cb59ebeb1d53ac1cccfc334201d938fe5f3458003cccb767096d8e032b8
 ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
 
 FROM ${GO_IMAGE} AS build
