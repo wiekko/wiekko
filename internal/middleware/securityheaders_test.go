@@ -9,7 +9,7 @@ import (
 )
 
 func TestSecurityHeaders(t *testing.T) {
-	handler := middleware.SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := middleware.SecurityHeaders(true)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -22,6 +22,7 @@ func TestSecurityHeaders(t *testing.T) {
 		{"X-Content-Type-Options", "nosniff"},
 		{"X-Frame-Options", "DENY"},
 		{"Referrer-Policy", "strict-origin-when-cross-origin"},
+		{"Strict-Transport-Security", "max-age=31536000"},
 	}
 	for _, tc := range tests {
 		if got := w.Header().Get(tc.header); got != tc.want {

@@ -10,11 +10,6 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// maxTestRunBody bounds a test run upload. Passing tests carry no output and
-// failures at most service.MaxTestOutput each, so this leaves room for large
-// suites while keeping a runaway upload from exhausting memory.
-const maxTestRunBody = 32 << 20
-
 // TestRunController handles automated test run uploads (FR-409).
 type TestRunController struct {
 	runs *service.TestRunService
@@ -37,7 +32,7 @@ func (c *TestRunController) Ingest(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxTestRunBody)
+	// The body is capped at middleware.MaxTestRunBody by the LimitBody middleware.
 	var req struct {
 		Source      string              `json:"source"`
 		CampaignID  string              `json:"campaign_id"`

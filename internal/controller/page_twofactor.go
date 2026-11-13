@@ -151,6 +151,9 @@ func (c *PageUserController) TwoFactorDisable(w http.ResponseWriter, r *http.Req
 
 // twoFactorMessage maps service errors to messages fit for the page.
 func twoFactorMessage(err error) string {
+	if wait, blocked := attemptsBlocked(err); blocked {
+		return tooManyCodesMessage(wait)
+	}
 	switch {
 	case errors.Is(err, service.ErrTOTPCodeReused):
 		return "That code was already used. Wait for your app to show the next code."

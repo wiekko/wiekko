@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"mime"
@@ -176,6 +177,17 @@ func (c *DiscussionController) CreateAttachment(w http.ResponseWriter, r *http.R
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
+	// Parse explicitly, so only uploadMemoryLimit of the body is held in RAM.
+	// Its total size is capped by the LimitBody middleware.
+	if err := r.ParseMultipartForm(uploadMemoryLimit); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			httputil.Error(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", "the upload exceeds the maximum size")
+			return
+		}
+		httputil.Error(w, http.StatusBadRequest, "invalid_request", "a multipart/form-data body with a file field is required")
+		return
+	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		httputil.Error(w, http.StatusBadRequest, "invalid_request", "a file field is required")

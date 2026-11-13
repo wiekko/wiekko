@@ -22,7 +22,12 @@ func Run(ctx context.Context, cfg *config.Config, handler http.Handler) error {
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		// Generous enough for the largest upload and download on a slow link,
+		// but a client can no longer hold a connection open indefinitely by
+		// trickling a body or never reading the response.
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 10 * time.Minute,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// Start listening in a goroutine.

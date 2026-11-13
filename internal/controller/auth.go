@@ -38,6 +38,44 @@ func loginBlocked(err error) (time.Duration, bool) {
 	return blocked.RetryAfter.Round(time.Second) + time.Second, true
 }
 
+// attemptsBlocked reports whether err means the second factor or account
+// creation is blocked for now, and for how long (rounded up to whole seconds).
+func attemptsBlocked(err error) (time.Duration, bool) {
+	var blocked *service.AttemptsBlockedError
+	if !errors.As(err, &blocked) {
+		return 0, false
+	}
+	return blocked.RetryAfter.Round(time.Second) + time.Second, true
+}
+
+// writeAccountsBlocked answers 429 if err means the client has created too
+// many accounts for now, and reports whether it did.
+func writeAccountsBlocked(w http.ResponseWriter, err error) bool {
+	wait, blocked := attemptsBlocked(err)
+	if !blocked {
+		return false
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())))
+	httputil.Error(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", tooManyAccountsMessage(wait))
+	return true
+}
+
+func tooManyCodesMessage(wait time.Duration) string {
+	return fmt.Sprintf("Too many wrong authentication codes. Try again in %s.", waitMinutes(wait))
+}
+
+func tooManyAccountsMessage(wait time.Duration) string {
+	return fmt.Sprintf("Too many accounts were created from your network. Try again in %s.", waitMinutes(wait))
+}
+
+func waitMinutes(wait time.Duration) string {
+	minutes := int(math.Ceil(wait.Minutes()))
+	if minutes == 1 {
+		return "1 minute"
+	}
+	return fmt.Sprintf("%d minutes", minutes)
+}
+
 func tooManyAttemptsMessage(wait time.Duration) string {
 	minutes := int(math.Ceil(wait.Minutes()))
 	unit := "minutes"
@@ -141,6 +179,11 @@ func (c *AuthController) completeTOTP(w http.ResponseWriter, r *http.Request, ch
 	result, err := c.auth.CompleteTOTPLogin(r.Context(), challenge, code, ip, r.UserAgent())
 	if err != nil {
 		logFailedLogin(r, username, ip, fmt.Errorf("second factor: %w", err))
+		if wait, blocked := attemptsBlocked(err); blocked {
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())))
+			httputil.Error(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", tooManyCodesMessage(wait))
+			return
+		}
 		if errors.Is(err, service.ErrLoginChallengeInvalid) {
 			httputil.Error(w, http.StatusUnauthorized, "CHALLENGE_INVALID", err.Error())
 			return
@@ -210,8 +253,12 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		Email:       req.Email,
 		DisplayName: req.DisplayName,
 		Password:    req.Password,
+		ClientIP:    clientIP(r),
 	})
 	if err != nil {
+		if writeAccountsBlocked(w, err) {
+			return
+		}
 		httputil.Error(w, http.StatusBadRequest, "REGISTRATION_FAILED", err.Error())
 		return
 	}
@@ -242,8 +289,12 @@ func (c *AuthController) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		Email:       req.Email,
 		DisplayName: req.DisplayName,
 		Password:    req.Password,
+		ClientIP:    clientIP(r),
 	})
 	if err != nil {
+		if writeAccountsBlocked(w, err) {
+			return
+		}
 		httputil.Error(w, http.StatusBadRequest, "INVITATION_FAILED", err.Error())
 		return
 	}

@@ -124,7 +124,7 @@ func main() {
 	go sessionCleanup(ctx, st.Session)
 
 	// Build the handler and start the server.
-	handler := router.New(svc, cfg.CookieSecure, cfg.DevMode, cfg.MaxUploadBytes)
+	handler := router.New(svc, cfg.CookieSecure, cfg.DevMode, cfg.MaxUploadBytes, cfg.TrustedProxies)
 	if err := server.Run(ctx, cfg, handler); err != nil {
 		slog.Error("server error", "err", err)
 		os.Exit(1)

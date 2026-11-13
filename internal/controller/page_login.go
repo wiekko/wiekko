@@ -90,6 +90,14 @@ func (c *PageLoginController) LoginTOTP(w http.ResponseWriter, r *http.Request) 
 	result, err := c.auth.CompleteTOTPLogin(r.Context(), cookie.Value, code, ip, r.UserAgent())
 	if err != nil {
 		logFailedLogin(r, "", ip, fmt.Errorf("second factor: %w", err))
+		if wait, blocked := attemptsBlocked(err); blocked {
+			// Back to the password form: the code form is of no use until
+			// the wait is over, and the challenge will have expired by then.
+			c.clearChallengeCookie(w)
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())))
+			c.renderLoginErrorStatus(w, r, tooManyCodesMessage(wait), http.StatusTooManyRequests)
+			return
+		}
 		if errors.Is(err, service.ErrLoginChallengeInvalid) {
 			c.clearChallengeCookie(w)
 			c.renderLoginError(w, r, err.Error())
@@ -166,10 +174,13 @@ func (c *PageLoginController) renderTOTPForm(w http.ResponseWriter, r *http.Requ
 	_ = login.TOTPPage(message).Render(r.Context(), w)
 }
 
-// clientIP returns the address recorded for sessions and failed-login logs.
+// clientIP returns the address recorded for sessions and failed-login logs,
+// and counted by the login limits. The ClientIP middleware determines it,
+// believing X-Forwarded-For only from trusted proxies; without the middleware
+// (handler tests) it is the connection's address.
 func clientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		return fwd
+	if ip := middleware.ClientIPFromContext(r.Context()); ip != "" {
+		return ip
 	}
 	return r.RemoteAddr
 }

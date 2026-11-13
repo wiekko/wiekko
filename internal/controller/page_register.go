@@ -206,6 +206,7 @@ func registerInput(r *http.Request) (service.RegisterInput, string) {
 		Email:       r.FormValue("email"),
 		DisplayName: r.FormValue("display_name"),
 		Password:    r.FormValue("password"),
+		ClientIP:    clientIP(r),
 	}
 	if input.Password != r.FormValue("password_confirm") {
 		return input, "The passwords do not match."
@@ -218,6 +219,9 @@ func registerInput(r *http.Request) (service.RegisterInput, string) {
 // is logged and replaced by a generic message, so no internals leak.
 func publicAccountError(r *http.Request, err error) string {
 	var inputErr *service.AccountInputError
+	if wait, blocked := attemptsBlocked(err); blocked {
+		return tooManyAccountsMessage(wait)
+	}
 	switch {
 	case errors.Is(err, service.ErrUsernameTaken), errors.Is(err, service.ErrEmailTaken):
 		return err.Error()

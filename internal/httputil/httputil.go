@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -40,8 +41,16 @@ func Error(w http.ResponseWriter, status int, code, message string) {
 
 // DecodeJSON reads and decodes a JSON request body into dst.
 // Returns false and writes an error response if decoding fails.
+//
+// The body is capped by the LimitBody middleware; one over the cap is answered
+// with 413.
 func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			Error(w, http.StatusRequestEntityTooLarge, "TOO_LARGE", "Request body is too large")
+			return false
+		}
 		Error(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON request body")
 		return false
 	}

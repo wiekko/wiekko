@@ -8,11 +8,34 @@ mentioned is described in the [configuration reference](configuration.md).
 `nexmapd` speaks plain HTTP. Run it behind a reverse proxy that terminates TLS (on Coolify, the built-in
 Traefik does this), and do not expose its port to the network directly:
 
-- Leave `NEXMAP_COOKIE_SECURE` at `true`. Browsers then send the session cookie over HTTPS only.
-- The server records the `X-Forwarded-For` header, without checking it, as the client address of
-  sessions and failed logins. Only a proxy in front of the server makes that address trustworthy, and the
-  proxy should replace a header sent by the client rather than append to it. The login limits below
-  count by the last address in the header, the one the proxy added.
+- Leave `NEXMAP_COOKIE_SECURE` at `true`. Browsers then send the session cookie over HTTPS only, and
+  the server sends `Strict-Transport-Security`, so browsers that have visited once refuse plain HTTP for
+  a year.
+- The client address of sessions, failed logins and the limits below comes from the `X-Forwarded-For`
+  header, but only when the request arrives from a trusted proxy
+  ([`NEXMAP_TRUSTED_PROXIES`](configuration.md#network), by default loopback and private networks).
+  A request from any other address is taken to come from that address, whatever its header says. From a
+  trusted proxy the header is read from the end, skipping trusted proxies, so entries a client wrote
+  itself do not count, whether the proxy replaces the header or appends to it.
+- If machines other than the proxy can reach `nexmapd` on a private network, set
+  `NEXMAP_TRUSTED_PROXIES` to the proxy's address. Otherwise they can claim any client address and
+  evade the limits.
+
+### Response headers
+
+Every response carries a `Content-Security-Policy` that only allows scripts, styles, images, fonts and
+form targets from the server itself and forbids framing, plus `X-Content-Type-Options`,
+`X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`. Images in Markdown that point to another
+server are therefore not loaded. The policy still allows inline scripts, which the pages use, so it
+limits what injected markup could do (load code from or send data to another server) rather than ruling
+it out. If your proxy adds headers of its own,
+make sure it does not replace these with weaker ones.
+
+### Request limits
+
+Request bodies are capped at 1 MiB, attachment uploads at `NEXMAP_MAX_UPLOAD_BYTES` plus 1 MiB for the
+form around the file, and test run uploads at 32 MiB; larger requests get `413`. A request has to be
+received within 5 minutes and answered within 10.
 
 ## The encryption key
 
@@ -87,6 +110,11 @@ Once users exist, both variables are ignored and can be removed.
   password clears the count for that username. There is no limit per account across addresses, so nobody
   can lock another user out by guessing their password. The counters live in memory and reset when the
   server restarts.
+- **Wrong two-factor codes are limited** per user: after 10 wrong codes (from the authenticator or
+  recovery codes) within an hour, no code is accepted for that user until the hour is over, at sign-in
+  and when changing the two-factor settings alike. This takes the user's password or session, so it
+  cannot be used to lock out a stranger; a user who is blocked this way should change their password.
+  The server logs `second factor blocked after repeated wrong codes` with the user ID.
 
 ## New accounts
 
@@ -101,6 +129,9 @@ People get an account in one of two ways:
   the server can create an account on `/register`. With *moderation* enabled, such accounts wait for an
   administrator's approval under `/admin/users` before they can sign in. A self-registered account
   belongs to no product until a product owner adds it.
+
+Creating accounts is limited to 20 attempts per client address and hour, for self-registration and
+invitations together; after that the form and the API (`429 TOO_MANY_ATTEMPTS`) ask to wait.
 
 Only product owners (and administrators) can invite to a product, and only administrators can invite to
 the installation without a product.

@@ -128,7 +128,7 @@ func newEnv(t *testing.T, seed bool) *e2e {
 		}
 	}
 
-	srv := httptest.NewServer(router.New(svc, false, false, 1<<20))
+	srv := httptest.NewServer(router.New(svc, false, false, 1<<20, nil))
 	t.Cleanup(srv.Close)
 
 	repoDir := t.TempDir()

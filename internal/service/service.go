@@ -66,6 +66,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		twoFactor: st.TwoFactor,
 		settings:  st.Setting,
 		provider:  provider,
+		limiter:   newAttemptLimiter(secondFactorMaxFailures, SecondFactorFailureWindow),
 	}
 
 	// Built before the test run service, which files defects for automated
@@ -103,6 +104,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			products:     st.Product,
 			productRoles: st.ProductRole,
 			provider:     provider,
+			regLimiter:   newAttemptLimiter(registrationMaxPerAddress, RegistrationWindow),
 		},
 		PAT: &PATService{
 			pats:         st.PAT,

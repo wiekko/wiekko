@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"strconv"
@@ -12,12 +13,22 @@ import (
 
 func Load(args []string) (*Config, error) {
 	cfg := defaults()
+	trustedProxies := DefaultTrustedProxies
 
 	applyEnv(cfg)
+	if v, ok := os.LookupEnv("NEXMAP_TRUSTED_PROXIES"); ok {
+		trustedProxies = v
+	}
 
-	if err := applyFlags(cfg, args); err != nil {
+	if err := applyFlags(cfg, args, &trustedProxies); err != nil {
 		return nil, err
 	}
+
+	proxies, err := ParseTrustedProxies(trustedProxies)
+	if err != nil {
+		return nil, err
+	}
+	cfg.TrustedProxies = proxies
 
 	publicURL, err := normalizePublicURL(cfg.PublicURL)
 	if err != nil {
@@ -106,7 +117,7 @@ func applyEnv(cfg *Config) {
 	}
 }
 
-func applyFlags(cfg *Config, args []string) error {
+func applyFlags(cfg *Config, args []string, trustedProxies *string) error {
 	fs := flag.NewFlagSet("nexmap", flag.ContinueOnError)
 
 	// Pointers to shadow vars; only applied when `flag.Visit` reports them set.
@@ -123,6 +134,7 @@ func applyFlags(cfg *Config, args []string) error {
 	maxUpload := fs.String("max-upload-bytes", "", "")
 	allowedUploads := fs.String("allowed-upload-types", "", "")
 	publicURL := fs.String("public-url", "", "")
+	proxies := fs.String("trusted-proxies", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("config: flags: %w", err)
@@ -162,6 +174,8 @@ func applyFlags(cfg *Config, args []string) error {
 			cfg.AllowedUploads = *allowedUploads
 		case "public-url":
 			cfg.PublicURL = *publicURL
+		case "trusted-proxies":
+			*trustedProxies = *proxies
 		}
 	})
 
@@ -183,4 +197,31 @@ func normalizePublicURL(raw string) (string, error) {
 		return "", fmt.Errorf("config: public URL %q must not contain credentials, a query or a fragment", raw)
 	}
 	return strings.TrimRight(u.String(), "/"), nil
+}
+
+// ParseTrustedProxies parses a comma-separated list of addresses and CIDR
+// ranges ("10.0.0.0/8, 192.0.2.7"). Empty or "none" trusts no proxy.
+func ParseTrustedProxies(spec string) ([]netip.Prefix, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" || strings.EqualFold(spec, "none") {
+		return nil, nil
+	}
+	var out []netip.Prefix
+	for _, raw := range strings.Split(spec, ",") {
+		item := strings.TrimSpace(raw)
+		if item == "" {
+			continue
+		}
+		if p, err := netip.ParsePrefix(item); err == nil {
+			out = append(out, p.Masked())
+			continue
+		}
+		addr, err := netip.ParseAddr(item)
+		if err != nil {
+			return nil, fmt.Errorf("config: trusted proxy %q is neither an IP address nor a CIDR range like 10.0.0.0/8", item)
+		}
+		addr = addr.Unmap()
+		out = append(out, netip.PrefixFrom(addr, addr.BitLen()))
+	}
+	return out, nil
 }

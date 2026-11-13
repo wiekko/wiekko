@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"net/netip"
+	"time"
+)
 
 const (
 	DefaultHost             = "localhost"
@@ -16,6 +19,10 @@ const (
 	DefaultUploadDir        = "./uploads"
 	DefaultMaxUploadBytes   = 10 << 20 // 10 MiB
 	DefaultAllowedUploads   = ""       // empty = every file type is accepted
+	// DefaultTrustedProxies covers a reverse proxy on the same host or on a
+	// private (container) network. Requests from public addresses are never
+	// believed about who their client is.
+	DefaultTrustedProxies = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
 )
 
 type Config struct {
@@ -38,4 +45,7 @@ type Config struct {
 	// PublicURL is the address users reach the server at ("https://nexmap.example.com"),
 	// without a trailing slash. Empty: links are built from the request.
 	PublicURL string
+	// TrustedProxies are the addresses whose X-Forwarded-For header is
+	// believed when determining a client's address. Empty: none.
+	TrustedProxies []netip.Prefix
 }

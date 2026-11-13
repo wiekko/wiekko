@@ -11,7 +11,7 @@ import (
 // otherwise only surface as a crash on startup.
 func TestNewRegistersRoutes(t *testing.T) {
 	// The handlers are never invoked, so an empty service set is enough.
-	if h := New(&service.Services{}, true, true, 1<<20); h == nil {
+	if h := New(&service.Services{}, true, true, 1<<20, nil); h == nil {
 		t.Fatal("New returned nil")
 	}
 }

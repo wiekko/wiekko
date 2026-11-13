@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
@@ -119,6 +120,11 @@ func (c *TOTPController) AdminReset(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeTOTPError(w http.ResponseWriter, err error) {
+	if wait, blocked := attemptsBlocked(err); blocked {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())))
+		httputil.Error(w, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", tooManyCodesMessage(wait))
+		return
+	}
 	switch {
 	case errors.Is(err, service.ErrIncorrectPassword):
 		httputil.Error(w, http.StatusBadRequest, "INVALID_PASSWORD", err.Error())

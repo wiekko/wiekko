@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"net/netip"
 
 	"nexmap.net/internal/controller"
 	"nexmap.net/internal/middleware"
@@ -9,7 +10,11 @@ import (
 )
 
 // New creates the top-level HTTP handler with all routes and middleware applied.
-func New(svc *service.Services, cookieSecure, devMode bool, maxUploadBytes int64) http.Handler {
+//
+// trustedProxies are the addresses whose X-Forwarded-For header is believed
+// (see middleware.ClientIP). cookieSecure says the server is reached over
+// HTTPS, which also turns on HSTS.
+func New(svc *service.Services, cookieSecure, devMode bool, maxUploadBytes int64, trustedProxies []netip.Prefix) http.Handler {
 	mux := http.NewServeMux()
 
 	mountStatic(mux)
@@ -23,9 +28,11 @@ func New(svc *service.Services, cookieSecure, devMode bool, maxUploadBytes int64
 
 	stack := middleware.Chain(
 		middleware.RequestID,
+		middleware.ClientIP(trustedProxies),
 		middleware.Logging,
 		middleware.Recovery,
-		middleware.SecurityHeaders,
+		middleware.SecurityHeaders(cookieSecure),
+		middleware.LimitBody(maxUploadBytes),
 		middleware.Authenticate(svc.Auth, svc.Auth),
 		middleware.RequireTwoFactorEnrollment(svc.TwoFactor),
 	)

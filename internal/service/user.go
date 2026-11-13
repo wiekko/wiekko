@@ -25,6 +25,9 @@ type UserService struct {
 	products     store.ProductStore
 	productRoles store.ProductRoleStore
 	provider     auth.Provider
+
+	// regLimiter bounds account creation per client address; nil disables it.
+	regLimiter *attemptLimiter
 }
 
 // Errors returned when a new account would clash with an existing one. Their
@@ -65,6 +68,9 @@ type RegisterInput struct {
 	Email       string
 	DisplayName string
 	Password    string
+	// ClientIP is the address the request came from, for the limit on
+	// account creation per address. Empty: not limited (internal callers).
+	ClientIP string
 }
 
 // UpdateProfileInput contains the fields that can be updated on a user profile.
@@ -78,6 +84,9 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*model
 	enabled, err := s.settings.Get(ctx, "self_registration_enabled")
 	if err != nil || enabled != "true" {
 		return nil, inputError(errors.New("self-registration is disabled"))
+	}
+	if err := s.countRegistration(input.ClientIP); err != nil {
+		return nil, err
 	}
 
 	input, err = normalizeRegisterInput(input)
@@ -137,6 +146,9 @@ func (s *UserService) LookupInvitation(ctx context.Context, rawToken string) (*I
 // invitation also makes the new user a member of that product with the
 // invited role (FR-305).
 func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, input RegisterInput) (*model.User, error) {
+	if err := s.countRegistration(input.ClientIP); err != nil {
+		return nil, err
+	}
 	inv, err := s.usableInvitation(ctx, rawToken)
 	if err != nil {
 		return nil, err
@@ -193,6 +205,22 @@ func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, inp
 		return nil, fmt.Errorf("mark invitation accepted: %w", err)
 	}
 	return user, nil
+}
+
+// countRegistration counts one attempt to create an account from clientIP and
+// returns an *AttemptsBlockedError once the address has used up its attempts
+// (registrationMaxPerAddress within RegistrationWindow). Every attempt counts,
+// whether it succeeds or not: each may cost a password hash.
+func (s *UserService) countRegistration(clientIP string) error {
+	if clientIP == "" {
+		return nil
+	}
+	key := limiterIP(clientIP)
+	if err := s.regLimiter.check(key); err != nil {
+		return err
+	}
+	s.regLimiter.add(key)
+	return nil
 }
 
 // usableInvitation resolves a raw invitation token to an invitation that has

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"nexmap.net/internal/auth"
@@ -47,6 +48,10 @@ type TwoFactorService struct {
 	settings  store.SettingStore
 	provider  auth.Provider
 	now       func() time.Time
+
+	// limiter blocks a user's second factor after repeated wrong codes; nil
+	// disables it.
+	limiter *attemptLimiter
 }
 
 // TOTPSetup is what a user needs to add the account to an authenticator app.
@@ -200,10 +205,32 @@ func (s *TwoFactorService) AdminReset(ctx context.Context, targetID string) erro
 
 // Verify checks a TOTP code (6 digits) or a recovery code for the user and
 // consumes it, so neither can be used twice.
+//
+// Wrong codes are counted per user; after secondFactorMaxFailures within
+// SecondFactorFailureWindow it returns an *AttemptsBlockedError without
+// looking at the code, until the window ends. A correct code clears the count.
 func (s *TwoFactorService) Verify(ctx context.Context, user *model.User, code string) error {
 	if !user.TOTPEnabled || user.TOTPSecret == "" {
 		return ErrTOTPNotEnabled
 	}
+	if err := s.limiter.check(user.ID); err != nil {
+		return err
+	}
+	err := s.verifyCode(ctx, user, code)
+	switch {
+	case err == nil:
+		s.limiter.reset(user.ID)
+	case errors.Is(err, ErrInvalidTOTPCode) && !errors.Is(err, ErrTOTPCodeReused):
+		// A reused code is a correct one typed twice, not a guess.
+		if s.limiter.add(user.ID) {
+			slog.Warn("second factor blocked after repeated wrong codes",
+				"user_id", user.ID, "window", SecondFactorFailureWindow.String())
+		}
+	}
+	return err
+}
+
+func (s *TwoFactorService) verifyCode(ctx context.Context, user *model.User, code string) error {
 	if totp.IsNumericCode(code) {
 		step, ok := totp.Validate(user.TOTPSecret, code, s.clock())
 		if !ok {

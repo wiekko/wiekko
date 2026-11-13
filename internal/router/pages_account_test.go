@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -74,7 +75,7 @@ func newAccountEnv(t *testing.T, driver string, db *sql.DB) *accountEnv {
 		t.Fatalf("create product: %v", err)
 	}
 
-	srv := httptest.NewServer(New(svc, false, false, 1<<20))
+	srv := httptest.NewServer(New(svc, false, false, 1<<20, []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")}))
 	t.Cleanup(srv.Close)
 	return &accountEnv{t: t, srv: srv, svc: svc, st: st, admin: admin, product: product}
 }

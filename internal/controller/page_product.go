@@ -1017,13 +1017,26 @@ func (c *PageProductController) SearchUsers(w http.ResponseWriter, r *http.Reque
 	productID := r.PathValue("id")
 	query := r.URL.Query().Get("q")
 
+	// The search reaches every account on the instance, so it is only for
+	// those who may add members: the product's owners and administrators.
+	// Without this check any signed-in user could list all users.
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil || !(user.IsAdmin || role == model.RoleOwner) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	if len(query) < 2 {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		return
 	}
 
 	// Get current members to exclude.
-	members, _ := c.product.ListMembers(r.Context(), user, productID)
+	members, err := c.product.ListMembers(r.Context(), user, productID)
+	if err != nil {
+		writePageServiceError(w, err)
+		return
+	}
 	memberSet := make(map[string]bool, len(members))
 	for _, m := range members {
 		memberSet[m.UserID] = true
