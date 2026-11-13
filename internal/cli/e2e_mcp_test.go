@@ -111,7 +111,7 @@ func generic(t *testing.T, v any) any {
 }
 
 var readTools = []string{
-	"campaign_status", "get_capability", "get_constraint", "get_context", "get_defect", "get_requirement",
+	"campaign_status", "export_specification", "get_capability", "get_constraint", "get_context", "get_defect", "get_requirement",
 	"get_structure", "get_test_case", "list_constraints", "list_defects", "list_requirements", "list_test_cases",
 }
 

@@ -40,7 +40,10 @@ agent is told. In short:
 
 - **Read:** `nexmap context -o md` (or the `get_context` tool) for a product briefing, then requirements,
   tasks, constraints, structure, defects, test cases and the campaign status as needed. `nexmap export`
-  gives the whole specification in one Markdown document.
+  (or the `export_specification` tool) gives the whole specification in one Markdown document, which an
+  agent can keep a spec file in the repository in sync with. The tool also returns the document's SHA-256,
+  so the agent can tell whether the file is current without comparing it. The tool is available on a
+  read-only server too.
 - **Turn documents into requirements:** nexmap has no import. An agent can read a document you give it
   and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
   existing ones instead of duplicating them.

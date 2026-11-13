@@ -3,6 +3,8 @@ package cli_test
 // `nexmap export` (FR-905) against the seeded Aviary product.
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,5 +55,30 @@ func TestE2EExport(t *testing.T) {
 	}
 	if r := e.run("", "", "export", "extra"); r.code != cli.ExitUsage {
 		t.Errorf("export with an argument: exit %d, want %d", r.code, cli.ExitUsage)
+	}
+}
+
+// TestE2EMCPExport checks that the MCP tool exports exactly what the CLI
+// does, also on a read-only server, and that its hash identifies the text.
+func TestE2EMCPExport(t *testing.T) {
+	e := newAviary(t)
+	want := e.mustRun("", "export").stdout
+	wantTasks := e.mustRun("", "export", "--tasks").stdout
+
+	s := e.startMCP("mcp", "--read-only")
+	text, got := mustTool(t, s, "export_specification", map[string]any{})
+	if text != want {
+		t.Fatal("export_specification differs from `nexmap export`")
+	}
+	m := got.(map[string]any)
+	sum := sha256.Sum256([]byte(want))
+	if m["sha256"] != hex.EncodeToString(sum[:]) || int(m["bytes"].(float64)) != len(want) || m["tasks"] != false {
+		t.Errorf("structured result = %v", m)
+	}
+	if _, ok := m["markdown"]; ok {
+		t.Error("the document is duplicated in the structured result")
+	}
+	if text, _ := mustTool(t, s, "export_specification", map[string]any{"tasks": true}); text != wantTasks {
+		t.Error("export_specification with tasks differs from `nexmap export --tasks`")
 	}
 }

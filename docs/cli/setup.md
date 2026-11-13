@@ -152,7 +152,8 @@ nexmap export --file docs/spec.md
 
 The order is fixed (categories as configured, items by number, structure by name) and the document
 contains no date, status or priority, so exporting an unchanged product gives the same file, and a
-committed export shows real changes in a diff. Anyone who can read the product can export it; a
+committed export shows real changes in a diff. With `-o json` and `--file`, the output names the file and
+the document's SHA-256. AI agents get the same document from the MCP tool `export_specification`. Anyone who can read the product can export it; a
 restricted token needs `read` on both `structure` and `backlog`.
 
 There is no import. To turn an existing document into requirements, let an AI agent read it and create

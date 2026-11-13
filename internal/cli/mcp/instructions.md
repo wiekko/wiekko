@@ -11,6 +11,9 @@ and defects.
   messages and code comments. Test cases are referenced by short ID (first 8
   characters of the ID, shown in lists) or by their test identifier.
   Capabilities are referenced by name.
+- To write or refresh a spec document in the repository, use
+  `export_specification` and save its text as is; compare its `sha256` with
+  the file's to see whether the file is out of date.
 - Treat constraints as non-negotiable unless the user says otherwise.
 - If a requirement is unclear, read its comments and parent, and ask the user
   rather than inventing scope.

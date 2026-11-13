@@ -2,6 +2,8 @@ package ops
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 
 	"nexmap.net/internal/client"
@@ -100,4 +102,33 @@ func (s *Session) findCapability(ctx context.Context, ref string) (client.Capabi
 		func(c client.Capability) string { return c.ID },
 		func(c client.Capability) string { return c.Name },
 		func(c client.Capability) bool { return strings.EqualFold(c.Name, strings.TrimSpace(ref)) })
+}
+
+// SpecificationQuery selects what the specification export contains.
+type SpecificationQuery struct {
+	Tasks bool `json:"tasks,omitempty" jsonschema:"include tasks; by default only the structure, constraints and requirements are exported"`
+}
+
+// SpecificationView describes an exported specification. The document
+// itself travels separately (stdout, a file, the MCP text content), so a
+// large specification is not duplicated in structured output.
+type SpecificationView struct {
+	ProductID string `json:"product_id"`
+	Tasks     bool   `json:"tasks"`
+	Bytes     int    `json:"bytes"`
+	// SHA256 is the document's hash (hex), so a caller can tell whether a
+	// committed export is still current without comparing the text.
+	SHA256 string `json:"sha256"`
+}
+
+// Specification exports the product's specification as Markdown (FR-905):
+// the structure, constraints and requirements, and tasks if asked for. The
+// server renders it, in a stable order and without timestamps.
+func (s *Session) Specification(ctx context.Context, q SpecificationQuery) (string, *SpecificationView, error) {
+	doc, err := s.C.Specification(ctx, s.ProductID, q.Tasks)
+	if err != nil {
+		return "", nil, err
+	}
+	sum := sha256.Sum256([]byte(doc))
+	return doc, &SpecificationView{ProductID: s.ProductID, Tasks: q.Tasks, Bytes: len(doc), SHA256: hex.EncodeToString(sum[:])}, nil
 }

@@ -211,6 +211,17 @@ func registerReadTools(s *sdk.Server, h *handlers) {
 			return v, func(w io.Writer) error { return render.Structure(w, output.Markdown, v) }, err
 		})
 
+	readTool(s, h, "export_specification", "Export the specification",
+		"The whole product specification as one Markdown document: components and capabilities, constraints and "+
+			"requirements grouped by category with identifiers, descriptions, definitions of done and capability links; "+
+			"tasks too if asked for. The order is stable and the document has no timestamps, so it can be written to a "+
+			"spec file in the repository as is, and an unchanged product exports identically. The document is the text "+
+			"result; the structured result carries its size and SHA-256, to check whether a committed copy is current.",
+		func(ctx context.Context, sess *ops.Session, q ops.SpecificationQuery) (*ops.SpecificationView, func(io.Writer) error, error) {
+			doc, v, err := sess.Specification(ctx, q)
+			return v, func(w io.Writer) error { _, err := io.WriteString(w, doc); return err }, err
+		})
+
 	readTool(s, h, "get_capability", "Show a capability",
 		"One capability by name or ID: its component, linked requirements, test cases and defects.",
 		func(ctx context.Context, sess *ops.Session, in RefInput) (*ops.CapabilityDetail, func(io.Writer) error, error) {

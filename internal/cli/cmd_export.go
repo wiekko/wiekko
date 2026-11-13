@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"nexmap.net/internal/cli/ops"
 	"nexmap.net/internal/cli/output"
 )
 
@@ -16,6 +17,7 @@ import (
 type exportView struct {
 	ProductID string `json:"product_id"`
 	Tasks     bool   `json:"tasks"`
+	SHA256    string `json:"sha256"`             // hash of the document, to compare with a committed copy
 	File      string `json:"file,omitempty"`     // where it was written, with --file
 	Markdown  string `json:"markdown,omitempty"` // the document, without --file
 }
@@ -38,11 +40,11 @@ func exportCommand() *command {
 			if err != nil {
 				return err
 			}
-			doc, err := s.C.Specification(ctx, s.ProductID, tasks)
+			doc, spec, err := s.Specification(ctx, ops.SpecificationQuery{Tasks: tasks})
 			if err != nil {
 				return err
 			}
-			view := exportView{ProductID: s.ProductID, Tasks: tasks}
+			view := exportView{ProductID: s.ProductID, Tasks: tasks, SHA256: spec.SHA256}
 			if file == "" {
 				if a.format == output.JSON {
 					view.Markdown = doc
