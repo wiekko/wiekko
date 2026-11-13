@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"log/slog"
 	"net/http"
 
 	"nexmap.net/internal/httputil"
+	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/service"
 	"nexmap.net/internal/store"
 )
@@ -50,9 +52,10 @@ func (c *AdminController) GetUser(w http.ResponseWriter, r *http.Request) {
 func (c *AdminController) LockUser(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("id")
 	if err := c.user.AdminLockUser(r.Context(), userID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "LOCK_FAILED", err.Error())
+		writeAccountError(w, "LOCK_FAILED", err)
 		return
 	}
+	logAdminAction(r, "lock user", userID)
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "locked"})
 }
 
@@ -60,9 +63,10 @@ func (c *AdminController) LockUser(w http.ResponseWriter, r *http.Request) {
 func (c *AdminController) UnlockUser(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("id")
 	if err := c.user.AdminUnlockUser(r.Context(), userID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "UNLOCK_FAILED", err.Error())
+		writeAccountError(w, "UNLOCK_FAILED", err)
 		return
 	}
+	logAdminAction(r, "unlock user", userID)
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "unlocked"})
 }
 
@@ -81,9 +85,10 @@ func (c *AdminController) SetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := c.user.AdminSetPassword(r.Context(), userID, req.Password, currentSessionID(r)); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "PASSWORD_SET_FAILED", err.Error())
+		writeAccountError(w, "PASSWORD_SET_FAILED", err)
 		return
 	}
+	logAdminAction(r, "set password", userID)
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "password_set"})
 }
 
@@ -91,9 +96,10 @@ func (c *AdminController) SetPassword(w http.ResponseWriter, r *http.Request) {
 func (c *AdminController) ApproveUser(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("id")
 	if err := c.user.AdminApproveUser(r.Context(), userID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "APPROVE_FAILED", err.Error())
+		writeAccountError(w, "APPROVE_FAILED", err)
 		return
 	}
+	logAdminAction(r, "approve user", userID)
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "approved"})
 }
 
@@ -101,9 +107,10 @@ func (c *AdminController) ApproveUser(w http.ResponseWriter, r *http.Request) {
 func (c *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("id")
 	if err := c.user.AdminDeleteUser(r.Context(), userID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "DELETE_FAILED", err.Error())
+		writeAccountError(w, "DELETE_FAILED", err)
 		return
 	}
+	logAdminAction(r, "delete user", userID)
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -124,8 +131,11 @@ func (c *AdminController) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := c.setting.Update(r.Context(), req); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "SETTINGS_UPDATE_FAILED", err.Error())
+		writeAccountError(w, "SETTINGS_UPDATE_FAILED", err)
 		return
+	}
+	for key, value := range req {
+		logAdminAction(r, "change setting", "", "setting", key, "value", value)
 	}
 
 	settings, err := c.setting.GetAll(r.Context())
@@ -134,4 +144,21 @@ func (c *AdminController) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	httputil.JSON(w, http.StatusOK, settings)
+}
+
+// logAdminAction records an administrative change in the server log: who did
+// what to whom, and from where. These actions have no place in a product's
+// audit trail, and without a record a misused or stolen administrator account
+// would leave no trace. targetID is the affected user, or "" if there is none;
+// more attributes may follow as key-value pairs.
+func logAdminAction(r *http.Request, action, targetID string, attrs ...any) {
+	args := []any{"action", action}
+	if targetID != "" {
+		args = append(args, "user_id", targetID)
+	}
+	if actor := middleware.UserFromContext(r.Context()); actor != nil {
+		args = append(args, "admin_id", actor.ID)
+	}
+	args = append(args, "ip", clientIP(r), "request_id", middleware.RequestIDFromContext(r.Context()))
+	slog.Warn("administrator action", append(args, attrs...)...)
 }

@@ -146,7 +146,7 @@ func (c *PageProductController) TaskCreate(w http.ResponseWriter, r *http.Reques
 		}
 		props.DisplayName = user.DisplayName
 		props.IsAdmin = user.IsAdmin
-		props.Error = createErr.Error()
+		props.Error = errorText(createErr)
 		f.apply(&props)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -245,7 +245,7 @@ func (c *PageProductController) TaskUpdate(w http.ResponseWriter, r *http.Reques
 		props.Task = task
 		props.IsEdit = true
 		props.ReturnTo = r.FormValue("return")
-		props.Error = updateErr.Error()
+		props.Error = errorText(updateErr)
 		f.apply(&props)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

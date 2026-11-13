@@ -130,7 +130,7 @@ func (c *PageProductController) BoardRequirementStatus(w http.ResponseWriter, r 
 		StatusID: &statusID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, errorText(err), http.StatusForbidden)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -149,7 +149,7 @@ func (c *PageProductController) BoardTaskStatus(w http.ResponseWriter, r *http.R
 		StatusID: &statusID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, errorText(err), http.StatusForbidden)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -166,7 +166,7 @@ func (c *PageProductController) BoardDefectStatus(w http.ResponseWriter, r *http
 		StatusID: &statusID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, errorText(err), http.StatusForbidden)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 
 	"nexmap.net/internal/auth"
@@ -29,6 +30,11 @@ const (
 type Provider struct {
 	users      store.UserStore
 	iterations int
+
+	// dummyHash is a hash of a random password at the provider's cost,
+	// computed on first use. See Authenticate.
+	dummyOnce sync.Once
+	dummyHash string
 }
 
 // New creates a built-in auth provider.
@@ -40,12 +46,20 @@ func New(users store.UserStore, iterations int) *Provider {
 	return &Provider{users: users, iterations: iterations}
 }
 
+// Authenticate verifies a username and password.
+//
+// Every attempt costs one password hash, whether or not the account exists
+// and is active. Otherwise the answer for an unknown name would come back
+// much faster than for a known one, and the response time alone would tell
+// which usernames exist.
 func (p *Provider) Authenticate(ctx context.Context, username, password string) (*auth.Identity, error) {
 	user, err := p.users.GetByUsername(ctx, username)
 	if err != nil {
+		p.burnHash(password)
 		return nil, errors.New("invalid credentials")
 	}
 	if user.Status != model.UserStatusActive {
+		p.burnHash(password)
 		return nil, errors.New("account is not active")
 	}
 	if err := p.VerifyPassword(password, user.PasswordHash); err != nil {
@@ -58,6 +72,16 @@ func (p *Provider) Authenticate(ctx context.Context, username, password string) 
 		DisplayName: user.DisplayName,
 		IsAdmin:     user.IsAdmin,
 	}, nil
+}
+
+// burnHash spends the time a real password check would take.
+func (p *Provider) burnHash(password string) {
+	p.dummyOnce.Do(func() {
+		random := make([]byte, 32)
+		_, _ = rand.Read(random)
+		p.dummyHash, _ = p.HashPassword(base64.RawStdEncoding.EncodeToString(random))
+	})
+	_ = p.VerifyPassword(password, p.dummyHash)
 }
 
 func (p *Provider) ValidatePassword(password string, policy auth.PasswordPolicy) error {

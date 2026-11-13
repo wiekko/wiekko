@@ -124,7 +124,17 @@ func main() {
 	go sessionCleanup(ctx, st.Session)
 
 	// Build the handler and start the server.
-	handler := router.New(svc, cfg.CookieSecure, cfg.DevMode, cfg.MaxUploadBytes, cfg.TrustedProxies)
+	handler, err := router.New(svc, router.Options{
+		CookieSecure:   cfg.CookieSecure,
+		DevMode:        cfg.DevMode,
+		MaxUploadBytes: cfg.MaxUploadBytes,
+		TrustedProxies: cfg.TrustedProxies,
+		PublicURL:      cfg.PublicURL,
+	})
+	if err != nil {
+		slog.Error("failed to set up the HTTP handler", "err", err)
+		os.Exit(1)
+	}
 	if err := server.Run(ctx, cfg, handler); err != nil {
 		slog.Error("server error", "err", err)
 		os.Exit(1)

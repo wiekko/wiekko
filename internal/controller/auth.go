@@ -185,7 +185,7 @@ func (c *AuthController) completeTOTP(w http.ResponseWriter, r *http.Request, ch
 			return
 		}
 		if errors.Is(err, service.ErrLoginChallengeInvalid) {
-			httputil.Error(w, http.StatusUnauthorized, "CHALLENGE_INVALID", err.Error())
+			httputil.Error(w, http.StatusUnauthorized, "CHALLENGE_INVALID", errorText(err))
 			return
 		}
 		httputil.Error(w, http.StatusUnauthorized, "INVALID_TOTP_CODE", "Invalid authentication code")
@@ -259,7 +259,7 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		if writeAccountsBlocked(w, err) {
 			return
 		}
-		httputil.Error(w, http.StatusBadRequest, "REGISTRATION_FAILED", err.Error())
+		writeAccountError(w, "REGISTRATION_FAILED", err)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (c *AuthController) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		if writeAccountsBlocked(w, err) {
 			return
 		}
-		httputil.Error(w, http.StatusBadRequest, "INVITATION_FAILED", err.Error())
+		writeAccountError(w, "INVITATION_FAILED", err)
 		return
 	}
 

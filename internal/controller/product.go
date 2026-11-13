@@ -61,10 +61,10 @@ func (c *ProductController) Create(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrForbidden) {
-			httputil.Error(w, http.StatusForbidden, "FORBIDDEN", err.Error())
+			httputil.Error(w, http.StatusForbidden, "FORBIDDEN", errorText(err))
 			return
 		}
-		httputil.Error(w, http.StatusBadRequest, "CREATE_FAILED", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "CREATE_FAILED", errorText(err))
 		return
 	}
 
@@ -247,11 +247,11 @@ func (c *ProductController) SplitStatuses(w http.ResponseWriter, r *http.Request
 // writeServiceError maps service-layer errors to HTTP status codes.
 func writeServiceError(w http.ResponseWriter, err error) {
 	if errors.Is(err, service.ErrForbidden) {
-		httputil.Error(w, http.StatusForbidden, "FORBIDDEN", err.Error())
+		httputil.Error(w, http.StatusForbidden, "FORBIDDEN", errorText(err))
 		return
 	}
 	if errors.Is(err, service.ErrNotFound) || errors.Is(err, storage.ErrNotFound) {
-		httputil.Error(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+		httputil.Error(w, http.StatusNotFound, "NOT_FOUND", errorText(err))
 		return
 	}
 	// Stores report a missing row as a wrapped sql.ErrNoRows. That is a 404 for
@@ -261,14 +261,31 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		return
 	}
 	if errors.Is(err, storage.ErrTooLarge) {
-		httputil.Error(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", err.Error())
+		httputil.Error(w, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", errorText(err))
 		return
 	}
 	if errors.Is(err, storage.ErrTypeNotAllowed) {
-		httputil.Error(w, http.StatusUnsupportedMediaType, "FILE_TYPE_NOT_ALLOWED", err.Error())
+		httputil.Error(w, http.StatusUnsupportedMediaType, "FILE_TYPE_NOT_ALLOWED", errorText(err))
 		return
 	}
-	httputil.Error(w, http.StatusBadRequest, "REQUEST_FAILED", err.Error())
+	message, internal := publicError(err)
+	if internal {
+		httputil.Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", message)
+		return
+	}
+	httputil.Error(w, http.StatusBadRequest, "REQUEST_FAILED", message)
+}
+
+// writeAccountError answers a failed account operation (registration, profile,
+// password, administration) with the service's message under the given code;
+// database errors are logged and answered with a generic 500 instead.
+func writeAccountError(w http.ResponseWriter, code string, err error) {
+	message, internal := publicError(err)
+	if internal {
+		httputil.Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", message)
+		return
+	}
+	httputil.Error(w, http.StatusBadRequest, code, message)
 }
 
 // productToJSON converts a Product to a JSON-safe map.

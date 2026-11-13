@@ -53,7 +53,7 @@ const userJoins = `FROM users u
 	LEFT JOIN personal_data pd_dn ON pd_dn.owner_table = 'users' AND pd_dn.owner_id = u.id AND pd_dn.field_name = 'display_name'`
 
 func (s *userStore) Create(ctx context.Context, user *model.User) error {
-	totpSecret, err := s.encryptTOTPSecret(user.TOTPSecret)
+	totpSecret, err := s.encryptTOTPSecret(user.ID, user.TOTPSecret)
 	if err != nil {
 		return fmt.Errorf("user create: %w", err)
 	}
@@ -87,11 +87,15 @@ func (s *userStore) GetByID(ctx context.Context, id string) (*model.User, error)
 }
 
 func (s *userStore) GetByUsername(ctx context.Context, username string) (*model.User, error) {
-	return s.getOne(ctx, `SELECT `+userSelectColumns+` `+userJoins+` WHERE u.username = ?`, username)
+	// Usernames are unique regardless of case: "Admin" must not be registrable
+	// next to "admin". LOWER runs in the database on both sides, so the two
+	// agree on what lowercase means whichever engine is used.
+	return s.getOne(ctx, `SELECT `+userSelectColumns+` `+userJoins+` WHERE LOWER(u.username) = LOWER(?)`,
+		strings.TrimSpace(username))
 }
 
 func (s *userStore) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	blind := s.keys.BlindIndex(email)
+	blind := s.emailIndex(email)
 	return s.getOne(ctx,
 		`SELECT `+userSelectColumns+` `+userJoins+`
 		 JOIN personal_data pd_lookup ON pd_lookup.owner_table = 'users' AND pd_lookup.owner_id = u.id AND pd_lookup.field_name = 'email'
@@ -177,7 +181,7 @@ func (s *userStore) List(ctx context.Context, filter UserFilter) ([]*model.User,
 }
 
 func (s *userStore) SetTOTP(ctx context.Context, id, secret string, enabled bool) error {
-	stored, err := s.encryptTOTPSecret(secret)
+	stored, err := s.encryptTOTPSecret(id, secret)
 	if err != nil {
 		return fmt.Errorf("user set totp: %w", err)
 	}
@@ -212,18 +216,18 @@ func (s *userStore) ConsumeTOTPStep(ctx context.Context, id string, step int64) 
 // encryptTOTPSecret encrypts a TOTP secret for the totp_secret column as
 // "<key id>:<ciphertext>". Base64 ciphertext never contains a colon, so the
 // last colon separates the two even if a key id contains one.
-func (s *userStore) encryptTOTPSecret(secret string) (string, error) {
+func (s *userStore) encryptTOTPSecret(userID, secret string) (string, error) {
 	if secret == "" {
 		return "", nil
 	}
-	ct, keyID, err := s.keys.Encrypt(secret)
+	ct, keyID, err := s.keys.EncryptFor(secret, personalDataContext("users", userID, "totp_secret"))
 	if err != nil {
 		return "", fmt.Errorf("encrypt totp secret: %w", err)
 	}
 	return keyID + ":" + ct, nil
 }
 
-func (s *userStore) decryptTOTPSecret(stored string) (string, error) {
+func (s *userStore) decryptTOTPSecret(userID, stored string) (string, error) {
 	if stored == "" {
 		return "", nil
 	}
@@ -231,11 +235,27 @@ func (s *userStore) decryptTOTPSecret(stored string) (string, error) {
 	if i < 0 {
 		return "", errors.New("decrypt totp secret: malformed value")
 	}
-	secret, err := s.keys.Decrypt(stored[i+1:], stored[:i])
+	// The key ID ends at the first colon that is followed by a ciphertext:
+	// neither base64 nor the "v2." prefix of a bound one contains a colon.
+	secret, err := s.keys.DecryptFor(stored[i+1:], stored[:i], personalDataContext("users", userID, "totp_secret"))
 	if err != nil {
 		return "", fmt.Errorf("decrypt totp secret: %w", err)
 	}
 	return secret, nil
+}
+
+// emailIndex is the lookup hash of an email address. Addresses are compared
+// without regard to case or surrounding space, so "Ada@Example.com" cannot be
+// registered next to "ada@example.com".
+func (s *userStore) emailIndex(email string) string {
+	return s.keys.BlindIndex(strings.ToLower(strings.TrimSpace(email)))
+}
+
+// personalDataContext names the place an encrypted value belongs to. It is
+// bound into the ciphertext (crypto.KeyRing.EncryptFor), so a value copied to
+// another record or field does not decrypt there.
+func personalDataContext(table, ownerID, field string) string {
+	return table + ":" + ownerID + ":" + field
 }
 
 func (s *userStore) Count(ctx context.Context) (int64, error) {
@@ -264,20 +284,20 @@ func (s *userStore) scanUser(sc scanner) (*model.User, error) {
 		return nil, err
 	}
 
-	u.TOTPSecret, err = s.decryptTOTPSecret(u.TOTPSecret)
+	u.TOTPSecret, err = s.decryptTOTPSecret(u.ID, u.TOTPSecret)
 	if err != nil {
 		return nil, err
 	}
 
 	if emailCT.Valid && emailKeyID.Valid {
-		u.Email, err = s.keys.Decrypt(emailCT.String, emailKeyID.String)
+		u.Email, err = s.keys.DecryptFor(emailCT.String, emailKeyID.String, personalDataContext("users", u.ID, "email"))
 		if err != nil {
 			return nil, fmt.Errorf("decrypt email: %w", err)
 		}
 	}
 
 	if dnCT.Valid && dnKeyID.Valid {
-		u.DisplayName, err = s.keys.Decrypt(dnCT.String, dnKeyID.String)
+		u.DisplayName, err = s.keys.DecryptFor(dnCT.String, dnKeyID.String, personalDataContext("users", u.ID, "display_name"))
 		if err != nil {
 			return nil, fmt.Errorf("decrypt display_name: %w", err)
 		}
@@ -287,11 +307,11 @@ func (s *userStore) scanUser(sc scanner) (*model.User, error) {
 }
 
 func (s *userStore) insertPersonalData(ctx context.Context, tx *Tx, user *model.User) error {
-	emailCT, emailKeyID, err := s.keys.Encrypt(user.Email)
+	emailCT, emailKeyID, err := s.keys.EncryptFor(user.Email, personalDataContext("users", user.ID, "email"))
 	if err != nil {
 		return fmt.Errorf("encrypt email: %w", err)
 	}
-	emailBlind := s.keys.BlindIndex(user.Email)
+	emailBlind := s.emailIndex(user.Email)
 
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO personal_data (id, owner_table, owner_id, field_name, ciphertext, key_id, blind_index)
@@ -302,7 +322,7 @@ func (s *userStore) insertPersonalData(ctx context.Context, tx *Tx, user *model.
 		return fmt.Errorf("insert email pd: %w", err)
 	}
 
-	dnCT, dnKeyID, err := s.keys.Encrypt(user.DisplayName)
+	dnCT, dnKeyID, err := s.keys.EncryptFor(user.DisplayName, personalDataContext("users", user.ID, "display_name"))
 	if err != nil {
 		return fmt.Errorf("encrypt display_name: %w", err)
 	}
@@ -320,11 +340,11 @@ func (s *userStore) insertPersonalData(ctx context.Context, tx *Tx, user *model.
 }
 
 func (s *userStore) updatePersonalData(ctx context.Context, tx *Tx, user *model.User) error {
-	emailCT, emailKeyID, err := s.keys.Encrypt(user.Email)
+	emailCT, emailKeyID, err := s.keys.EncryptFor(user.Email, personalDataContext("users", user.ID, "email"))
 	if err != nil {
 		return fmt.Errorf("encrypt email: %w", err)
 	}
-	emailBlind := s.keys.BlindIndex(user.Email)
+	emailBlind := s.emailIndex(user.Email)
 
 	_, err = tx.ExecContext(ctx,
 		`UPDATE personal_data SET ciphertext = ?, key_id = ?, blind_index = ?
@@ -335,7 +355,7 @@ func (s *userStore) updatePersonalData(ctx context.Context, tx *Tx, user *model.
 		return fmt.Errorf("update email pd: %w", err)
 	}
 
-	dnCT, dnKeyID, err := s.keys.Encrypt(user.DisplayName)
+	dnCT, dnKeyID, err := s.keys.EncryptFor(user.DisplayName, personalDataContext("users", user.ID, "display_name"))
 	if err != nil {
 		return fmt.Errorf("encrypt display_name: %w", err)
 	}

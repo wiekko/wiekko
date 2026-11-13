@@ -82,9 +82,10 @@ func (c *PageAdminController) ApproveUser(w http.ResponseWriter, r *http.Request
 	targetID := r.PathValue("id")
 
 	if err := c.user.AdminApproveUser(r.Context(), targetID); err != nil {
-		c.renderActionsCard(w, r, targetID, currentUser, err.Error())
+		c.renderActionsCard(w, r, targetID, currentUser, errorText(err))
 		return
 	}
+	logAdminAction(r, "approve user", targetID)
 
 	c.renderActionsCard(w, r, targetID, currentUser, "")
 }
@@ -95,9 +96,10 @@ func (c *PageAdminController) LockUser(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 
 	if err := c.user.AdminLockUser(r.Context(), targetID); err != nil {
-		c.renderActionsCard(w, r, targetID, currentUser, err.Error())
+		c.renderActionsCard(w, r, targetID, currentUser, errorText(err))
 		return
 	}
+	logAdminAction(r, "lock user", targetID)
 
 	c.renderActionsCard(w, r, targetID, currentUser, "")
 }
@@ -108,9 +110,10 @@ func (c *PageAdminController) UnlockUser(w http.ResponseWriter, r *http.Request)
 	targetID := r.PathValue("id")
 
 	if err := c.user.AdminUnlockUser(r.Context(), targetID); err != nil {
-		c.renderActionsCard(w, r, targetID, currentUser, err.Error())
+		c.renderActionsCard(w, r, targetID, currentUser, errorText(err))
 		return
 	}
+	logAdminAction(r, "unlock user", targetID)
 
 	c.renderActionsCard(w, r, targetID, currentUser, "")
 }
@@ -128,9 +131,10 @@ func (c *PageAdminController) SetPassword(w http.ResponseWriter, r *http.Request
 
 	if err := c.user.AdminSetPassword(r.Context(), targetID, password, currentSessionID(r)); err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = admin.PasswordResetForm(targetID, err.Error()).Render(r.Context(), w)
+		_ = admin.PasswordResetForm(targetID, errorText(err)).Render(r.Context(), w)
 		return
 	}
+	logAdminAction(r, "set password", targetID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = admin.PasswordResetSuccess().Render(r.Context(), w)
@@ -143,7 +147,7 @@ func (c *PageAdminController) ResetTwoFactor(w http.ResponseWriter, r *http.Requ
 	targetID := r.PathValue("id")
 
 	if err := c.twoFactor.AdminReset(r.Context(), targetID); err != nil {
-		c.renderActionsCard(w, r, targetID, currentUser, err.Error())
+		c.renderActionsCard(w, r, targetID, currentUser, errorText(err))
 		return
 	}
 	slog.Warn("two-factor authentication reset by administrator", "user_id", targetID, "admin_id", currentUser.ID)
@@ -155,9 +159,10 @@ func (c *PageAdminController) DeleteUser(w http.ResponseWriter, r *http.Request)
 	targetID := r.PathValue("id")
 
 	if err := c.user.AdminDeleteUser(r.Context(), targetID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, errorText(err), http.StatusBadRequest)
 		return
 	}
+	logAdminAction(r, "delete user", targetID)
 
 	w.Header().Set("HX-Redirect", "/admin/users")
 	w.WriteHeader(http.StatusOK)
@@ -167,7 +172,7 @@ func (c *PageAdminController) DeleteUser(w http.ResponseWriter, r *http.Request)
 func (c *PageAdminController) renderActionsCard(w http.ResponseWriter, r *http.Request, targetID string, currentUser *model.User, feedback string) {
 	target, err := c.user.GetByID(r.Context(), targetID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -212,9 +217,10 @@ func (c *PageAdminController) UpdateSetting(w http.ResponseWriter, r *http.Reque
 		if errors.Is(err, service.ErrInvalidSetting) {
 			status = http.StatusBadRequest
 		}
-		http.Error(w, err.Error(), status)
+		http.Error(w, errorText(err), status)
 		return
 	}
+	logAdminAction(r, "change setting", "", "setting", key, "value", value)
 
 	// Return the updated toggle/input element.
 	checked := value == "true"
@@ -266,7 +272,7 @@ func (c *PageAdminController) CreateInvitation(w http.ResponseWriter, r *http.Re
 	result, err := c.invitation.Create(r.Context(), currentUser, email, "", "")
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = admin.InviteResult(err.Error(), "", false).Render(r.Context(), w)
+		_ = admin.InviteResult(errorText(err), "", false).Render(r.Context(), w)
 		return
 	}
 
@@ -279,7 +285,7 @@ func (c *PageAdminController) DeleteInvitation(w http.ResponseWriter, r *http.Re
 	id := r.PathValue("id")
 
 	if err := c.invitation.Delete(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, errorText(err), http.StatusBadRequest)
 		return
 	}
 

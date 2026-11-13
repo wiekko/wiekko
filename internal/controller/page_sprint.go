@@ -164,7 +164,7 @@ func (c *PageProductController) SprintCreate(w http.ResponseWriter, r *http.Requ
 			MilestoneID: milestoneID,
 			StartDate:   startDate,
 			EndDate:     endDate,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -266,7 +266,7 @@ func (c *PageProductController) SprintUpdate(w http.ResponseWriter, r *http.Requ
 			MilestoneID: milestoneID,
 			StartDate:   startDate,
 			EndDate:     endDate,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -284,7 +284,7 @@ func (c *PageProductController) SprintDelete(w http.ResponseWriter, r *http.Requ
 	sprintID := r.PathValue("sprintId")
 
 	if err := c.milestone.DeleteSprint(r.Context(), user, productID, sprintID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -328,7 +328,7 @@ func (c *PageProductController) setSprintStatus(w http.ResponseWriter, r *http.R
 	sprintID := r.PathValue("sprintId")
 
 	if _, err := c.milestone.SetSprintStatus(r.Context(), user, productID, sprintID, status); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -436,7 +436,7 @@ func (c *PageProductController) SprintItemMove(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, errorText(err), http.StatusForbidden)
 		return
 	}
 

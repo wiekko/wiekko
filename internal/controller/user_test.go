@@ -94,9 +94,16 @@ func TestRequestDeletion(t *testing.T) {
 	// moderation disabled (default), so immediate delete.
 
 	ctrl := controller.NewUser(env.Services.User)
+
+	// A session has to confirm with the password.
 	w, r := authedRequest(http.MethodPost, "/user/me/delete", "", user)
 	ctrl.RequestDeletion(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("without password: status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
 
+	w, r = authedRequest(http.MethodPost, "/user/me/delete", `{"password":"secret"}`, user)
+	ctrl.RequestDeletion(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
 	}
@@ -108,7 +115,7 @@ func TestRequestDeletion_Error(t *testing.T) {
 	env.Users.DeleteFunc = func(_ context.Context, _ string) error { return errors.New("db error") }
 
 	ctrl := controller.NewUser(env.Services.User)
-	w, r := authedRequest(http.MethodPost, "/user/me/delete", "", user)
+	w, r := authedRequest(http.MethodPost, "/user/me/delete", `{"password":"secret"}`, user)
 	ctrl.RequestDeletion(w, r)
 
 	if w.Code != http.StatusBadRequest {

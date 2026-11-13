@@ -63,21 +63,37 @@ templ ProfilePage(props ProfileProps) {
 					<h3 class="text-base font-semibold text-red-700 dark:text-red-400">Danger Zone</h3>
 				</div>
 				@ui.CardBody() {
-					<div class="flex items-center justify-between">
+					<form
+						class="flex flex-wrap items-end justify-between gap-4"
+						hx-post="/user/profile/delete"
+						hx-confirm="Are you sure you want to delete your account? This action cannot be undone."
+					>
 						<div>
 							<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Delete Account</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Permanently delete your account and all associated data.</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">Permanently delete your account and all associated data. Enter your password to confirm.</p>
 						</div>
-						<button
-							type="button"
-							class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-							hx-post="/user/profile/delete"
-							hx-confirm="Are you sure you want to delete your account? This action cannot be undone."
-						>
-							@ui.Icon("trash", "sm")
-							Request Deletion
-						</button>
-					</div>
+						<div class="flex items-end gap-3">
+							<div>
+								<label for="delete-account-password" class="sr-only">Your password</label>
+								<input
+									type="password"
+									id="delete-account-password"
+									name="password"
+									required
+									autocomplete="current-password"
+									placeholder="Your password"
+									class="block w-48 rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-red-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+								/>
+							</div>
+							<button
+								type="submit"
+								class="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+							>
+								@ui.Icon("trash", "sm")
+								Request Deletion
+							</button>
+						</div>
+					</form>
 				}
 			}
 		</div>

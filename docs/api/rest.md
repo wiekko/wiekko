@@ -60,7 +60,8 @@ request:
 ```
 
 All fields but `name` are optional; leave out `products` for a token that reaches every product of its
-user. The response contains the token once, as `raw_token`. A request made with a token can only create
+user. A request made with a web session has to add `"password"`, the user's current password, to grant
+the `account` or `admin` scope; so does `POST /api/v1/user/me/delete`. The response contains the token once, as `raw_token`. A request made with a token can only create
 tokens that are narrower than its own. If the instance limits the token lifetime, `expires_at` is required
 and must lie within the limit. `GET /api/v1/user/me/tokens` lists the tokens with their restrictions, and
 `DELETE /api/v1/user/me/tokens/{id}` revokes one.

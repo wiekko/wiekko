@@ -164,7 +164,7 @@ func twoFactorMessage(err error) string {
 		errors.Is(err, service.ErrTOTPAlreadyEnabled),
 		errors.Is(err, service.ErrTOTPNotEnabled),
 		errors.Is(err, service.ErrTOTPNoPendingSetup):
-		return err.Error()
+		return errorText(err)
 	default:
 		slog.Error("two-factor operation failed", "err", err)
 		return "Something went wrong. Please try again."

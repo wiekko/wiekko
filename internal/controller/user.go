@@ -49,7 +49,7 @@ func (c *UserController) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		DisplayName: req.DisplayName,
 	})
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "UPDATE_FAILED", err.Error())
+		writeAccountError(w, "UPDATE_FAILED", err)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := c.user.ChangePassword(r.Context(), user.ID, req.OldPassword, req.NewPassword, currentSessionID(r)); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "PASSWORD_CHANGE_FAILED", err.Error())
+		writeAccountError(w, "PASSWORD_CHANGE_FAILED", err)
 		return
 	}
 
@@ -84,8 +84,15 @@ func (c *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 func (c *UserController) RequestDeletion(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 
-	if err := c.user.RequestDeletion(r.Context(), user.ID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "DELETION_FAILED", err.Error())
+	// Session requests confirm with the password; token requests send no body.
+	var req struct {
+		Password string `json:"password"`
+	}
+	if r.ContentLength != 0 && !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+	if err := c.user.RequestDeletion(r.Context(), user.ID, req.Password); err != nil {
+		writeAccountError(w, "DELETION_FAILED", err)
 		return
 	}
 

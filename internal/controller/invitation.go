@@ -37,7 +37,7 @@ func (c *InvitationController) Create(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	result, err := c.invitation.Create(r.Context(), user, req.Email, req.ProductID, req.Role)
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "INVITATION_FAILED", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "INVITATION_FAILED", errorText(err))
 		return
 	}
 
@@ -95,7 +95,7 @@ func (c *InvitationController) List(w http.ResponseWriter, r *http.Request) {
 func (c *InvitationController) Delete(w http.ResponseWriter, r *http.Request) {
 	invID := r.PathValue("id")
 	if err := c.invitation.Delete(r.Context(), invID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "DELETE_FAILED", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "DELETE_FAILED", errorText(err))
 		return
 	}
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})

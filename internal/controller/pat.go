@@ -53,6 +53,9 @@ func (c *PATController) Create(w http.ResponseWriter, r *http.Request) {
 		Scopes    *[]string `json:"scopes"`
 		RoleCap   string    `json:"role_cap"`
 		Products  *[]string `json:"products"`
+		// Password confirms a token with the account or admin scope when
+		// the request is made with a web session.
+		Password string `json:"password"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -62,14 +65,14 @@ func (c *PATController) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	in := service.CreatePATInput{Name: req.Name, RoleCap: req.RoleCap}
+	in := service.CreatePATInput{Name: req.Name, RoleCap: req.RoleCap, Password: req.Password}
 	if req.ExpiresAt != nil {
 		in.ExpiresAt = *req.ExpiresAt
 	}
 	if req.Scopes != nil {
 		grants, err := access.ParseGrants(strings.Join(*req.Scopes, " "))
 		if err != nil {
-			httputil.Error(w, http.StatusBadRequest, "INVALID_SCOPES", err.Error())
+			httputil.Error(w, http.StatusBadRequest, "INVALID_SCOPES", errorText(err))
 			return
 		}
 		in.Grants = grants
@@ -81,11 +84,11 @@ func (c *PATController) Create(w http.ResponseWriter, r *http.Request) {
 
 	result, err := c.pat.Create(r.Context(), user, in)
 	if errors.Is(err, service.ErrForbidden) {
-		httputil.Error(w, http.StatusForbidden, "FORBIDDEN", err.Error())
+		httputil.Error(w, http.StatusForbidden, "FORBIDDEN", errorText(err))
 		return
 	}
 	if err != nil {
-		httputil.Error(w, http.StatusBadRequest, "CREATE_FAILED", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "CREATE_FAILED", errorText(err))
 		return
 	}
 
@@ -104,7 +107,7 @@ func (c *PATController) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := c.pat.Revoke(r.Context(), user.ID, patID); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "REVOKE_FAILED", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "REVOKE_FAILED", errorText(err))
 		return
 	}
 

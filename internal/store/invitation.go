@@ -50,7 +50,7 @@ func (s *invitationStore) Create(ctx context.Context, inv *model.Invitation) err
 		return fmt.Errorf("invitation create: insert invitation: %w", err)
 	}
 
-	emailCT, emailKeyID, err := s.keys.Encrypt(inv.Email)
+	emailCT, emailKeyID, err := s.keys.EncryptFor(inv.Email, personalDataContext("invitations", inv.ID, "email"))
 	if err != nil {
 		return fmt.Errorf("invitation create: encrypt email: %w", err)
 	}
@@ -138,7 +138,7 @@ func (s *invitationStore) scanInvitation(sc scanner) (*model.Invitation, error) 
 	inv.AcceptedAt = acceptedAt.String
 
 	if emailCT.Valid && emailKeyID.Valid {
-		inv.Email, err = s.keys.Decrypt(emailCT.String, emailKeyID.String)
+		inv.Email, err = s.keys.DecryptFor(emailCT.String, emailKeyID.String, personalDataContext("invitations", inv.ID, "email"))
 		if err != nil {
 			return nil, fmt.Errorf("decrypt invitation email: %w", err)
 		}

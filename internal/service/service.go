@@ -110,6 +110,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			pats:         st.PAT,
 			productRoles: st.ProductRole,
 			settings:     st.Setting,
+			provider:     provider,
 		},
 		Setting: settingSvc,
 		Invitation: &InvitationService{

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"nexmap.net/internal/access"
+	"nexmap.net/internal/auth"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/store"
 )
@@ -20,7 +21,14 @@ type PATService struct {
 	pats         store.PATStore
 	productRoles store.ProductRoleStore
 	settings     store.SettingStore
+	// provider checks the password that confirms far-reaching tokens; nil
+	// skips the confirmation.
+	provider auth.Provider
 }
+
+// ErrPasswordRequired is returned when an action needs the current password
+// as confirmation and none was given.
+var ErrPasswordRequired = errors.New("enter your current password to confirm")
 
 // SettingPATMaxLifetimeDays is the instance setting limiting how long a token
 // may live, in days; "0" or empty means no limit (SC-409).
@@ -38,6 +46,10 @@ type CreatePATInput struct {
 	RoleCap            string   // "" for no cap
 	ProductsRestricted bool     // restrict the token to ProductIDs
 	ProductIDs         []string // products the token reaches, if restricted
+
+	// Password is the user's current password. A web session needs it to
+	// create a token with the account or admin scope.
+	Password string
 }
 
 // CreatePATResult contains the data returned after creating a PAT.
@@ -64,6 +76,16 @@ func (s *PATService) Create(ctx context.Context, user *model.User, in CreatePATI
 	}
 	if grants[access.Admin] > access.None && !user.IsAdmin {
 		return nil, fmt.Errorf("%w: only administrators can grant the admin scope", ErrForbidden)
+	}
+	// A token with the account or admin scope outlives the session that made
+	// it and survives a password change. Someone who got hold of a session
+	// (an unlocked laptop, a stolen cookie) must not be able to turn it into
+	// such a token, so the password is asked for again. A request made with a
+	// token is bounded by that token instead (SubsetOf, below).
+	if access.FromContext(ctx) == nil && (grants[access.Account] > access.None || grants[access.Admin] > access.None) {
+		if err := confirmPassword(s.provider, user, in.Password); err != nil {
+			return nil, err
+		}
 	}
 	if in.RoleCap != "" && model.RoleRank(in.RoleCap) < 0 {
 		return nil, fmt.Errorf("invalid role cap %q", in.RoleCap)
@@ -107,6 +129,22 @@ func (s *PATService) Create(ctx context.Context, user *model.User, in CreatePATI
 		return nil, fmt.Errorf("store token: %w", err)
 	}
 	return &CreatePATResult{RawToken: rawToken, PAT: pat}, nil
+}
+
+// confirmPassword checks the password a user re-entered to confirm a sensitive
+// action. Providers that do not manage passwords (external sign-in) cannot
+// check one, so there the session has to do.
+func confirmPassword(provider auth.Provider, user *model.User, password string) error {
+	if provider == nil || !provider.SupportsPasswordChange() {
+		return nil
+	}
+	if password == "" {
+		return ErrPasswordRequired
+	}
+	if err := provider.VerifyPassword(password, user.PasswordHash); err != nil {
+		return ErrIncorrectPassword
+	}
+	return nil
 }
 
 // checkProducts validates the products a token is restricted to and returns

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Key holds an encryption key with its version identifier.
@@ -72,9 +73,44 @@ func NewKeyRing(jsonConfig string) (*KeyRing, error) {
 	return &KeyRing{keys: keys, hmacKey: hmacKey}, nil
 }
 
+// boundPrefix marks a ciphertext that is bound to a context (EncryptFor). It
+// contains a character that base64 never produces, so it cannot be mistaken
+// for the start of an unbound ciphertext.
+const boundPrefix = "v2."
+
+// EncryptFor encrypts plaintext like Encrypt and binds the result to context,
+// a string naming the place the value belongs to ("users:<id>:email"). The
+// context is authenticated but not stored: DecryptFor only succeeds with the
+// same context. A ciphertext copied to another record or field â€” by someone
+// who can write to the database but does not have the key â€” therefore fails
+// to decrypt instead of being accepted as that record's value.
+func (kr *KeyRing) EncryptFor(plaintext, context string) (ciphertext string, keyID string, err error) {
+	ct, keyID, err := kr.seal(plaintext, []byte(context))
+	if err != nil {
+		return "", "", err
+	}
+	return boundPrefix + ct, keyID, nil
+}
+
+// DecryptFor decrypts a ciphertext produced by EncryptFor with the same
+// context. Ciphertexts written before values were bound to a context (without
+// the "v2." prefix) are still accepted, so existing data stays readable; they
+// are replaced by bound ones the next time the record is written.
+func (kr *KeyRing) DecryptFor(ciphertext, keyID, context string) (string, error) {
+	if rest, ok := strings.CutPrefix(ciphertext, boundPrefix); ok {
+		return kr.open(rest, keyID, []byte(context))
+	}
+	return kr.open(ciphertext, keyID, nil)
+}
+
 // Encrypt encrypts plaintext using AES-256-GCM with the active key.
 // Returns base64-encoded ciphertext (nonce prepended) and the key ID.
+// Prefer EncryptFor for anything stored in a database row.
 func (kr *KeyRing) Encrypt(plaintext string) (ciphertext string, keyID string, err error) {
+	return kr.seal(plaintext, nil)
+}
+
+func (kr *KeyRing) seal(plaintext string, aad []byte) (ciphertext string, keyID string, err error) {
 	active := kr.keys[0]
 
 	block, err := aes.NewCipher(active.Raw)
@@ -92,12 +128,16 @@ func (kr *KeyRing) Encrypt(plaintext string) (ciphertext string, keyID string, e
 		return "", "", fmt.Errorf("crypto: nonce: %w", err)
 	}
 
-	sealed := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	sealed := gcm.Seal(nonce, nonce, []byte(plaintext), aad)
 	return base64.StdEncoding.EncodeToString(sealed), active.ID, nil
 }
 
 // Decrypt decrypts base64-encoded ciphertext using the key identified by keyID.
 func (kr *KeyRing) Decrypt(ciphertext string, keyID string) (string, error) {
+	return kr.open(ciphertext, keyID, nil)
+}
+
+func (kr *KeyRing) open(ciphertext string, keyID string, aad []byte) (string, error) {
 	key, err := kr.findKey(keyID)
 	if err != nil {
 		return "", err
@@ -123,7 +163,7 @@ func (kr *KeyRing) Decrypt(ciphertext string, keyID string) (string, error) {
 		return "", errors.New("crypto: ciphertext too short")
 	}
 
-	plaintext, err := gcm.Open(nil, data[:nonceSize], data[nonceSize:], nil)
+	plaintext, err := gcm.Open(nil, data[:nonceSize], data[nonceSize:], aad)
 	if err != nil {
 		return "", fmt.Errorf("crypto: decrypt: %w", err)
 	}

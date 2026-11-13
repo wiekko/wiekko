@@ -63,9 +63,13 @@ func newAccountEnv(t *testing.T, driver string, db *sql.DB) *accountEnv {
 
 	ctx := context.Background()
 	now := time.Now().UTC().Format(time.RFC3339)
+	adminHash, err := builtin.New(st.User, cfg.PBKDF2Iterations).HashPassword(goodPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
 	admin := &model.User{
 		ID: uuid.New().String(), Username: "root", Email: "root@localhost", DisplayName: "Root",
-		PasswordHash: "x", IsAdmin: true, Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+		PasswordHash: adminHash, IsAdmin: true, Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := st.User.Create(ctx, admin); err != nil {
 		t.Fatalf("create admin: %v", err)
@@ -75,7 +79,14 @@ func newAccountEnv(t *testing.T, driver string, db *sql.DB) *accountEnv {
 		t.Fatalf("create product: %v", err)
 	}
 
-	srv := httptest.NewServer(New(svc, false, false, 1<<20, []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")}))
+	handler, err := New(svc, Options{
+		MaxUploadBytes: 1 << 20,
+		TrustedProxies: []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return &accountEnv{t: t, srv: srv, svc: svc, st: st, admin: admin, product: product}
 }

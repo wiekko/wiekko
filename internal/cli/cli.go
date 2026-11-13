@@ -67,6 +67,8 @@ type app struct {
 
 	settings *config.Settings
 	format   output.Format
+
+	warnedTokenDestination bool
 }
 
 type command struct {
@@ -256,7 +258,26 @@ func (a *app) setup() error {
 // newClient returns an API client for the resolved server. withToken requires
 // credentials and fails with a hint to log in when there are none.
 func (a *app) newClient(withToken bool) (*client.Client, error) {
+	if withToken {
+		a.warnTokenDestination()
+	}
 	return a.clientFor(a.settings.Server, a.settings.Token, withToken)
+}
+
+// warnTokenDestination points out, once per run, that the token from the
+// environment is about to go to a server chosen by the repository's
+// .nexmap.json. Stored tokens are kept per server, so a changed file cannot
+// redirect them; the environment's token goes wherever the file says. In CI a
+// branch that edits the file could thus collect the job's token, which is why
+// the server should be set next to the token there.
+func (a *app) warnTokenDestination() {
+	s := a.settings
+	if a.warnedTokenDestination || s.TokenSource != config.EnvToken || s.RepoFile == "" || s.ServerSource != s.RepoFile {
+		return
+	}
+	a.warnedTokenDestination = true
+	fmt.Fprintf(a.io.Stderr, "nexmap: warning: sending the token from %s to %s, the server named in %s. Set %s as well, so that a changed file cannot redirect the token.\n",
+		config.EnvToken, s.Server, s.RepoFile, config.EnvServer)
 }
 
 func (a *app) clientFor(server, token string, withToken bool) (*client.Client, error) {

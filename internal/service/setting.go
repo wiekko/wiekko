@@ -29,14 +29,32 @@ var ErrInvalidSetting = errors.New("invalid setting value")
 // MaxPATLifetimeDays bounds the configurable maximum token lifetime.
 const MaxPATLifetimeDays = 3650
 
-// validateSetting checks values of settings that have a range.
+// Bounds of the configurable minimum password length. The lower bound keeps
+// an administrator (or a stolen administrator session) from switching the
+// password policy off altogether.
+const (
+	MinPasswordMinLength = 8
+	MaxPasswordMinLength = 128
+)
+
+// validateSetting checks a setting's value: numbers have a range, and every
+// other known setting is a switch.
 func validateSetting(key, value string) error {
-	if key != SettingPATMaxLifetimeDays {
-		return nil
-	}
-	n, err := strconv.Atoi(value)
-	if err != nil || n < 0 || n > MaxPATLifetimeDays {
-		return fmt.Errorf("%w: %s must be a number of days from 0 (no limit) to %d", ErrInvalidSetting, key, MaxPATLifetimeDays)
+	switch key {
+	case SettingPATMaxLifetimeDays:
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 || n > MaxPATLifetimeDays {
+			return fmt.Errorf("%w: %s must be a number of days from 0 (no limit) to %d", ErrInvalidSetting, key, MaxPATLifetimeDays)
+		}
+	case "password_min_length":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < MinPasswordMinLength || n > MaxPasswordMinLength {
+			return fmt.Errorf("%w: %s must be a number from %d to %d", ErrInvalidSetting, key, MinPasswordMinLength, MaxPasswordMinLength)
+		}
+	default:
+		if value != "true" && value != "false" {
+			return fmt.Errorf("%w: %s must be true or false", ErrInvalidSetting, key)
+		}
 	}
 	return nil
 }

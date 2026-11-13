@@ -298,6 +298,11 @@ templ CreateTokenForm(props CreateTokenFormProps) {
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Write includes read. Presets never grant account or administration access.</p>
 			</fieldset>
 			<div>
+				<label for="token-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Your Password</label>
+				<input type="password" id="token-password" name="password" autocomplete="current-password" class={ fieldClass }/>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Only needed to grant account or administration access.</p>
+			</div>
+			<div>
 				<label for="token-role-cap" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Role Cap</label>
 				<select id="token-role-cap" name="role_cap" class={ fieldClass }>
 					<option value="" selected?={ props.RoleCap == "" }>No cap: act with my role</option>

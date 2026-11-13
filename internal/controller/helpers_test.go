@@ -41,6 +41,10 @@ func newTestEnv(t *testing.T) *testEnv {
 		return nil, fmt.Errorf("user not found: %w", sql.ErrNoRows)
 	}
 	users := &testutil.MockUserStore{GetByUsernameFunc: notFound, GetByEmailFunc: notFound}
+	// Locking and deleting look the account up first; default to an ordinary user.
+	users.GetByIDFunc = func(_ context.Context, id string) (*model.User, error) {
+		return testutil.MakeUser(func(u *model.User) { u.ID = id }), nil
+	}
 	sessions := &testutil.MockSessionStore{}
 	pats := &testutil.MockPATStore{}
 	settings := &testutil.MockSettingStore{

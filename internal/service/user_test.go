@@ -45,13 +45,23 @@ func newUserService(users *testutil.MockUserStore, sessions *testutil.MockSessio
 	if users != nil && users.GetByEmailFunc == nil {
 		users.GetByEmailFunc = notFoundUser
 	}
-	return &UserService{
+	// Locking and deleting look the account up first; default to an ordinary user.
+	if users != nil && users.GetByIDFunc == nil {
+		users.GetByIDFunc = func(_ context.Context, id string) (*model.User, error) {
+			return testutil.MakeUser(func(u *model.User) { u.ID = id }), nil
+		}
+	}
+	svc := &UserService{
 		users:       users,
 		sessions:    sessions,
 		settings:    settings,
 		invitations: invitations,
-		provider:    provider,
 	}
+	// A nil *MockAuthProvider in the interface would not compare equal to nil.
+	if provider != nil {
+		svc.provider = provider
+	}
+	return svc
 }
 
 func TestRegister(t *testing.T) {
@@ -388,7 +398,7 @@ func TestRequestDeletion(t *testing.T) {
 				GetFunc: settingsGetFunc(map[string]string{"moderation_enabled": "true"}),
 			}, nil, nil,
 		)
-		if err := svc.RequestDeletion(context.Background(), "u1"); err != nil {
+		if err := svc.RequestDeletion(context.Background(), "u1", ""); err != nil {
 			t.Fatalf("RequestDeletion: %v", err)
 		}
 		if updatedStatus != model.UserStatusDeletionRequested {
@@ -406,7 +416,7 @@ func TestRequestDeletion(t *testing.T) {
 				GetFunc: settingsGetFunc(map[string]string{}),
 			}, nil, nil,
 		)
-		if err := svc.RequestDeletion(context.Background(), "u1"); err != nil {
+		if err := svc.RequestDeletion(context.Background(), "u1", ""); err != nil {
 			t.Fatalf("RequestDeletion: %v", err)
 		}
 		if !deleted {

@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/store"
@@ -255,7 +258,39 @@ func normalizeRegisterInput(input RegisterInput) (RegisterInput, error) {
 	if input.DisplayName == "" {
 		input.DisplayName = input.Username
 	}
+	if err := validateEmail(input.Email); err != nil {
+		return input, err
+	}
+	if err := validateDisplayName(input.DisplayName); err != nil {
+		return input, err
+	}
 	return input, nil
+}
+
+const (
+	maxEmailLength       = 254 // RFC 5321
+	maxDisplayNameLength = 100
+)
+
+// validateEmail checks that email is a plain address ("ada@example.com"),
+// already trimmed. The address is not verified â€” nexmap sends no email â€” but
+// it is shown to administrators and owners and must not be free text.
+func validateEmail(email string) error {
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email || len(email) > maxEmailLength {
+		return inputError(errors.New("enter a valid email address, like name@example.com"))
+	}
+	return nil
+}
+
+func validateDisplayName(name string) error {
+	if name == "" {
+		return inputError(errors.New("the display name must not be empty"))
+	}
+	if utf8.RuneCountInString(name) > maxDisplayNameLength {
+		return inputError(fmt.Errorf("the display name must not be longer than %d characters", maxDisplayNameLength))
+	}
+	return nil
 }
 
 // ensureAvailable reports a clash with an existing account before the insert,
@@ -291,10 +326,27 @@ func (s *UserService) UpdateProfile(ctx context.Context, id string, input Update
 		return nil, err
 	}
 	if input.Email != nil {
-		user.Email = *input.Email
+		email := strings.TrimSpace(*input.Email)
+		if err := validateEmail(email); err != nil {
+			return nil, err
+		}
+		if !strings.EqualFold(email, user.Email) {
+			// Checked here so the person gets a clear message, not the
+			// database's complaint about its unique index.
+			if other, err := s.users.GetByEmail(ctx, email); err == nil && other.ID != user.ID {
+				return nil, ErrEmailTaken
+			} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return nil, fmt.Errorf("check email: %w", err)
+			}
+		}
+		user.Email = email
 	}
 	if input.DisplayName != nil {
-		user.DisplayName = *input.DisplayName
+		name := strings.TrimSpace(*input.DisplayName)
+		if err := validateDisplayName(name); err != nil {
+			return nil, err
+		}
+		user.DisplayName = name
 	}
 	user.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := s.users.Update(ctx, user); err != nil {
@@ -340,8 +392,50 @@ func (s *UserService) endSessions(ctx context.Context, userID, keepSessionID str
 	return nil
 }
 
-// RequestDeletion marks a user's account for deletion.
-func (s *UserService) RequestDeletion(ctx context.Context, id string) error {
+// ErrLastAdmin is returned when an action would leave the instance without an
+// active administrator. Nobody could then manage users or settings, and there
+// is no way back in short of editing the database.
+var ErrLastAdmin = errors.New("this is the only active administrator and cannot be locked or deleted")
+
+// ensureNotLastAdmin refuses to take the last active administrator out of
+// service (by locking or deleting the account).
+func (s *UserService) ensureNotLastAdmin(ctx context.Context, targetID string) error {
+	target, err := s.users.GetByID(ctx, targetID)
+	if err != nil {
+		return err
+	}
+	if !target.IsAdmin || target.Status != model.UserStatusActive {
+		return nil
+	}
+	active, err := s.users.List(ctx, store.UserFilter{Status: model.UserStatusActive})
+	if err != nil {
+		return fmt.Errorf("list administrators: %w", err)
+	}
+	for _, u := range active {
+		if u.IsAdmin && u.ID != targetID {
+			return nil
+		}
+	}
+	return ErrLastAdmin
+}
+
+// RequestDeletion marks a user's account for deletion. From a web session it
+// needs the user's current password as confirmation: deleting an account
+// cannot be undone, and a session alone (an unlocked laptop) must not be
+// enough. A request made with a token passes password as "".
+func (s *UserService) RequestDeletion(ctx context.Context, id, password string) error {
+	if access.FromContext(ctx) == nil {
+		user, err := s.users.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := confirmPassword(s.provider, user, password); err != nil {
+			return err
+		}
+	}
+	if err := s.ensureNotLastAdmin(ctx, id); err != nil {
+		return err
+	}
 	moderation, _ := s.settings.Get(ctx, "moderation_enabled")
 	if moderation == "true" {
 		return s.users.UpdateStatus(ctx, id, model.UserStatusDeletionRequested)
@@ -367,6 +461,9 @@ func (s *UserService) AdminSetPassword(ctx context.Context, targetID, newPasswor
 
 // AdminLockUser locks a user account.
 func (s *UserService) AdminLockUser(ctx context.Context, targetID string) error {
+	if err := s.ensureNotLastAdmin(ctx, targetID); err != nil {
+		return err
+	}
 	return s.users.UpdateStatus(ctx, targetID, model.UserStatusLocked)
 }
 
@@ -377,6 +474,9 @@ func (s *UserService) AdminUnlockUser(ctx context.Context, targetID string) erro
 
 // AdminDeleteUser deletes a user account and all associated data.
 func (s *UserService) AdminDeleteUser(ctx context.Context, targetID string) error {
+	if err := s.ensureNotLastAdmin(ctx, targetID); err != nil {
+		return err
+	}
 	return s.users.Delete(ctx, targetID)
 }
 

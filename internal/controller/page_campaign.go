@@ -172,7 +172,7 @@ func (c *PageProductController) CampaignCreate(w http.ResponseWriter, r *http.Re
 			DisplayName:   user.DisplayName,
 			IsAdmin:       user.IsAdmin,
 			Product:       p,
-			Error:         err.Error(),
+			Error:         errorText(err),
 			TestCases:     scope.TestCases,
 			Components:    scope.Components,
 			Capabilities:  scope.Capabilities,
@@ -277,7 +277,7 @@ func (c *PageProductController) CampaignUpdate(w http.ResponseWriter, r *http.Re
 			Product:     p,
 			Campaign:    campaign,
 			IsEdit:      true,
-			Error:       err.Error(),
+			Error:       errorText(err),
 			ReturnTo:    r.FormValue("return"),
 			Name:        name,
 			Description: description,
@@ -335,7 +335,7 @@ func (c *PageProductController) CampaignActivate(w http.ResponseWriter, r *http.
 
 	if _, err := c.testing.ActivateCampaign(r.Context(), user, productID, campaignID); err != nil {
 		// The message names the blocking campaign, so it is worth surfacing.
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, errorText(err), http.StatusConflict)
 		return
 	}
 
@@ -381,7 +381,7 @@ func (c *PageProductController) CampaignClose(w http.ResponseWriter, r *http.Req
 	campaignID := r.PathValue("campaignId")
 
 	if _, err := c.testing.CloseCampaign(r.Context(), user, productID, campaignID, true); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, errorText(err), http.StatusConflict)
 		return
 	}
 
@@ -1020,7 +1020,7 @@ func (c *PageProductController) CampaignResultSetStatus(w http.ResponseWriter, r
 	_, err := c.testing.SetResultStatus(r.Context(), user, productID, campaignID, resultID,
 		r.FormValue("status"), r.FormValue("defect_id"))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, errorText(err), http.StatusConflict)
 		return
 	}
 
@@ -1156,19 +1156,19 @@ func (c *PageProductController) CampaignResultFailWithDefect(w http.ResponseWrit
 
 	defect, err := c.backlog.CreateDefect(r.Context(), user, input)
 	if err != nil {
-		rerender(err.Error())
+		rerender(errorText(err))
 		return
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defect.ID,
 		model.DefectLinkTargetTestCase, result.TestCaseID); err != nil {
-		rerender("created defect but failed to link it to the test case: " + err.Error())
+		rerender("created defect but failed to link it to the test case: " + errorText(err))
 		return
 	}
 
 	if _, err := c.testing.SetResultStatus(r.Context(), user, productID, campaignID, resultID,
 		model.CampaignResultStatusFailed, defect.ID); err != nil {
-		rerender("created defect but failed to record the result: " + err.Error())
+		rerender("created defect but failed to record the result: " + errorText(err))
 		return
 	}
 

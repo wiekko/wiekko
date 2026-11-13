@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"html"
 
 	"github.com/yuin/goldmark"
 )
@@ -11,7 +12,9 @@ import (
 func RenderMarkdown(source string) string {
 	var buf bytes.Buffer
 	if err := goldmark.Convert([]byte(source), &buf); err != nil {
-		return source
+		// The result is written to the page unescaped, so the fallback must
+		// not be the raw input.
+		return html.EscapeString(source)
 	}
 	return buf.String()
 }

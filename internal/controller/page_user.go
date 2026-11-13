@@ -58,7 +58,7 @@ func (c *PageUserController) UpdateProfile(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.ProfileCard(user, err.Error()).Render(r.Context(), w)
+		_ = userpage.ProfileCard(user, errorText(err)).Render(r.Context(), w)
 		return
 	}
 
@@ -89,7 +89,7 @@ func (c *PageUserController) ChangePassword(w http.ResponseWriter, r *http.Reque
 
 	if err := c.user.ChangePassword(r.Context(), user.ID, oldPassword, newPassword, currentSessionID(r)); err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = userpage.PasswordCard(err.Error(), true).Render(r.Context(), w)
+		_ = userpage.PasswordCard(errorText(err), true).Render(r.Context(), w)
 		return
 	}
 
@@ -101,8 +101,11 @@ func (c *PageUserController) ChangePassword(w http.ResponseWriter, r *http.Reque
 func (c *PageUserController) RequestDeletion(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 
-	if err := c.user.RequestDeletion(r.Context(), user.ID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := c.user.RequestDeletion(r.Context(), user.ID, r.FormValue("password")); err != nil {
+		// Plain text with 422: htmx-errors.js shows it as a toast.
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(errorText(err)))
 		return
 	}
 
@@ -185,12 +188,13 @@ func (c *PageUserController) CreateToken(w http.ResponseWriter, r *http.Request)
 		form.Products[i].Selected = slices.Contains(selected, form.Products[i].ID)
 	}
 
-	in := service.CreatePATInput{Name: form.Name, RoleCap: form.RoleCap, Grants: access.Grants{}}
+	in := service.CreatePATInput{Name: form.Name, RoleCap: form.RoleCap, Grants: access.Grants{},
+		Password: r.FormValue("password")}
 	var formErr string
 	for _, sc := range access.AllScopes {
 		level, err := access.ParseLevel(r.FormValue("scope_" + string(sc)))
 		if err != nil {
-			formErr = err.Error()
+			formErr = errorText(err)
 			continue
 		}
 		if level > access.None {
@@ -221,7 +225,7 @@ func (c *PageUserController) CreateToken(w http.ResponseWriter, r *http.Request)
 
 	result, err := c.pat.Create(r.Context(), user, in)
 	if err != nil {
-		msg := strings.TrimPrefix(err.Error(), service.ErrForbidden.Error()+": ")
+		msg := strings.TrimPrefix(errorText(err), service.ErrForbidden.Error()+": ")
 		if msg != "" {
 			msg = strings.ToUpper(msg[:1]) + msg[1:] + "."
 		}
@@ -239,7 +243,7 @@ func (c *PageUserController) RevokeToken(w http.ResponseWriter, r *http.Request)
 	tokenID := r.PathValue("id")
 
 	if err := c.pat.Revoke(r.Context(), user.ID, tokenID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, errorText(err), http.StatusBadRequest)
 		return
 	}
 

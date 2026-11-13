@@ -21,6 +21,12 @@ Traefik does this), and do not expose its port to the network directly:
   `NEXMAP_TRUSTED_PROXIES` to the proxy's address. Otherwise they can claim any client address and
   evade the limits.
 
+- The server refuses form posts and API calls that a browser sends on behalf of another site. Modern
+  browsers state the origin of a request themselves; for older ones the server compares the `Origin`
+  header with the `Host` header, so the proxy has to pass the original `Host` on (Traefik and Caddy do;
+  nginx needs `proxy_set_header Host $host`). Setting
+  [`NEXMAP_PUBLIC_URL`](configuration.md#network) makes that comparison independent of the proxy.
+
 ### Response headers
 
 Every response carries a `Content-Security-Policy` that only allows scripts, styles, images, fonts and
@@ -54,6 +60,11 @@ printf '[{"id":"%s","key":"%s"}]\n' "$(date +%Y-%m)" "$(openssl rand -base64 32)
 ```
 
 Treat the key like a database password: keep it in your platform's secret store, not in a repository.
+
+Each encrypted value, including a user's two-factor secret, is bound to the record and field it belongs
+to. Someone who can write to the database but does not have the key cannot move one user's value into
+another user's record: it no longer decrypts there. Values written by a version before this binding
+existed are still read and are bound the next time the record is saved.
 
 **Back up the key separately from the database.** Without it, the personal data in a database backup
 cannot be decrypted, and nexmap has no way to recover it. Conversely, a database backup stored together
@@ -96,11 +107,20 @@ Once users exist, both variables are ignored and can be removed.
   instance settings (`/admin/settings`) requires it for everyone. An administrator can reset a user's
   2FA from the user's detail page, after which that user can sign in with the password alone until they
   set it up again.
+- **Usernames and email addresses** are unique regardless of case: `Admin` cannot be registered next to
+  `admin`, and signing in accepts either spelling.
 - **Passwords** are stored as salted PBKDF2-SHA256 hashes (`NEXMAP_PBKDF2_ITERATIONS`). The instance
-  settings can require uppercase and lowercase letters, digits and special characters in new passwords.
+  settings can require uppercase and lowercase letters, digits and special characters in new passwords,
+  and a minimum length from 8 to 128 characters.
+- **The password is asked for again** before two things a session alone must not be enough for: deleting
+  your own account, and creating an access token with the `account` or `admin` scope.
+- **The last administrator cannot be locked or deleted**, by anyone including themselves, and a product
+  always keeps at least one owner. There is no setting to make a user an administrator yet; the first
+  administrator is the only one unless you change `is_admin` in the database.
 - **Email is not implemented yet**: there are no password reset or invitation emails. Administrators set
   new passwords for users from the user's detail page.
-- **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default). Changing a password ends the
+- **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default). The database stores only a hash
+  of each session token, so a database backup contains nothing that works as a session cookie. Changing a password ends the
   user's other sessions, keeping only the one the change was made from; an administrator setting a new
   password ends all of that user's sessions. Personal access tokens stay valid either way; revoke them
   separately if they may have leaked. Locking an account blocks its sessions and tokens at once.
@@ -115,6 +135,14 @@ Once users exist, both variables are ignored and can be removed.
   and when changing the two-factor settings alike. This takes the user's password or session, so it
   cannot be used to lock out a stranger; a user who is blocked this way should change their password.
   The server logs `second factor blocked after repeated wrong codes` with the user ID.
+
+### Records of administrative actions
+
+Changes to a product's team (adding and removing members, changing roles, transferring ownership) are
+recorded in the product's audit trail. Administrator actions (approving, locking, unlocking and deleting
+users, setting passwords, resetting 2FA, changing instance settings) are written to the server log as
+`administrator action` with the administrator's and the affected user's ID and the client address. Keep
+the log if you need to trace them later.
 
 ## New accounts
 
@@ -144,7 +172,7 @@ area, and to a lower role (see [Restricted tokens](../api/rest.md#restricted-tok
 more than its user holds at the time of the request.
 
 Two rights are never granted by default: managing the user's own account and tokens (`account`), and
-administration (`admin`). An administrator's token without the `admin` scope has no administrator rights,
+administration (`admin`). Granting either from the web UI or a session needs the user's password. An administrator's token without the `admin` scope has no administrator rights,
 so a leaked CI token cannot reach the instance settings. A token can create further tokens only with the
 `account` scope, and only narrower than itself.
 

@@ -224,7 +224,7 @@ func publicAccountError(r *http.Request, err error) string {
 	}
 	switch {
 	case errors.Is(err, service.ErrUsernameTaken), errors.Is(err, service.ErrEmailTaken):
-		return err.Error()
+		return errorText(err)
 	case errors.As(err, &inputErr):
 		return inputErr.Error()
 	}

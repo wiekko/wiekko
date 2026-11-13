@@ -10,6 +10,13 @@ import (
 )
 
 func newProductService(products *testutil.MockProductStore, roles *testutil.MockProductRoleStore, settings *testutil.MockSettingStore, audit *testutil.MockAuditStore) *ProductService {
+	// Member changes are audited and look at the current members first.
+	if audit == nil {
+		audit = noopAudit()
+	}
+	if roles != nil && roles.ListByProductIDFunc == nil {
+		roles.ListByProductIDFunc = func(context.Context, string) ([]*model.ProductRole, error) { return nil, nil }
+	}
 	return &ProductService{
 		products:      products,
 		productRoles:  roles,

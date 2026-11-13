@@ -9,33 +9,51 @@ import (
 	"nexmap.net/internal/service"
 )
 
+// Options are the settings the HTTP layer needs besides the services.
+type Options struct {
+	// CookieSecure says the server is reached over HTTPS: cookies are marked
+	// Secure and HSTS is sent.
+	CookieSecure bool
+	// DevMode mounts the component catalogue.
+	DevMode bool
+	// MaxUploadBytes is the largest accepted attachment.
+	MaxUploadBytes int64
+	// TrustedProxies are the addresses whose X-Forwarded-For header is
+	// believed (see middleware.ClientIP).
+	TrustedProxies []netip.Prefix
+	// PublicURL is the address users reach the server at, if configured.
+	PublicURL string
+}
+
 // New creates the top-level HTTP handler with all routes and middleware applied.
-//
-// trustedProxies are the addresses whose X-Forwarded-For header is believed
-// (see middleware.ClientIP). cookieSecure says the server is reached over
-// HTTPS, which also turns on HSTS.
-func New(svc *service.Services, cookieSecure, devMode bool, maxUploadBytes int64, trustedProxies []netip.Prefix) http.Handler {
+func New(svc *service.Services, opts Options) (http.Handler, error) {
 	mux := http.NewServeMux()
 
-	mountStatic(mux)
-	mountPages(mux, svc, cookieSecure, maxUploadBytes)
-	mountAPIv1(mux, svc, cookieSecure)
+	crossOrigin, err := middleware.CrossOrigin(opts.PublicURL)
+	if err != nil {
+		return nil, err
+	}
 
-	if devMode {
+	mountStatic(mux)
+	mountPages(mux, svc, opts.CookieSecure, opts.MaxUploadBytes)
+	mountAPIv1(mux, svc, opts.CookieSecure)
+
+	if opts.DevMode {
 		dev := controller.NewDevController()
 		mux.HandleFunc("GET /dev/catalogue", dev.Catalogue)
 	}
 
 	stack := middleware.Chain(
 		middleware.RequestID,
-		middleware.ClientIP(trustedProxies),
+		middleware.ClientIP(opts.TrustedProxies),
 		middleware.Logging,
 		middleware.Recovery,
-		middleware.SecurityHeaders(cookieSecure),
-		middleware.LimitBody(maxUploadBytes),
+		middleware.SecurityHeaders(opts.CookieSecure),
+		crossOrigin,
+		middleware.LimitBody(opts.MaxUploadBytes),
 		middleware.Authenticate(svc.Auth, svc.Auth),
 		middleware.RequireTwoFactorEnrollment(svc.TwoFactor),
 	)
 
-	return stack(mux)
+	return stack(mux), nil
 }

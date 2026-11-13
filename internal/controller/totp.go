@@ -127,15 +127,15 @@ func writeTOTPError(w http.ResponseWriter, err error) {
 	}
 	switch {
 	case errors.Is(err, service.ErrIncorrectPassword):
-		httputil.Error(w, http.StatusBadRequest, "INVALID_PASSWORD", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "INVALID_PASSWORD", errorText(err))
 	case errors.Is(err, service.ErrInvalidTOTPCode):
-		httputil.Error(w, http.StatusBadRequest, "INVALID_TOTP_CODE", err.Error())
+		httputil.Error(w, http.StatusBadRequest, "INVALID_TOTP_CODE", errorText(err))
 	case errors.Is(err, service.ErrTOTPEnforced):
-		httputil.Error(w, http.StatusForbidden, "TOTP_ENFORCED", err.Error())
+		httputil.Error(w, http.StatusForbidden, "TOTP_ENFORCED", errorText(err))
 	case errors.Is(err, service.ErrTOTPAlreadyEnabled),
 		errors.Is(err, service.ErrTOTPNotEnabled),
 		errors.Is(err, service.ErrTOTPNoPendingSetup):
-		httputil.Error(w, http.StatusConflict, "TOTP_STATE", err.Error())
+		httputil.Error(w, http.StatusConflict, "TOTP_STATE", errorText(err))
 	default:
 		slog.Error("two-factor operation failed", "err", err)
 		httputil.Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Two-factor operation failed")

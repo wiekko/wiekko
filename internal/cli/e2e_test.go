@@ -78,9 +78,15 @@ func newEnv(t *testing.T, seed bool) *e2e {
 
 	ctx := context.Background()
 	now := time.Now().UTC().Format(time.RFC3339)
+	// Tokens with the account or admin scope are confirmed with the password.
+	const rootPassword = "Root-Password-1"
+	rootHash, err := provider.HashPassword(rootPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
 	admin := &model.User{
 		ID: uuid.New().String(), Username: "root", Email: "root@localhost", DisplayName: "Root",
-		PasswordHash: "x", IsAdmin: true, Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+		PasswordHash: rootHash, IsAdmin: true, Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := st.User.Create(ctx, admin); err != nil {
 		t.Fatalf("create user: %v", err)
@@ -109,7 +115,7 @@ func newEnv(t *testing.T, seed bool) *e2e {
 	adminGrants := access.FullAccess()
 	adminGrants[access.Account] = access.Write
 	adminGrants[access.Admin] = access.Write
-	pat, err := svc.PAT.Create(ctx, admin, service.CreatePATInput{Name: "cli e2e", Grants: adminGrants})
+	pat, err := svc.PAT.Create(ctx, admin, service.CreatePATInput{Name: "cli e2e", Grants: adminGrants, Password: rootPassword})
 	if err != nil {
 		t.Fatalf("create PAT: %v", err)
 	}
@@ -128,7 +134,11 @@ func newEnv(t *testing.T, seed bool) *e2e {
 		}
 	}
 
-	srv := httptest.NewServer(router.New(svc, false, false, 1<<20, nil))
+	handler, err := router.New(svc, router.Options{MaxUploadBytes: 1 << 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
 	repoDir := t.TempDir()
@@ -141,6 +151,12 @@ func newEnv(t *testing.T, seed bool) *e2e {
 		u, err := st.User.GetByUsername(ctx, name)
 		if err != nil {
 			t.Fatalf("user %s: %v", name, err)
+		}
+		if in.Password == "" {
+			in.Password = devseed.DemoPassword
+			if name == admin.Username {
+				in.Password = rootPassword
+			}
 		}
 		p, err := svc.PAT.Create(ctx, u, in)
 		if err != nil {
@@ -391,4 +407,25 @@ func mustRead(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// TestE2ETokenDestinationWarning: a token from the environment that goes to
+// the server named in .nexmap.json is pointed out; pinning the server in the
+// environment as well silences it.
+func TestE2ETokenDestinationWarning(t *testing.T) {
+	e := newE2E(t)
+	e.env[cliconfig.EnvToken] = e.token
+	if r := e.run("", "", "init", "--server", e.serverURL, "--product", e.products[0].ID); r.code != cli.ExitOK {
+		t.Fatalf("init: exit %d, stderr %q", r.code, r.stderr)
+	}
+
+	r := e.mustRun("", "whoami")
+	if !strings.Contains(r.stderr, "warning") || !strings.Contains(r.stderr, cliconfig.EnvServer) {
+		t.Errorf("no warning about the token destination: stderr %q", r.stderr)
+	}
+
+	e.env[cliconfig.EnvServer] = e.serverURL
+	if r := e.mustRun("", "whoami"); strings.Contains(r.stderr, "warning") {
+		t.Errorf("warning although the server is pinned: stderr %q", r.stderr)
+	}
 }

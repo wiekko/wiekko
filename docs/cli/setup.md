@@ -80,7 +80,9 @@ Each setting is taken from the first source that has it, in this order:
 | Token | — | `NEXMAP_TOKEN` | — | stored per server by `login` |
 | Plain HTTP | `--allow-http` | `NEXMAP_ALLOW_HTTP` | — | — |
 
-`NEXMAP_TOKEN` takes precedence over a stored token; `login` warns when it is set. Boolean variables
+`NEXMAP_TOKEN` takes precedence over a stored token; `login` warns when it is set. Unlike a stored
+token, which is kept per server, it is sent to whichever server is configured. The CLI warns when that
+server comes from `.nexmap.json`; set `NEXMAP_SERVER` next to the token to pin it. Boolean variables
 accept `1`, `true`, `yes` or `on`.
 
 The user configuration directory is `nexmap` inside the operating system's configuration directory:

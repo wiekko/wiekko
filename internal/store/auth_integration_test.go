@@ -162,6 +162,15 @@ func TestSessionStore(t *testing.T) {
 			}
 		}
 
+		// The table must not hold anything usable as a session cookie.
+		var stored int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE id = ?`, live.ID).Scan(&stored); err != nil {
+			t.Fatalf("count raw tokens: %v", err)
+		}
+		if stored != 0 {
+			t.Error("the session token is stored in the clear")
+		}
+
 		got, err := s.GetByID(ctx, live.ID)
 		if err != nil {
 			t.Fatalf("get: %v", err)

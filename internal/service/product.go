@@ -416,6 +416,9 @@ func (s *ProductService) AddMember(ctx context.Context, user *model.User, produc
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if roleRank(role) < 0 {
+		return fmt.Errorf("invalid role %q", role)
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	pr := &model.ProductRole{
@@ -425,7 +428,51 @@ func (s *ProductService) AddMember(ctx context.Context, user *model.User, produc
 		Role:      role,
 		CreatedAt: now,
 	}
-	return s.productRoles.Create(ctx, pr)
+	if err := s.productRoles.Create(ctx, pr); err != nil {
+		return err
+	}
+	s.auditMember(ctx, user, productID, targetUserID, "", role)
+	return nil
+}
+
+// ErrLastOwner is returned when a change would leave a product without an
+// owner: nobody but an administrator could then manage it or its team.
+var ErrLastOwner = errors.New("this is the product's only owner; make another member an owner first")
+
+// memberRole returns the target's current role in the product ("" if not a
+// member) and whether another member is an owner.
+func (s *ProductService) memberRole(ctx context.Context, productID, targetUserID string) (role string, otherOwner bool, err error) {
+	members, err := s.productRoles.ListByProductID(ctx, productID)
+	if err != nil {
+		return "", false, fmt.Errorf("list members: %w", err)
+	}
+	for _, m := range members {
+		switch {
+		case m.UserID == targetUserID:
+			role = m.Role
+		case m.Role == model.RoleOwner:
+			otherOwner = true
+		}
+	}
+	return role, otherOwner, nil
+}
+
+// auditMember records a change to a product's team in the product's audit
+// trail: who may do what in a product is as much part of its history as its
+// content. An empty old or new role stands for "not a member".
+func (s *ProductService) auditMember(ctx context.Context, actor *model.User, productID, targetUserID, oldRole, newRole string) {
+	if oldRole == "" {
+		oldRole = "no access"
+	}
+	if newRole == "" {
+		newRole = "no access"
+	}
+	_ = s.audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), EntityType: "product", EntityID: productID,
+		UserID: actor.ID, Action: "update", FieldName: "role of user " + targetUserID,
+		OldValue: oldRole, NewValue: newRole,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 // UpdateMember changes a member's role.
@@ -433,13 +480,27 @@ func (s *ProductService) UpdateMember(ctx context.Context, user *model.User, pro
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
+	if roleRank(role) < 0 {
+		return fmt.Errorf("invalid role %q", role)
+	}
+	oldRole, otherOwner, err := s.memberRole(ctx, productID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if oldRole == model.RoleOwner && role != model.RoleOwner && !otherOwner {
+		return ErrLastOwner
+	}
 
 	pr := &model.ProductRole{
 		UserID:    targetUserID,
 		ProductID: productID,
 		Role:      role,
 	}
-	return s.productRoles.Update(ctx, pr)
+	if err := s.productRoles.Update(ctx, pr); err != nil {
+		return err
+	}
+	s.auditMember(ctx, user, productID, targetUserID, oldRole, role)
+	return nil
 }
 
 // RemoveMember removes a user from a product.
@@ -447,8 +508,18 @@ func (s *ProductService) RemoveMember(ctx context.Context, user *model.User, pro
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
-
-	return s.productRoles.Delete(ctx, targetUserID, productID)
+	oldRole, otherOwner, err := s.memberRole(ctx, productID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if oldRole == model.RoleOwner && !otherOwner {
+		return ErrLastOwner
+	}
+	if err := s.productRoles.Delete(ctx, targetUserID, productID); err != nil {
+		return err
+	}
+	s.auditMember(ctx, user, productID, targetUserID, oldRole, "")
+	return nil
 }
 
 // ListMembers returns all members of a product.
@@ -505,18 +576,27 @@ func (s *ProductService) TransferOwnership(ctx context.Context, user *model.User
 		return fmt.Errorf("demote current owner: %w", err)
 	}
 
+	s.auditMember(ctx, user, productID, user.ID, model.RoleOwner, model.RoleDeveloper)
 	// Check if new owner already has a role.
 	existing, err := s.productRoles.GetByUserAndProduct(ctx, newOwnerID, productID)
 	if err != nil {
 		// No existing role — create one.
 		now := time.Now().UTC().Format(time.RFC3339)
-		return s.productRoles.Create(ctx, &model.ProductRole{
+		if err := s.productRoles.Create(ctx, &model.ProductRole{
 			ID: uuid.New().String(), UserID: newOwnerID, ProductID: productID,
 			Role: model.RoleOwner, CreatedAt: now,
-		})
+		}); err != nil {
+			return err
+		}
+		s.auditMember(ctx, user, productID, newOwnerID, "", model.RoleOwner)
+		return nil
 	}
-
 	// Promote to owner.
+	oldRole := existing.Role
 	existing.Role = model.RoleOwner
-	return s.productRoles.Update(ctx, existing)
+	if err := s.productRoles.Update(ctx, existing); err != nil {
+		return err
+	}
+	s.auditMember(ctx, user, productID, newOwnerID, oldRole, model.RoleOwner)
+	return nil
 }

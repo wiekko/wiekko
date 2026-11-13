@@ -100,7 +100,7 @@ func (c *PageLoginController) LoginTOTP(w http.ResponseWriter, r *http.Request) 
 		}
 		if errors.Is(err, service.ErrLoginChallengeInvalid) {
 			c.clearChallengeCookie(w)
-			c.renderLoginError(w, r, err.Error())
+			c.renderLoginError(w, r, errorText(err))
 			return
 		}
 		if errors.Is(err, service.ErrTOTPCodeReused) {

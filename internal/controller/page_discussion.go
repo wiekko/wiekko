@@ -445,8 +445,8 @@ func discussionError(err error, maxUploadBytes int64) (int, string) {
 
 // uploadRejectionMessage turns a policy error into a sentence.
 func uploadRejectionMessage(err error) string {
-	msg := strings.TrimPrefix(err.Error(), storage.ErrTypeNotAllowed.Error()+": ")
-	if msg == "" || msg == err.Error() {
+	msg := strings.TrimPrefix(errorText(err), storage.ErrTypeNotAllowed.Error()+": ")
+	if msg == "" || msg == errorText(err) {
 		return "That file type is not allowed."
 	}
 	return "That file type is not allowed — " + msg + "."
@@ -464,9 +464,14 @@ func writePageServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "file exceeds the maximum upload size", http.StatusRequestEntityTooLarge)
 	case errors.Is(err, storage.ErrTypeNotAllowed):
 		// The message carries the allow-list, so surface it verbatim.
-		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
+		http.Error(w, errorText(err), http.StatusUnsupportedMediaType)
 	default:
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		message, internal := publicError(err)
+		if internal {
+			http.Error(w, message, http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, message, http.StatusUnprocessableEntity)
 	}
 }
 

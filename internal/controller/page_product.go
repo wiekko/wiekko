@@ -130,7 +130,7 @@ func (c *PageProductController) Create(w http.ResponseWriter, r *http.Request) {
 			Description:    description,
 			EstimationMode: estimationMode,
 			WorkflowMode:   workflowMode,
-			Error:          err.Error(),
+			Error:          errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -232,13 +232,13 @@ func (c *PageProductController) SettingsStatuses(w http.ResponseWriter, r *http.
 
 	product, err := c.product.GetByID(r.Context(), user, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
 	reqStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -246,7 +246,7 @@ func (c *PageProductController) SettingsStatuses(w http.ResponseWriter, r *http.
 	if !product.StatusSync {
 		defStatuses, err = c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, errorText(err), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -262,7 +262,7 @@ func (c *PageProductController) SettingsEnvironments(w http.ResponseWriter, r *h
 
 	envs, err := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -277,7 +277,7 @@ func (c *PageProductController) SettingsPyramid(w http.ResponseWriter, r *http.R
 
 	levels, err := c.milestone.ListPyramidLevels(r.Context(), user, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -315,7 +315,7 @@ func (c *PageProductController) CreateStatus(w http.ResponseWriter, r *http.Requ
 		IsActive:   isActive,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -361,7 +361,7 @@ func (c *PageProductController) UpdateStatus(w http.ResponseWriter, r *http.Requ
 
 	_, err = c.milestone.UpdateStatus(r.Context(), user, productID, statusID, input)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -387,7 +387,7 @@ func (c *PageProductController) DeleteStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := c.milestone.DeleteStatus(r.Context(), user, productID, statusID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -415,7 +415,7 @@ func (c *PageProductController) MoveStatus(w http.ResponseWriter, r *http.Reques
 
 	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, status.EntityType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -445,11 +445,11 @@ func (c *PageProductController) MoveStatus(w http.ResponseWriter, r *http.Reques
 		// Swap positions via two UpdateStatus calls. The service mirrors each
 		// change to the sibling entity-type status when StatusSync is true.
 		if _, err := c.milestone.UpdateStatus(r.Context(), user, productID, target.ID, service.UpdateStatusInput{Position: &neighbor.Position}); err != nil {
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 			return
 		}
 		if _, err := c.milestone.UpdateStatus(r.Context(), user, productID, neighbor.ID, service.UpdateStatusInput{Position: &target.Position}); err != nil {
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 			return
 		}
 	}
@@ -481,23 +481,23 @@ func (c *PageProductController) SettingsCategories(w http.ResponseWriter, r *htt
 
 	reqCats, err := c.category.ListCategories(r.Context(), user, productID, model.RequirementKindRequirement)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	taskCats, err := c.category.ListCategories(r.Context(), user, productID, model.RequirementKindTask)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	conCats, err := c.category.ListCategories(r.Context(), user, productID, "constraint")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
 	usage, err := c.categoryUsage(r, user, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -530,7 +530,7 @@ func (c *PageProductController) CreateCategory(w http.ResponseWriter, r *http.Re
 		Position:   position,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -559,7 +559,7 @@ func (c *PageProductController) UpdateCategory(w http.ResponseWriter, r *http.Re
 	}
 
 	if _, err := c.category.UpdateCategory(r.Context(), user, productID, categoryID, input); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -579,7 +579,7 @@ func (c *PageProductController) DeleteCategory(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := c.category.DeleteCategory(r.Context(), user, productID, categoryID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -602,7 +602,7 @@ func (c *PageProductController) MoveCategory(w http.ResponseWriter, r *http.Requ
 
 	cats, err := c.category.ListCategories(r.Context(), user, productID, cat.EntityType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -630,11 +630,11 @@ func (c *PageProductController) MoveCategory(w http.ResponseWriter, r *http.Requ
 		target := cats[idx]
 		neighbor := cats[neighborIdx]
 		if _, err := c.category.UpdateCategory(r.Context(), user, productID, target.ID, service.UpdateCategoryInput{Position: &neighbor.Position}); err != nil {
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 			return
 		}
 		if _, err := c.category.UpdateCategory(r.Context(), user, productID, neighbor.ID, service.UpdateCategoryInput{Position: &target.Position}); err != nil {
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 			return
 		}
 	}
@@ -646,12 +646,12 @@ func (c *PageProductController) MoveCategory(w http.ResponseWriter, r *http.Requ
 func (c *PageProductController) renderCategoryList(w http.ResponseWriter, r *http.Request, user *model.User, productID, entityType string) {
 	cats, err := c.category.ListCategories(r.Context(), user, productID, entityType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	usage, err := c.category.UsageCounts(r.Context(), user, productID, entityType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -678,7 +678,7 @@ func (c *PageProductController) categoryUsage(r *http.Request, user *model.User,
 func (c *PageProductController) renderStatusList(w http.ResponseWriter, r *http.Request, user *model.User, productID, entityType string) {
 	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, entityType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -689,7 +689,7 @@ func (c *PageProductController) renderStatusList(w http.ResponseWriter, r *http.
 func (c *PageProductController) renderSyncedStatusList(w http.ResponseWriter, r *http.Request, user *model.User, productID string) {
 	statuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -702,19 +702,19 @@ func (c *PageProductController) SplitStatuses(w http.ResponseWriter, r *http.Req
 	productID := r.PathValue("id")
 
 	if err := c.product.SplitStatuses(r.Context(), user, productID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
 	// Re-render the full statuses tab content in split mode.
 	reqStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	defStatuses, err := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 
@@ -735,7 +735,7 @@ func (c *PageProductController) CreateEnvironment(w http.ResponseWriter, r *http
 
 	_, err := c.milestone.CreateRuntimeEnvironment(r.Context(), user, productID, name)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -749,7 +749,7 @@ func (c *PageProductController) DeleteEnvironment(w http.ResponseWriter, r *http
 	envID := r.PathValue("envId")
 
 	if err := c.milestone.DeleteRuntimeEnvironment(r.Context(), user, productID, envID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -760,7 +760,7 @@ func (c *PageProductController) DeleteEnvironment(w http.ResponseWriter, r *http
 func (c *PageProductController) renderEnvironmentList(w http.ResponseWriter, r *http.Request, user *model.User, productID string) {
 	envs, err := c.milestone.ListRuntimeEnvironments(r.Context(), user, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -795,7 +795,7 @@ func (c *PageProductController) CreatePyramidLevel(w http.ResponseWriter, r *htt
 		Position:  position,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -815,7 +815,7 @@ func (c *PageProductController) UpdatePyramidLevel(w http.ResponseWriter, r *htt
 
 	_, err := c.milestone.UpdatePyramidLevel(r.Context(), user, productID, levelID, input)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -829,7 +829,7 @@ func (c *PageProductController) DeletePyramidLevel(w http.ResponseWriter, r *htt
 	levelID := r.PathValue("levelId")
 
 	if err := c.milestone.DeletePyramidLevel(r.Context(), user, productID, levelID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -840,7 +840,7 @@ func (c *PageProductController) DeletePyramidLevel(w http.ResponseWriter, r *htt
 func (c *PageProductController) renderPyramidList(w http.ResponseWriter, r *http.Request, user *model.User, productID string) {
 	levels, err := c.milestone.ListPyramidLevels(r.Context(), user, productID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, errorText(err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -874,7 +874,7 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 
 	updated, err := c.product.Update(r.Context(), user, productID, input)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -930,7 +930,7 @@ func (c *PageProductController) AddMember(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := c.product.AddMember(r.Context(), user, productID, targetUserID, role); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -956,7 +956,7 @@ func (c *PageProductController) UpdateMemberRole(w http.ResponseWriter, r *http.
 	}
 
 	if err := c.product.UpdateMember(r.Context(), user, productID, targetUserID, role); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -983,7 +983,7 @@ func (c *PageProductController) RemoveMember(w http.ResponseWriter, r *http.Requ
 	targetUserID := r.PathValue("userId")
 
 	if err := c.product.RemoveMember(r.Context(), user, productID, targetUserID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1002,7 +1002,7 @@ func (c *PageProductController) TransferOwnership(w http.ResponseWriter, r *http
 	}
 
 	if err := c.product.TransferOwnership(r.Context(), user, productID, newOwnerID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1086,7 +1086,7 @@ func (c *PageProductController) InviteMember(w http.ResponseWriter, r *http.Requ
 	result, err := c.invitation.Create(r.Context(), user, email, productID, role)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = productpage.InviteFormOOB(productID, err.Error()).Render(r.Context(), w)
+		_ = productpage.InviteFormOOB(productID, errorText(err)).Render(r.Context(), w)
 		return
 	}
 
@@ -1109,7 +1109,7 @@ func (c *PageProductController) DeleteProduct(w http.ResponseWriter, r *http.Req
 	productID := r.PathValue("id")
 
 	if err := c.product.Delete(r.Context(), user, productID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1363,7 +1363,7 @@ func (c *PageProductController) MilestoneCreate(w http.ResponseWriter, r *http.R
 			Description: description,
 			Type:        milestoneType,
 			DueDate:     dueDate,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -1463,7 +1463,7 @@ func (c *PageProductController) MilestoneUpdate(w http.ResponseWriter, r *http.R
 			Description: description,
 			Type:        milestoneType,
 			DueDate:     dueDate,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -1481,7 +1481,7 @@ func (c *PageProductController) MilestoneDelete(w http.ResponseWriter, r *http.R
 	milestoneID := r.PathValue("milestoneId")
 
 	if err := c.milestone.DeleteMilestone(r.Context(), user, productID, milestoneID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1624,7 +1624,7 @@ func (c *PageProductController) MilestoneComponentLink(w http.ResponseWriter, r 
 	if _, err := c.component.UpdateComponent(r.Context(), user, productID, targetID, service.UpdateComponentInput{
 		MilestoneID: &mid,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1648,7 +1648,7 @@ func (c *PageProductController) MilestoneComponentUnlink(w http.ResponseWriter, 
 	if _, err := c.component.UpdateComponent(r.Context(), user, productID, targetID, service.UpdateComponentInput{
 		MilestoneID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1771,7 +1771,7 @@ func (c *PageProductController) MilestoneCapabilityLink(w http.ResponseWriter, r
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, targetID, service.UpdateCapabilityInput{
 		MilestoneID: &mid,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1795,7 +1795,7 @@ func (c *PageProductController) MilestoneCapabilityUnlink(w http.ResponseWriter,
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, targetID, service.UpdateCapabilityInput{
 		MilestoneID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1919,7 +1919,7 @@ func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, 
 	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
 		MilestoneID: &mid,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -1943,7 +1943,7 @@ func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter
 	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
 		MilestoneID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2069,7 +2069,7 @@ func (c *PageProductController) MilestoneConstraintLink(w http.ResponseWriter, r
 	if _, err := c.constraint.UpdateConstraint(r.Context(), user, productID, targetID, service.UpdateConstraintInput{
 		MilestoneID: &mid,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2093,7 +2093,7 @@ func (c *PageProductController) MilestoneConstraintUnlink(w http.ResponseWriter,
 	if _, err := c.constraint.UpdateConstraint(r.Context(), user, productID, targetID, service.UpdateConstraintInput{
 		MilestoneID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2218,7 +2218,7 @@ func (c *PageProductController) MilestoneDefectLink(w http.ResponseWriter, r *ht
 	if _, err := c.backlog.UpdateDefect(r.Context(), user, productID, targetID, service.UpdateDefectInput{
 		MilestoneID: &mid,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2242,7 +2242,7 @@ func (c *PageProductController) MilestoneDefectUnlink(w http.ResponseWriter, r *
 	if _, err := c.backlog.UpdateDefect(r.Context(), user, productID, targetID, service.UpdateDefectInput{
 		MilestoneID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2365,7 +2365,7 @@ func (c *PageProductController) MilestoneSprintLink(w http.ResponseWriter, r *ht
 	if _, err := c.milestone.UpdateSprint(r.Context(), user, productID, targetID, service.UpdateSprintInput{
 		MilestoneID: &mid,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2389,7 +2389,7 @@ func (c *PageProductController) MilestoneSprintUnlink(w http.ResponseWriter, r *
 	if _, err := c.milestone.UpdateSprint(r.Context(), user, productID, targetID, service.UpdateSprintInput{
 		MilestoneID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2594,7 +2594,7 @@ func (c *PageProductController) ComponentCreate(w http.ResponseWriter, r *http.R
 			Name:        name,
 			Description: description,
 			MilestoneID: milestoneID,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -2695,7 +2695,7 @@ func (c *PageProductController) ComponentUpdate(w http.ResponseWriter, r *http.R
 			Name:        name,
 			Description: description,
 			MilestoneID: milestoneID,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -2713,7 +2713,7 @@ func (c *PageProductController) ComponentDelete(w http.ResponseWriter, r *http.R
 	componentID := r.PathValue("componentId")
 
 	if err := c.component.DeleteComponent(r.Context(), user, productID, componentID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2828,7 +2828,7 @@ func (c *PageProductController) ComponentCapabilityLink(w http.ResponseWriter, r
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, capabilityID, service.UpdateCapabilityInput{
 		ComponentID: &newCompID,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -2913,7 +2913,7 @@ func (c *PageProductController) ComponentCapabilityCreateAndLink(w http.Response
 		MilestoneID: milestoneID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
@@ -2931,7 +2931,7 @@ func (c *PageProductController) ComponentCapabilityUnlink(w http.ResponseWriter,
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, capabilityID, service.UpdateCapabilityInput{
 		ComponentID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3045,7 +3045,7 @@ func (c *PageProductController) ComponentTestCaseLink(w http.ResponseWriter, r *
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
 		ComponentID: &newCompID,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3143,7 +3143,7 @@ func (c *PageProductController) ComponentTestCaseCreateAndLink(w http.ResponseWr
 		PyramidLevelID: pyramidLevelID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
@@ -3161,7 +3161,7 @@ func (c *PageProductController) ComponentTestCaseUnlink(w http.ResponseWriter, r
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
 		ComponentID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3369,7 +3369,7 @@ func (c *PageProductController) CapabilityCreate(w http.ResponseWriter, r *http.
 			Description: description,
 			ComponentID: componentID,
 			MilestoneID: milestoneID,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -3478,7 +3478,7 @@ func (c *PageProductController) CapabilityUpdate(w http.ResponseWriter, r *http.
 			Description: description,
 			ComponentID: componentID,
 			MilestoneID: milestoneID,
-			Error:       err.Error(),
+			Error:       errorText(err),
 		}).Render(r.Context(), w)
 		return
 	}
@@ -3496,7 +3496,7 @@ func (c *PageProductController) CapabilityDelete(w http.ResponseWriter, r *http.
 	capabilityID := r.PathValue("capabilityId")
 
 	if err := c.component.DeleteCapability(r.Context(), user, productID, capabilityID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3615,7 +3615,7 @@ func (c *PageProductController) CapabilityRequirementLink(w http.ResponseWriter,
 	}
 
 	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3739,12 +3739,12 @@ func (c *PageProductController) CapabilityRequirementCreateAndLink(w http.Respon
 		IsCoarse:         isCoarse,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, capabilityID, req.ID); err != nil {
-		rerenderForm("created requirement but failed to link: " + err.Error())
+		rerenderForm("created requirement but failed to link: " + errorText(err))
 		return
 	}
 
@@ -3758,7 +3758,7 @@ func (c *PageProductController) CapabilityRequirementUnlink(w http.ResponseWrite
 	requirementID := r.PathValue("requirementId")
 
 	if err := c.component.UnlinkRequirementFromCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3883,7 +3883,7 @@ func (c *PageProductController) CapabilityTestCaseLink(w http.ResponseWriter, r 
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
 		CapabilityID: &newCapID,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -3981,7 +3981,7 @@ func (c *PageProductController) CapabilityTestCaseCreateAndLink(w http.ResponseW
 		PyramidLevelID: pyramidLevelID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
@@ -3999,7 +3999,7 @@ func (c *PageProductController) CapabilityTestCaseUnlink(w http.ResponseWriter, 
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
 		CapabilityID: &empty,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -4116,7 +4116,7 @@ func (c *PageProductController) CapabilityDefectLink(w http.ResponseWriter, r *h
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetCapability, capabilityID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -4225,12 +4225,12 @@ func (c *PageProductController) CapabilityDefectCreateAndLink(w http.ResponseWri
 		Priority:      priority,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, model.DefectLinkTargetCapability, capabilityID); err != nil {
-		rerenderForm("created defect but failed to link: " + err.Error())
+		rerenderForm("created defect but failed to link: " + errorText(err))
 		return
 	}
 
@@ -4244,7 +4244,7 @@ func (c *PageProductController) CapabilityDefectUnlink(w http.ResponseWriter, r 
 	linkID := r.PathValue("linkId")
 
 	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -4575,12 +4575,12 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 		PyramidLevelID: pyramidLevelID,
 	})
 	if err != nil {
-		rerender(err.Error())
+		rerender(errorText(err))
 		return
 	}
 
 	if err := c.syncTestCaseEnvironments(r, user, productID, tc.ID, environmentIDs); err != nil {
-		rerender("created the test case but failed to link its environments: " + err.Error())
+		rerender("created the test case but failed to link its environments: " + errorText(err))
 		return
 	}
 
@@ -4755,12 +4755,12 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 		PyramidLevelID: &pyramidLevelID,
 	})
 	if err != nil {
-		rerender(err.Error())
+		rerender(errorText(err))
 		return
 	}
 
 	if err := c.syncTestCaseEnvironments(r, user, productID, testCaseID, environmentIDs); err != nil {
-		rerender("saved the test case but failed to update its environments: " + err.Error())
+		rerender("saved the test case but failed to update its environments: " + errorText(err))
 		return
 	}
 
@@ -4895,7 +4895,7 @@ func (c *PageProductController) TestCaseRequirementLink(w http.ResponseWriter, r
 	}
 
 	if err := c.testing.LinkRequirement(r.Context(), user, productID, testCaseID, requirementID, "requirement"); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -5019,12 +5019,12 @@ func (c *PageProductController) TestCaseRequirementCreateAndLink(w http.Response
 		IsCoarse:         isCoarse,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.testing.LinkRequirement(r.Context(), user, productID, testCaseID, req.ID, "requirement"); err != nil {
-		rerenderForm("created requirement but failed to link: " + err.Error())
+		rerenderForm("created requirement but failed to link: " + errorText(err))
 		return
 	}
 
@@ -5038,7 +5038,7 @@ func (c *PageProductController) TestCaseRequirementUnlink(w http.ResponseWriter,
 	requirementID := r.PathValue("requirementId")
 
 	if err := c.testing.UnlinkRequirement(r.Context(), user, productID, testCaseID, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -5549,7 +5549,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 			Statuses:         statuses,
 			Milestones:       milestones,
 			Sprints:          sprints,
-			Error:            createErr.Error(),
+			Error:            errorText(createErr),
 			Title:            title,
 			Description:      description,
 			DefinitionOfDone: definitionOfDone,
@@ -5697,7 +5697,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 			Sprints:          sprints,
 			IsEdit:           true,
 			ReturnTo:         r.FormValue("return"),
-			Error:            updateErr.Error(),
+			Error:            errorText(updateErr),
 			Title:            title,
 			Description:      description,
 			DefinitionOfDone: definitionOfDone,
@@ -5871,7 +5871,7 @@ func (c *PageProductController) RequirementCapabilityLink(w http.ResponseWriter,
 	}
 
 	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -5956,12 +5956,12 @@ func (c *PageProductController) RequirementCapabilityCreateAndLink(w http.Respon
 		MilestoneID: milestoneID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.component.LinkRequirementToCapability(r.Context(), user, productID, cap.ID, requirementID); err != nil {
-		rerenderForm("created capability but failed to link: " + err.Error())
+		rerenderForm("created capability but failed to link: " + errorText(err))
 		return
 	}
 
@@ -5976,7 +5976,7 @@ func (c *PageProductController) RequirementCapabilityUnlink(w http.ResponseWrite
 	capabilityID := r.PathValue("capId")
 
 	if err := c.component.UnlinkRequirementFromCapability(r.Context(), user, productID, capabilityID, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -6117,7 +6117,7 @@ func (c *PageProductController) RequirementTestCaseLink(w http.ResponseWriter, r
 	}
 
 	if err := c.testing.LinkRequirement(r.Context(), user, productID, testCaseID, requirementID, "requirement"); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -6215,12 +6215,12 @@ func (c *PageProductController) RequirementTestCaseCreateAndLink(w http.Response
 		PyramidLevelID: pyramidLevelID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.testing.LinkRequirement(r.Context(), user, productID, tc.ID, requirementID, "requirement"); err != nil {
-		rerenderForm("created test case but failed to link: " + err.Error())
+		rerenderForm("created test case but failed to link: " + errorText(err))
 		return
 	}
 
@@ -6235,7 +6235,7 @@ func (c *PageProductController) RequirementTestCaseUnlink(w http.ResponseWriter,
 	testCaseID := r.PathValue("testCaseId")
 
 	if err := c.testing.UnlinkRequirement(r.Context(), user, productID, testCaseID, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -6368,7 +6368,7 @@ func (c *PageProductController) RequirementDefectLink(w http.ResponseWriter, r *
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetRequirement, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -6479,12 +6479,12 @@ func (c *PageProductController) RequirementDefectCreateAndLink(w http.ResponseWr
 		Priority:      priority,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, d.ID, model.DefectLinkTargetRequirement, requirementID); err != nil {
-		rerenderForm("created defect but failed to link: " + err.Error())
+		rerenderForm("created defect but failed to link: " + errorText(err))
 		return
 	}
 
@@ -6501,7 +6501,7 @@ func (c *PageProductController) RequirementDefectUnlink(w http.ResponseWriter, r
 	linkID := r.PathValue("linkId")
 
 	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -6960,7 +6960,7 @@ func (c *PageProductController) DefectCreate(w http.ResponseWriter, r *http.Requ
 			Milestones:    milestones,
 			Sprints:       sprints,
 			Environments:  environments,
-			Error:         createErr.Error(),
+			Error:         errorText(createErr),
 			Title:         title,
 			Description:   description,
 			Criticality:   criticality,
@@ -7092,7 +7092,7 @@ func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Requ
 			Environments:  environments,
 			IsEdit:        true,
 			ReturnTo:      r.FormValue("return"),
-			Error:         updateErr.Error(),
+			Error:         errorText(updateErr),
 			Title:         title,
 			Description:   description,
 			Criticality:   criticality,
@@ -7236,7 +7236,7 @@ func (c *PageProductController) DefectComponentLink(w http.ResponseWriter, r *ht
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetComponent, componentID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7252,7 +7252,7 @@ func (c *PageProductController) DefectComponentUnlink(w http.ResponseWriter, r *
 	linkID := r.PathValue("linkId")
 
 	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7376,7 +7376,7 @@ func (c *PageProductController) DefectCapabilityLink(w http.ResponseWriter, r *h
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetCapability, capabilityID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7392,7 +7392,7 @@ func (c *PageProductController) DefectCapabilityUnlink(w http.ResponseWriter, r 
 	linkID := r.PathValue("linkId")
 
 	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7523,7 +7523,7 @@ func (c *PageProductController) DefectTestCaseLink(w http.ResponseWriter, r *htt
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetTestCase, testCaseID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7539,7 +7539,7 @@ func (c *PageProductController) DefectTestCaseUnlink(w http.ResponseWriter, r *h
 	linkID := r.PathValue("linkId")
 
 	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7678,12 +7678,12 @@ func (c *PageProductController) DefectTestCaseCreateAndLink(w http.ResponseWrite
 		PyramidLevelID: pyramidLevelID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetTestCase, tc.ID); err != nil {
-		rerenderForm("created test case but failed to link: " + err.Error())
+		rerenderForm("created test case but failed to link: " + errorText(err))
 		return
 	}
 
@@ -7774,7 +7774,7 @@ func (c *PageProductController) DefectRequirementLink(w http.ResponseWriter, r *
 	}
 
 	if err := c.backlog.AddDefectLink(r.Context(), user, productID, defectID, model.DefectLinkTargetRequirement, requirementID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -7790,7 +7790,7 @@ func (c *PageProductController) DefectRequirementUnlink(w http.ResponseWriter, r
 	linkID := r.PathValue("linkId")
 
 	if err := c.backlog.RemoveDefectLink(r.Context(), user, productID, linkID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -8015,7 +8015,7 @@ func (c *PageProductController) ConstraintCreate(w http.ResponseWriter, r *http.
 			Product:         p,
 			Categories:      categories,
 			Milestones:      milestones,
-			Error:           createErr.Error(),
+			Error:           errorText(createErr),
 			Title:           title,
 			Description:     description,
 			CategoryID:      categoryID,
@@ -8127,7 +8127,7 @@ func (c *PageProductController) ConstraintUpdate(w http.ResponseWriter, r *http.
 			Milestones:      milestones,
 			IsEdit:          true,
 			ReturnTo:        r.FormValue("return"),
-			Error:           updateErr.Error(),
+			Error:           errorText(updateErr),
 			Title:           title,
 			Description:     description,
 			CategoryID:      categoryID,
@@ -8282,7 +8282,7 @@ func (c *PageProductController) ConstraintCapabilityLink(w http.ResponseWriter, 
 	}
 
 	if err := c.constraint.LinkCapability(r.Context(), user, productID, constraintID, capabilityID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -8365,12 +8365,12 @@ func (c *PageProductController) ConstraintCapabilityCreateAndLink(w http.Respons
 		MilestoneID: milestoneID,
 	})
 	if err != nil {
-		rerenderForm(err.Error())
+		rerenderForm(errorText(err))
 		return
 	}
 
 	if err := c.constraint.LinkCapability(r.Context(), user, productID, constraintID, cap.ID); err != nil {
-		rerenderForm("created capability but failed to link: " + err.Error())
+		rerenderForm("created capability but failed to link: " + errorText(err))
 		return
 	}
 
@@ -8384,7 +8384,7 @@ func (c *PageProductController) ConstraintCapabilityUnlink(w http.ResponseWriter
 	capabilityID := r.PathValue("capabilityId")
 
 	if err := c.constraint.UnlinkCapability(r.Context(), user, productID, constraintID, capabilityID); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
 		return
 	}
 

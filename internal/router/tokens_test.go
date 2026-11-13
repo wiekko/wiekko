@@ -21,6 +21,7 @@ func TestRestrictedTokens(t *testing.T) {
 		mint := func(in service.CreatePATInput) string {
 			t.Helper()
 			in.Name = "test"
+			in.Password = goodPassword // confirms tokens with the account or admin scope
 			res, err := e.svc.PAT.Create(ctx, e.admin, in)
 			if err != nil {
 				t.Fatalf("create token: %v", err)
