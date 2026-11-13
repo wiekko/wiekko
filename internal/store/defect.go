@@ -31,6 +31,7 @@ var DefectSortColumns = map[string]string{
 	"criticality": `CASE d.criticality WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`,
 	"status":      `COALESCE(s.position, 9999)`,
 	"environment": `LOWER(COALESCE(e.name, ''))`,
+	"identifier":  `d.sequence_number`,
 	"priority":    `d.priority`,
 	"created":     `d.created_at`,
 }
@@ -43,6 +44,7 @@ const defectDefaultOrder = `d.priority DESC, d.created_at`
 // not stored on the defect itself. Both joins are outer: status and environment
 // are optional, and a defect missing one must not drop out of the list.
 const defectListFrom = ` FROM defects d
+	JOIN products p ON d.product_id = p.id
 	LEFT JOIN statuses s ON d.status_id = s.id
 	LEFT JOIN runtime_environments e ON d.environment_id = e.id`
 
@@ -50,6 +52,8 @@ const defectListFrom = ` FROM defects d
 type DefectStore interface {
 	Create(ctx context.Context, d *model.Defect) error
 	GetByID(ctx context.Context, id string) (*model.Defect, error)
+	GetBySequence(ctx context.Context, productID string, seq int) (*model.Defect, error)
+	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	Update(ctx context.Context, d *model.Defect) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter DefectFilter) ([]*model.Defect, error)
@@ -73,11 +77,11 @@ type defectStore struct {
 
 func (s *defectStore) Create(ctx context.Context, d *model.Defect) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO defects (id, product_id, title, description, criticality,
+		`INSERT INTO defects (id, product_id, sequence_number, title, description, criticality,
 		 status_id, milestone_id, sprint_id, environment_id, estimation, priority, is_active,
 		 created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.ProductID, d.Title, d.Description, d.Criticality,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.ProductID, d.SequenceNumber, d.Title, d.Description, d.Criticality,
 		nullableText(d.StatusID), nullableText(d.MilestoneID), nullableText(d.SprintID),
 		nullableText(d.EnvironmentID), nullableText(d.Estimation), d.Priority, d.IsActive,
 		d.CreatedAt, d.UpdatedAt,
@@ -92,6 +96,33 @@ func (s *defectStore) GetByID(ctx context.Context, id string) (*model.Defect, er
 		return nil, fmt.Errorf("defect not found: %w", err)
 	}
 	return d, err
+}
+
+// GetBySequence returns the product's defect with the given sequence number.
+func (s *defectStore) GetBySequence(ctx context.Context, productID string, seq int) (*model.Defect, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+defectColumns+` FROM defects WHERE product_id = ? AND sequence_number = ?`, productID, seq)
+	d, err := scanDefect(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("defect not found: %w", err)
+	}
+	return d, err
+}
+
+// NextSequenceNumber returns the next free defect number of the product. A
+// concurrent insert can take it first; the unique index then rejects the
+// second insert, and the caller retries (see BacklogService.CreateDefect).
+func (s *defectStore) NextSequenceNumber(ctx context.Context, productID string) (int, error) {
+	var maxSeq sql.NullInt64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT MAX(sequence_number) FROM defects WHERE product_id = ?`, productID).Scan(&maxSeq)
+	if err != nil {
+		return 0, err
+	}
+	if maxSeq.Valid {
+		return int(maxSeq.Int64) + 1, nil
+	}
+	return 1, nil
 }
 
 func (s *defectStore) Update(ctx context.Context, d *model.Defect) error {
@@ -140,15 +171,16 @@ func defectListWhere(productID string, filter DefectFilter, search string) (stri
 		args = append(args, filter.MilestoneID)
 	}
 	// The global search deliberately spans only the columns a substring match
-	// is meaningful for. Priority is numeric, so "1" would match 10 and 21;
+	// is meaningful for, the identifier (DF-17) among them. Priority is numeric, so "1" would match 10 and 21;
 	// created_at is RFC 3339 while the column renders as "12 Jul", so matching
 	// the stored form would not match what the user is looking at.
 	if pattern := searchPattern(search); search != "" {
 		where += ` AND (LOWER(d.title) LIKE ? ESCAPE '` + LikeEscape + `'` +
+			` OR LOWER(p.defect_prefix || '-' || CAST(d.sequence_number AS TEXT)) LIKE ? ESCAPE '` + LikeEscape + `'` +
 			` OR LOWER(d.criticality) LIKE ? ESCAPE '` + LikeEscape + `'` +
 			` OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '` + LikeEscape + `'` +
 			` OR LOWER(COALESCE(e.name, '')) LIKE ? ESCAPE '` + LikeEscape + `')`
-		args = append(args, pattern, pattern, pattern, pattern)
+		args = append(args, pattern, pattern, pattern, pattern, pattern)
 	}
 	return where, args
 }
@@ -315,21 +347,27 @@ func (s *defectStore) listDefects(ctx context.Context, query string, args ...any
 }
 
 // defectColumns reads is_active through activeColumn, like requirementColumns.
-var defectColumns = `id, product_id, title, description, criticality,
+//
+// The product's defect prefix comes along through a subquery, so every read
+// yields the identifier with the prefix currently configured (FR-043).
+var defectColumns = `id, product_id, sequence_number,
+	(SELECT dp.defect_prefix FROM products dp WHERE dp.id = defects.product_id),
+	title, description, criticality,
 	status_id, milestone_id, sprint_id, environment_id, estimation, priority, ` + activeColumn("defects") + `,
 	created_at, updated_at`
 
 // defectColumnsQualified is defectColumns for the joined list query, where bare
 // column names would be ambiguous. Both feed the same scanDefect, so the column
 // order has to stay identical.
-var defectColumnsQualified = `d.id, d.product_id, d.title, d.description, d.criticality,
+var defectColumnsQualified = `d.id, d.product_id, d.sequence_number, p.defect_prefix, d.title, d.description, d.criticality,
 	d.status_id, d.milestone_id, d.sprint_id, d.environment_id, d.estimation, d.priority, ` + activeColumn("d") + `,
 	d.created_at, d.updated_at`
 
 func scanDefect(sc scanner) (*model.Defect, error) {
 	var d model.Defect
 	var statusID, milestoneID, sprintID, environmentID, estimation sql.NullString
-	err := sc.Scan(&d.ID, &d.ProductID, &d.Title, &d.Description, &d.Criticality,
+	var prefix string
+	err := sc.Scan(&d.ID, &d.ProductID, &d.SequenceNumber, &prefix, &d.Title, &d.Description, &d.Criticality,
 		&statusID, &milestoneID, &sprintID, &environmentID, &estimation, &d.Priority,
 		&d.IsActive, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
@@ -340,5 +378,6 @@ func scanDefect(sc scanner) (*model.Defect, error) {
 	d.SprintID = sprintID.String
 	d.EnvironmentID = environmentID.String
 	d.Estimation = estimation.String
+	d.Identifier = model.EntityIdentifier(prefix, d.SequenceNumber)
 	return &d, nil
 }

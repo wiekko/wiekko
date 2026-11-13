@@ -28,9 +28,9 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	categoryCtrl := controller.NewCategory(svc.Category)
 	backlogCtrl := controller.NewBacklog(svc.Backlog)
 	constraintCtrl := controller.NewConstraint(svc.Constraint)
-	testingCtrl := controller.NewTesting(svc.Testing)
+	testingCtrl := controller.NewTesting(svc.Testing, svc.Backlog.ResolveDefectRef)
 	testRunCtrl := controller.NewTestRun(svc.TestRun)
-	discussionCtrl := controller.NewDiscussion(svc.Discussion)
+	discussionCtrl := controller.NewDiscussion(svc.Discussion, svc.Backlog.ResolveDefectRef)
 	auditCtrl := controller.NewAudit(svc.Audit)
 
 	// Requirement and constraint routes accept identifiers ("FR-12", "AC-42")
@@ -38,6 +38,8 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	reqRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "id")
 	reqParamRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "reqId")
 	conRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "id")
+	// Defect routes accept defect identifiers ("DF-17", FR-043) likewise.
+	defRef := controller.ResolveRefs(svc.Backlog.ResolveDefectRef, "id")
 
 	// Health (public).
 	apiV1.HandleFunc("GET /health", controller.Health)
@@ -195,15 +197,15 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	// Defects.
 	api.authed("GET /products/{productId}/defects", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefects))
 	api.authed("POST /products/{productId}/defects", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.CreateDefect)))
-	api.authed("GET /products/{productId}/defects/{id}", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.GetDefect))
-	api.authed("PATCH /products/{productId}/defects/{id}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.UpdateDefect)))
-	api.authed("DELETE /products/{productId}/defects/{id}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.DeleteDefect)))
-	api.authed("GET /products/{productId}/defects/{id}/assignees", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefectAssignees))
-	api.authed("POST /products/{productId}/defects/{id}/assignees", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.AssignDefect)))
-	api.authed("DELETE /products/{productId}/defects/{id}/assignees/{userId}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.UnassignDefect)))
-	api.authed("GET /products/{productId}/defects/{id}/links", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefectLinks))
-	api.authed("POST /products/{productId}/defects/{id}/links", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.AddDefectLink)))
-	api.authed("DELETE /products/{productId}/defects/{id}/links/{linkId}", need(access.W(access.Defects)), csrf(http.HandlerFunc(backlogCtrl.RemoveDefectLink)))
+	api.authed("GET /products/{productId}/defects/{id}", need(access.R(access.Defects)), defRef(http.HandlerFunc(backlogCtrl.GetDefect)))
+	api.authed("PATCH /products/{productId}/defects/{id}", need(access.W(access.Defects)), defRef(csrf(http.HandlerFunc(backlogCtrl.UpdateDefect))))
+	api.authed("DELETE /products/{productId}/defects/{id}", need(access.W(access.Defects)), defRef(csrf(http.HandlerFunc(backlogCtrl.DeleteDefect))))
+	api.authed("GET /products/{productId}/defects/{id}/assignees", need(access.R(access.Defects)), defRef(http.HandlerFunc(backlogCtrl.ListDefectAssignees)))
+	api.authed("POST /products/{productId}/defects/{id}/assignees", need(access.W(access.Defects)), defRef(csrf(http.HandlerFunc(backlogCtrl.AssignDefect))))
+	api.authed("DELETE /products/{productId}/defects/{id}/assignees/{userId}", need(access.W(access.Defects)), defRef(csrf(http.HandlerFunc(backlogCtrl.UnassignDefect))))
+	api.authed("GET /products/{productId}/defects/{id}/links", need(access.R(access.Defects)), defRef(http.HandlerFunc(backlogCtrl.ListDefectLinks)))
+	api.authed("POST /products/{productId}/defects/{id}/links", need(access.W(access.Defects)), defRef(csrf(http.HandlerFunc(backlogCtrl.AddDefectLink))))
+	api.authed("DELETE /products/{productId}/defects/{id}/links/{linkId}", need(access.W(access.Defects)), defRef(csrf(http.HandlerFunc(backlogCtrl.RemoveDefectLink))))
 
 	// Test cases.
 	api.authed("GET /products/{productId}/test-cases", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListTestCases))

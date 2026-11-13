@@ -95,6 +95,7 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		Description    *string `json:"description"`
 		EstimationMode *string `json:"estimation_mode"`
 		WorkflowMode   *string `json:"workflow_mode"`
+		DefectPrefix   *string `json:"defect_prefix"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -105,6 +106,7 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		Description:    req.Description,
 		EstimationMode: req.EstimationMode,
 		WorkflowMode:   req.WorkflowMode,
+		DefectPrefix:   req.DefectPrefix,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -265,6 +267,7 @@ func productToJSON(p *model.Product) map[string]any {
 		"description":     p.Description,
 		"estimation_mode": p.EstimationMode,
 		"workflow_mode":   p.WorkflowMode,
+		"defect_prefix":   p.DefectPrefix,
 		"created_at":      p.CreatedAt,
 		"updated_at":      p.UpdatedAt,
 	}

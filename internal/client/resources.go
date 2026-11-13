@@ -96,20 +96,22 @@ type Capability struct {
 
 // Defect is a bug or issue.
 type Defect struct {
-	ID            string `json:"id"`
-	ProductID     string `json:"product_id"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	Criticality   string `json:"criticality"`
-	StatusID      string `json:"status_id"`
-	MilestoneID   string `json:"milestone_id"`
-	SprintID      string `json:"sprint_id"`
-	EnvironmentID string `json:"environment_id"`
-	Estimation    string `json:"estimation"`
-	Priority      int    `json:"priority"`
-	IsActive      bool   `json:"is_active"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	ID             string `json:"id"`
+	ProductID      string `json:"product_id"`
+	Identifier     string `json:"identifier"` // e.g. DF-17
+	SequenceNumber int    `json:"sequence_number"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	Criticality    string `json:"criticality"`
+	StatusID       string `json:"status_id"`
+	MilestoneID    string `json:"milestone_id"`
+	SprintID       string `json:"sprint_id"`
+	EnvironmentID  string `json:"environment_id"`
+	Estimation     string `json:"estimation"`
+	Priority       int    `json:"priority"`
+	IsActive       bool   `json:"is_active"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
 }
 
 // DefectLink links a defect to a component, capability, test case or requirement.

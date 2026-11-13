@@ -552,20 +552,22 @@ func requirementToJSON(r *model.Requirement, prefixes map[string]string) map[str
 
 func defectToJSON(d *model.Defect) map[string]any {
 	return map[string]any{
-		"id":             d.ID,
-		"product_id":     d.ProductID,
-		"title":          d.Title,
-		"description":    d.Description,
-		"criticality":    d.Criticality,
-		"status_id":      d.StatusID,
-		"milestone_id":   d.MilestoneID,
-		"sprint_id":      d.SprintID,
-		"environment_id": d.EnvironmentID,
-		"estimation":     d.Estimation,
-		"priority":       d.Priority,
-		"is_active":      d.IsActive,
-		"created_at":     d.CreatedAt,
-		"updated_at":     d.UpdatedAt,
+		"id":              d.ID,
+		"product_id":      d.ProductID,
+		"identifier":      d.Identifier,
+		"sequence_number": d.SequenceNumber,
+		"title":           d.Title,
+		"description":     d.Description,
+		"criticality":     d.Criticality,
+		"status_id":       d.StatusID,
+		"milestone_id":    d.MilestoneID,
+		"sprint_id":       d.SprintID,
+		"environment_id":  d.EnvironmentID,
+		"estimation":      d.Estimation,
+		"priority":        d.Priority,
+		"is_active":       d.IsActive,
+		"created_at":      d.CreatedAt,
+		"updated_at":      d.UpdatedAt,
 	}
 }
 

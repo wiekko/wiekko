@@ -129,7 +129,9 @@ type TestRunOutcome struct {
 	ResultID       string `json:"result_id,omitempty"`
 	PreviousStatus string `json:"previous_status,omitempty"`
 	DefectID       string `json:"defect_id,omitempty"`
-	Defect         string `json:"defect,omitempty"`
+	// DefectIdentifier is the defect's identifier, e.g. DF-17.
+	DefectIdentifier string `json:"defect_identifier,omitempty"`
+	Defect           string `json:"defect,omitempty"`
 }
 
 // IngestTestRun uploads a test run (tester role). With no active campaign

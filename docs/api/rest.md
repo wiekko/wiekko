@@ -65,6 +65,15 @@ tokens that are narrower than its own. If the instance limits the token lifetime
 and must lie within the limit. `GET /api/v1/user/me/tokens` lists the tokens with their restrictions, and
 `DELETE /api/v1/user/me/tokens/{id}` revokes one.
 
+## Identifiers
+
+Wherever a path names a requirement, task, constraint or defect by ID, its identifier works as well:
+`GET /api/v1/products/{p}/defects/DF-17` is the same as using the defect's ID. Identifiers are not case
+sensitive. Responses carry both: `id` and `identifier`. Defect identifiers are also accepted for the
+`defect_id` of a campaign result and for the `owner_id` of comments and attachments on a defect. The
+defect prefix is the product's `defect_prefix`, which `PATCH /api/v1/products/{p}` changes; it must
+differ from every category prefix of the product.
+
 ## Responses
 
 Successful responses wrap their payload in `data`; errors carry a machine-readable `code` and a
@@ -96,4 +105,4 @@ human-readable `message`:
 }
 ```
 
-and answers with `recorded`, `campaign`, `environment`, a `summary` (counts per status, per outcome, `defects_created`, `defects_reused`, `total`) and per-test `results` with `outcome` (`updated`, `unchanged`, `unknown_test_case`, `not_in_campaign`, `environment_required`, `not_recorded`) and `defect` (`created`, `reused`). Uploads are limited to 32 MiB and 50,000 results; statuses are `passed`, `failed` and `skipped`.
+and answers with `recorded`, `campaign`, `environment`, a `summary` (counts per status, per outcome, `defects_created`, `defects_reused`, `total`) and per-test `results` with `outcome` (`updated`, `unchanged`, `unknown_test_case`, `not_in_campaign`, `environment_required`, `not_recorded`), `defect` (`created`, `reused`) and the defect's `defect_id` and `defect_identifier`. Uploads are limited to 32 MiB and 50,000 results; statuses are `passed`, `failed` and `skipped`.

@@ -96,6 +96,15 @@ templ DefectFormBody(props DefectFormProps) {
 				if props.LinkTo != "" {
 					<input type="hidden" name="link_to" value={ props.LinkTo }/>
 				}
+				if props.IsEdit {
+					@ui.TextInput(ui.InputProps{
+						ID:       "identifier",
+						Name:     "identifier",
+						Label:    "Identifier",
+						Value:    props.Defect.Identifier,
+						Disabled: true,
+					})
+				}
 				@ui.TextInput(ui.InputProps{
 					ID:          "title",
 					Name:        "title",
@@ -198,7 +207,7 @@ func defectFormBreadcrumbs(props DefectFormProps) []templates.BreadcrumbItem {
 	}
 	if props.IsEdit {
 		crumbs = append(crumbs,
-			templates.BreadcrumbItem{Label: props.Defect.Title, Href: "/products/" + props.Product.ID + "/defects/" + props.Defect.ID},
+			templates.BreadcrumbItem{Label: props.Defect.Identifier, Href: "/products/" + props.Product.ID + "/defects/" + props.Defect.ID},
 			templates.BreadcrumbItem{Label: "Edit"},
 		)
 	} else {

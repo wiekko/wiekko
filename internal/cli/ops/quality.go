@@ -126,8 +126,9 @@ func (s *Session) findTestCase(ctx context.Context, ref string) (client.TestCase
 
 func (s *Session) findDefect(ctx context.Context, ref string) (*client.Defect, error) {
 	ref = strings.TrimSpace(ref)
-	// A full ID is fetched directly; anything else is matched as a prefix.
-	if len(ref) == 36 {
+	// An identifier (DF-17) or a full ID is fetched directly, the server
+	// resolving the identifier; anything else is matched as an ID prefix.
+	if identifierPattern.MatchString(ref) || len(ref) == 36 {
 		d, err := s.C.Defect(ctx, s.ProductID, ref)
 		if err == nil {
 			return d, nil
@@ -143,11 +144,26 @@ func (s *Session) findDefect(ctx context.Context, ref string) (*client.Defect, e
 	}
 	d, err := match("defect", ref, list,
 		func(d client.Defect) string { return d.ID },
-		func(d client.Defect) string { return ShortID(d.ID) + " " + d.Title }, nil)
+		func(d client.Defect) string { return d.Identifier + " " + d.Title }, nil)
 	if err != nil {
 		return nil, err
 	}
 	return &d, nil
+}
+
+// defectIdentifiers maps the product's defect IDs to their identifiers. It
+// is best effort: a token without the defects scope gets an empty map, and
+// callers fall back to the ID.
+func (s *Session) defectIdentifiers(ctx context.Context) map[string]string {
+	m := map[string]string{}
+	list, err := s.C.Defects(ctx, s.ProductID)
+	if err != nil {
+		return m
+	}
+	for _, d := range list {
+		m[d.ID] = d.Identifier
+	}
+	return m
 }
 
 func (s *Session) linkLabel(ctx context.Context, l client.DefectLink) (string, error) {
@@ -189,7 +205,7 @@ func (s *Session) defectSummaries(ctx context.Context, items []client.Defect) ([
 	out := make([]DefectSummary, 0, len(items))
 	for _, d := range items {
 		sum := DefectSummary{
-			ID: d.ID, ShortID: ShortID(d.ID), Title: d.Title, Criticality: d.Criticality,
+			ID: d.ID, Identifier: d.Identifier, Title: d.Title, Criticality: d.Criticality,
 			Priority: d.Priority, Active: d.IsActive,
 		}
 		if st, ok := statuses[d.StatusID]; ok {
@@ -331,11 +347,12 @@ func (s *Session) ShowTestCase(ctx context.Context, ref string) (*TestCaseDetail
 	for _, c := range campaigns {
 		byID[c.ID] = c
 	}
+	defectIDs := s.defectIdentifiers(ctx)
 	for _, r := range results {
 		c := byID[r.CampaignID]
 		d.Results = append(d.Results, ResultView{
 			Campaign: c.Name, CampaignStatus: c.Status, Environment: envNames[r.EnvironmentID],
-			Status: r.Status, DefectID: r.DefectID, ExecutedAt: r.ExecutedAt,
+			Status: r.Status, DefectID: r.DefectID, Defect: defectIDs[r.DefectID], ExecutedAt: r.ExecutedAt,
 		})
 	}
 
@@ -415,6 +432,7 @@ func (s *Session) CampaignStatus(ctx context.Context, ref string) (*CampaignStat
 		return nil, err
 	}
 	var tcByID map[string]client.TestCase
+	var defectIDs map[string]string // read once, only if a result names a defect
 	envNames, err := s.environmentNames(ctx)
 	if err != nil {
 		return nil, err
@@ -434,11 +452,14 @@ func (s *Session) CampaignStatus(ctx context.Context, ref string) (*CampaignStat
 			}
 		}
 		tc := tcByID[r.TestCaseID]
+		if r.DefectID != "" && defectIDs == nil {
+			defectIDs = s.defectIdentifiers(ctx)
+		}
 		view.Attention = append(view.Attention, ResultView{
 			Campaign: c.Name, CampaignStatus: c.Status,
 			TestCase:       &Ref{ID: r.TestCaseID, Title: tc.Title},
 			TestIdentifier: tc.TestIdentifier, Environment: envNames[r.EnvironmentID],
-			Status: r.Status, DefectID: r.DefectID, ExecutedAt: r.ExecutedAt,
+			Status: r.Status, DefectID: r.DefectID, Defect: defectIDs[r.DefectID], ExecutedAt: r.ExecutedAt,
 		})
 	}
 	return &CampaignStatusView{Campaign: view}, nil

@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS products (
     estimation_mode TEXT NOT NULL DEFAULT 'disabled',
     workflow_mode   TEXT NOT NULL DEFAULT 'kanban',
     status_sync    INTEGER NOT NULL DEFAULT 1,
+    -- Prefix of defect identifiers such as DF-17 (FR-043). Unique within the
+    -- product together with the category prefixes, see categories.
+    defect_prefix   TEXT NOT NULL DEFAULT 'DF',
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -181,6 +184,8 @@ CREATE TABLE IF NOT EXISTS defects (
     estimation     TEXT,
     priority       INTEGER NOT NULL DEFAULT 0,
     is_active      INTEGER NOT NULL DEFAULT 0,
+    -- Defects number from a per-product counter of their own (FR-043).
+    sequence_number INTEGER NOT NULL DEFAULT 0,
     created_at     TEXT NOT NULL,
     updated_at     TEXT NOT NULL
 );
@@ -189,6 +194,7 @@ CREATE INDEX IF NOT EXISTS idx_defects_status_id ON defects(status_id);
 CREATE INDEX IF NOT EXISTS idx_defects_milestone_id ON defects(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_defects_sprint_id ON defects(sprint_id);
 CREATE INDEX IF NOT EXISTS idx_defects_environment_id ON defects(environment_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_defects_product_seq ON defects(product_id, sequence_number);
 
 -- Constraints: non-functional requirements (architecture, security, UX rules)
 CREATE TABLE IF NOT EXISTS constraints (

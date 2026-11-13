@@ -28,11 +28,11 @@ type productStore struct {
 
 func (s *productStore) Create(ctx context.Context, product *model.Product) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO products (id, name, description, estimation_mode, workflow_mode, status_sync, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO products (id, name, description, estimation_mode, workflow_mode, status_sync, defect_prefix, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		product.ID, product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
-		product.StatusSync,
+		product.StatusSync, defectPrefixOrDefault(product.DefectPrefix),
 		product.CreatedAt, product.UpdatedAt,
 	)
 	return err
@@ -40,8 +40,7 @@ func (s *productStore) Create(ctx context.Context, product *model.Product) error
 
 func (s *productStore) GetByID(ctx context.Context, id string) (*model.Product, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, estimation_mode, workflow_mode, status_sync, created_at, updated_at
-		 FROM products WHERE id = ?`, id)
+		`SELECT `+productColumns+` FROM products WHERE id = ?`, id)
 	p, err := scanProduct(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("product not found: %w", err)
@@ -51,11 +50,12 @@ func (s *productStore) GetByID(ctx context.Context, id string) (*model.Product, 
 
 func (s *productStore) Update(ctx context.Context, product *model.Product) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE products SET name = ?, description = ?, estimation_mode = ?, workflow_mode = ?, status_sync = ?, updated_at = ?
+		`UPDATE products SET name = ?, description = ?, estimation_mode = ?, workflow_mode = ?, status_sync = ?,
+		 defect_prefix = ?, updated_at = ?
 		 WHERE id = ?`,
 		product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
-		product.StatusSync,
+		product.StatusSync, defectPrefixOrDefault(product.DefectPrefix),
 		product.UpdatedAt, product.ID,
 	)
 	return err
@@ -78,8 +78,7 @@ func (s *productStore) Delete(ctx context.Context, id string) error {
 
 func (s *productStore) List(ctx context.Context) ([]*model.Product, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, description, estimation_mode, workflow_mode, status_sync, created_at, updated_at
-		 FROM products ORDER BY name`)
+		`SELECT `+productColumns+` FROM products ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +95,23 @@ func (s *productStore) List(ctx context.Context) ([]*model.Product, error) {
 	return products, rows.Err()
 }
 
+const productColumns = `id, name, description, estimation_mode, workflow_mode, status_sync, defect_prefix,
+	created_at, updated_at`
+
+// defectPrefixOrDefault keeps a product written without a defect prefix on
+// the default rather than an empty prefix.
+func defectPrefixOrDefault(prefix string) string {
+	if prefix == "" {
+		return model.DefaultDefectPrefix
+	}
+	return prefix
+}
+
 func scanProduct(sc scanner) (*model.Product, error) {
 	var p model.Product
 	err := sc.Scan(&p.ID, &p.Name, &p.Description,
 		&p.EstimationMode, &p.WorkflowMode,
-		&p.StatusSync,
+		&p.StatusSync, &p.DefectPrefix,
 		&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err

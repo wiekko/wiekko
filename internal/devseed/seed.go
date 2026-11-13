@@ -560,6 +560,14 @@ func (p *productSeed) fillerDefects(n int, statuses, envs, sprints []string) {
 			CreatedAt:     created,
 			UpdatedAt:     created,
 		}
+		// Inserted directly to control created_at, so the number has to be
+		// drawn here as the service would (FR-043).
+		seq, err := p.s.st.Defect.NextSequenceNumber(p.s.ctx, p.id)
+		if err != nil {
+			p.s.fail(fmt.Sprintf("number filler defect %d", i+1), err)
+			return
+		}
+		d.SequenceNumber = seq
 		if err := p.s.st.Defect.Create(p.s.ctx, d); err != nil {
 			p.s.fail(fmt.Sprintf("create filler defect %d", i+1), err)
 			return

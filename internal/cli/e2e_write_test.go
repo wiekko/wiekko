@@ -175,11 +175,11 @@ func TestE2EDefectWrites(t *testing.T) {
 	}
 
 	// Testers report defects, developers move them through the workflow.
-	wantForbidden(t, "tester", e.as("bo", "", "defect", "status", d.ShortID, "In Progress"))
+	wantForbidden(t, "tester", e.as("bo", "", "defect", "status", d.Identifier, "In Progress"))
 	// FR-407: only once the defect has been activated.
-	wantForbidden(t, "developer on an inactive defect", e.as("cy", "", "defect", "status", d.ShortID, "Done"))
+	wantForbidden(t, "developer on an inactive defect", e.as("cy", "", "defect", "status", d.Identifier, "Done"))
 	e.mustRun("", "api", "PATCH", "/products/{product}/defects/"+d.ID, "--data", `{"is_active":true}`)
-	moved := decode[ops.DefectDetail](t, e.mustAs("cy", "", "defect", "status", d.ShortID, "Done", "-o", "json").stdout)
+	moved := decode[ops.DefectDetail](t, e.mustAs("cy", "", "defect", "status", d.Identifier, "Done", "-o", "json").stdout)
 	if moved.Status != "Done" || !moved.StatusClosed {
 		t.Errorf("after status change: %s (closed %v)", moved.Status, moved.StatusClosed)
 	}
@@ -197,7 +197,7 @@ func TestE2ECommentAdd(t *testing.T) {
 
 	// Requirements need developers; defects and test cases accept testers.
 	wantForbidden(t, "tester on a requirement", e.as("bo", "", "comment", "add", req.Identifier, "--body", "hi"))
-	wantForbidden(t, "viewer on a defect", e.as("ada", "", "comment", "add", defect.ShortID, "--type", "defect", "--body", "hi"))
+	wantForbidden(t, "viewer on a defect", e.as("ada", "", "comment", "add", defect.Identifier, "--type", "defect", "--body", "hi"))
 
 	c := decode[ops.CommentResult](t, e.mustAs("cy", "Decided: store drafts locally.\n", "comment", "add", strings.ToLower(req.Identifier), "--body-file", "-", "-o", "json").stdout)
 	if c.OwnerType != "requirement" || c.Owner.ID != req.ID || c.Comment.Author != "cy" {
@@ -208,14 +208,14 @@ func TestE2ECommentAdd(t *testing.T) {
 		t.Errorf("comment not visible on %s: %+v", req.Identifier, shown.Comments)
 	}
 
-	e.mustAs("bo", "", "comment", "add", defect.ShortID, "--type", "defect", "--body", "Still happens on 1.2")
+	e.mustAs("bo", "", "comment", "add", defect.Identifier, "--type", "defect", "--body", "Still happens on 1.2")
 	e.mustAs("bo", "", "comment", "add", "TestLocalStore_SightingRoundTrip", "--type", "test_case", "--body", "Flaky on CI")
 
 	for _, bad := range []struct {
 		args []string
 		code int
 	}{
-		{[]string{"comment", "add", defect.ShortID, "--body", "x"}, cli.ExitUsage}, // not an identifier, no type
+		{[]string{"comment", "add", ops.ShortID(defect.ID), "--body", "x"}, cli.ExitUsage}, // not an identifier, no type
 		{[]string{"comment", "add", "FR-9999", "--body", "x"}, cli.ExitNotFound},
 		{[]string{"comment", "add", req.Identifier}, cli.ExitUsage}, // empty body
 		{[]string{"comment", "add", req.Identifier, "--type", "sprint", "--body", "x"}, cli.ExitUsage},

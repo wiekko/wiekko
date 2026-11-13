@@ -86,11 +86,14 @@ templ GeneralTabContent(p *model.Product) {
 					@settingTextArea(p.ID, "description", "Description", p.Description)
 					@settingSelect(p.ID, "estimation_mode", "Estimation Mode", estimationModeOptions(p.EstimationMode))
 					@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
+					@settingTextFieldHint(p.ID, "defect_prefix", "Defect Identifier Prefix", p.DefectPrefix, defectPrefixHint)
 				</div>
 			}
 		}
 	</div>
 }
+
+const defectPrefixHint = "Defects are numbered like DF-17. Changing the prefix renames every defect identifier; it must differ from all category prefixes."
 
 // StubTabContent renders a placeholder for unimplemented settings tabs.
 templ StubTabContent(name string) {
@@ -663,10 +666,17 @@ templ SettingField(p *model.Product, field string) {
 			@settingSelect(p.ID, "estimation_mode", "Estimation Mode", estimationModeOptions(p.EstimationMode))
 		case "workflow_mode":
 			@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
+		case "defect_prefix":
+			@settingTextFieldHint(p.ID, "defect_prefix", "Defect Identifier Prefix", p.DefectPrefix, defectPrefixHint)
 	}
 }
 
 templ settingTextField(productID, field, label, value string) {
+	@settingTextFieldHint(productID, field, label, value, "")
+}
+
+// settingTextFieldHint is settingTextField with a help text below the input.
+templ settingTextFieldHint(productID, field, label, value, hint string) {
 	<div
 		id={ "setting-" + field }
 		class="space-y-1"
@@ -684,7 +694,13 @@ templ settingTextField(productID, field, label, value string) {
 			hx-include="this"
 			hx-vals={ `{"field":"` + field + `"}` }
 			hx-trigger="change"
+			if hint != "" {
+				aria-describedby={ field + "-hint" }
+			}
 		/>
+		if hint != "" {
+			<p id={ field + "-hint" } class="text-sm text-gray-500 dark:text-gray-400">{ hint }</p>
+		}
 	</div>
 }
 

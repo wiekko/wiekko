@@ -986,6 +986,11 @@ func eventActorName(names map[string]string, userID string) string {
 	return "Unknown user"
 }
 
+// defectLabel names a defect by identifier and title, e.g. "DF-17 Login fails".
+func defectLabel(d *model.Defect) string {
+	return d.Identifier + " " + d.Title
+}
+
 // defectTitleMap resolves only the defects the given events actually reference.
 func (c *PageProductController) defectTitleMap(r *http.Request, user *model.User, productID string, events []*model.CampaignResultEvent) map[string]string {
 	titles := make(map[string]string)
@@ -994,7 +999,7 @@ func (c *PageProductController) defectTitleMap(r *http.Request, user *model.User
 			continue
 		}
 		if d, err := c.backlog.GetDefect(r.Context(), user, productID, ev.DefectID); err == nil {
-			titles[ev.DefectID] = d.Title
+			titles[ev.DefectID] = defectLabel(d)
 		}
 	}
 	return titles

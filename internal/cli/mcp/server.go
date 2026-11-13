@@ -105,7 +105,7 @@ type Items[T any] struct {
 
 // RefInput selects one entity.
 type RefInput struct {
-	Ref string `json:"ref" jsonschema:"identifier (FR-12, AC-3), short ID, full ID, or name where the tool says so"`
+	Ref string `json:"ref" jsonschema:"identifier (FR-12, AC-3, DF-17), short ID, full ID, or name where the tool says so"`
 }
 
 // CampaignInput optionally selects a campaign.
@@ -222,14 +222,14 @@ func registerReadTools(s *sdk.Server, h *handlers) {
 		})
 
 	readTool(s, h, "list_defects", "List defects",
-		"List defects, most critical first. Defects are referenced by their short ID.",
+		"List defects, most critical first. Defects are referenced by their identifier, e.g. DF-17.",
 		func(ctx context.Context, sess *ops.Session, q ops.DefectQuery) (Items[ops.DefectSummary], func(io.Writer) error, error) {
 			items, err := sess.ListDefects(ctx, q)
 			return Items[ops.DefectSummary]{items}, func(w io.Writer) error { return render.Defects(w, output.Markdown, items) }, err
 		})
 
 	readTool(s, h, "get_defect", "Show a defect",
-		"One defect by short ID or ID: description, criticality, links to requirements and test cases, comments.",
+		"One defect by identifier (DF-17) or ID: description, criticality, links to requirements and test cases, comments.",
 		func(ctx context.Context, sess *ops.Session, in RefInput) (*ops.DefectDetail, func(io.Writer) error, error) {
 			if err := required(in.Ref); err != nil {
 				return nil, nil, err

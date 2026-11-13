@@ -643,6 +643,8 @@ func (m *MockRequirementStore) ListAssignees(ctx context.Context, requirementID 
 type MockDefectStore struct {
 	CreateFunc              func(ctx context.Context, d *model.Defect) error
 	GetByIDFunc             func(ctx context.Context, id string) (*model.Defect, error)
+	GetBySequenceFunc       func(ctx context.Context, productID string, seq int) (*model.Defect, error)
+	NextSequenceNumberFunc  func(ctx context.Context, productID string) (int, error)
 	UpdateFunc              func(ctx context.Context, d *model.Defect) error
 	DeleteFunc              func(ctx context.Context, id string) error
 	ListByProductIDFunc     func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
@@ -666,6 +668,23 @@ func (m *MockDefectStore) Create(ctx context.Context, d *model.Defect) error {
 func (m *MockDefectStore) GetByID(ctx context.Context, id string) (*model.Defect, error) {
 	return m.GetByIDFunc(ctx, id)
 }
+
+// GetBySequence reports not found unless GetBySequenceFunc is set.
+func (m *MockDefectStore) GetBySequence(ctx context.Context, productID string, seq int) (*model.Defect, error) {
+	if m.GetBySequenceFunc == nil {
+		return nil, errors.New("defect not found")
+	}
+	return m.GetBySequenceFunc(ctx, productID, seq)
+}
+
+// NextSequenceNumber returns 1 unless NextSequenceNumberFunc is set.
+func (m *MockDefectStore) NextSequenceNumber(ctx context.Context, productID string) (int, error) {
+	if m.NextSequenceNumberFunc == nil {
+		return 1, nil
+	}
+	return m.NextSequenceNumberFunc(ctx, productID)
+}
+
 func (m *MockDefectStore) Update(ctx context.Context, d *model.Defect) error {
 	return m.UpdateFunc(ctx, d)
 }

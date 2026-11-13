@@ -185,7 +185,7 @@ func TestE2EDefectsTestsCampaign(t *testing.T) {
 			t.Errorf("defects not sorted by criticality: %s before %s", defects[i-1].Criticality, defects[i].Criticality)
 		}
 	}
-	d := decode[ops.DefectDetail](t, e.mustRun("", "defect", "show", defects[0].ShortID, "-o", "json").stdout)
+	d := decode[ops.DefectDetail](t, e.mustRun("", "defect", "show", defects[0].Identifier, "-o", "json").stdout)
 	if d.ID != defects[0].ID || d.Status == "" {
 		t.Fatalf("defect = %+v", d.DefectSummary)
 	}

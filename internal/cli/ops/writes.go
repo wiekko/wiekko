@@ -207,7 +207,7 @@ func (s *Session) CreateDefect(ctx context.Context, in NewDefect) (*DefectDetail
 	}
 	for _, l := range links {
 		if err := s.C.AddDefectLink(ctx, s.ProductID, d.ID, l.targetType, l.id); err != nil {
-			return nil, fmt.Errorf("defect %s was created, but linking it to %s failed: %w", ShortID(d.ID), l.label, err)
+			return nil, fmt.Errorf("defect %s was created, but linking it to %s failed: %w", d.Identifier, l.label, err)
 		}
 	}
 	return s.ShowDefect(ctx, d.ID)
@@ -262,7 +262,8 @@ func (s *Session) AddComment(ctx context.Context, in NewComment) (*CommentResult
 }
 
 // commentOwner resolves the commented entity. Without a type, only
-// identifiers are accepted: they name a requirement, task or constraint.
+// identifiers are accepted: they name a requirement, task, constraint or
+// defect.
 func (s *Session) commentOwner(ctx context.Context, typ, ref string) (string, Ref, error) {
 	switch typ {
 	case "":
@@ -276,7 +277,19 @@ func (s *Session) commentOwner(ctx context.Context, typ, ref string) (string, Re
 		if !client.IsNotFound(err) {
 			return "", Ref{}, err
 		}
-		return s.commentOwner(ctx, "constraint", ref)
+		typ, owner, err := s.commentOwner(ctx, "constraint", ref)
+		var nf *NotFoundError
+		if !errors.As(err, &nf) {
+			return typ, owner, err
+		}
+		d, err := s.C.Defect(ctx, s.ProductID, ref)
+		if err != nil {
+			if client.IsNotFound(err) {
+				return "", Ref{}, &NotFoundError{Kind: "requirement, task, constraint or defect", Ref: ref}
+			}
+			return "", Ref{}, err
+		}
+		return "defect", Ref{ID: d.ID, Identifier: d.Identifier, Title: d.Title}, nil
 	case "requirement", "task":
 		r, err := s.requirement(ctx, ref, typ)
 		if err != nil {
@@ -297,7 +310,7 @@ func (s *Session) commentOwner(ctx context.Context, typ, ref string) (string, Re
 		if err != nil {
 			return "", Ref{}, err
 		}
-		return typ, Ref{ID: d.ID, Title: d.Title}, nil
+		return typ, Ref{ID: d.ID, Identifier: d.Identifier, Title: d.Title}, nil
 	case "test_case", "test":
 		tc, err := s.findTestCase(ctx, ref)
 		if err != nil {

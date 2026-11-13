@@ -61,10 +61,14 @@ func (f defectFixture) addDefect(t *testing.T, db *DB, title, criticality, statu
 	t.Helper()
 
 	id := uuid.NewString()
-	_, err := db.Exec(`INSERT INTO defects
-		(id, product_id, title, description, criticality, status_id, environment_id, sprint_id, priority, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, FALSE, ?, ?)`,
-		id, f.productID, title, criticality,
+	seq, err := (&defectStore{db: db}).NextSequenceNumber(context.Background(), f.productID)
+	if err != nil {
+		t.Fatalf("number defect %q: %v", title, err)
+	}
+	_, err = db.Exec(`INSERT INTO defects
+		(id, product_id, sequence_number, title, description, criticality, status_id, environment_id, sprint_id, priority, is_active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, FALSE, ?, ?)`,
+		id, f.productID, seq, title, criticality,
 		nullableText(statusID), nullableText(envID), nullableText(sprintID),
 		priority, created, created)
 	if err != nil {

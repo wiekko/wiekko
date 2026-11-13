@@ -705,6 +705,9 @@ templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
 				@ui.Table() {
 					@ui.TableHead() {
 						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
 							Title
 						}
 						@ui.TableHeader() {
@@ -718,6 +721,9 @@ templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
 					@ui.TableBody("") {
 						for _, d := range props.Defects {
 							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ d.Identifier }</span>
+								}
 								@ui.TableCell() {
 									<a
 										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, d.ID)) }
@@ -790,7 +796,7 @@ templ MilestoneDefectLinkResults(productID, milestoneID string, candidates []*mo
 				<li class="flex items-center justify-between gap-4 py-3">
 					<div class="min-w-0 flex-1">
 						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ d.Title }</p>
-						<p class="text-xs text-gray-500 dark:text-gray-400">{ d.Criticality }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ d.Identifier } · { d.Criticality }</p>
 						if d.MilestoneID != "" {
 							<p class="text-xs text-amber-600 dark:text-amber-400">
 								{ "currently: " + milestoneNameOf(milestoneNames, d.MilestoneID) }

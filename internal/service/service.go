@@ -147,6 +147,7 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		},
 		Category: &CategoryService{
 			categories:   st.Category,
+			products:     st.Product,
 			requirements: st.Requirement,
 			constraints:  st.Constraint,
 			audit:        st.Audit,

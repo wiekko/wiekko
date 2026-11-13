@@ -55,6 +55,9 @@ A **defect** is something that does not work as it should. It has a **criticalit
 critical), moves through the same kind of workflow as the backlog, and can be linked to the components,
 capabilities, requirements and test cases it affects.
 
+Defects are numbered by a counter of their own and get identifiers like `DF-17`. The prefix `DF` can be
+changed under **Settings → General**; it must differ from every category prefix.
+
 ## Test cases and testing campaigns
 
 - A **test case** describes one check. It is **manual** (a person carries it out) or **automatic** (a test

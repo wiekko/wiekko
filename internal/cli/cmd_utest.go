@@ -287,7 +287,7 @@ func writeRecorded(b *strings.Builder, rep *client.TestRunReport) {
 		}
 		line := fmt.Sprintf("  %-7s %s (%s → %s)", strings.ToUpper(o.Status), o.TestIdentifier, o.PreviousStatus, o.Status)
 		if o.Defect != "" {
-			line += fmt.Sprintf(", defect %s %s", shortID(o.DefectID), o.Defect)
+			line += fmt.Sprintf(", defect %s %s", defectRef(o.DefectIdentifier, o.DefectID), o.Defect)
 		}
 		b.WriteString(line + "\n")
 	}
@@ -355,6 +355,15 @@ func writeDryRun(b *strings.Builder, rep *client.TestRunReport) {
 		fmt.Fprintln(tw, strings.Join(r, "\t"))
 	}
 	_ = tw.Flush()
+}
+
+// defectRef names a defect by its identifier, or by its short ID if the
+// server sent none.
+func defectRef(identifier, id string) string {
+	if identifier != "" {
+		return identifier
+	}
+	return shortID(id)
 }
 
 func shortID(id string) string {

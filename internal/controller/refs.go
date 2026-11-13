@@ -11,6 +11,15 @@ import (
 // refResolver turns an entity reference from the URL into the entity's ID.
 type refResolver func(ctx context.Context, user *model.User, productID, ref string) (string, error)
 
+// resolveDefect turns a defect reference from a request body or query into
+// the defect's ID; empty references and a nil resolver pass through.
+func resolveDefect(r *http.Request, resolve refResolver, ref string) (string, error) {
+	if ref == "" || resolve == nil {
+		return ref, nil
+	}
+	return resolve(r.Context(), middleware.UserFromContext(r.Context()), r.PathValue("productId"), ref)
+}
+
 // ResolveRefs rewrites the named path values from human-readable identifiers
 // ("FR-12", "AC-42") to entity IDs before the handler runs, so every route
 // below /requirements/{id} or /constraints/{id} accepts either form without

@@ -73,7 +73,9 @@ type TestRunOutcome struct {
 	ResultID       string
 	PreviousStatus string
 	DefectID       string
-	Defect         string // TestRunDefectCreated, TestRunDefectReused or empty
+	// DefectIdentifier is the defect's identifier, e.g. DF-17 (FR-043).
+	DefectIdentifier string
+	Defect           string // TestRunDefectCreated, TestRunDefectReused or empty
 }
 
 // TestRunReport is the result of IngestRun.
@@ -188,7 +190,28 @@ func (s *TestRunService) IngestRun(ctx context.Context, user *model.User, in Tes
 		report.Outcomes = append(report.Outcomes, o)
 	}
 	report.Recorded = write
+	s.fillDefectIdentifiers(ctx, report)
 	return report, nil
+}
+
+// fillDefectIdentifiers adds the identifiers of the defects the outcomes name.
+// A defect that cannot be read keeps its ID only; the run is recorded anyway.
+func (s *TestRunService) fillDefectIdentifiers(ctx context.Context, report *TestRunReport) {
+	seen := map[string]string{}
+	for i := range report.Outcomes {
+		o := &report.Outcomes[i]
+		if o.DefectID == "" {
+			continue
+		}
+		ident, ok := seen[o.DefectID]
+		if !ok {
+			if d, err := s.defects.GetByID(ctx, o.DefectID); err == nil {
+				ident = d.Identifier
+			}
+			seen[o.DefectID] = ident
+		}
+		o.DefectIdentifier = ident
+	}
 }
 
 // apply changes one result's status, filing or reusing a defect for a

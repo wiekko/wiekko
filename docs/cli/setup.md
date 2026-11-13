@@ -114,6 +114,6 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 
 `nexmap help <command>` (e.g. `nexmap help req show`) lists a command's arguments and flags.
 
-Requirements, tasks and constraints are referenced by their identifier (`FR-12`, `MT-3`, `AC-42`),
-defects and test cases by their short ID (the first 8 characters of the ID, shown in lists), test cases
-also by their test identifier, and capabilities by name.
+Requirements, tasks, constraints and defects are referenced by their identifier (`FR-12`, `MT-3`,
+`AC-42`, `DF-17`), test cases by their short ID (the first 8 characters of the ID, shown in lists) or
+their test identifier, and capabilities by name.

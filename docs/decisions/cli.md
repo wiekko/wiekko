@@ -61,6 +61,12 @@ enforces. The CLI enforces nothing on its own.
 ## Identifiers instead of UUIDs
 
 Agents and people think in `FR-12` and "In Progress", not in UUIDs. The API therefore returns identifiers
-alongside IDs and accepts them wherever a requirement or constraint ID appears in a path. An identifier
-only resolves when its prefix matches the item's category, so `MT-12` never aliases `FR-12`. Defects
-have no human identifier yet; the CLI references them by the first 8 characters of their ID meanwhile.
+alongside IDs and accepts them wherever a requirement, constraint or defect ID appears in a path. An
+identifier only resolves when its prefix matches the item's category (for defects, the product's defect
+prefix), so `MT-12` never aliases `FR-12`. Test cases have no human identifier; the CLI references them
+by the first 8 characters of their ID or by their test identifier.
+
+Defects number from a counter of their own rather than the backlog's: a defect is not backlog
+specification, and automated test runs can file many of them, which would otherwise eat into the
+requirement numbering. Their prefix is a product setting, not a category, because defects have no
+categories; it shares the category prefixes' namespace so that no identifier is ambiguous.

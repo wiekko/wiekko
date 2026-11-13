@@ -865,6 +865,8 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 		input.EstimationMode = &value
 	case "workflow_mode":
 		input.WorkflowMode = &value
+	case "defect_prefix":
+		input.DefectPrefix = &value
 	default:
 		http.Error(w, "unknown field", http.StatusBadRequest)
 		return
@@ -2171,7 +2173,7 @@ func (c *PageProductController) MilestoneDefectLinkSearch(w http.ResponseWriter,
 		if d.MilestoneID == milestoneID {
 			continue
 		}
-		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) {
+		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) && !strings.Contains(strings.ToLower(d.Identifier), query) {
 			continue
 		}
 		candidates = append(candidates, d)
@@ -4079,7 +4081,7 @@ func (c *PageProductController) CapabilityDefectLinkSearch(w http.ResponseWriter
 		if _, ok := linkedIDs[d.ID]; ok {
 			continue
 		}
-		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) {
+		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) && !strings.Contains(strings.ToLower(d.Identifier), query) {
 			continue
 		}
 		candidates = append(candidates, d)
@@ -5102,7 +5104,7 @@ func (c *PageProductController) TestCaseCampaignsTab(w http.ResponseWriter, r *h
 		}
 		if result.DefectID != "" {
 			if d, err := c.backlog.GetDefect(r.Context(), user, productID, result.DefectID); err == nil {
-				view.DefectTitle = d.Title
+				view.DefectTitle = defectLabel(d)
 			} else {
 				view.DefectTitle = "Defect"
 			}
@@ -6330,7 +6332,7 @@ func (c *PageProductController) RequirementDefectLinkSearch(w http.ResponseWrite
 		if _, ok := linkedIDs[d.ID]; ok {
 			continue
 		}
-		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) {
+		if query != "" && !strings.Contains(strings.ToLower(d.Title), query) && !strings.Contains(strings.ToLower(d.Identifier), query) {
 			continue
 		}
 		candidates = append(candidates, d)
@@ -6748,7 +6750,7 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.DefectDetailPage(productpage.DefectDetailProps{
 		Meta: templates.PageMeta{
-			Title:     p.Name + " - " + d.Title,
+			Title:     p.Name + " - " + d.Identifier + " " + d.Title,
 			CSRFToken: csrfToken,
 		},
 		DisplayName: user.DisplayName,

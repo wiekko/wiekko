@@ -234,7 +234,7 @@ var defectHeaders = []string{"ID", "Title", "Criticality", "Status", "Prio", "Fl
 func defectRows(items []ops.DefectSummary) [][]string {
 	rows := make([][]string, 0, len(items))
 	for _, x := range items {
-		rows = append(rows, []string{x.ShortID, x.Title, x.Criticality, dash(x.Status), strconv.Itoa(x.Priority),
+		rows = append(rows, []string{x.Identifier, x.Title, x.Criticality, dash(x.Status), strconv.Itoa(x.Priority),
 			flags("active", x.Active, "closed", x.StatusClosed)})
 	}
 	return rows
@@ -248,7 +248,7 @@ func Defects(w io.Writer, f output.Format, items []ops.DefectSummary) error {
 // Defect renders one defect.
 func Defect(w io.Writer, x *ops.DefectDetail) error {
 	var d doc
-	d.h(1, "Defect "+x.ShortID+": "+x.Title)
+	d.h(1, "Defect "+x.Identifier+": "+x.Title)
 	d.kv("Criticality", x.Criticality)
 	d.kv("Status", x.Status)
 	d.kv("Priority", strconv.Itoa(x.Priority))
@@ -417,7 +417,10 @@ func Campaign(w io.Writer, v *ops.CampaignStatusView) error {
 		}
 		defect := ""
 		if r.DefectID != "" {
-			defect = ops.ShortID(r.DefectID)
+			defect = r.Defect
+			if defect == "" { // the token may not read defects
+				defect = ops.ShortID(r.DefectID)
+			}
 		}
 		rows = append(rows, []string{title, dash(r.TestIdentifier), dash(r.Environment), r.Status, dash(defect)})
 	}

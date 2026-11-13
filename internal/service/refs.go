@@ -93,6 +93,28 @@ func (s *BacklogService) ResolveRequirementRef(ctx context.Context, user *model.
 	return r.ID, nil
 }
 
+// ResolveDefectRef turns a defect reference into its ID: the ID itself,
+// returned unchanged, or an identifier such as "DF-17" (FR-043). The prefix
+// must be the product's current defect prefix, so a requirement identifier
+// never resolves to a defect. Requires viewer role.
+func (s *BacklogService) ResolveDefectRef(ctx context.Context, user *model.User, productID, ref string) (string, error) {
+	prefix, seq, ok := parseRef(ref)
+	if !ok {
+		return ref, nil
+	}
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return "", err
+	}
+	if prefix != s.defectPrefix(ctx, productID) {
+		return "", fmt.Errorf("%w: no defect %s", ErrNotFound, ref)
+	}
+	d, err := s.defects.GetBySequence(ctx, productID, seq)
+	if err != nil {
+		return "", fmt.Errorf("%w: no defect %s", ErrNotFound, ref)
+	}
+	return d.ID, nil
+}
+
 // CategoryPrefixes maps the product's constraint category IDs to their
 // prefixes. Requires viewer role.
 func (s *ConstraintService) CategoryPrefixes(ctx context.Context, user *model.User, productID string) (map[string]string, error) {

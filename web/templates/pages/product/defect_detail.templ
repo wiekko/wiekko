@@ -37,10 +37,10 @@ templ DefectDetailPage(props DefectDetailProps) {
 					{Label: "Dashboard", Href: "/"},
 					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 					{Label: "Defects", Href: "/products/" + props.Product.ID + "/defects"},
-					{Label: props.Defect.Title},
+					{Label: props.Defect.Identifier},
 				},
 				props.Defect.Title,
-				"",
+				props.Defect.Identifier,
 				defectEditHref(props),
 				defectDeleteURL(props),
 				props.Meta.CSRFToken,
@@ -110,6 +110,7 @@ templ DefectOverviewTabContent(props DefectOverviewProps) {
 		@ui.Card() {
 			@ui.CardBody() {
 				@patterns.DetailGrid() {
+					@patterns.DetailField("Identifier", props.Defect.Identifier)
 					@patterns.DetailField("Criticality", defectCriticalityDisplay(props.Defect.Criticality))
 					@workflowStatusField(props.Status)
 					if props.Defect.MilestoneID != "" && props.MilestoneName != "" {

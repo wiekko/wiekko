@@ -2,8 +2,14 @@ package model
 
 // Defect represents a bug or issue within a product.
 type Defect struct {
-	ID          string
-	ProductID   string
+	ID        string
+	ProductID string
+	// SequenceNumber numbers the product's defects (FR-043); with the product's
+	// defect prefix it forms the identifier, e.g. DF-17.
+	SequenceNumber int
+	// Identifier is the human-readable identifier, filled in when read from
+	// the store with the product's current prefix.
+	Identifier  string
 	Title       string
 	Description string // Markdown
 	Criticality string // "critical", "high", "medium", "low"

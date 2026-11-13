@@ -28,9 +28,9 @@ Prefer the tools over the CLI.
 - Requirements, tasks and constraints have identifiers like `FR-12`, `MT-3`,
   `AC-42` (category prefix + number). Use them in commands, commit messages
   and code comments.
-- Defects and test cases are referenced by their short ID (first 8 characters
-  of the ID, shown in lists). Test cases can also be referenced by their test
-  identifier, e.g. the Go test function name.
+- Defects have identifiers like `DF-17`; use them like the ones above.
+- Test cases are referenced by their short ID (first 8 characters of the ID,
+  shown in lists) or by their test identifier, e.g. the Go test function name.
 - Capabilities are referenced by name.
 
 ### Commands
@@ -41,7 +41,7 @@ Prefer the tools over the CLI.
 | `nexmap req show <FR-12>` | One requirement or task |
 | `nexmap constraint list [--compliance violated]` / `constraint show <AC-42>` | Rules the code must follow |
 | `nexmap component list` / `capability show <name>` | Product structure and traceability |
-| `nexmap defect list [--open] [--criticality high]` / `defect show <short ID>` | Known bugs |
+| `nexmap defect list [--open] [--criticality high]` / `defect show <DF-17>` | Known bugs |
 | `nexmap test list [--automatic]` / `test show <test identifier>` | Test cases and their results |
 | `nexmap campaign status` | Active testing campaign: verdict and failing tests |
 | `nexmap api [METHOD] <path>` | Raw REST call for anything else (`{product}` is replaced) |
@@ -57,8 +57,8 @@ into a sprint). An item's `active` field says whether it is.
 | Command | Purpose | Role |
 | --- | --- | --- |
 | `nexmap req status FR-12 "In Progress"` | Move an item through the workflow when you start or finish it | developer, on active items only |
-| `nexmap defect status <short ID> Done` | Same for a defect you fixed | developer, on active defects only |
-| `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; `--type defect` etc. for short IDs) | developer (tester on defects and test cases) |
+| `nexmap defect status DF-17 Done` | Same for a defect you fixed | developer, on active defects only |
+| `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; works for `DF-17` too; `--type test_case` etc. for test cases and capabilities) | developer (tester on defects and test cases) |
 | `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
 | `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |
 

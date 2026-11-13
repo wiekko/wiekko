@@ -8,9 +8,13 @@ type Product struct {
 	EstimationMode string // "disabled", "story_points", "tshirt_sizes", "hours"
 	WorkflowMode   string // "kanban", "scrum"
 	StatusSync     bool   // true = statuses synced between requirements and defects
+	DefectPrefix   string // prefix of defect identifiers, e.g. "DF" in DF-17 (FR-043)
 	CreatedAt      string // RFC 3339
 	UpdatedAt      string // RFC 3339
 }
+
+// DefaultDefectPrefix is the defect identifier prefix of new products.
+const DefaultDefectPrefix = "DF"
 
 // Estimation mode constants.
 const (

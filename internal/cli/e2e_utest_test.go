@@ -102,7 +102,7 @@ func TestE2EUtest(t *testing.T) {
 	if filed == nil {
 		t.Fatal("no defect filed for the photo test")
 	}
-	d := decode[ops.DefectDetail](t, e.mustRun("", "defect", "show", filed.ShortID, "-o", "json").stdout)
+	d := decode[ops.DefectDetail](t, e.mustRun("", "defect", "show", filed.Identifier, "-o", "json").stdout)
 	if !strings.Contains(d.Description, "orientation = 6, want 1") || !strings.Contains(d.Description, "0123456789abcdef") ||
 		d.Environment != "Android 14" {
 		t.Errorf("filed defect: env %q, description:\n%s", d.Environment, d.Description)

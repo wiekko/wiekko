@@ -130,6 +130,7 @@ func defectCard(productID string, d *model.Defect) templates.BoardCard {
 	return templates.BoardCard{
 		EntityType: "defect",
 		ID:         d.ID,
+		Identifier: d.Identifier,
 		Title:      d.Title,
 		Priority:   d.Priority,
 		MoveURL:    "/products/" + productID + "/board/defects/" + d.ID + "/status",

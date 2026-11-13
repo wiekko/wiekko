@@ -12,12 +12,16 @@ import (
 
 // TestingController handles test case, campaign, and campaign result endpoints.
 type TestingController struct {
-	testing *service.TestingService
+	testing   *service.TestingService
+	defectRef refResolver
 }
 
 // NewTesting creates a TestingController.
-func NewTesting(testing *service.TestingService) *TestingController {
-	return &TestingController{testing: testing}
+//
+// defectRef resolves defect identifiers given for a campaign result's defect
+// (FR-043); nil accepts IDs only.
+func NewTesting(testing *service.TestingService, defectRef refResolver) *TestingController {
+	return &TestingController{testing: testing, defectRef: defectRef}
 }
 
 // --- Test Cases ---
@@ -552,7 +556,13 @@ func (c *TestingController) UpdateResult(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	item, err := c.testing.SetResultStatus(r.Context(), user, productID, campaignID, resultID, req.Status, req.DefectID)
+	defectID, err := resolveDefect(r, c.defectRef, req.DefectID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	item, err := c.testing.SetResultStatus(r.Context(), user, productID, campaignID, resultID, req.Status, defectID)
 	if err != nil {
 		writeServiceError(w, err)
 		return

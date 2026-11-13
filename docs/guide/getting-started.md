@@ -18,7 +18,8 @@ enabled product creation; administrators always can. You become the product's ow
 
 **Settings** in the product's sidebar has five tabs. Changes are saved as you make them.
 
-- **General:** name, description, estimation mode and workflow mode.
+- **General:** name, description, estimation mode, workflow mode and the defect identifier prefix
+  (`DF` in `DF-17`).
 - **Categories:** the categories of requirements, tasks and constraints, each with a name and an
   identifier prefix. The defaults are listed in [Concepts](concepts.md#requirements-tasks-and-constraints).
   Settle the prefixes early, before identifiers like `FR-12` appear in commit messages.

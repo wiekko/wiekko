@@ -22,7 +22,10 @@ var prefixPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{0,5}$`)
 
 // CategoryService handles category CRUD.
 type CategoryService struct {
-	categories   store.CategoryStore
+	categories store.CategoryStore
+	// products holds the defect prefix, which category prefixes must not
+	// take (FR-043). nil skips that check.
+	products     store.ProductStore
 	requirements store.RequirementStore
 	constraints  store.ConstraintStore
 	audit        store.AuditStore
@@ -292,11 +295,26 @@ func (s *CategoryService) checkNameFree(ctx context.Context, productID, entityTy
 // their own sequence counter, so a shared prefix would render two different items
 // as the same identifier.
 func (s *CategoryService) checkPrefixFree(ctx context.Context, productID, prefix, selfID string) error {
+	if s.products != nil {
+		if p, err := s.products.GetByID(ctx, productID); err == nil && p.DefectPrefix == prefix {
+			return fmt.Errorf("prefix %q is already used for defects", prefix)
+		}
+	}
 	existing, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix)
 	if err != nil || existing == nil || existing.ID == selfID {
 		return nil
 	}
 	return fmt.Errorf("prefix %q is already used by the %s category %q", prefix, existing.EntityType, existing.Name)
+}
+
+// normalizeDefectPrefix validates a defect identifier prefix by the same
+// rules as category prefixes.
+func normalizeDefectPrefix(prefix string) (string, error) {
+	prefix = strings.ToUpper(strings.TrimSpace(prefix))
+	if !prefixPattern.MatchString(prefix) {
+		return "", errors.New("defect prefix must be 1-6 letters or digits, starting with a letter (e.g. DF)")
+	}
+	return prefix, nil
 }
 
 func normalizePrefix(prefix string) (string, error) {

@@ -223,8 +223,8 @@ func TestE2EMCPMatchesCLI(t *testing.T) {
 		if len(defects) == 0 {
 			t.Fatal("seed has no defects")
 		}
-		_, got = mustTool(t, s, "get_defect", map[string]any{"ref": defects[0].ShortID})
-		same("defect", got, cliJSON("defect", "show", defects[0].ShortID))
+		_, got = mustTool(t, s, "get_defect", map[string]any{"ref": defects[0].Identifier})
+		same("defect", got, cliJSON("defect", "show", defects[0].Identifier))
 	})
 }
 

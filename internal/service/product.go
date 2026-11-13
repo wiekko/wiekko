@@ -40,6 +40,9 @@ type UpdateProductInput struct {
 	Description    *string
 	EstimationMode *string
 	WorkflowMode   *string
+	// DefectPrefix renames every defect identifier at once (FR-043); it must
+	// not be a prefix of any of the product's categories.
+	DefectPrefix *string
 }
 
 // Create creates a new product and assigns the creator as owner (FR-303).
@@ -258,6 +261,16 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 	}
 	if input.EstimationMode != nil {
 		product.EstimationMode = *input.EstimationMode
+	}
+	if input.DefectPrefix != nil {
+		prefix, err := normalizeDefectPrefix(*input.DefectPrefix)
+		if err != nil {
+			return nil, err
+		}
+		if cat, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix); err == nil && cat != nil {
+			return nil, fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
+		}
+		product.DefectPrefix = prefix
 	}
 	switchesToScrum := false
 	if input.WorkflowMode != nil {

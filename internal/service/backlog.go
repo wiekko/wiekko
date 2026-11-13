@@ -530,9 +530,10 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err := s.defects.Create(ctx, d); err != nil {
-		return nil, fmt.Errorf("create defect: %w", err)
+	if err := s.insertNumbered(ctx, d); err != nil {
+		return nil, err
 	}
+	d.Identifier = model.EntityIdentifier(s.defectPrefix(ctx, input.ProductID), d.SequenceNumber)
 	if s.kanbanMode(ctx, input.ProductID) {
 		d.IsActive = s.columnActive(ctx, d.StatusID)
 	}
@@ -702,6 +703,43 @@ func checkActivationChange(kind string, isDeveloper, kanban, current bool, reque
 }
 
 // kanbanMode reports whether the product activates items by column.
+// defectNumberAttempts bounds how often a defect insert is retried when a
+// concurrent insert took its number first.
+const defectNumberAttempts = 5
+
+// insertNumbered stores a new defect under the product's next defect number
+// (FR-043). Two concurrent inserts can draw the same number; the unique index
+// rejects the second, which then draws again. Automated test runs make this
+// realistic: parallel CI jobs file defects for the same product.
+func (s *BacklogService) insertNumbered(ctx context.Context, d *model.Defect) error {
+	for attempt := 1; ; attempt++ {
+		seq, err := s.defects.NextSequenceNumber(ctx, d.ProductID)
+		if err != nil {
+			return fmt.Errorf("next defect number: %w", err)
+		}
+		d.SequenceNumber = seq
+		err = s.defects.Create(ctx, d)
+		if err == nil {
+			return nil
+		}
+		// Retry only if the number was taken meanwhile; anything else is a
+		// real failure.
+		if _, lookupErr := s.defects.GetBySequence(ctx, d.ProductID, seq); lookupErr != nil || attempt == defectNumberAttempts {
+			return fmt.Errorf("create defect: %w", err)
+		}
+	}
+}
+
+// defectPrefix returns the product's defect identifier prefix.
+func (s *BacklogService) defectPrefix(ctx context.Context, productID string) string {
+	if s.products != nil {
+		if p, err := s.products.GetByID(ctx, productID); err == nil && p.DefectPrefix != "" {
+			return p.DefectPrefix
+		}
+	}
+	return model.DefaultDefectPrefix
+}
+
 func (s *BacklogService) kanbanMode(ctx context.Context, productID string) bool {
 	if s.products == nil {
 		return false

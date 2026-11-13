@@ -64,7 +64,7 @@ type ConstraintDetail struct {
 // DefectSummary is one row of a defect list.
 type DefectSummary struct {
 	ID           string `json:"id"`
-	ShortID      string `json:"short_id"`
+	Identifier   string `json:"identifier"` // e.g. DF-17
 	Title        string `json:"title"`
 	Criticality  string `json:"criticality"`
 	Status       string `json:"status"`
@@ -130,6 +130,7 @@ type ResultView struct {
 	Environment    string `json:"environment,omitempty"`
 	Status         string `json:"status"`
 	DefectID       string `json:"defect_id,omitempty"`
+	Defect         string `json:"defect,omitempty"` // the defect's identifier
 	ExecutedAt     string `json:"executed_at,omitempty"`
 }
 

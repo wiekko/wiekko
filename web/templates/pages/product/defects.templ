@@ -117,6 +117,7 @@ templ DefectsTableContent(props DefectsProps) {
 			} else {
 				@ui.Table() {
 					@ui.TableHead() {
+						@ui.SortHeader("ID", "identifier", props.State, defectsTableTarget)
 						@ui.SortHeader("Title", "title", props.State, defectsTableTarget)
 						@ui.SortHeader("Criticality", "criticality", props.State, defectsTableTarget)
 						@ui.SortHeader("Status", "status", props.State, defectsTableTarget)
@@ -134,6 +135,9 @@ templ DefectsTableContent(props DefectsProps) {
 					@ui.TableBody("") {
 						for _, d := range props.Defects {
 							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ d.Identifier }</span>
+								}
 								@ui.TableCell() {
 									<a
 										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID)) }

@@ -7,10 +7,10 @@ and defects.
   `{"ref": "FR-12"}`): description, definition of done, covering test cases,
   linked defects and comments.
 - Requirements, tasks and constraints have identifiers like `FR-12` or `AC-42`
-  (category prefix + number); use them in commit messages and code comments.
-  Defects and test cases are referenced by short ID (first 8 characters of the
-  ID, shown in lists); test cases also by their test identifier. Capabilities
-  are referenced by name.
+  (category prefix + number), defects like `DF-17`; use them in commit
+  messages and code comments. Test cases are referenced by short ID (first 8
+  characters of the ID, shown in lists) or by their test identifier.
+  Capabilities are referenced by name.
 - Treat constraints as non-negotiable unless the user says otherwise.
 - If a requirement is unclear, read its comments and parent, and ask the user
   rather than inventing scope.

@@ -80,15 +80,16 @@ func testRunReportToJSON(rep *service.TestRunReport) map[string]any {
 	results := make([]map[string]any, 0, len(rep.Outcomes))
 	for _, o := range rep.Outcomes {
 		results = append(results, map[string]any{
-			"test_identifier": o.TestIdentifier,
-			"reported":        o.Reported,
-			"status":          o.Status,
-			"outcome":         o.Outcome,
-			"test_case_id":    o.TestCaseID,
-			"result_id":       o.ResultID,
-			"previous_status": o.PreviousStatus,
-			"defect_id":       o.DefectID,
-			"defect":          o.Defect,
+			"test_identifier":   o.TestIdentifier,
+			"reported":          o.Reported,
+			"status":            o.Status,
+			"outcome":           o.Outcome,
+			"test_case_id":      o.TestCaseID,
+			"result_id":         o.ResultID,
+			"previous_status":   o.PreviousStatus,
+			"defect_id":         o.DefectID,
+			"defect_identifier": o.DefectIdentifier,
+			"defect":            o.Defect,
 		})
 	}
 	var campaign any

@@ -18,11 +18,24 @@ import (
 // DiscussionController handles comment and attachment endpoints.
 type DiscussionController struct {
 	discussion *service.DiscussionService
+	defectRef  refResolver
 }
 
 // NewDiscussion creates a DiscussionController.
-func NewDiscussion(discussion *service.DiscussionService) *DiscussionController {
-	return &DiscussionController{discussion: discussion}
+//
+// defectRef resolves defect identifiers given as the owner of comments and
+// attachments (FR-043); nil accepts IDs only.
+func NewDiscussion(discussion *service.DiscussionService, defectRef refResolver) *DiscussionController {
+	return &DiscussionController{discussion: discussion, defectRef: defectRef}
+}
+
+// ownerID resolves the owner reference of a comment or attachment: defects
+// may be named by identifier.
+func (c *DiscussionController) ownerID(r *http.Request, ownerType, ref string) (string, error) {
+	if ownerType != model.OwnerTypeDefect {
+		return ref, nil
+	}
+	return resolveDefect(r, c.defectRef, ref)
 }
 
 // --- Comments ---
@@ -32,7 +45,11 @@ func (c *DiscussionController) ListComments(w http.ResponseWriter, r *http.Reque
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	ownerType := r.URL.Query().Get("owner_type")
-	ownerID := r.URL.Query().Get("owner_id")
+	ownerID, err := c.ownerID(r, ownerType, r.URL.Query().Get("owner_id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
 
 	items, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID)
 	if err != nil {
@@ -61,7 +78,13 @@ func (c *DiscussionController) CreateComment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	item, err := c.discussion.CreateComment(r.Context(), user, productID, req.OwnerType, req.OwnerID, req.Body)
+	ownerID, err := c.ownerID(r, req.OwnerType, req.OwnerID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	item, err := c.discussion.CreateComment(r.Context(), user, productID, req.OwnerType, ownerID, req.Body)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -128,7 +151,11 @@ func (c *DiscussionController) ListAttachments(w http.ResponseWriter, r *http.Re
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	ownerType := r.URL.Query().Get("owner_type")
-	ownerID := r.URL.Query().Get("owner_id")
+	ownerID, err := c.ownerID(r, ownerType, r.URL.Query().Get("owner_id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
 
 	items, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID)
 	if err != nil {
@@ -156,9 +183,15 @@ func (c *DiscussionController) CreateAttachment(w http.ResponseWriter, r *http.R
 	}
 	defer func() { _ = file.Close() }()
 
+	ownerID, err := c.ownerID(r, r.FormValue("owner_type"), r.FormValue("owner_id"))
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
 	item, err := c.discussion.CreateAttachment(r.Context(), user, productID, service.CreateAttachmentInput{
 		OwnerType:   r.FormValue("owner_type"),
-		OwnerID:     r.FormValue("owner_id"),
+		OwnerID:     ownerID,
 		Filename:    filepath.Base(header.Filename),
 		ContentType: header.Header.Get("Content-Type"),
 		Content:     file,
