@@ -20,7 +20,7 @@ type PasswordPolicy struct {
 	RequireSpecial   bool
 }
 
-// Provider is the pluggable authentication interface (SR-108).
+// Provider is the pluggable authentication interface (SC-108).
 // The built-in provider uses username/password stored in the database.
 // Future providers (LDAP, OIDC) implement the same interface.
 type Provider interface {

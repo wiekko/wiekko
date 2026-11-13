@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at      TEXT NOT NULL
 );
 
--- Product roles: relocated from 00002 with proper FK (SR-201..SR-206)
+-- Product roles: relocated from 00002 with proper FK (SC-201..SC-206)
 CREATE TABLE IF NOT EXISTS product_roles (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
