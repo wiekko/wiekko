@@ -232,6 +232,9 @@ var commentTypes = []string{"requirement", "task", "constraint", "defect", "test
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{0,5}-[1-9][0-9]{0,9}$`)
 
+// IsIdentifier reports whether s looks like an identifier such as FR-12.
+func IsIdentifier(s string) bool { return identifierPattern.MatchString(strings.TrimSpace(s)) }
+
 // AddComment adds a Markdown comment (tester role on defects and test cases,
 // developer role elsewhere).
 func (s *Session) AddComment(ctx context.Context, in NewComment) (*CommentResult, error) {

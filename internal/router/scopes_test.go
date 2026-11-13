@@ -20,8 +20,9 @@ var resourceScopes = map[string]access.Scope{
 	"defects":    access.Defects,
 	"test-cases": access.Tests, "campaigns": access.Tests, "test-runs": access.Tests,
 	"comments": access.Discussion, "attachments": access.Discussion,
-	"members": access.Settings, "transfer-ownership": access.Settings, "categories": access.Settings,
-	"statuses": access.Settings, "pyramid-levels": access.Settings, "runtime-environments": access.Settings,
+	"members": access.Settings, "transfer-ownership": access.Settings, "invitations": access.Settings,
+	"categories": access.Settings,
+	"statuses":   access.Settings, "pyramid-levels": access.Settings, "runtime-environments": access.Settings,
 }
 
 // expectedNeeds is the scope rule of apiRoutes, written out independently.

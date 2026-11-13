@@ -179,7 +179,8 @@ func constraintGroup() *command {
 			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Constraint(w, d) })
 		},
 	}
-	return &command{name: "constraint", summary: "constraints: rules that are met or violated", subs: []*command{list, show}}
+	return &command{name: "constraint", summary: "constraints: rules that are met or violated",
+		subs: []*command{list, show, constraintCreateCommand(), constraintUpdateCommand()}}
 }
 
 func structureCommand(name string) *command {
@@ -205,7 +206,7 @@ func structureCommand(name string) *command {
 
 func componentGroup() *command {
 	return &command{name: "component", summary: "components (structural parts of the product)",
-		subs: []*command{structureCommand("component list")}}
+		subs: []*command{structureCommand("component list"), componentCreateCommand(), componentUpdateCommand(), componentDeleteCommand()}}
 }
 
 func capabilityGroup() *command {
@@ -230,7 +231,8 @@ func capabilityGroup() *command {
 		},
 	}
 	return &command{name: "capability", summary: "capabilities (testable feature areas)",
-		subs: []*command{structureCommand("capability list"), show}}
+		subs: []*command{structureCommand("capability list"), show, capabilityCreateCommand(), capabilityUpdateCommand(),
+			capabilityDeleteCommand(), capabilityLinkCommand(false), capabilityLinkCommand(true)}}
 }
 
 func defectGroup() *command {
@@ -341,7 +343,7 @@ func testGroup() *command {
 			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.TestCase(w, d) })
 		},
 	}
-	return &command{name: "test", summary: "test cases", subs: []*command{list, show, testSyncCommand()}}
+	return &command{name: "test", summary: "test cases", subs: []*command{list, show, testSyncCommand(), testLinkCommand(false), testLinkCommand(true)}}
 }
 
 func campaignGroup() *command {

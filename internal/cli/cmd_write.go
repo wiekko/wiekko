@@ -123,7 +123,7 @@ func requirementCreateCommand(group, fixedKind string) *command {
 func defectStatusCommand() *command {
 	return &command{
 		name:    "defect status",
-		args:    "<short ID|ID> <status>",
+		args:    "<DF-17|ID> <status>",
 		summary: "move a defect to another status by name (developer role)",
 		run: func(ctx context.Context, a *app, args []string) error {
 			ref, status, err := statusArgs("defect status", args)

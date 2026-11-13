@@ -105,6 +105,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("PATCH /products/{productId}/members/{userId}", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.UpdateMember)))
 	api.authed("DELETE /products/{productId}/members/{userId}", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.RemoveMember)))
 	api.authed("POST /products/{productId}/transfer-ownership", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.TransferOwnership)))
+	api.authed("POST /products/{productId}/invitations", need(access.W(access.Settings)), csrf(http.HandlerFunc(invCtrl.CreateForProduct)))
 
 	// Components.
 	api.authed("GET /products/{productId}/components", need(access.R(access.Structure)), http.HandlerFunc(componentCtrl.ListComponents))
@@ -150,6 +151,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/statuses", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.ListStatuses))
 	api.authed("POST /products/{productId}/statuses", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.CreateStatus)))
 	api.authed("GET /products/{productId}/statuses/{id}", need(access.R(access.Settings)), http.HandlerFunc(planningCtrl.GetStatus))
+	api.authed("POST /products/{productId}/statuses/split", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.SplitStatuses)))
 	api.authed("PATCH /products/{productId}/statuses/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.UpdateStatus)))
 	api.authed("DELETE /products/{productId}/statuses/{id}", need(access.W(access.Settings)), csrf(http.HandlerFunc(planningCtrl.DeleteStatus)))
 
@@ -231,6 +233,8 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("DELETE /products/{productId}/campaigns/{id}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.DeleteCampaign)))
 	api.authed("POST /products/{productId}/campaigns/{id}/activate", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.ActivateCampaign)))
 	api.authed("POST /products/{productId}/campaigns/{id}/close", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.CloseCampaign)))
+	api.authed("POST /products/{productId}/campaigns/{id}/test-cases", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.AddCampaignTestCases)))
+	api.authed("DELETE /products/{productId}/campaigns/{id}/test-cases/{testCaseId}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.RemoveCampaignTestCase)))
 	api.authed("GET /products/{productId}/campaigns/{id}/progress", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.Progress))
 	api.authed("GET /products/{productId}/campaigns/{id}/events", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListResultEvents))
 	api.authed("GET /products/{productId}/campaigns/{id}/results", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListCampaignResults))

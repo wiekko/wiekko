@@ -232,6 +232,18 @@ func (c *ProductController) TransferOwnership(w http.ResponseWriter, r *http.Req
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "ownership_transferred"})
 }
 
+// SplitStatuses handles POST /products/{productId}/statuses/split: it
+// separates the requirement and defect statuses for good, as the settings
+// page does.
+func (c *ProductController) SplitStatuses(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	if err := c.product.SplitStatuses(r.Context(), user, r.PathValue("productId")); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]string{"status": "statuses_split"})
+}
+
 // writeServiceError maps service-layer errors to HTTP status codes.
 func writeServiceError(w http.ResponseWriter, err error) {
 	if errors.Is(err, service.ErrForbidden) {

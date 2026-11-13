@@ -7,6 +7,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"nexmap.net/internal/cli/ops"
+	"nexmap.net/internal/cli/output"
 	"nexmap.net/internal/cli/render"
 )
 
@@ -57,5 +58,102 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 		func(ctx context.Context, sess *ops.Session, in ops.NewComment) (*ops.CommentResult, func(io.Writer) error, error) {
 			v, err := sess.AddComment(ctx, in)
 			return v, func(w io.Writer) error { return render.Comment(w, v) }, err
+		})
+
+	registerStructureWriteTools(s, h)
+}
+
+// registerStructureWriteTools offers the structure, constraint and link
+// writes of the CLI (FR-904). Deletions are deliberately left out: an agent
+// can restructure, but not remove.
+func registerStructureWriteTools(s *sdk.Server, h *handlers) {
+	component := func(v *ops.ComponentView) func(io.Writer) error {
+		return func(w io.Writer) error {
+			return render.Structure(w, output.Markdown, &ops.Structure{Components: []ops.ComponentView{*v}, ProductLevel: []ops.CapabilityView{}})
+		}
+	}
+	writeTool(s, h, "create_component", "Create a component",
+		"Create a component, a structural part of the product. Requires the product owner role. Returns the component.",
+		false,
+		func(ctx context.Context, sess *ops.Session, in ops.NewComponent) (*ops.ComponentView, func(io.Writer) error, error) {
+			v, err := sess.CreateComponent(ctx, in)
+			if err != nil {
+				return nil, nil, err
+			}
+			return v, component(v), nil
+		})
+	writeTool(s, h, "update_component", "Update a component",
+		"Rename a component or change its description; omitted fields stay. Requires the product owner role.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.ComponentChange) (*ops.ComponentView, func(io.Writer) error, error) {
+			v, err := sess.UpdateComponent(ctx, in)
+			if err != nil {
+				return nil, nil, err
+			}
+			return v, component(v), nil
+		})
+	writeTool(s, h, "create_capability", "Create a capability",
+		"Create a capability (a testable feature area), under a component or at product level. Requires the product owner role.",
+		false,
+		func(ctx context.Context, sess *ops.Session, in ops.NewCapability) (*ops.CapabilityDetail, func(io.Writer) error, error) {
+			v, err := sess.CreateCapability(ctx, in)
+			return v, func(w io.Writer) error { return render.Capability(w, v) }, err
+		})
+	writeTool(s, h, "update_capability", "Update a capability",
+		"Rename a capability, move it to another component (empty component: product level) or change its description; "+
+			"omitted fields stay. Requires the product owner role.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.CapabilityChange) (*ops.CapabilityDetail, func(io.Writer) error, error) {
+			v, err := sess.UpdateCapability(ctx, in)
+			return v, func(w io.Writer) error { return render.Capability(w, v) }, err
+		})
+	writeTool(s, h, "link_capability", "Link items to a capability",
+		"Link requirements (FR-12) and constraints (AC-3) to a capability, for traceability. Tasks cannot be linked. "+
+			"Requires the product owner role. Returns the capability with everything traced to it.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.CapabilityLinks) (*ops.CapabilityDetail, func(io.Writer) error, error) {
+			v, err := sess.LinkCapability(ctx, in)
+			return v, func(w io.Writer) error { return render.Capability(w, v) }, err
+		})
+	writeTool(s, h, "unlink_capability", "Unlink items from a capability",
+		"Remove the links between a capability and requirements or constraints. Requires the product owner role.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.CapabilityLinks) (*ops.CapabilityDetail, func(io.Writer) error, error) {
+			in.Unlink = true
+			v, err := sess.LinkCapability(ctx, in)
+			return v, func(w io.Writer) error { return render.Capability(w, v) }, err
+		})
+	writeTool(s, h, "link_test_case", "Link a test case",
+		"Link a test case to the requirement it verifies, and/or set the capability or component it belongs to "+
+			"(replacing the current one). Requires the developer role. Returns the test case.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.TestCaseLinks) (*ops.TestCaseDetail, func(io.Writer) error, error) {
+			v, err := sess.LinkTestCase(ctx, in)
+			return v, func(w io.Writer) error { return render.TestCase(w, v) }, err
+		})
+	writeTool(s, h, "unlink_test_case", "Unlink a test case",
+		"Remove a test case's link to a requirement, or clear its capability or component if it is the one named. "+
+			"Requires the developer role.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.TestCaseLinks) (*ops.TestCaseDetail, func(io.Writer) error, error) {
+			in.Unlink = true
+			v, err := sess.LinkTestCase(ctx, in)
+			return v, func(w io.Writer) error { return render.TestCase(w, v) }, err
+		})
+	writeTool(s, h, "create_constraint", "Create a constraint",
+		"Create a constraint, a rule the product must keep following (architecture, security, UX). "+
+			"Requires the product owner role. Returns the constraint with its identifier.",
+		false,
+		func(ctx context.Context, sess *ops.Session, in ops.NewConstraint) (*ops.ConstraintDetail, func(io.Writer) error, error) {
+			v, err := sess.CreateConstraint(ctx, in)
+			return v, func(w io.Writer) error { return render.Constraint(w, v) }, err
+		})
+	writeTool(s, h, "update_constraint", "Update a constraint",
+		"Change a constraint, e.g. record after a check whether it is met or violated (compliance); omitted fields stay. "+
+			"Requires the product owner role.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.ConstraintChange) (*ops.ConstraintDetail, func(io.Writer) error, error) {
+			v, err := sess.UpdateConstraint(ctx, in)
+			return v, func(w io.Writer) error { return render.Constraint(w, v) }, err
 		})
 }

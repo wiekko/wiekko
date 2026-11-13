@@ -86,6 +86,16 @@ human-readable `message`:
 
 ## Endpoints
 
+### Team, workflow and campaign scope
+
+- `POST /api/v1/products/{p}/invitations` (owner; `settings:write`) invites someone who has no account
+  yet, with `{"email": …, "role": …}`, and answers with the invitation's `url`.
+- `POST /api/v1/products/{p}/statuses/split` (owner; `settings:write`) gives defects a status set of
+  their own. It cannot be undone.
+- `POST /api/v1/products/{p}/campaigns/{id}/test-cases` with `{"test_case_ids": […]}` and
+  `DELETE /api/v1/products/{p}/campaigns/{id}/test-cases/{testCaseId}` (owner; `tests:write`) change the
+  scope of a draft campaign; an active campaign's scope is locked.
+
 ### Specification export
 
 `GET /api/v1/products/{productId}/specification` (viewer role; tokens need `structure:read` and

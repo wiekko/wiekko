@@ -513,6 +513,46 @@ func (c *TestingController) ActivateCampaign(w http.ResponseWriter, r *http.Requ
 	httputil.JSON(w, http.StatusOK, campaignToJSON(item))
 }
 
+// AddCampaignTestCases handles POST /products/{productId}/campaigns/{id}/test-cases:
+// it adds test cases to a draft campaign's scope (FR-321).
+func (c *TestingController) AddCampaignTestCases(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	var req struct {
+		TestCaseIDs []string `json:"test_case_ids"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+	if len(req.TestCaseIDs) == 0 {
+		httputil.Error(w, http.StatusBadRequest, "MISSING_FIELDS", "test_case_ids is required")
+		return
+	}
+	if err := c.testing.AddCampaignTestCases(r.Context(), user, productID, id, req.TestCaseIDs); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	item, err := c.testing.GetCampaign(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, campaignToJSON(item))
+}
+
+// RemoveCampaignTestCase handles DELETE /products/{productId}/campaigns/{id}/test-cases/{testCaseId}:
+// it takes a test case out of a draft campaign's scope (FR-321).
+func (c *TestingController) RemoveCampaignTestCase(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	if err := c.testing.RemoveCampaignTestCase(r.Context(), user, r.PathValue("productId"), r.PathValue("id"), r.PathValue("testCaseId")); err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
 // CloseCampaign handles POST /products/{productId}/campaigns/{id}/close.
 // Closing a campaign with results still awaiting testing requires "force".
 func (c *TestingController) CloseCampaign(w http.ResponseWriter, r *http.Request) {

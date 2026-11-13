@@ -115,7 +115,9 @@ var readTools = []string{
 	"get_structure", "get_test_case", "list_constraints", "list_defects", "list_requirements", "list_test_cases",
 }
 
-var writeTools = []string{"add_comment", "create_backlog_item", "create_defect", "set_defect_status", "set_requirement_status"}
+var writeTools = []string{"add_comment", "create_backlog_item", "create_defect", "set_defect_status", "set_requirement_status",
+	"create_component", "update_component", "create_capability", "update_capability", "link_capability", "unlink_capability",
+	"link_test_case", "unlink_test_case", "create_constraint", "update_constraint"}
 
 func contains(list []string, v string) bool {
 	for _, x := range list {
@@ -153,6 +155,9 @@ func TestE2EMCPTools(t *testing.T) {
 				}
 				if tool.Description == "" {
 					t.Errorf("%s has no description", tool.Name)
+				}
+				if strings.Contains(tool.Name, "delete") || strings.Contains(tool.Name, "remove") {
+					t.Errorf("%s: MCP offers no deletions (FR-904)", tool.Name)
 				}
 			}
 			sort.Strings(names)

@@ -44,8 +44,10 @@ agent is told. In short:
 - **Turn documents into requirements:** nexmap has no import. An agent can read a document you give it
   and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
   existing ones instead of duplicating them.
-- **Write:** set the status of requirements, tasks and defects, add comments, report defects, and create
-  tasks, each only as far as the user's role allows (see below).
+- **Write:** set the status of requirements, tasks and defects, add comments, report defects, create
+  tasks, create and update constraints (including whether they are met), change the product structure,
+  and link requirements, constraints and test cases to capabilities and test cases to requirements, each
+  only as far as the user's role allows (see below). The MCP server offers none of the CLI's deletions.
 
 ## Allowing writes
 
@@ -62,7 +64,9 @@ Writes are checked by the server against the token user's role in the product, e
 | Set the status of a requirement, task or defect | developer, and only on items a product owner has activated (kanban: by moving them into an active column; scrum: by planning them into a sprint) |
 | Comment | developer; tester on defects and test cases |
 | Report a defect | tester |
+| Link a test case to a requirement, capability or component | developer |
 | Create a task | product owner |
+| Create or update a constraint, component or capability; link capabilities | product owner |
 
 Each role includes the ones below it (product owner, developer, tester, viewer), and administrators may
 do everything.

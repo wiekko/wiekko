@@ -102,10 +102,11 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `version` | Client version and, if a server is configured, the server version |
 | `context` | Product briefing: structure, constraints, work in progress, defects, testing status |
 | `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create` |
-| `constraint` | `list`, `show` |
-| `component`, `capability` | Product structure |
+| `constraint` | `list`, `show`, `create`, `update` (e.g. `--compliance met`) |
+| `component` | Product structure: `list`, `create`, `update`, `delete` |
+| `capability` | `list`, `show`, `create`, `update`, `delete`, and `link`/`unlink` requirements and constraints |
 | `defect` | `list`, `show`, `status`, `create` |
-| `test` | Test cases: `list`, `show`, `sync` |
+| `test` | Test cases: `list`, `show`, `sync`, and `link`/`unlink` them to a requirement, capability or component |
 | `campaign` | `status` of the active testing campaign |
 | `comment` | `add` a comment to any commentable item |
 | `utest` | Record test results from CI, see [CI integration](ci-integration.md) |
@@ -118,6 +119,25 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 Requirements, tasks, constraints and defects are referenced by their identifier (`FR-12`, `MT-3`,
 `AC-42`, `DF-17`), test cases by their short ID (the first 8 characters of the ID, shown in lists) or
 their test identifier, and capabilities by name.
+
+## Changing the structure
+
+Product owners can build the product structure from the command line, which helps when an AI agent
+helps develop the product:
+
+```sh
+nexmap component create --name "Sync engine" --body "Keeps devices in step."
+nexmap capability create --name "Offline queue" --component "Sync engine"
+nexmap capability link Offline queue FR-12 AC-3
+nexmap constraint update AC-3 --compliance violated
+nexmap test link TestQueue_Replay --req FR-12 --capability "Offline queue"
+```
+
+Names with spaces need no quotes where they are the command's only argument. For `capability link`,
+everything before the first identifier names the capability; a capability whose name ends in something
+like `Step-1` has to be given by ID there. `update` commands change only the options given, and an
+empty value clears a description or, for `capability update --component ""`, moves a capability to
+product level. `component delete` and `capability delete` need `--yes`.
 
 ## Exporting the specification
 

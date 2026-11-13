@@ -47,6 +47,35 @@ func (c *InvitationController) Create(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusCreated, resp)
 }
 
+// CreateForProduct handles POST /products/{productId}/invitations: a product
+// owner invites a not-yet-registered user with a role (FR-305), as the team
+// page does.
+func (c *InvitationController) CreateForProduct(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+		Role  string `json:"role"`
+	}
+	if !httputil.DecodeJSON(w, r, &req) {
+		return
+	}
+	if req.Email == "" || req.Role == "" {
+		httputil.Error(w, http.StatusBadRequest, "MISSING_FIELDS", "Email and role are required")
+		return
+	}
+
+	user := middleware.UserFromContext(r.Context())
+	result, err := c.invitation.Create(r.Context(), user, req.Email, r.PathValue("productId"), req.Role)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	resp := invitationToJSON(result.Invitation)
+	resp["raw_token"] = result.RawToken
+	resp["url"] = c.invitation.AcceptURL(result.RawToken, httputil.RequestBaseURL(r))
+	httputil.JSON(w, http.StatusCreated, resp)
+}
+
 // List handles GET /admin/invitations.
 func (c *InvitationController) List(w http.ResponseWriter, r *http.Request) {
 	invitations, err := c.invitation.List(r.Context())

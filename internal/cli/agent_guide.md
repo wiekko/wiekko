@@ -62,6 +62,15 @@ into a sprint). An item's `active` field says whether it is.
 | `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; works for `DF-17` too; `--type test_case` etc. for test cases and capabilities) | developer (tester on defects and test cases) |
 | `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
 | `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |
+| `nexmap test link <test identifier> --req FR-12 [--capability <name>]` / `test unlink …` | Record which requirement a test verifies and which capability it belongs to | developer |
+| `nexmap constraint update AC-3 --compliance met\|violated` | Record whether a constraint holds after checking it | owner |
+| `nexmap constraint create --title … [--category SC] [--compliance …]` | Add a rule the product must follow | owner |
+| `nexmap component create --name …` / `component update <name> …` | Change the product structure | owner |
+| `nexmap capability create --name … [--component <name>]` / `capability update <name> …` | Same for capabilities | owner |
+| `nexmap capability link <name> FR-12 AC-3` / `capability unlink …` | Trace requirements and constraints to a capability | owner |
+
+`component delete` and `capability delete` exist too and need `--yes`; never
+delete unless the user asked for exactly that.
 
 Only change what the task at hand calls for, and tell the user what you
 changed.
