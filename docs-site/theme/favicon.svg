@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Circle with layered map/compass motif -->
+  <!-- Outer circle -->
+  <circle cx="32" cy="32" r="30" fill="#4f46e5"/>
+  <!-- Subtle inner ring -->
+  <circle cx="32" cy="32" r="22" fill="none" stroke="#c7d2fe" stroke-width="1.5" opacity="0.3"/>
+  <!-- Map grid nodes -->
+  <circle cx="18.8" cy="38.8" r="3.8" fill="#c7d2fe"/>
+  <circle cx="26.16" cy="19.44" r="4.2" fill="#c7d2fe"/>
+  <!-- Connecting paths -->
+  <path d="M20 36 L24 22" stroke="#c7d2fe" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <path d="M28 21 L35 30" stroke="#c7d2fe" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- Arrow bursting forward from the main node -->
+  <path d="m41.04 30.96 12-6" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+  <path d="m47.253 23.338 6.395 0.32-1.716 6.169" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="37.36" cy="32.64" r="4" fill="#c7d2fe"/>
+  <!-- Small accent dot -->
+  <circle cx="30" cy="44" r="2" fill="#c7d2fe" opacity="0.5"/>
+</svg>

@@ -1,0 +1,22 @@
+/* Sidebar logo; see logo.js. */
+
+.sidebar-logo {
+    display: block;
+    padding: 6px 10px 14px;
+    color: var(--sidebar-fg);
+}
+
+.sidebar-logo svg {
+    display: block;
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+}
+
+/* The logo's indigo is too dark on the dark sidebars: use a lighter shade of it. */
+html.coal .sidebar-logo .logo-nex,
+html.navy .sidebar-logo .logo-nex,
+html.ayu .sidebar-logo .logo-nex,
+html.rust .sidebar-logo .logo-nex {
+    fill: #818cf8;
+}

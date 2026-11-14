@@ -13,7 +13,8 @@ create-missing = false
 
 [output.html]
 # No git-repository-url: the repository is private, so readers could not open it.
-# Version switcher and the banner on unreleased docs; build.sh copies the
+# Version switcher, the banner on unreleased docs and the sidebar logo;
+# theme/favicon.svg replaces mdBook's icon. build.sh copies the
 # current versions of these files into every version it builds.
-additional-css = ["theme/version.css"]
-additional-js = ["theme/version.js"]
+additional-css = ["theme/version.css", "theme/logo.css"]
+additional-js = ["theme/version.js", "theme/logo.js"]

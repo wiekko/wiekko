@@ -109,6 +109,10 @@ tooling, so none of it is published.
   `just docs-build` builds all versions into `build/docs-site/`, and `just docs-container` builds and runs
   the deployed image on port 8080.
 
+- **Logo:** `docs-site/theme/favicon.svg` is a copy of `web/static/img/logo-icon.svg`, and
+  `docs-site/theme/logo.js` inlines a copy of `web/static/img/logo.svg` at the top of the sidebar. Update
+  both copies when the logo changes.
+
 `docs-site/build.sh` builds the versions, `docs-site/Dockerfile` runs it (mdBook pinned by version and
 checksum) and serves the result with nginx on port 8080.
 
