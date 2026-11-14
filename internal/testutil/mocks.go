@@ -224,6 +224,15 @@ type MockProductStore struct {
 	ListFunc    func(ctx context.Context) ([]*model.Product, error)
 
 	ResetActivationToSprintsFunc func(ctx context.Context, productID string) error
+
+	ListTwoFactorRequiredForUserFunc func(ctx context.Context, userID string) ([]*model.Product, error)
+}
+
+func (m *MockProductStore) ListTwoFactorRequiredForUser(ctx context.Context, userID string) ([]*model.Product, error) {
+	if m == nil || m.ListTwoFactorRequiredForUserFunc == nil {
+		return nil, nil
+	}
+	return m.ListTwoFactorRequiredForUserFunc(ctx, userID)
 }
 
 func (m *MockProductStore) Create(ctx context.Context, product *model.Product) error {

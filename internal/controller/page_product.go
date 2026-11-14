@@ -867,6 +867,9 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 		input.WorkflowMode = &value
 	case "defect_prefix":
 		input.DefectPrefix = &value
+	case "two_factor_required":
+		on := value == "true"
+		input.TwoFactorRequired = &on
 	default:
 		http.Error(w, "unknown field", http.StatusBadRequest)
 		return
@@ -1211,13 +1214,20 @@ func (c *PageProductController) buildTeamMembers(r *http.Request, user *model.Us
 		userMap[u.ID] = u
 	}
 
+	requires2FA := false
+	if p, err := c.product.GetByID(r.Context(), user, productID); err == nil {
+		requires2FA = p.TwoFactorRequired
+	}
+
 	views := make([]productpage.TeamMemberView, 0, len(members))
 	for _, m := range members {
 		displayName := m.UserID
 		username := ""
+		missing2FA := false
 		if u, ok := userMap[m.UserID]; ok {
 			displayName = u.DisplayName
 			username = u.Username
+			missing2FA = requires2FA && !u.TOTPEnabled
 		}
 		views = append(views, productpage.TeamMemberView{
 			UserID:      m.UserID,
@@ -1225,6 +1235,8 @@ func (c *PageProductController) buildTeamMembers(r *http.Request, user *model.Us
 			Username:    username,
 			Role:        m.Role,
 			IsOwner:     m.Role == model.RoleOwner,
+
+			MissingTwoFactor: missing2FA,
 		})
 	}
 

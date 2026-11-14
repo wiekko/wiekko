@@ -37,7 +37,21 @@ templ SettingsPage(props SettingsProps) {
 						@SettingToggle("self_registration_enabled", "Self-Registration", "Allow users to register without an invitation link.", props.Settings["self_registration_enabled"] == "true")
 						@SettingToggle("moderation_enabled", "Moderation", "Require admin approval for self-registered accounts.", props.Settings["moderation_enabled"] == "true")
 						@SettingToggle("product_creation_enabled", "Product Creation", "Allow non-admin users to create new products.", props.Settings["product_creation_enabled"] == "true")
-						@SettingToggle("2fa_enforced", "Enforce 2FA", "Require two-factor authentication for all users.", props.Settings["2fa_enforced"] == "true")
+					</div>
+				}
+			}
+			<!-- Two-Factor Authentication (SC-107) -->
+			@ui.Card() {
+				@ui.CardHeader("Two-Factor Authentication") {
+				}
+				@ui.CardBody() {
+					<div class="space-y-4">
+						<p class="text-sm text-gray-500 dark:text-gray-400">
+							Users covered here must set up two-factor authentication before they can use Nexmap. A role applies to users who hold it in at least one product. Product owners can also require two-factor authentication for the members of their product.
+						</p>
+						for _, key := range TwoFactorSettingKeys {
+							@SettingToggle(key, TwoFactorSettingLabel(key), TwoFactorSettingDescription(key), props.Settings[key] == "true")
+						}
 					</div>
 				}
 			}
@@ -67,6 +81,54 @@ templ SettingsPage(props SettingsProps) {
 			}
 		</div>
 	}
+}
+
+// TwoFactorSettingKeys lists the 2FA enforcement settings in display order.
+var TwoFactorSettingKeys = []string{
+	"2fa_enforced",
+	"2fa_enforced_admins",
+	"2fa_enforced_owner",
+	"2fa_enforced_developer",
+	"2fa_enforced_tester",
+	"2fa_enforced_viewer",
+}
+
+// TwoFactorSettingLabel is the label of a 2FA enforcement setting.
+func TwoFactorSettingLabel(key string) string {
+	switch key {
+	case "2fa_enforced":
+		return "All users"
+	case "2fa_enforced_admins":
+		return "Administrators"
+	case "2fa_enforced_owner":
+		return "Product owners"
+	case "2fa_enforced_developer":
+		return "Developers"
+	case "2fa_enforced_tester":
+		return "Testers"
+	case "2fa_enforced_viewer":
+		return "Viewers"
+	}
+	return key
+}
+
+// TwoFactorSettingDescription is the description of a 2FA enforcement setting.
+func TwoFactorSettingDescription(key string) string {
+	switch key {
+	case "2fa_enforced":
+		return "Require two-factor authentication for everyone."
+	case "2fa_enforced_admins":
+		return "Require it for instance administrators."
+	case "2fa_enforced_owner":
+		return "Require it for users who own a product."
+	case "2fa_enforced_developer":
+		return "Require it for users who are a developer in a product."
+	case "2fa_enforced_tester":
+		return "Require it for users who are a tester in a product."
+	case "2fa_enforced_viewer":
+		return "Require it for users who are a viewer in a product."
+	}
+	return ""
 }
 
 // SettingToggle renders a single toggle setting. Returned as fragment after update.

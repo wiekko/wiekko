@@ -234,6 +234,33 @@ func TestProductUpdate(t *testing.T) {
 		}
 	})
 
+	t.Run("requiring 2FA needs own 2FA", func(t *testing.T) {
+		product := testutil.MakeProduct()
+		svc := newProductService(
+			&testutil.MockProductStore{
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Product, error) { return product, nil },
+				UpdateFunc:  func(_ context.Context, _ *model.Product) error { return nil },
+			},
+			ownerRoles(), nil, noopAudit(),
+		)
+		on, off := true, false
+		if _, err := svc.Update(context.Background(), testutil.MakeUser(), "product-001",
+			UpdateProductInput{TwoFactorRequired: &on}); !errors.Is(err, ErrOwnTwoFactorRequired) {
+			t.Fatalf("err = %v, want ErrOwnTwoFactorRequired", err)
+		}
+		enrolled := testutil.MakeUser(func(u *model.User) { u.TOTPEnabled = true })
+		result, err := svc.Update(context.Background(), enrolled, "product-001", UpdateProductInput{TwoFactorRequired: &on})
+		if err != nil || !result.TwoFactorRequired {
+			t.Fatalf("enable: %v, required = %v", err, result != nil && result.TwoFactorRequired)
+		}
+		// Turning it off does not need 2FA (an owner whose 2FA was reset by an
+		// administrator could not reach the product anyway).
+		result, err = svc.Update(context.Background(), enrolled, "product-001", UpdateProductInput{TwoFactorRequired: &off})
+		if err != nil || result.TwoFactorRequired {
+			t.Fatalf("disable: %v", err)
+		}
+	})
+
 	t.Run("forbidden", func(t *testing.T) {
 		svc := newProductService(nil, forbiddenRoles(), nil, nil)
 		_, err := svc.Update(context.Background(), testutil.MakeUser(), "product-001", UpdateProductInput{})

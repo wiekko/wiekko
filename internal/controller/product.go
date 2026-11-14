@@ -96,6 +96,8 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		EstimationMode *string `json:"estimation_mode"`
 		WorkflowMode   *string `json:"workflow_mode"`
 		DefectPrefix   *string `json:"defect_prefix"`
+		// TwoFactorRequired keeps members without 2FA out (SC-107).
+		TwoFactorRequired *bool `json:"two_factor_required"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -107,6 +109,8 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		EstimationMode: req.EstimationMode,
 		WorkflowMode:   req.WorkflowMode,
 		DefectPrefix:   req.DefectPrefix,
+
+		TwoFactorRequired: req.TwoFactorRequired,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -246,6 +250,11 @@ func (c *ProductController) SplitStatuses(w http.ResponseWriter, r *http.Request
 
 // writeServiceError maps service-layer errors to HTTP status codes.
 func writeServiceError(w http.ResponseWriter, err error) {
+	if errors.Is(err, service.ErrTwoFactorRequired) {
+		httputil.Error(w, http.StatusForbidden, "TOTP_SETUP_REQUIRED",
+			"This product requires two-factor authentication; set it up via /api/v1/user/me/totp")
+		return
+	}
 	if errors.Is(err, service.ErrForbidden) {
 		httputil.Error(w, http.StatusForbidden, "FORBIDDEN", errorText(err))
 		return
@@ -291,14 +300,15 @@ func writeAccountError(w http.ResponseWriter, code string, err error) {
 // productToJSON converts a Product to a JSON-safe map.
 func productToJSON(p *model.Product) map[string]any {
 	return map[string]any{
-		"id":              p.ID,
-		"name":            p.Name,
-		"description":     p.Description,
-		"estimation_mode": p.EstimationMode,
-		"workflow_mode":   p.WorkflowMode,
-		"defect_prefix":   p.DefectPrefix,
-		"created_at":      p.CreatedAt,
-		"updated_at":      p.UpdatedAt,
+		"id":                  p.ID,
+		"name":                p.Name,
+		"description":         p.Description,
+		"estimation_mode":     p.EstimationMode,
+		"workflow_mode":       p.WorkflowMode,
+		"defect_prefix":       p.DefectPrefix,
+		"two_factor_required": p.TwoFactorRequired,
+		"created_at":          p.CreatedAt,
+		"updated_at":          p.UpdatedAt,
 	}
 }
 

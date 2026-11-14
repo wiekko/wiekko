@@ -43,7 +43,14 @@ type UpdateProductInput struct {
 	// DefectPrefix renames every defect identifier at once (FR-043); it must
 	// not be a prefix of any of the product's categories.
 	DefectPrefix *string
+	// TwoFactorRequired keeps members without 2FA out of the product
+	// (SC-107). Only users with 2FA set up may turn it on.
+	TwoFactorRequired *bool
 }
+
+// ErrOwnTwoFactorRequired is returned when a user without 2FA tries to make a
+// product require it.
+var ErrOwnTwoFactorRequired = errors.New("set up two-factor authentication on your own account before requiring it for the product")
 
 // Create creates a new product and assigns the creator as owner (FR-303).
 // Checks product_creation_enabled setting unless user is admin (FR-301, FR-302).
@@ -272,6 +279,12 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 		}
 		product.DefectPrefix = prefix
 	}
+	if input.TwoFactorRequired != nil {
+		if *input.TwoFactorRequired && !product.TwoFactorRequired && !user.TOTPEnabled {
+			return nil, ErrOwnTwoFactorRequired
+		}
+		product.TwoFactorRequired = *input.TwoFactorRequired
+	}
 	switchesToScrum := false
 	if input.WorkflowMode != nil {
 		switchesToScrum = *input.WorkflowMode == model.WorkflowModeScrum && product.WorkflowMode != model.WorkflowModeScrum
@@ -328,6 +341,9 @@ func (s *ProductService) Delete(ctx context.Context, user *model.User, productID
 type ProductWithRole struct {
 	Product *model.Product
 	Role    string // "admin" when an admin has no explicit membership
+	// TwoFactorLocked is set when the product requires 2FA and the user has
+	// not set it up: the product is listed, but cannot be opened (SC-107).
+	TwoFactorLocked bool
 }
 
 // List returns all products the user has access to. Admins see all.
@@ -372,7 +388,7 @@ func (s *ProductService) ListWithRoles(ctx context.Context, user *model.User) ([
 			}
 			result = append(result, ProductWithRole{Product: p, Role: role})
 		}
-		return restrictProductRoles(ctx, result), nil
+		return markTwoFactorLocked(ctx, user, restrictProductRoles(ctx, result)), nil
 	}
 
 	var result []ProductWithRole
@@ -383,7 +399,19 @@ func (s *ProductService) ListWithRoles(ctx context.Context, user *model.User) ([
 		}
 		result = append(result, ProductWithRole{Product: p, Role: role.Role})
 	}
-	return restrictProductRoles(ctx, result), nil
+	return markTwoFactorLocked(ctx, user, restrictProductRoles(ctx, result)), nil
+}
+
+// markTwoFactorLocked flags the products the user cannot open for lack of
+// 2FA, mirroring Authorizer.checkTwoFactor.
+func markTwoFactorLocked(ctx context.Context, user *model.User, list []ProductWithRole) []ProductWithRole {
+	if user.TOTPEnabled || access.ViaToken(ctx) {
+		return list
+	}
+	for i := range list {
+		list[i].TwoFactorLocked = list[i].Product.TwoFactorRequired
+	}
+	return list
 }
 
 // restrictProductRoles applies a token's restriction to a product listing:

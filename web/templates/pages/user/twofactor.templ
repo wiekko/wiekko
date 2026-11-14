@@ -18,8 +18,10 @@ type TOTPSetupView struct {
 // applies, checked in this order: RecoveryCodes (just issued), Setup (pending
 // confirmation), Enabled, not configured.
 type TwoFactorCardProps struct {
-	Enabled           bool
-	Enforced          bool
+	Enabled  bool
+	Enforced bool
+	// EnforcedBy says why 2FA is required, e.g. "required for administrators".
+	EnforcedBy        string
 	RecoveryRemaining int
 	Setup             *TOTPSetupView
 	RecoveryCodes     []string
@@ -33,6 +35,9 @@ type TwoFactorCardProps struct {
 	// Standalone marks the card as rendered on /user/2fa/setup (the page users
 	// land on when the instance enforces 2FA) rather than on the profile.
 	Standalone bool
+	// ProductID is the product the standalone page was opened for; the card
+	// links back to it once setup is done.
+	ProductID string
 }
 
 // TwoFactorSetupProps holds the data for the standalone setup page.
@@ -40,7 +45,12 @@ type TwoFactorSetupProps struct {
 	Meta        templates.PageMeta
 	DisplayName string
 	IsAdmin     bool
-	Enforced    bool
+	// InstanceRule is set when an instance-level rule requires 2FA: the user
+	// cannot use Nexmap until it is set up.
+	InstanceRule bool
+	EnforcedBy   string
+	// ProductName is the product the page was opened for, which requires 2FA.
+	ProductName string
 	Card        TwoFactorCardProps
 }
 
@@ -56,9 +66,13 @@ templ TwoFactorSetupPage(props TwoFactorSetupProps) {
 		<div class="mx-auto max-w-3xl space-y-6">
 			<div>
 				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Set up two-factor authentication</h1>
-				if props.Enforced {
+				if props.InstanceRule {
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-						Your administrator requires two-factor authentication. Finish the setup below to continue using Nexmap.
+						Two-factor authentication is { props.EnforcedBy }. Finish the setup below to continue using Nexmap.
+					</p>
+				} else if props.ProductName != "" {
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+						The product { props.ProductName } requires two-factor authentication of its members. Finish the setup below to access it.
 					</p>
 				}
 			</div>
@@ -88,10 +102,21 @@ templ TwoFactorCard(props TwoFactorCardProps) {
 	</div>
 }
 
-templ standaloneField(standalone bool) {
-	if standalone {
+templ standaloneField(props TwoFactorCardProps) {
+	if props.Standalone {
 		<input type="hidden" name="standalone" value="1"/>
+		if props.ProductID != "" {
+			<input type="hidden" name="product" value={ props.ProductID }/>
+		}
 	}
+}
+
+// continueURL is where the standalone page continues once setup is done.
+func continueURL(props TwoFactorCardProps) string {
+	if props.ProductID != "" {
+		return "/products/" + props.ProductID
+	}
+	return "/"
 }
 
 templ disabledView(props TwoFactorCardProps) {
@@ -104,7 +129,7 @@ templ disabledView(props TwoFactorCardProps) {
 				<p class="text-sm font-medium text-gray-900 dark:text-gray-100">Not configured</p>
 				<p class="text-sm text-gray-500 dark:text-gray-400">
 					if props.Enforced {
-						Required on this instance. Protect your account with a code from an authenticator app.
+						Two-factor authentication is { props.EnforcedBy }. Protect your account with a code from an authenticator app.
 					} else {
 						Protect your account with a code from an authenticator app.
 					}
@@ -112,7 +137,7 @@ templ disabledView(props TwoFactorCardProps) {
 			</div>
 		</div>
 		<form hx-post="/user/2fa/setup" hx-target="#twofactor-card" hx-swap="outerHTML">
-			@standaloneField(props.Standalone)
+			@standaloneField(props)
 			@ui.Button(ui.ButtonProps{
 				Label:   "Set up",
 				Variant: "primary",
@@ -142,7 +167,7 @@ templ setupView(props TwoFactorCardProps) {
 					<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Time-based, 6 digits, 30 seconds.</p>
 				</div>
 				<form class="space-y-4" hx-post="/user/2fa/confirm" hx-target="#twofactor-card" hx-swap="outerHTML">
-					@standaloneField(props.Standalone)
+					@standaloneField(props)
 					@ui.CodeInput(ui.CodeInputProps{
 						ID:        "totp-confirm-code",
 						Name:      "code",
@@ -185,7 +210,7 @@ templ recoveryCodesView(props TwoFactorCardProps) {
 		</ul>
 		<div class="flex justify-end">
 			if props.Standalone {
-				<a href="/" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">I have saved them — continue</a>
+				<a href={ templ.SafeURL(continueURL(props)) } class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">I have saved them — continue</a>
 			} else {
 				<a href="/user/profile" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">I have saved them</a>
 			}
@@ -234,7 +259,7 @@ templ enabledView(props TwoFactorCardProps) {
 			</form>
 		</details>
 		if props.Enforced {
-			<p class="text-sm text-gray-500 dark:text-gray-400">Two-factor authentication is required on this instance and cannot be turned off.</p>
+			<p class="text-sm text-gray-500 dark:text-gray-400">Two-factor authentication is { props.EnforcedBy } and cannot be turned off.</p>
 		} else {
 			<details class="group rounded-md ring-1 ring-gray-200 dark:ring-gray-700" open?={ props.Section == "disable" }>
 				<summary class="cursor-pointer px-4 py-3 text-sm font-medium text-red-700 dark:text-red-400">Turn off two-factor authentication</summary>

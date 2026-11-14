@@ -64,6 +64,12 @@ templ productCard(p service.ProductSummary) {
 					<h3 class="truncate text-base font-semibold text-gray-900 dark:text-gray-100">{ p.Product.Name }</h3>
 					@ui.RoleBadge(p.Role)
 				</div>
+				if p.TwoFactorLocked {
+					<div class="mt-4 flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+						@ui.Icon("lock", "sm")
+						<span>Requires two-factor authentication — set it up to open this product.</span>
+					</div>
+				} else {
 				if p.Product.Description != "" {
 					<div class="prose prose-sm dark:prose-invert mt-2 line-clamp-2 max-w-none text-gray-500 dark:text-gray-400">
 						@templ.Raw(templates.RenderMarkdown(p.Product.Description))
@@ -84,6 +90,7 @@ templ productCard(p service.ProductSummary) {
 						@ui.Icon("clock", "sm")
 						<span>{ p.CurrentSprint }</span>
 					</div>
+				}
 				}
 			</div>
 		}

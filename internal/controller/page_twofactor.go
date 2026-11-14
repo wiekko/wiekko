@@ -17,8 +17,20 @@ import (
 func (c *PageUserController) twoFactorCard(r *http.Request, user *model.User, standalone bool) userpage.TwoFactorCardProps {
 	props := userpage.TwoFactorCardProps{
 		Enabled:    user.TOTPEnabled,
-		Enforced:   c.twoFactor.Enforced(r.Context()),
 		Standalone: standalone,
+	}
+	req, err := c.twoFactor.Requirement(r.Context(), user)
+	if err != nil {
+		slog.Error("cannot read the 2FA requirement", "user_id", user.ID, "err", err)
+	}
+	props.Enforced = req.Required()
+	props.EnforcedBy = req.String()
+	// A product the setup page was opened for (see RequireTwoFactorEnrollment):
+	// the card returns there once setup is done.
+	if standalone {
+		if id := r.FormValue("product"); safeProductID(id) {
+			props.ProductID = id
+		}
 	}
 	if user.TOTPEnabled {
 		if n, err := c.twoFactor.RecoveryCodesRemaining(r.Context(), user.ID); err == nil {
@@ -40,8 +52,23 @@ func renderTwoFactorCard(w http.ResponseWriter, r *http.Request, props userpage.
 	_ = userpage.TwoFactorCard(props).Render(r.Context(), w)
 }
 
+// safeProductID reports whether id can be put into a /products/{id} link
+// without leading anywhere else.
+func safeProductID(id string) bool {
+	if id == "" || len(id) > 64 {
+		return false
+	}
+	for _, ch := range id {
+		if !(ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '-') {
+			return false
+		}
+	}
+	return true
+}
+
 // TwoFactorSetupPage renders GET /user/2fa/setup. Users land here when the
-// instance enforces 2FA; it starts (or resumes) the setup right away.
+// instance requires 2FA of them, or when they open a product that requires it
+// (?product=); it starts (or resumes) the setup right away.
 func (c *PageUserController) TwoFactorSetupPage(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	if user.TOTPEnabled {
@@ -50,6 +77,14 @@ func (c *PageUserController) TwoFactorSetupPage(w http.ResponseWriter, r *http.R
 	}
 
 	card := c.twoFactorCard(r, user, true)
+	var productName string
+	if card.ProductID != "" {
+		if p := c.twoFactor.LockedProduct(r.Context(), user, card.ProductID); p != nil {
+			productName = p.Name
+		} else {
+			card.ProductID = ""
+		}
+	}
 	setup, err := c.twoFactor.PendingSetup(user)
 	if err == nil && setup == nil {
 		setup, err = c.twoFactor.BeginSetup(r.Context(), user.ID)
@@ -66,10 +101,12 @@ func (c *PageUserController) TwoFactorSetupPage(w http.ResponseWriter, r *http.R
 			Title:     "Two-Factor Authentication",
 			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
 		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Enforced:    card.Enforced,
-		Card:        card,
+		DisplayName:  user.DisplayName,
+		IsAdmin:      user.IsAdmin,
+		InstanceRule: c.twoFactor.RequiredFor(r.Context(), user),
+		EnforcedBy:   card.EnforcedBy,
+		ProductName:  productName,
+		Card:         card,
 	}).Render(r.Context(), w)
 }
 

@@ -329,8 +329,9 @@ func settingMeta(key string) (label, description string) {
 		return "Moderation", "Require admin approval for self-registered accounts."
 	case "product_creation_enabled":
 		return "Product Creation", "Allow non-admin users to create new products."
-	case "2fa_enforced":
-		return "Enforce 2FA", "Require two-factor authentication for all users."
+	case "2fa_enforced", "2fa_enforced_admins", "2fa_enforced_owner",
+		"2fa_enforced_developer", "2fa_enforced_tester", "2fa_enforced_viewer":
+		return admin.TwoFactorSettingLabel(key), admin.TwoFactorSettingDescription(key)
 	case "password_min_length":
 		return "Minimum Length", ""
 	case "pat_max_lifetime_days":

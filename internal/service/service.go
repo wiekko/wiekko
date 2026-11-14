@@ -47,7 +47,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	mailer := NewMailer(sender, cfg.PublicURL)
 	settingSvc := &SettingService{settings: st.Setting}
 
-	authz := &Authorizer{productRoles: st.ProductRole}
+	authz := &Authorizer{productRoles: st.ProductRole, products: st.Product}
 	owns := newOwnership(st)
 
 	// Built first: the entity services below delegate their comment and
@@ -76,11 +76,13 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	}
 
 	twoFactorSvc := &TwoFactorService{
-		users:     st.User,
-		twoFactor: st.TwoFactor,
-		settings:  st.Setting,
-		provider:  provider,
-		limiter:   newAttemptLimiter(secondFactorMaxFailures, SecondFactorFailureWindow),
+		users:        st.User,
+		twoFactor:    st.TwoFactor,
+		settings:     st.Setting,
+		productRoles: st.ProductRole,
+		products:     st.Product,
+		provider:     provider,
+		limiter:      newAttemptLimiter(secondFactorMaxFailures, SecondFactorFailureWindow),
 	}
 
 	// Built before the test run service, which files defects for automated

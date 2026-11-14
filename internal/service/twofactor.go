@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,8 +17,106 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// SettingTwoFactorEnforced is the instance setting that makes TOTP mandatory (SC-107).
-const SettingTwoFactorEnforced = "2fa_enforced"
+// Instance settings that make TOTP mandatory (SC-107). SettingTwoFactorEnforced
+// covers everyone; the others cover administrators and users who hold a given
+// role in at least one product (see SettingTwoFactorEnforcedRole).
+const (
+	SettingTwoFactorEnforced       = "2fa_enforced"
+	SettingTwoFactorEnforcedAdmins = "2fa_enforced_admins"
+)
+
+// TwoFactorRoles lists the product roles that can be covered by an instance
+// setting, in display order.
+var TwoFactorRoles = []string{model.RoleOwner, model.RoleDeveloper, model.RoleTester, model.RoleViewer}
+
+// SettingTwoFactorEnforcedRole is the instance setting that makes TOTP
+// mandatory for users holding role in at least one product.
+func SettingTwoFactorEnforcedRole(role string) string { return "2fa_enforced_" + role }
+
+// twoFactorPolicy is the instance-level enforcement as configured.
+type twoFactorPolicy struct {
+	everyone bool
+	admins   bool
+	roles    map[string]bool
+}
+
+func (p *twoFactorPolicy) anyRole() bool {
+	for _, on := range p.roles {
+		if on {
+			return true
+		}
+	}
+	return false
+}
+
+// TwoFactorRoleGroup names the users a role setting covers, e.g. "product
+// owners".
+func TwoFactorRoleGroup(role string) string {
+	switch role {
+	case model.RoleOwner:
+		return "product owners"
+	case model.RoleDeveloper:
+		return "developers"
+	case model.RoleTester:
+		return "testers"
+	case model.RoleViewer:
+		return "viewers"
+	}
+	return role + "s"
+}
+
+// TwoFactorRequirement says whether and why a user must use two-factor
+// authentication.
+type TwoFactorRequirement struct {
+	// Instance lists the instance-level rules that cover the user, e.g.
+	// "all users", "administrators", "product owners". While it is not empty
+	// the user must set up 2FA before using Nexmap at all.
+	Instance []string
+	// Products are the products the user is a member of that require 2FA.
+	// Without 2FA the user cannot reach them.
+	Products []*model.Product
+}
+
+// Required reports whether any rule requires 2FA of the user.
+func (r TwoFactorRequirement) Required() bool {
+	return len(r.Instance) > 0 || len(r.Products) > 0
+}
+
+// String describes the requirement for messages, e.g. "required for
+// administrators and by the product Alpha".
+func (r TwoFactorRequirement) String() string {
+	var parts []string
+	if len(r.Instance) > 0 {
+		parts = append(parts, "required for "+joinWords(r.Instance))
+	}
+	if len(r.Products) > 0 {
+		names := make([]string, len(r.Products))
+		for i, p := range r.Products {
+			names[i] = p.Name
+		}
+		noun := "the product "
+		if len(names) > 1 {
+			noun = "the products "
+		}
+		prefix := "required by "
+		if len(parts) > 0 {
+			prefix = "by "
+		}
+		parts = append(parts, prefix+noun+joinWords(names))
+	}
+	return strings.Join(parts, " and ")
+}
+
+// joinWords joins "a", "b", "c" as "a, b and c".
+func joinWords(words []string) string {
+	switch len(words) {
+	case 0:
+		return ""
+	case 1:
+		return words[0]
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
+}
 
 // totpIssuer is the issuer name authenticator apps display next to the account.
 const totpIssuer = "Nexmap"
@@ -37,27 +138,33 @@ var (
 	ErrTOTPNoPendingSetup = errors.New("no two-factor setup in progress; start again")
 	// ErrTOTPEnforced is returned when a user tries to disable TOTP while the
 	// instance requires it.
-	ErrTOTPEnforced = errors.New("two-factor authentication is required on this instance and cannot be disabled")
+	ErrTOTPEnforced = errors.New("two-factor authentication is required for your account and cannot be disabled")
 	// ErrIncorrectPassword is returned when a re-entered password does not match.
 	ErrIncorrectPassword = errors.New("current password is incorrect")
 )
 
 // TwoFactorService manages TOTP enrollment, verification and recovery codes.
 type TwoFactorService struct {
-	users     store.UserStore
-	twoFactor store.TwoFactorStore
-	settings  store.SettingStore
-	provider  auth.Provider
-	now       func() time.Time
+	users        store.UserStore
+	twoFactor    store.TwoFactorStore
+	settings     store.SettingStore
+	productRoles store.ProductRoleStore
+	products     store.ProductStore
+	provider     auth.Provider
+	now          func() time.Time
 
 	// limiter blocks a user's second factor after repeated wrong codes; nil
 	// disables it.
 	limiter *attemptLimiter
 
-	// enforcedKnown is the enforcement setting as last read successfully;
-	// enforcedStale is set while reading it fails. See Enforced.
-	enforcedKnown atomic.Bool
-	enforcedStale atomic.Bool
+	// policyKnown is the enforcement policy as last read successfully;
+	// policyStale is set while reading it fails. See policy.
+	policyKnown atomic.Pointer[twoFactorPolicy]
+	policyStale atomic.Bool
+	// rolesKnown maps a user ID to the product roles last read for that user
+	// ([]string); rolesStale is set while reading them fails.
+	rolesKnown sync.Map
+	rolesStale atomic.Bool
 }
 
 // TOTPSetup is what a user needs to add the account to an authenticator app.
@@ -75,29 +182,137 @@ func (s *TwoFactorService) clock() time.Time {
 	return time.Now()
 }
 
-// Enforced reports whether the instance requires two-factor authentication.
+// policy returns the instance-level enforcement policy.
 //
-// The setting is read on every call, so a change takes effect at once. If it
-// cannot be read (a database hiccup), the answer is the last one that could:
-// an instance that enforces 2FA keeps doing so, rather than letting users who
-// have not enrolled in with a password alone for as long as the fault lasts,
-// and one that does not enforce it does not lock anyone out. Only before the
-// first successful read is there nothing to go by, and the answer is false;
-// nexmapd reads the setting once at startup, so that does not arise there.
-func (s *TwoFactorService) Enforced(ctx context.Context) bool {
-	v, err := s.settings.Get(ctx, SettingTwoFactorEnforced)
+// The settings are read on every call, so a change takes effect at once. If
+// they cannot be read (a database hiccup), the answer is the last one that
+// could: an instance that enforces 2FA keeps doing so, rather than letting
+// users who have not enrolled in with a password alone for as long as the
+// fault lasts, and one that does not enforce it does not lock anyone out. Only
+// before the first successful read is there nothing to go by, and nothing is
+// enforced; nexmapd reads the settings once at startup (LoadPolicy), so that
+// does not arise there.
+func (s *TwoFactorService) policy(ctx context.Context) *twoFactorPolicy {
+	all, err := s.settings.GetAll(ctx)
 	if err != nil {
+		known := s.policyKnown.Load()
 		// Log once per fault, not once per request.
-		if s.enforcedStale.CompareAndSwap(false, true) {
-			slog.Warn("cannot read the 2FA enforcement setting; keeping the last known value",
-				"enforced", s.enforcedKnown.Load(), "err", err)
+		if s.policyStale.CompareAndSwap(false, true) {
+			slog.Warn("cannot read the 2FA enforcement settings; keeping the last known values",
+				"known", known != nil, "err", err)
 		}
-		return s.enforcedKnown.Load()
+		if known == nil {
+			return &twoFactorPolicy{}
+		}
+		return known
 	}
-	enforced := v == "true"
-	s.enforcedKnown.Store(enforced)
-	s.enforcedStale.Store(false)
-	return enforced
+	p := &twoFactorPolicy{
+		everyone: all[SettingTwoFactorEnforced] == "true",
+		admins:   all[SettingTwoFactorEnforcedAdmins] == "true",
+		roles:    make(map[string]bool, len(TwoFactorRoles)),
+	}
+	for _, r := range TwoFactorRoles {
+		p.roles[r] = all[SettingTwoFactorEnforcedRole(r)] == "true"
+	}
+	s.policyKnown.Store(p)
+	s.policyStale.Store(false)
+	return p
+}
+
+// LoadPolicy reads the enforcement settings, so that they are known even if
+// the database cannot be reached later (see policy).
+func (s *TwoFactorService) LoadPolicy(ctx context.Context) {
+	s.policy(ctx)
+}
+
+// userRoles returns the distinct product roles the user holds. Like policy, it
+// falls back to the roles last read for the user when they cannot be read.
+func (s *TwoFactorService) userRoles(ctx context.Context, userID string) []string {
+	prs, err := s.productRoles.ListByUserID(ctx, userID)
+	if err != nil {
+		if s.rolesStale.CompareAndSwap(false, true) {
+			slog.Warn("cannot read product roles for 2FA enforcement; keeping the last known values", "err", err)
+		}
+		if v, ok := s.rolesKnown.Load(userID); ok {
+			return v.([]string)
+		}
+		return nil
+	}
+	roles := []string{}
+	for _, pr := range prs {
+		if !slices.Contains(roles, pr.Role) {
+			roles = append(roles, pr.Role)
+		}
+	}
+	s.rolesKnown.Store(userID, roles)
+	s.rolesStale.Store(false)
+	return roles
+}
+
+// instanceRules lists the instance-level rules that cover the user.
+func (s *TwoFactorService) instanceRules(ctx context.Context, user *model.User) []string {
+	p := s.policy(ctx)
+	if p.everyone {
+		return []string{"all users"}
+	}
+	var rules []string
+	if p.admins && user.IsAdmin {
+		rules = append(rules, "administrators")
+	}
+	if p.anyRole() {
+		held := s.userRoles(ctx, user.ID)
+		for _, r := range TwoFactorRoles {
+			if p.roles[r] && slices.Contains(held, r) {
+				rules = append(rules, TwoFactorRoleGroup(r))
+			}
+		}
+	}
+	return rules
+}
+
+// RequiredFor reports whether an instance-level rule requires the user to use
+// two-factor authentication, i.e. whether they must set it up before using
+// Nexmap at all. Products that require 2FA are not considered here; they only
+// keep users without it out of themselves (see Authorizer.RequireRole).
+func (s *TwoFactorService) RequiredFor(ctx context.Context, user *model.User) bool {
+	return len(s.instanceRules(ctx, user)) > 0
+}
+
+// Requirement returns every rule, instance-level or product, that requires
+// the user to use two-factor authentication.
+func (s *TwoFactorService) Requirement(ctx context.Context, user *model.User) (TwoFactorRequirement, error) {
+	req := TwoFactorRequirement{Instance: s.instanceRules(ctx, user)}
+	products, err := s.products.ListTwoFactorRequiredForUser(ctx, user.ID)
+	if err != nil {
+		return req, err
+	}
+	req.Products = products
+	return req, nil
+}
+
+// ProductLocked reports whether the product keeps the user out because it
+// requires two-factor authentication and the user has not set it up. It is
+// false for users who could not reach the product anyway, so that the answer
+// tells nothing about products the user is not a member of.
+func (s *TwoFactorService) ProductLocked(ctx context.Context, user *model.User, productID string) bool {
+	return s.LockedProduct(ctx, user, productID) != nil
+}
+
+// LockedProduct returns the product if ProductLocked is true, else nil.
+func (s *TwoFactorService) LockedProduct(ctx context.Context, user *model.User, productID string) *model.Product {
+	if user.TOTPEnabled {
+		return nil
+	}
+	p, err := s.products.GetByID(ctx, productID)
+	if err != nil || !p.TwoFactorRequired {
+		return nil
+	}
+	if !user.IsAdmin {
+		if _, err := s.productRoles.GetByUserAndProduct(ctx, user.ID, productID); err != nil {
+			return nil
+		}
+	}
+	return p
 }
 
 // BeginSetup generates a new pending secret for the user. Calling it again
@@ -175,12 +390,16 @@ func (s *TwoFactorService) ConfirmSetup(ctx context.Context, userID, code string
 
 // Disable turns TOTP off after re-checking the password and a current code.
 func (s *TwoFactorService) Disable(ctx context.Context, userID, password, code string) error {
-	if s.Enforced(ctx) {
-		return ErrTOTPEnforced
-	}
 	user, err := s.users.GetByID(ctx, userID)
 	if err != nil {
 		return err
+	}
+	req, err := s.Requirement(ctx, user)
+	if err != nil {
+		return err
+	}
+	if req.Required() {
+		return fmt.Errorf("%w (%s)", ErrTOTPEnforced, req)
 	}
 	if !user.TOTPEnabled {
 		return ErrTOTPNotEnabled
@@ -218,7 +437,7 @@ func (s *TwoFactorService) RecoveryCodesRemaining(ctx context.Context, userID st
 
 // AdminReset removes a user's TOTP configuration, e.g. after a lost device.
 // The user can log in with the password alone afterwards and, if the instance
-// enforces 2FA, is sent straight to setup.
+// requires 2FA of them, is sent straight to setup.
 func (s *TwoFactorService) AdminReset(ctx context.Context, targetID string) error {
 	if _, err := s.users.GetByID(ctx, targetID); err != nil {
 		return err

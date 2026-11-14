@@ -87,10 +87,46 @@ templ GeneralTabContent(p *model.Product) {
 					@settingSelect(p.ID, "estimation_mode", "Estimation Mode", estimationModeOptions(p.EstimationMode))
 					@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
 					@settingTextFieldHint(p.ID, "defect_prefix", "Defect Identifier Prefix", p.DefectPrefix, defectPrefixHint)
+					@settingTwoFactorToggle(p)
 				</div>
 			}
 		}
 	</div>
+}
+
+const twoFactorRequiredHint = "Members without two-factor authentication cannot open this product until they set it up. Access tokens are not affected."
+
+// settingTwoFactorToggle renders the "2FA required" switch (SC-107).
+templ settingTwoFactorToggle(p *model.Product) {
+	<div
+		id="setting-two_factor_required"
+		class="flex items-center justify-between gap-4"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<div>
+			<p id="two_factor_required-label" class="text-sm font-medium text-gray-700 dark:text-gray-300">Require two-factor authentication</p>
+			<p class="text-sm text-gray-500 dark:text-gray-400">{ twoFactorRequiredHint }</p>
+		</div>
+		<button
+			type="button"
+			role="switch"
+			aria-labelledby="two_factor_required-label"
+			aria-checked={ boolString(p.TwoFactorRequired) }
+			class={ "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900", templ.KV("bg-indigo-600", p.TwoFactorRequired), templ.KV("bg-gray-200 dark:bg-gray-700", !p.TwoFactorRequired) }
+			hx-patch={ "/products/" + p.ID + "/settings" }
+			hx-vals={ `{"field":"two_factor_required","value":"` + boolString(!p.TwoFactorRequired) + `"}` }
+		>
+			<span class={ "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform dark:bg-gray-200", templ.KV("translate-x-5", p.TwoFactorRequired), templ.KV("translate-x-0", !p.TwoFactorRequired) }></span>
+		</button>
+	</div>
+}
+
+func boolString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
 
 const defectPrefixHint = "Defects are numbered like DF-17. Changing the prefix renames every defect identifier; it must differ from all category prefixes."
@@ -668,6 +704,8 @@ templ SettingField(p *model.Product, field string) {
 			@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
 		case "defect_prefix":
 			@settingTextFieldHint(p.ID, "defect_prefix", "Defect Identifier Prefix", p.DefectPrefix, defectPrefixHint)
+		case "two_factor_required":
+			@settingTwoFactorToggle(p)
 	}
 }
 

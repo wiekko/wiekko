@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS products (
     -- Prefix of defect identifiers such as DF-17 (FR-043). Unique within the
     -- product together with the category prefixes, see categories.
     defect_prefix   TEXT NOT NULL DEFAULT 'DF',
+    -- Members must have 2FA set up to reach the product (SC-107).
+    two_factor_required BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL,
     updated_at      TIMESTAMPTZ NOT NULL
 );

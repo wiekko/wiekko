@@ -11,16 +11,21 @@ import (
 
 // Known setting keys.
 var knownSettings = map[string]bool{
-	"self_registration_enabled":  true,
-	"moderation_enabled":         true,
-	"2fa_enforced":               true,
-	"password_min_length":        true,
-	"password_require_uppercase": true,
-	"password_require_lowercase": true,
-	"password_require_digit":     true,
-	"password_require_special":   true,
-	"product_creation_enabled":   true,
-	SettingPATMaxLifetimeDays:    true,
+	"self_registration_enabled":    true,
+	"moderation_enabled":           true,
+	SettingTwoFactorEnforced:       true,
+	SettingTwoFactorEnforcedAdmins: true,
+	"2fa_enforced_owner":           true,
+	"2fa_enforced_developer":       true,
+	"2fa_enforced_tester":          true,
+	"2fa_enforced_viewer":          true,
+	"password_min_length":          true,
+	"password_require_uppercase":   true,
+	"password_require_lowercase":   true,
+	"password_require_digit":       true,
+	"password_require_special":     true,
+	"product_creation_enabled":     true,
+	SettingPATMaxLifetimeDays:      true,
 }
 
 // ErrInvalidSetting is returned for a setting value outside its range.

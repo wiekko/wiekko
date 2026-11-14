@@ -18,8 +18,10 @@ enabled product creation; administrators always can. You become the product's ow
 
 **Settings** in the product's sidebar has five tabs. Changes are saved as you make them.
 
-- **General:** name, description, estimation mode, workflow mode and the defect identifier prefix
-  (`DF` in `DF-17`).
+- **General:** name, description, estimation mode, workflow mode, the defect identifier prefix
+  (`DF` in `DF-17`), and whether members must use **two-factor authentication**. With that switch
+  on, members who have not set up 2FA cannot open the product until they do; the *Team* page marks
+  them. You need 2FA on your own account to turn it on.
 - **Categories:** the categories of requirements, tasks and constraints, each with a name and an
   identifier prefix. The defaults are listed in [Concepts](concepts.md#requirements-tasks-and-constraints).
   Settle the prefixes early, before identifiers like `FR-12` appear in commit messages.

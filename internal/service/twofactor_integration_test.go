@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/auth/builtin"
 	"nexmap.net/internal/auth/totp"
 	"nexmap.net/internal/config"
@@ -236,8 +237,8 @@ func TestTwoFactorDisableAndReset(t *testing.T) {
 		if err := env.svc.Setting.Update(ctx, map[string]string{SettingTwoFactorEnforced: "true"}); err != nil {
 			t.Fatal(err)
 		}
-		if !env.svc.TwoFactor.Enforced(ctx) {
-			t.Fatal("Enforced() = false")
+		if !env.svc.TwoFactor.RequiredFor(ctx, env.user) {
+			t.Fatal("RequiredFor() = false")
 		}
 		if err := env.svc.TwoFactor.Disable(ctx, env.user.ID, testPassword, env.code(t)); !errors.Is(err, ErrTOTPEnforced) {
 			t.Fatalf("disable while enforced: err = %v", err)
@@ -275,6 +276,94 @@ func TestTwoFactorDisableAndReset(t *testing.T) {
 		u, _ := env.svc.User.GetByID(ctx, env.user.ID)
 		if u.TOTPEnabled || u.TOTPSecret != "" {
 			t.Fatal("TOTP still configured after reset")
+		}
+	})
+}
+
+// TestTwoFactorScopedEnforcement runs the role and product rules (SC-107)
+// through the real stores.
+func TestTwoFactorScopedEnforcement(t *testing.T) {
+	ctx := context.Background()
+	dbtest.Each(t, func(t *testing.T, driver string, conn *sql.DB) {
+		env := newTwoFactorEnv(t, driver, conn)
+		svc := env.svc
+
+		product, err := svc.Product.Create(ctx, env.user, CreateProductInput{Name: "Strict"})
+		if err != nil {
+			t.Fatalf("create product: %v", err)
+		}
+
+		// Role rules: alice owns a product.
+		if err := svc.Setting.Update(ctx, map[string]string{"2fa_enforced_developer": "true"}); err != nil {
+			t.Fatal(err)
+		}
+		if svc.TwoFactor.RequiredFor(ctx, env.user) {
+			t.Fatal("developer rule applies to an owner")
+		}
+		if err := svc.Setting.Update(ctx, map[string]string{"2fa_enforced_owner": "true"}); err != nil {
+			t.Fatal(err)
+		}
+		if !svc.TwoFactor.RequiredFor(ctx, env.user) {
+			t.Fatal("owner rule does not apply to an owner")
+		}
+		if err := svc.Setting.Update(ctx, map[string]string{"2fa_enforced_owner": "false", "2fa_enforced_developer": "false"}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Requiring 2FA for the product needs 2FA of the owner.
+		on := true
+		if _, err := svc.Product.Update(ctx, env.user, product.ID, UpdateProductInput{TwoFactorRequired: &on}); !errors.Is(err, ErrOwnTwoFactorRequired) {
+			t.Fatalf("require without own 2FA: err = %v", err)
+		}
+		env.enable(t)
+		alice, err := svc.User.GetByID(ctx, env.user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := svc.Product.Update(ctx, alice, product.ID, UpdateProductInput{TwoFactorRequired: &on}); err != nil {
+			t.Fatalf("require 2FA: %v", err)
+		}
+
+		req, err := svc.TwoFactor.Requirement(ctx, alice)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(req.Products) != 1 || req.Products[0].ID != product.ID || len(req.Instance) != 0 {
+			t.Fatalf("requirement = %+v", req)
+		}
+		if err := svc.TwoFactor.Disable(ctx, alice.ID, testPassword, env.code(t)); !errors.Is(err, ErrTOTPEnforced) {
+			t.Fatalf("disable while a product requires 2FA: err = %v", err)
+		}
+
+		// A member without 2FA is locked out of the product, but not out of
+		// Nexmap, and not when using a token.
+		now := time.Now().UTC().Format(time.RFC3339)
+		bob := &model.User{
+			ID: uuid.NewString(), Username: "bob", Email: "bob@example.com", DisplayName: "Bob",
+			PasswordHash: "x", Status: model.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+		}
+		if err := svc.User.users.Create(ctx, bob); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.Product.AddMember(ctx, alice, product.ID, bob.ID, model.RoleViewer); err != nil {
+			t.Fatalf("add member: %v", err)
+		}
+		if svc.TwoFactor.RequiredFor(ctx, bob) {
+			t.Fatal("a product requirement forces enrollment instance-wide")
+		}
+		if !svc.TwoFactor.ProductLocked(ctx, bob, product.ID) {
+			t.Fatal("ProductLocked = false for a member without 2FA")
+		}
+		if _, err := svc.Product.GetByID(ctx, bob, product.ID); !errors.Is(err, ErrTwoFactorRequired) {
+			t.Fatalf("member without 2FA: err = %v", err)
+		}
+		token := access.WithRestriction(ctx, &access.Restriction{Grants: access.Grants{access.Settings: access.Read}})
+		if _, err := svc.Product.GetByID(token, bob, product.ID); err != nil {
+			t.Fatalf("token request: %v", err)
+		}
+		list, err := svc.Product.ListWithRoles(ctx, bob)
+		if err != nil || len(list) != 1 || !list[0].TwoFactorLocked {
+			t.Fatalf("ListWithRoles = %+v, %v", list, err)
 		}
 	})
 }

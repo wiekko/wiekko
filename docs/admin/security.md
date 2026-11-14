@@ -104,11 +104,26 @@ Once users exist, both variables are ignored and can be removed.
 
 ## Accounts and sign-in
 
-- **Two-factor authentication:** users can set up TOTP on their profile page. *Enforce 2FA* in the
-  instance settings (`/admin/settings`) requires it for everyone. An administrator can reset a user's
-  2FA from the user's detail page, after which that user can sign in with the password alone until they
-  set it up again. Should the server be unable to read the *Enforce 2FA* setting for a while (a database
-  fault), it keeps acting on the value it read last, so enforcement does not lapse in the meantime.
+- **Two-factor authentication:** users can set up TOTP on their profile page. It can be required in
+  two places:
+  - **Instance-wide**, under *Two-Factor Authentication* in the instance settings (`/admin/settings`):
+    for *all users*, for *administrators*, and for *product owners*, *developers*, *testers* or
+    *viewers*. A role switch covers users who hold that role in at least one product. Users covered
+    are sent to the setup page after signing in and cannot use nexmap until 2FA is set up; API calls
+    with their session get `403 TOTP_SETUP_REQUIRED`. A common setup is to require it for
+    administrators and product owners and leave the rest to the products.
+  - **Per product**, by its owners under *Settings → General* (*Require two-factor authentication*).
+    Members without 2FA, administrators included, cannot open that product until they set it up; their
+    other products keep working. The dashboard marks such products with a lock, and API calls to them
+    get `403 TOTP_SETUP_REQUIRED`. Only a user with 2FA can turn the requirement on, and the team page
+    shows owners which members still lack it.
+
+  Personal access tokens are not affected by either: a token is a separate credential. Users cannot
+  turn 2FA off while any rule requires it of them. An administrator can reset a user's 2FA from the
+  user's detail page, after which that user can sign in with the password alone until they set it up
+  again (and is sent to setup, or kept out of 2FA products, as above). Should the server be unable to
+  read the 2FA settings or a user's product roles for a while (a database fault), it keeps acting on
+  the values it read last, so enforcement does not lapse in the meantime.
 - **Usernames and email addresses** are unique regardless of case: `Admin` cannot be registered next to
   `admin`, and signing in accepts either spelling.
 - **Passwords** are stored as salted PBKDF2-SHA256 hashes (`NEXMAP_PBKDF2_ITERATIONS`). The instance

@@ -138,6 +138,11 @@ templ productSwitcherRow(p service.ProductWithRole, currentID, section string) {
 				}
 			</span>
 			<span class="truncate">{ p.Product.Name }</span>
+			if p.TwoFactorLocked {
+				<span class="shrink-0 text-amber-600 dark:text-amber-400" title="Requires two-factor authentication">
+					@ui.Icon("lock", "sm")
+				</span>
+			}
 		</span>
 		@ui.RoleBadge(p.Role)
 	</a>

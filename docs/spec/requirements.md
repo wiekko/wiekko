@@ -76,7 +76,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **SC-104**: The web UI shall implement CSRF protection for all state-changing requests.
 * **SC-105**: The CLI shall use personal access tokens (PAT) to authenticate API requests.
 * **SC-106**: Users shall be able to create, list and revoke personal access tokens via the web UI, optionally restricting them (SC-401 to SC-409).
-* **SC-107**: Two-Factor-Authentication shall be an option, either available to the user, or enforced at instance level.
+* **SC-107**: Two-Factor-Authentication shall be an option, either available to the user, or enforced. Administrators shall be able to enforce it at instance level for everyone, for administrators, and for users holding a given product role (owner, developer, tester, viewer) in at least one product; users covered must set it up before using the instance. Product owners shall be able to require it for the members of their product; members without it cannot access that product until they set it up.
 * **SC-108**: The authentication system shall use a pluggable provider interface to allow future integration of LDAP and OIDC (OpenID Connect) providers (e.g. Google, GitHub, OneLogin).
 * **SC-109**: Invitation links (for user registration or product membership) shall be delivered via email.
 * **SC-110**: Password reset shall be handled via a time-limited, single-use link delivered by email.

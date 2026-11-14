@@ -15,6 +15,9 @@ type ProductSummary struct {
 	OpenRequirements int
 	ActiveDefects    int
 	CurrentSprint    string // name of the active sprint, or ""
+	// TwoFactorLocked is set when the product requires 2FA and the user has
+	// not set it up; the counts above are left empty then (SC-107).
+	TwoFactorLocked bool
 }
 
 // DashboardService provides data for the dashboard page.
@@ -40,6 +43,13 @@ func (s *DashboardService) ProductSummaries(ctx context.Context, user *model.Use
 
 		// Resolve user's role.
 		summary.Role = s.resolveRole(ctx, user, p.ID)
+
+		// A product the user cannot open shows nothing of its content.
+		if p.TwoFactorRequired && !user.TOTPEnabled {
+			summary.TwoFactorLocked = true
+			summaries = append(summaries, summary)
+			continue
+		}
 
 		// Count open requirements.
 		closedStatuses, err := s.closedStatusIDs(ctx, p.ID)

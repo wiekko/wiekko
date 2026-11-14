@@ -170,3 +170,77 @@ func TestRestrictProductRoles(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestRequireRoleTwoFactorProduct(t *testing.T) {
+	strict := &model.Product{ID: "strict", TwoFactorRequired: true}
+	open := &model.Product{ID: "open"}
+	authz := &Authorizer{
+		productRoles: &testutil.MockProductRoleStore{
+			GetByUserAndProductFunc: func(_ context.Context, _, _ string) (*model.ProductRole, error) {
+				return testutil.MakeProductRole(func(pr *model.ProductRole) { pr.Role = model.RoleDeveloper }), nil
+			},
+		},
+		products: &testutil.MockProductStore{
+			GetByIDFunc: func(_ context.Context, id string) (*model.Product, error) {
+				if id == strict.ID {
+					return strict, nil
+				}
+				return open, nil
+			},
+		},
+	}
+	session := context.Background()
+	token := access.WithRestriction(context.Background(), &access.Restriction{})
+	plain := testutil.MakeUser()
+	enrolled := testutil.MakeUser(func(u *model.User) { u.TOTPEnabled = true })
+	admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
+
+	cases := []struct {
+		name    string
+		ctx     context.Context
+		user    *model.User
+		product string
+		locked  bool
+	}{
+		{"member without 2FA", session, plain, strict.ID, true},
+		{"admin without 2FA", session, admin, strict.ID, true},
+		{"member with 2FA", session, enrolled, strict.ID, false},
+		{"product without requirement", session, plain, open.ID, false},
+		{"token request", token, plain, strict.ID, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := authz.RequireRole(tc.ctx, tc.user, tc.product, model.RoleViewer)
+			if tc.locked {
+				if !errors.Is(err, ErrTwoFactorRequired) || !errors.Is(err, ErrForbidden) {
+					t.Fatalf("err = %v, want ErrTwoFactorRequired wrapping ErrForbidden", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RequireRole: %v", err)
+			}
+		})
+	}
+}
+
+func TestMarkTwoFactorLocked(t *testing.T) {
+	list := func() []ProductWithRole {
+		return []ProductWithRole{
+			{Product: &model.Product{ID: "strict", TwoFactorRequired: true}, Role: model.RoleViewer},
+			{Product: &model.Product{ID: "open"}, Role: model.RoleViewer},
+		}
+	}
+	got := markTwoFactorLocked(context.Background(), testutil.MakeUser(), list())
+	if !got[0].TwoFactorLocked || got[1].TwoFactorLocked {
+		t.Fatalf("session without 2FA: %+v", got)
+	}
+	enrolled := testutil.MakeUser(func(u *model.User) { u.TOTPEnabled = true })
+	if got := markTwoFactorLocked(context.Background(), enrolled, list()); got[0].TwoFactorLocked {
+		t.Fatal("locked for a user with 2FA")
+	}
+	token := access.WithRestriction(context.Background(), &access.Restriction{})
+	if got := markTwoFactorLocked(token, testutil.MakeUser(), list()); got[0].TwoFactorLocked {
+		t.Fatal("locked for a token request")
+	}
+}

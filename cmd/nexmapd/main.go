@@ -117,9 +117,9 @@ func main() {
 	}
 	svc := service.NewWithMail(st, provider, cfg, blobs, sender)
 
-	// Read the 2FA enforcement setting once, so that it is known even if the
-	// database cannot be reached later (see TwoFactorService.Enforced).
-	svc.TwoFactor.Enforced(context.Background())
+	// Read the 2FA enforcement settings once, so that they are known even if
+	// the database cannot be reached later (see TwoFactorService.LoadPolicy).
+	svc.TwoFactor.LoadPolicy(context.Background())
 
 	// Bootstrap admin account if no users exist.
 	admin, err := bootstrapAdmin(st, provider, cfg.InitialAdminUser, cfg.InitialAdminPass)

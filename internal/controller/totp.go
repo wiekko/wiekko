@@ -24,9 +24,26 @@ func NewTOTP(twoFactor *service.TwoFactorService) *TOTPController {
 // Status handles GET /user/me/totp.
 func (c *TOTPController) Status(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
+	req, err := c.twoFactor.Requirement(r.Context(), user)
+	if err != nil {
+		httputil.Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to read the 2FA requirement")
+		return
+	}
+	products := make([]map[string]string, len(req.Products))
+	for i, p := range req.Products {
+		products[i] = map[string]string{"id": p.ID, "name": p.Name}
+	}
+	instance := req.Instance
+	if instance == nil {
+		instance = []string{}
+	}
 	resp := map[string]any{
 		"enabled":  user.TOTPEnabled,
-		"enforced": c.twoFactor.Enforced(r.Context()),
+		"enforced": req.Required(),
+		// Why it is enforced: instance-level rules ("all users",
+		// "administrators", "product owners", ...) and products.
+		"enforced_for": instance,
+		"enforced_by":  products,
 	}
 	if user.TOTPEnabled {
 		n, err := c.twoFactor.RecoveryCodesRemaining(r.Context(), user.ID)

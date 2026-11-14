@@ -6,6 +6,13 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT INTO settings (key, value) VALUES ('self_registration_enabled', 'false');
 INSERT INTO settings (key, value) VALUES ('moderation_enabled', 'false');
 INSERT INTO settings (key, value) VALUES ('2fa_enforced', 'false');
+-- Scoped 2FA enforcement (SC-107): administrators, and users holding a role
+-- in at least one product.
+INSERT INTO settings (key, value) VALUES ('2fa_enforced_admins', 'false');
+INSERT INTO settings (key, value) VALUES ('2fa_enforced_owner', 'false');
+INSERT INTO settings (key, value) VALUES ('2fa_enforced_developer', 'false');
+INSERT INTO settings (key, value) VALUES ('2fa_enforced_tester', 'false');
+INSERT INTO settings (key, value) VALUES ('2fa_enforced_viewer', 'false');
 INSERT INTO settings (key, value) VALUES ('password_min_length', '10');
 INSERT INTO settings (key, value) VALUES ('password_require_uppercase', 'true');
 INSERT INTO settings (key, value) VALUES ('password_require_lowercase', 'true');

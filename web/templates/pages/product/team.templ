@@ -17,6 +17,9 @@ type TeamMemberView struct {
 	Username    string
 	Role        string
 	IsOwner     bool
+	// MissingTwoFactor is set when the product requires 2FA and the member
+	// has not set it up, so they cannot open the product (SC-107).
+	MissingTwoFactor bool
 }
 
 // UserSearchResult is a user returned by the typeahead search.
@@ -416,7 +419,14 @@ templ MemberRow(m TeamMemberView, productID string, isOwnerOrAdmin bool) {
 	<tr id={ "member-" + m.UserID }>
 		<td class="whitespace-nowrap px-4 py-3">
 			<div>
-				<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{ m.DisplayName }</p>
+				<p class="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+					{ m.DisplayName }
+					if isOwnerOrAdmin && m.MissingTwoFactor {
+						<span title="This product requires two-factor authentication. The member cannot open it until they set it up.">
+							@ui.Badge("2FA missing", "yellow")
+						</span>
+					}
+				</p>
 				if m.Username != "" {
 					<p class="text-xs text-gray-500 dark:text-gray-400">{ "@" + m.Username }</p>
 				}

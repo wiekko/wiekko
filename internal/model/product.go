@@ -9,8 +9,10 @@ type Product struct {
 	WorkflowMode   string // "kanban", "scrum"
 	StatusSync     bool   // true = statuses synced between requirements and defects
 	DefectPrefix   string // prefix of defect identifiers, e.g. "DF" in DF-17 (FR-043)
-	CreatedAt      string // RFC 3339
-	UpdatedAt      string // RFC 3339
+	// TwoFactorRequired keeps members without 2FA out of the product (SC-107).
+	TwoFactorRequired bool
+	CreatedAt         string // RFC 3339
+	UpdatedAt         string // RFC 3339
 }
 
 // DefaultDefectPrefix is the defect identifier prefix of new products.

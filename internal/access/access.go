@@ -262,6 +262,11 @@ func WithRestriction(ctx context.Context, r *Restriction) context.Context {
 	return context.WithValue(ctx, ctxKey{}, r)
 }
 
+// ViaToken reports whether the request is token-authenticated.
+func ViaToken(ctx context.Context) bool {
+	return FromContext(ctx) != nil
+}
+
 // FromContext returns the restriction of the request's token, or nil when
 // the request is not token-authenticated.
 func FromContext(ctx context.Context) *Restriction {
