@@ -46,11 +46,12 @@ templ AppLayout(props AppLayoutProps) {
 					{ children... }
 				</main>
 			</div>
+			<!-- Modal container: inside #app-shell, so requests from modal content
+			     inherit its X-CSRF-Token header like every other page request. -->
+			@ui.ModalContainer()
 		</div>
 		<!-- Toast container -->
 		@ui.ToastContainer()
-		<!-- Modal container -->
-		@ui.ModalContainer()
 		@sidebarScript()
 		<script src="/static/js/product-switcher.js" defer></script>
 	}

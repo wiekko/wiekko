@@ -351,7 +351,7 @@ func (c *PageProductController) DocumentLinkModal(w http.ResponseWriter, r *http
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DocumentLinkModal(productID, r.PathValue("documentId"), middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
+	_ = productpage.DocumentLinkModal(productID, r.PathValue("documentId")).Render(r.Context(), w)
 }
 
 // DocumentLinkSearch renders GET /products/{id}/documents/{documentId}/links/link-search?type=&q=:

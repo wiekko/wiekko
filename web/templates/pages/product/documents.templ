@@ -416,11 +416,9 @@ templ documentLinkGroup(props DocumentLinksTabProps, title, targetType string, i
 	}
 }
 
-// The modal is mounted outside the app shell that sends the CSRF header, so
-// the form carries the token for the Link buttons inside it.
-templ DocumentLinkModal(productID, documentID, csrfToken string) {
+templ DocumentLinkModal(productID, documentID string) {
 	@ui.Modal("document-link-modal", "Link to the document", "md") {
-		<form class="space-y-4" hx-headers={ templ.JSONString(map[string]string{"X-CSRF-Token": csrfToken}) } hx-get={ documentURL(productID, documentID) + "/links/link-search" } hx-target="#document-link-results" hx-trigger="change, keyup changed delay:300ms from:input[name=q], search from:input[name=q], load">
+		<form class="space-y-4" hx-get={ documentURL(productID, documentID) + "/links/link-search" } hx-target="#document-link-results" hx-trigger="change, keyup changed delay:300ms from:input[name=q], search from:input[name=q], load">
 			<div class="flex gap-2">
 				<select
 					name="type"
