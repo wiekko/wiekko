@@ -26,6 +26,7 @@ func (s *seeder) seedAviary() {
 	s.aviaryConstraints(p)
 	s.aviaryDefects(p)
 	s.aviaryTestCases(p)
+	s.aviaryDocuments(p)
 	s.aviaryCampaigns(p)
 	s.aviaryDiscussion(p)
 }
@@ -308,6 +309,56 @@ func (s *seeder) aviaryBacklog(p *productSeed) {
 		estimation:  "3",
 		priority:    3,
 		coarse:      true,
+	})
+}
+
+func (s *seeder) aviaryDocuments(p *productSeed) {
+	p.document(documentSpec{
+		title:     "Sync protocol",
+		format:    model.DocumentFormatMarkdown,
+		state:     model.DocumentStateCurrent,
+		component: "Sync & Storage",
+		milestone: "1.0 Public Launch",
+		revisions: []string{
+			"# Sync protocol\n\nDevices push queued sightings to `POST /v1/sync` in batches of at most 50.\n\n" +
+				"## Batches\n\n- Every sighting carries a client-generated UUID.\n- The server answers with the UUIDs it stored.\n",
+			"# Sync protocol\n\nDevices push queued sightings to `POST /v1/sync` in batches of at most 50.\n\n" +
+				"## Batches\n\n- Every sighting carries a client-generated UUID.\n- The server answers with the UUIDs it stored.\n" +
+				"- Replaying a batch is harmless: a UUID the server knows is acknowledged, not stored twice.\n\n" +
+				"## Backoff\n\nAfter a failed push the device waits 2, 4, 8 … up to 300 seconds.\n",
+		},
+		linkReqs:  []string{"offline"},
+		linkCons:  []string{"Offline-first, no blocking network calls in the logging path"},
+		linkTests: []string{"tc-queue-idempotent", "tc-sync-reconnect"},
+	})
+	p.document(documentSpec{
+		title:      "Sighting record schema",
+		format:     model.DocumentFormatJSON,
+		state:      model.DocumentStateCurrent,
+		capability: "Offline Sync",
+		milestone:  "1.0 Public Launch",
+		revisions: []string{`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sighting",
+  "type": "object",
+  "required": ["id", "species", "observed_at"],
+  "properties": {
+    "id": {"type": "string", "format": "uuid"},
+    "species": {"type": "string"},
+    "count": {"type": "integer", "minimum": 1},
+    "observed_at": {"type": "string", "format": "date-time"}
+  }
+}
+`},
+		linkReqs: []string{"arch-local-store"},
+	})
+	p.document(documentSpec{
+		title:     "Conflict resolution",
+		format:    model.DocumentFormatMarkdown,
+		state:     model.DocumentStateDraft,
+		component: "Sync & Storage",
+		revisions: []string{"# Conflict resolution\n\nOpen question: last write wins per field, or a merge screen?\n"},
+		linkReqs:  []string{"sync-conflict"},
 	})
 }
 

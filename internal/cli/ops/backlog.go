@@ -98,6 +98,7 @@ func (s *Session) ShowRequirement(ctx context.Context, ref string) (*Requirement
 		Capabilities:       []Ref{},
 		TestCases:          []TestCaseSummary{},
 		Defects:            []DefectSummary{},
+		Documents:          documentRefs(r.Documents),
 	}
 
 	if r.MilestoneID != "" {
@@ -266,7 +267,7 @@ func (s *Session) ShowConstraint(ctx context.Context, ref string) (*ConstraintDe
 	if err != nil {
 		return nil, err
 	}
-	d := &ConstraintDetail{ConstraintSummary: sum, Description: c.Description, Capabilities: []Ref{}}
+	d := &ConstraintDetail{ConstraintSummary: sum, Description: c.Description, Capabilities: []Ref{}, Documents: documentRefs(c.Documents)}
 	if c.MilestoneID != "" {
 		ms, err := s.milestoneNames(ctx)
 		if err != nil {

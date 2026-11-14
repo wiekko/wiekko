@@ -12,9 +12,6 @@ import (
 	"nexmap.net/internal/cli/render"
 )
 
-// WriteToolNames lists the tools that --read-only leaves out.
-var WriteToolNames = []string{"add_comment", "create_backlog_item", "create_defect", "set_defect_status", "set_requirement_status"}
-
 func registerWriteTools(s *sdk.Server, h *handlers) {
 	writeTool(s, h, "set_requirement_status", "Set requirement status",
 		"Move a requirement or task to another workflow status by name, e.g. when starting or finishing work on it. "+
@@ -62,6 +59,7 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 		})
 
 	registerStructureWriteTools(s, h)
+	registerDocumentWriteTools(s, h)
 }
 
 // registerStructureWriteTools offers the structure, constraint and link

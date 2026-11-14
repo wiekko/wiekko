@@ -43,6 +43,9 @@ type UpdateProductInput struct {
 	// DefectPrefix renames every defect identifier at once (FR-043); it must
 	// not be a prefix of any of the product's categories.
 	DefectPrefix *string
+	// DocumentPrefix renames every document identifier at once (FR-050); it
+	// must differ from the defect prefix and every category prefix.
+	DocumentPrefix *string
 	// TwoFactorRequired keeps members without 2FA out of the product
 	// (SC-107). Only users with 2FA set up may turn it on.
 	TwoFactorRequired *bool
@@ -278,6 +281,19 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 			return nil, fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
 		}
 		product.DefectPrefix = prefix
+	}
+	if input.DocumentPrefix != nil {
+		prefix, err := normalizeDocumentPrefix(*input.DocumentPrefix)
+		if err != nil {
+			return nil, err
+		}
+		if cat, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix); err == nil && cat != nil {
+			return nil, fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
+		}
+		product.DocumentPrefix = prefix
+	}
+	if (input.DefectPrefix != nil || input.DocumentPrefix != nil) && product.DefectPrefix == product.DocumentPrefix {
+		return nil, fmt.Errorf("defects and documents cannot share the prefix %q", product.DefectPrefix)
 	}
 	if input.TwoFactorRequired != nil {
 		if *input.TwoFactorRequired && !product.TwoFactorRequired && !user.TOTPEnabled {

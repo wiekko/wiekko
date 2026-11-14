@@ -21,6 +21,7 @@ type TestCaseDetailProps struct {
 	CapabilityName    string
 	PyramidLevelName  string
 	EnvironmentNames  []string
+	Documents         []*model.Document // linked documents (FR-909)
 	CanEdit           bool // developer, owner, or admin
 }
 
@@ -54,7 +55,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 			@ui.TabGroup(testCaseDetailTabs(props.Product.ID, props.TestCase.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName, props.EnvironmentNames)
+				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName, props.EnvironmentNames, props.Documents)
 			}
 			@ui.TabPanelHidden("requirements") {
 				@ui.LoadingSpinner("md")
@@ -75,7 +76,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 	}
 }
 
-templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string, environmentNames []string) {
+templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string, environmentNames []string, documents []*model.Document) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -97,6 +98,7 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 				@patterns.DetailField("Last Updated", formatDate(tc.UpdatedAt))
 			}
 			@patterns.DetailDescription(tc.Description)
+			@LinkedDocuments(productID, documents)
 		}
 	}
 }

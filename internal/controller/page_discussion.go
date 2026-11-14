@@ -280,6 +280,7 @@ var ownerSegments = map[string]string{
 	model.OwnerTypeCapability:  "capabilities",
 	model.OwnerTypeMilestone:   "milestones",
 	model.OwnerTypeDefect:      "defects",
+	model.OwnerTypeDocument:    "documents",
 }
 
 func commentsBaseURL(productID, ownerType, ownerID string) string {

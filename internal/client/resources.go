@@ -31,6 +31,9 @@ type Requirement struct {
 	IsActive         bool   `json:"is_active"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
+	// Documents names the linked documents (FR-909); only in single-item
+	// responses, and identifiers only without the documents scope.
+	Documents []DocumentRef `json:"documents,omitempty"`
 }
 
 // RequirementFilter narrows ListRequirements; empty fields do not filter.
@@ -55,6 +58,9 @@ type Constraint struct {
 	Priority        int    `json:"priority"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
+	// Documents names the linked documents (FR-909); only in single-item
+	// responses, and identifiers only without the documents scope.
+	Documents []DocumentRef `json:"documents,omitempty"`
 }
 
 // Category groups requirements, tasks or constraints and supplies their prefix.
@@ -131,6 +137,9 @@ type TestCase struct {
 	ExecutionMode  string `json:"execution_mode"`
 	TestIdentifier string `json:"test_identifier"`
 	PyramidLevelID string `json:"pyramid_level_id"`
+	// Documents names the linked documents (FR-909); only in single-item
+	// responses, and identifiers only without the documents scope.
+	Documents []DocumentRef `json:"documents,omitempty"`
 }
 
 // TestCaseRequirement links a test case to a requirement or its definition of done.
@@ -468,11 +477,15 @@ func (c *Client) CampaignResults(ctx context.Context, productID, id string) ([]C
 
 // Specification returns the product's specification as Markdown (FR-905),
 // with tasks if asked for.
-func (c *Client) Specification(ctx context.Context, productID string, tasks bool) (string, error) {
-	path := productPath(productID, "specification")
+func (c *Client) Specification(ctx context.Context, productID string, tasks, drafts bool) (string, error) {
+	q := url.Values{}
 	if tasks {
-		path += "?tasks=true"
+		q.Set("tasks", "true")
 	}
+	if drafts {
+		q.Set("drafts", "true")
+	}
+	path := withQuery(productPath(productID, "specification"), q)
 	resp, err := c.Raw(ctx, http.MethodGet, path, nil, "")
 	if err != nil {
 		return "", err

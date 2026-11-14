@@ -22,6 +22,7 @@ type Scope string
 const (
 	Structure  Scope = "structure"  // components, capabilities, milestones, sprints
 	Backlog    Scope = "backlog"    // requirements, tasks, constraints
+	Documents  Scope = "documents"  // documents and their revisions
 	Defects    Scope = "defects"    // defects
 	Tests      Scope = "tests"      // test cases, campaigns, results, test runs
 	Discussion Scope = "discussion" // comments, attachments
@@ -31,10 +32,10 @@ const (
 )
 
 // ProductScopes lists the scopes of product data, in display order.
-var ProductScopes = []Scope{Structure, Backlog, Defects, Tests, Discussion, Settings}
+var ProductScopes = []Scope{Structure, Backlog, Documents, Defects, Tests, Discussion, Settings}
 
 // AllScopes lists every scope, in display order.
-var AllScopes = []Scope{Structure, Backlog, Defects, Tests, Discussion, Settings, Account, Admin}
+var AllScopes = []Scope{Structure, Backlog, Documents, Defects, Tests, Discussion, Settings, Account, Admin}
 
 // Valid reports whether s is a known scope.
 func (s Scope) Valid() bool { return slices.Contains(AllScopes, s) }
@@ -139,6 +140,13 @@ func Presets() []Preset {
 		{Name: "full", Label: "Full access", Grants: FullAccess()},
 		{Name: "ci", Label: "CI ingestion", Grants: Grants{Tests: Write}},
 		{Name: "agent-read", Label: "Agent, read-only", Grants: readOnly},
+		// An agent maintaining the specification: it writes the product's
+		// definition and discusses it, and reads defects and tests to see
+		// where the product stands, but changes no settings.
+		{Name: "agent-spec", Label: "Agent, spec author", Grants: Grants{
+			Structure: Write, Backlog: Write, Documents: Write, Discussion: Write,
+			Defects: Read, Tests: Read,
+		}},
 	}
 }
 
@@ -250,6 +258,8 @@ func ScopeForOwnerType(ownerType string) Scope {
 		return Defects
 	case model.OwnerTypeTestCase:
 		return Tests
+	case model.OwnerTypeDocument:
+		return Documents
 	default: // component, capability, milestone
 		return Structure
 	}

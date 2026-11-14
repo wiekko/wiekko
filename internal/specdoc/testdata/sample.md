@@ -26,6 +26,18 @@ Keeps devices in step.
 
 * **Sign-in**
 
+## Documents
+
+* **DOC-1**: Sync protocol
+
+  File: `DOC-1.md`. Format: markdown. Revision 3.
+
+  Requirements: FR-1. Constraints: SC-1. Test cases: Replay keeps order.
+
+* **DOC-2**: Sighting schema
+
+  File: `DOC-2.json`. Format: json. Revision 1. State: draft.
+
 ## Constraints
 
 ### Security
@@ -50,7 +62,7 @@ Keeps devices in step.
   - saved offline
   - synced later
 
-  Capabilities: Offline queue, Replay.
+  Capabilities: Offline queue, Replay. Documents: DOC-1.
 
   * **FR-4**: Attach a photo
   * **FR-5**: Attach a location

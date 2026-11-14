@@ -185,6 +185,9 @@ func Requirement(w io.Writer, r *ops.RequirementDetail) error {
 	}
 	d.h(2, "Defects")
 	d.table(defectHeaders, defectRows(r.Defects))
+	if r.Kind != "task" {
+		documentsSection(&d, r.Documents)
+	}
 	comments(&d, r.Comments)
 	return d.write(w)
 }
@@ -223,6 +226,7 @@ func Constraint(w io.Writer, c *ops.ConstraintDetail) error {
 		caps = append(caps, x.Title)
 	}
 	d.list(caps)
+	documentsSection(&d, c.Documents)
 	comments(&d, c.Comments)
 	return d.write(w)
 }
@@ -318,6 +322,7 @@ func TestCase(w io.Writer, t *ops.TestCaseDetail) error {
 	d.table([]string{"Campaign", "Campaign status", "Environment", "Result", "Executed"}, rows)
 	d.h(2, "Defects")
 	d.table(defectHeaders, defectRows(t.Defects))
+	documentsSection(&d, t.Documents)
 	comments(&d, t.Comments)
 	return d.write(w)
 }

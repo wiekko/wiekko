@@ -138,12 +138,48 @@ func TestContext(t *testing.T) {
 func TestScopeForOwnerType(t *testing.T) {
 	cases := map[string]Scope{
 		model.OwnerTypeRequirement: Backlog, model.OwnerTypeTask: Backlog, model.OwnerTypeConstraint: Backlog,
-		model.OwnerTypeDefect: Defects, model.OwnerTypeTestCase: Tests,
+		model.OwnerTypeDefect: Defects, model.OwnerTypeTestCase: Tests, model.OwnerTypeDocument: Documents,
 		model.OwnerTypeComponent: Structure, model.OwnerTypeCapability: Structure, model.OwnerTypeMilestone: Structure,
 	}
 	for ot, want := range cases {
 		if got := ScopeForOwnerType(ot); got != want {
 			t.Errorf("ScopeForOwnerType(%s) = %s, want %s", ot, got, want)
+		}
+	}
+}
+
+// TestPresets checks what each preset grants (SC-408): every product scope,
+// documents included, in the full and read-only presets, and a spec author
+// that writes the product's definition but no settings.
+func TestPresets(t *testing.T) {
+	presets := map[string]Grants{}
+	for _, p := range Presets() {
+		presets[p.Name] = p.Grants
+	}
+	if presets["full"][Documents] != Write || presets["agent-read"][Documents] != Read {
+		t.Errorf("documents missing from the full or read-only preset: %v", presets)
+	}
+	if presets["ci"][Documents] != None {
+		t.Error("CI ingestion reaches documents")
+	}
+	spec, ok := presets["agent-spec"]
+	if !ok {
+		t.Fatal("no agent-spec preset")
+	}
+	for sc, want := range map[Scope]Level{
+		Structure: Write, Backlog: Write, Documents: Write, Discussion: Write,
+		Defects: Read, Tests: Read, Settings: None, Account: None, Admin: None,
+	} {
+		if spec[sc] != want {
+			t.Errorf("agent-spec grants %s %s, want %s", sc, spec[sc], want)
+		}
+	}
+	full := FullAccess()
+	for _, p := range Presets() {
+		for sc, l := range p.Grants {
+			if l > full[sc] {
+				t.Errorf("preset %s exceeds full access on %s", p.Name, sc)
+			}
 		}
 	}
 }

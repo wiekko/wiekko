@@ -26,6 +26,7 @@ type Store struct {
 	Requirement        RequirementStore
 	Defect             DefectStore
 	Constraint         ConstraintStore
+	Document           DocumentStore
 	PyramidLevel       PyramidLevelStore
 	TestCase           TestCaseStore
 	RuntimeEnvironment RuntimeEnvironmentStore
@@ -60,6 +61,7 @@ func New(conn *sql.DB, dialect Dialect, keys *crypto.KeyRing) *Store {
 		Requirement:        &requirementStore{db: db},
 		Defect:             &defectStore{db: db},
 		Constraint:         &constraintStore{db: db},
+		Document:           &documentStore{db: db},
 		PyramidLevel:       &pyramidLevelStore{db: db},
 		TestCase:           &testCaseStore{db: db},
 		RuntimeEnvironment: &runtimeEnvironmentStore{db: db},

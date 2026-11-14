@@ -34,7 +34,8 @@ removes it again; `nexmap whoami` shows the user, server and product in effect a
 came from.
 
 When you create a token, narrow it to what it is for: pick a preset, or set the scopes, a role cap and
-the products yourself. *CI ingestion* suits `nexmap utest`, *Agent, read-only* suits an AI agent that only
+the products yourself. *CI ingestion* suits `nexmap utest`, *Agent, spec author* an AI agent that maintains the
+specification, and *Agent, read-only* suits an AI agent that only
 reads. A token never grants more than its user holds; `nexmap whoami` shows its restriction. See
 [Restricted tokens](../api/rest.md#restricted-tokens) for what each scope covers.
 
@@ -105,6 +106,7 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `context` | Product briefing: structure, constraints, work in progress, defects, testing status |
 | `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create` |
 | `constraint` | `list`, `show`, `create`, `update` (e.g. `--compliance met`) |
+| `doc` | Documents: `list`, `show`, `create`, `update`, `delete`, `link`/`unlink`, `revisions`, `diff`, `restore`, `get` |
 | `component` | Product structure: `list`, `create`, `update`, `delete` |
 | `capability` | `list`, `show`, `create`, `update`, `delete`, and `link`/`unlink` requirements and constraints |
 | `defect` | `list`, `show`, `status`, `create` |
@@ -118,8 +120,8 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 
 `nexmap help <command>` (e.g. `nexmap help req show`) lists a command's arguments and flags.
 
-Requirements, tasks, constraints and defects are referenced by their identifier (`FR-12`, `MT-3`,
-`AC-42`, `DF-17`), test cases by their short ID (the first 8 characters of the ID, shown in lists) or
+Requirements, tasks, constraints, documents and defects are referenced by their identifier (`FR-12`, `MT-3`,
+`AC-42`, `DOC-3`, `DF-17`), test cases by their short ID (the first 8 characters of the ID, shown in lists) or
 their test identifier, and capabilities by name.
 
 ## Changing the structure
@@ -141,6 +143,25 @@ like `Step-1` has to be given by ID there. `update` commands change only the opt
 empty value clears a description or, for `capability update --component ""`, moves a capability to
 product level. `component delete` and `capability delete` need `--yes`.
 
+## Documents
+
+Documents hold the protocols, schemas and other texts that define the product. Nexmap is where they are
+written; a repository gets copies through the export below. A body can come from a file and goes back
+out unchanged:
+
+```sh
+nexmap doc create --title "Sighting schema" --format json --state current --body-file schema.json
+nexmap doc update DOC-3 --body-file schema.json
+nexmap doc diff DOC-3
+nexmap doc link DOC-3 FR-12 SC-2 TestSchema_Validates
+nexmap doc get DOC-3 --file api/schema.json
+```
+
+Every change to a document's title, content or format is a new revision; `doc revisions` lists them,
+`doc diff` compares two (`--from`, `--to`), `doc restore DOC-3 2` makes an earlier content current again
+and `doc get --revision 2` prints it. Setting a body from a file is an ordinary update: Nexmap does not
+watch the file. Only product owners change documents; `doc delete` needs `--yes`.
+
 ## Exporting the specification
 
 `nexmap export` writes the product's structure (components and capabilities), constraints and
@@ -148,15 +169,21 @@ requirements as one Markdown document: grouped by category, each item with its i
 description, definition of done and linked capabilities, and refinements nested below the item they
 refine. `--tasks` adds the tasks, `--file docs/spec.md` writes the document to a file instead of stdout.
 
+The specification also lists the current documents, and with `--drafts` the drafts. `--documents DIR`
+writes each listed document's content to its own file there, byte for byte, named by its identifier and
+format (`DOC-3.json`), so tools in the repository, such as code generators and schema validators, can use
+it directly:
+
 ```sh
-nexmap export --file docs/spec.md
+nexmap export --file docs/spec.md --documents docs/definitions
 ```
 
 The order is fixed (categories as configured, items by number, structure by name) and the document
 contains no date, status or priority, so exporting an unchanged product gives the same file, and a
 committed export shows real changes in a diff. With `-o json` and `--file`, the output names the file and
 the document's SHA-256. AI agents get the same document from the MCP tool `export_specification`. Anyone who can read the product can export it; a
-restricted token needs `read` on both `structure` and `backlog`.
+restricted token needs `read` on both `structure` and `backlog`, and `documents` to include the
+documents.
 
 There is no import. To turn an existing document into requirements, let an AI agent read it and create
 the items with `nexmap req create` or the REST API. Since the export carries identifiers, the agent can

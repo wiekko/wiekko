@@ -16,6 +16,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product)
 	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes)
+	productCtrl.UseDocuments(svc.Document)
 	upload := pageUpload(productCtrl)
 
 	// Public pages.
@@ -410,6 +411,33 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("DELETE /products/{id}/constraints/{constraintId}/attachments/{attachmentId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintAttachmentDelete)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.ConstraintHistoryTab)))
+
+	// Document pages (FR-044..FR-052).
+	mux.Handle("GET /products/{id}/documents", pageAuthed(http.HandlerFunc(productCtrl.Documents)))
+	mux.Handle("GET /products/{id}/documents/new", pageAuthed(http.HandlerFunc(productCtrl.DocumentCreateForm)))
+	mux.Handle("POST /products/{id}/documents", pageAuthed(http.HandlerFunc(productCtrl.DocumentCreate)))
+	mux.Handle("GET /products/{id}/documents/{documentId}", pageAuthed(http.HandlerFunc(productCtrl.DocumentDetail)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/raw", pageAuthed(http.HandlerFunc(productCtrl.DocumentRaw)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/edit", pageAuthed(http.HandlerFunc(productCtrl.DocumentEditForm)))
+	mux.Handle("POST /products/{id}/documents/{documentId}", pageAuthed(http.HandlerFunc(productCtrl.DocumentUpdate)))
+	mux.Handle("DELETE /products/{id}/documents/{documentId}", pageAuthed(http.HandlerFunc(productCtrl.DocumentDelete)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.DocumentDeleteConfirm)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.DocumentOverviewTab)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/tabs/links", pageAuthed(http.HandlerFunc(productCtrl.DocumentLinksTab)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/links/link-modal", pageAuthed(http.HandlerFunc(productCtrl.DocumentLinkModal)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/links/link-search", pageAuthed(http.HandlerFunc(productCtrl.DocumentLinkSearch)))
+	mux.Handle("POST /products/{id}/documents/{documentId}/links", pageAuthed(http.HandlerFunc(productCtrl.DocumentLink)))
+	mux.Handle("DELETE /products/{id}/documents/{documentId}/links/{type}/{targetId}", pageAuthed(http.HandlerFunc(productCtrl.DocumentUnlink)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/tabs/revisions", pageAuthed(http.HandlerFunc(productCtrl.DocumentRevisionsTab)))
+	mux.Handle("POST /products/{id}/documents/{documentId}/restore", pageAuthed(http.HandlerFunc(productCtrl.DocumentRestore)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/tabs/comments", pageAuthed(http.HandlerFunc(productCtrl.DocumentCommentsTab)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/tabs/attachments", pageAuthed(http.HandlerFunc(productCtrl.DocumentAttachmentsTab)))
+	mux.Handle("POST /products/{id}/documents/{documentId}/comments", pageAuthed(http.HandlerFunc(productCtrl.DocumentCommentCreate)))
+	mux.Handle("DELETE /products/{id}/documents/{documentId}/comments/{commentId}", pageAuthed(http.HandlerFunc(productCtrl.DocumentCommentDelete)))
+	mux.Handle("POST /products/{id}/documents/{documentId}/attachments", upload(http.HandlerFunc(productCtrl.DocumentAttachmentCreate)))
+	mux.Handle("DELETE /products/{id}/documents/{documentId}/attachments/{attachmentId}", pageAuthed(http.HandlerFunc(productCtrl.DocumentAttachmentDelete)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
+	mux.Handle("GET /products/{id}/documents/{documentId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.DocumentHistoryTab)))
 
 	// Admin pages.
 	mux.Handle("GET /admin/users", pageAdmin(http.HandlerFunc(adminCtrl.ListUsers)))

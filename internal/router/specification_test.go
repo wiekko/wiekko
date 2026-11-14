@@ -124,5 +124,33 @@ func TestSpecificationExport(t *testing.T) {
 		if status, _, _ := get(mint(access.Grants{access.Backlog: access.Read}), ""); status != http.StatusForbidden {
 			t.Errorf("export without the structure scope: status %d", status)
 		}
+
+		// Documents (FR-907): listed for a token that may read them, current
+		// ones by default, drafts on request; left out silently otherwise.
+		protocol, err := e.svc.Document.CreateDocument(ctx, admin, service.CreateDocumentInput{ProductID: pid,
+			Title: "Sync protocol", Body: "# Sync\n", State: model.DocumentStateCurrent})
+		must(err)
+		_, err = e.svc.Document.CreateDocument(ctx, admin, service.CreateDocumentInput{ProductID: pid,
+			Title: "Sighting schema", Format: model.DocumentFormatJSON, Body: "{}\n"})
+		must(err)
+		must(e.svc.Document.LinkDocument(ctx, admin, pid, protocol.ID, model.DocumentLinkRequirement, record.ID))
+		must(e.svc.Document.LinkDocument(ctx, admin, pid, protocol.ID, model.DocumentLinkConstraint, tls.ID))
+		if _, _, out := get(reader, ""); strings.Contains(out, "## Documents") || strings.Contains(out, "DOC-1") {
+			t.Errorf("documents exported for a token without the documents scope:\n%s", out)
+		}
+		docReader := mint(access.Grants{access.Structure: access.Read, access.Backlog: access.Read, access.Documents: access.Read})
+		_, _, out := get(docReader, "")
+		for _, want := range []string{"## Documents", "* **DOC-1**: Sync protocol", "File: `DOC-1.md`. Format: markdown. Revision 1.",
+			"Requirements: FR-1. Constraints: SC-1.", "Capabilities: Offline queue. Documents: DOC-1."} {
+			if !strings.Contains(out, want) {
+				t.Errorf("export lacks %q:\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "DOC-2") {
+			t.Error("a draft document was exported without drafts=true")
+		}
+		if _, _, out := get(docReader, "?drafts=true"); !strings.Contains(out, "* **DOC-2**: Sighting schema") || !strings.Contains(out, "State: draft.") {
+			t.Errorf("drafts=true does not list the draft:\n%s", out)
+		}
 	})
 }

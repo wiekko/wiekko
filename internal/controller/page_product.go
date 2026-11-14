@@ -33,6 +33,7 @@ type PageProductController struct {
 	backlog    *service.BacklogService
 	category   *service.CategoryService
 	constraint *service.ConstraintService
+	document   *service.DocumentService
 	discussion *service.DiscussionService
 	audit      *service.AuditService
 
@@ -867,6 +868,8 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 		input.WorkflowMode = &value
 	case "defect_prefix":
 		input.DefectPrefix = &value
+	case "document_prefix":
+		input.DocumentPrefix = &value
 	case "two_factor_required":
 		on := value == "true"
 		input.TwoFactorRequired = &on
@@ -4468,6 +4471,7 @@ func (c *PageProductController) TestCaseDetail(w http.ResponseWriter, r *http.Re
 		PyramidLevelName: c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID),
 		EnvironmentNames: c.resolveTestCaseEnvironmentNames(r, user, productID, testCaseID),
 		CanEdit:          c.canEditTestCases(user, role),
+		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkTestCase, testCaseID),
 	}).Render(r.Context(), w)
 }
 
@@ -4841,7 +4845,7 @@ func (c *PageProductController) TestCaseOverviewTab(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, capabilityName,
-		pyramidLevelName, environmentNames).Render(r.Context(), w)
+		pyramidLevelName, environmentNames, c.linkedDocuments(r, user, productID, model.DocumentLinkTestCase, testCaseID)).Render(r.Context(), w)
 }
 
 // TestCaseRequirementsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/requirements.
@@ -5468,6 +5472,7 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		ParentIdentifier: parentIdentifier,
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
+		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkRequirement, req.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -5815,6 +5820,7 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 		ParentIdentifier: parentIdentifier,
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
+		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkRequirement, req.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -7961,6 +7967,7 @@ func (c *PageProductController) ConstraintDetail(w http.ResponseWriter, r *http.
 		CategoryNames:    catNames,
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, con.MilestoneID),
 		CanEdit:          c.canEditConstraints(user, role),
+		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkConstraint, con.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -8228,6 +8235,7 @@ func (c *PageProductController) ConstraintOverviewTab(w http.ResponseWriter, r *
 		CategoryNames:    catNames,
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, con.MilestoneID),
 		CanEdit:          c.canEditConstraints(user, role),
+		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkConstraint, con.ID),
 	}).Render(r.Context(), w)
 }
 

@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS products (
     -- Prefix of defect identifiers such as DF-17 (FR-043). Unique within the
     -- product together with the category prefixes, see categories.
     defect_prefix   TEXT NOT NULL DEFAULT 'DF',
+    -- Prefix of document identifiers such as DOC-3 (FR-050). Unique within
+    -- the product together with the defect and category prefixes.
+    document_prefix TEXT NOT NULL DEFAULT 'DOC',
     -- Members must have 2FA set up to reach the product (SC-107).
     two_factor_required INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL,
@@ -366,6 +369,80 @@ CREATE TABLE IF NOT EXISTS constraint_capabilities (
 );
 CREATE INDEX IF NOT EXISTS idx_constraint_capabilities_constraint_id ON constraint_capabilities(constraint_id);
 CREATE INDEX IF NOT EXISTS idx_constraint_capabilities_capability_id ON constraint_capabilities(capability_id);
+
+-- Documents: long-form reference texts that define part of the product
+-- (FR-044..FR-052). body is stored byte for byte; format says how it is shown
+-- and exported. A document sits under a component or a capability, or
+-- directly under the product.
+CREATE TABLE IF NOT EXISTS documents (
+    id               TEXT PRIMARY KEY,
+    product_id       TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    sequence_number  INTEGER NOT NULL DEFAULT 0,
+    title            TEXT NOT NULL,
+    body             TEXT NOT NULL DEFAULT '',
+    format           TEXT NOT NULL DEFAULT 'markdown',
+    state            TEXT NOT NULL DEFAULT 'draft',
+    superseded_by_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
+    component_id     TEXT REFERENCES components(id) ON DELETE SET NULL,
+    capability_id    TEXT REFERENCES capabilities(id) ON DELETE SET NULL,
+    milestone_id     TEXT REFERENCES milestones(id) ON DELETE SET NULL,
+    revision         INTEGER NOT NULL DEFAULT 1,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_documents_product_id ON documents(product_id);
+CREATE INDEX IF NOT EXISTS idx_documents_superseded_by_id ON documents(superseded_by_id);
+CREATE INDEX IF NOT EXISTS idx_documents_component_id ON documents(component_id);
+CREATE INDEX IF NOT EXISTS idx_documents_capability_id ON documents(capability_id);
+CREATE INDEX IF NOT EXISTS idx_documents_milestone_id ON documents(milestone_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_product_seq ON documents(product_id, sequence_number);
+
+-- Document revisions: a full snapshot per change of title, body or format
+-- (FR-051). Like the audit trail, user_id has no foreign key so the history
+-- outlives the account that wrote it.
+CREATE TABLE IF NOT EXISTS document_revisions (
+    id          TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    revision    INTEGER NOT NULL,
+    title       TEXT NOT NULL,
+    body        TEXT NOT NULL DEFAULT '',
+    format      TEXT NOT NULL DEFAULT 'markdown',
+    user_id     TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    UNIQUE(document_id, revision)
+);
+CREATE INDEX IF NOT EXISTS idx_document_revisions_document_id ON document_revisions(document_id);
+
+-- Document links (FR-048)
+CREATE TABLE IF NOT EXISTS requirement_documents (
+    id             TEXT PRIMARY KEY,
+    requirement_id TEXT NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
+    document_id    TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    created_at     TEXT NOT NULL,
+    UNIQUE(requirement_id, document_id)
+);
+CREATE INDEX IF NOT EXISTS idx_requirement_documents_requirement_id ON requirement_documents(requirement_id);
+CREATE INDEX IF NOT EXISTS idx_requirement_documents_document_id ON requirement_documents(document_id);
+
+CREATE TABLE IF NOT EXISTS constraint_documents (
+    id            TEXT PRIMARY KEY,
+    constraint_id TEXT NOT NULL REFERENCES constraints(id) ON DELETE CASCADE,
+    document_id   TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    created_at    TEXT NOT NULL,
+    UNIQUE(constraint_id, document_id)
+);
+CREATE INDEX IF NOT EXISTS idx_constraint_documents_constraint_id ON constraint_documents(constraint_id);
+CREATE INDEX IF NOT EXISTS idx_constraint_documents_document_id ON constraint_documents(document_id);
+
+CREATE TABLE IF NOT EXISTS test_case_documents (
+    id           TEXT PRIMARY KEY,
+    test_case_id TEXT NOT NULL REFERENCES test_cases(id) ON DELETE CASCADE,
+    document_id  TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    UNIQUE(test_case_id, document_id)
+);
+CREATE INDEX IF NOT EXISTS idx_test_case_documents_test_case_id ON test_case_documents(test_case_id);
+CREATE INDEX IF NOT EXISTS idx_test_case_documents_document_id ON test_case_documents(document_id);
 
 -- Defect links: polymorphic links to components, capabilities, test cases (FR-023)
 CREATE TABLE IF NOT EXISTS defect_links (

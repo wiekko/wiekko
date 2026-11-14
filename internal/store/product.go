@@ -32,11 +32,12 @@ type productStore struct {
 func (s *productStore) Create(ctx context.Context, product *model.Product) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO products (id, name, description, estimation_mode, workflow_mode, status_sync, defect_prefix,
-		 two_factor_required, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 document_prefix, two_factor_required, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		product.ID, product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
 		product.StatusSync, defectPrefixOrDefault(product.DefectPrefix),
+		documentPrefixOrDefault(product.DocumentPrefix),
 		product.TwoFactorRequired,
 		product.CreatedAt, product.UpdatedAt,
 	)
@@ -56,11 +57,12 @@ func (s *productStore) GetByID(ctx context.Context, id string) (*model.Product, 
 func (s *productStore) Update(ctx context.Context, product *model.Product) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE products SET name = ?, description = ?, estimation_mode = ?, workflow_mode = ?, status_sync = ?,
-		 defect_prefix = ?, two_factor_required = ?, updated_at = ?
+		 defect_prefix = ?, document_prefix = ?, two_factor_required = ?, updated_at = ?
 		 WHERE id = ?`,
 		product.Name, product.Description,
 		product.EstimationMode, product.WorkflowMode,
 		product.StatusSync, defectPrefixOrDefault(product.DefectPrefix),
+		documentPrefixOrDefault(product.DocumentPrefix),
 		product.TwoFactorRequired,
 		product.UpdatedAt, product.ID,
 	)
@@ -124,11 +126,11 @@ func (s *productStore) List(ctx context.Context) ([]*model.Product, error) {
 }
 
 const productColumns = `id, name, description, estimation_mode, workflow_mode, status_sync, defect_prefix,
-	two_factor_required, created_at, updated_at`
+	document_prefix, two_factor_required, created_at, updated_at`
 
 // prefixedProductColumns is productColumns qualified with the alias p.
 const prefixedProductColumns = `p.id, p.name, p.description, p.estimation_mode, p.workflow_mode, p.status_sync,
-	p.defect_prefix, p.two_factor_required, p.created_at, p.updated_at`
+	p.defect_prefix, p.document_prefix, p.two_factor_required, p.created_at, p.updated_at`
 
 // defectPrefixOrDefault keeps a product written without a defect prefix on
 // the default rather than an empty prefix.
@@ -139,11 +141,19 @@ func defectPrefixOrDefault(prefix string) string {
 	return prefix
 }
 
+// documentPrefixOrDefault does the same for the document prefix (FR-050).
+func documentPrefixOrDefault(prefix string) string {
+	if prefix == "" {
+		return model.DefaultDocumentPrefix
+	}
+	return prefix
+}
+
 func scanProduct(sc scanner) (*model.Product, error) {
 	var p model.Product
 	err := sc.Scan(&p.ID, &p.Name, &p.Description,
 		&p.EstimationMode, &p.WorkflowMode,
-		&p.StatusSync, &p.DefectPrefix,
+		&p.StatusSync, &p.DefectPrefix, &p.DocumentPrefix,
 		&p.TwoFactorRequired,
 		&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {

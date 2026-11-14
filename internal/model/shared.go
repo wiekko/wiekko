@@ -36,13 +36,14 @@ const (
 	OwnerTypeCapability  = "capability"
 	OwnerTypeMilestone   = "milestone"
 	OwnerTypeDefect      = "defect"
+	OwnerTypeDocument    = "document"
 )
 
 // ValidOwnerType reports whether ownerType can carry comments and attachments.
 func ValidOwnerType(ownerType string) bool {
 	switch ownerType {
 	case OwnerTypeRequirement, OwnerTypeTask, OwnerTypeConstraint, OwnerTypeTestCase,
-		OwnerTypeComponent, OwnerTypeCapability, OwnerTypeMilestone, OwnerTypeDefect:
+		OwnerTypeComponent, OwnerTypeCapability, OwnerTypeMilestone, OwnerTypeDefect, OwnerTypeDocument:
 		return true
 	default:
 		return false

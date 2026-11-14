@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
+	"nexmap.net/internal/access"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/specdoc"
 	"nexmap.net/internal/store"
@@ -21,12 +23,44 @@ type SpecificationService struct {
 	categories   store.CategoryStore
 	requirements store.RequirementStore
 	constraints  store.ConstraintStore
+	documents    store.DocumentStore
+	testCases    store.TestCaseStore
 	authz        *Authorizer
 }
 
 // ExportOptions selects what an export contains beyond the defaults.
 type ExportOptions struct {
 	Tasks bool // include tasks (FR-905: only on request)
+	// Drafts includes draft documents besides the current ones (FR-907).
+	Drafts bool
+}
+
+// ExportedDocuments lists the documents an export includes, in its order:
+// the current ones, and the drafts when asked for. A token without the
+// documents scope gets none; the export then leaves them out rather than
+// failing (FR-907). Requires viewer role.
+func (s *SpecificationService) ExportedDocuments(ctx context.Context, user *model.User, productID string, opts ExportOptions) ([]*model.Document, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.exportedDocuments(ctx, productID, opts)
+}
+
+func (s *SpecificationService) exportedDocuments(ctx context.Context, productID string, opts ExportOptions) ([]*model.Document, error) {
+	if s.documents == nil || !access.FromContext(ctx).Allows(access.Documents, access.Read) {
+		return nil, nil
+	}
+	all, err := s.documents.ListPageByProductID(ctx, productID, store.DocumentFilter{}, store.ListParams{Sort: "identifier"})
+	if err != nil {
+		return nil, fmt.Errorf("list documents: %w", err)
+	}
+	docs := []*model.Document{}
+	for _, d := range all {
+		if d.State == model.DocumentStateCurrent || (opts.Drafts && d.State == model.DocumentStateDraft) {
+			docs = append(docs, d)
+		}
+	}
+	return docs, nil
 }
 
 // Export renders the product's structure, constraints and requirements, and
@@ -56,6 +90,24 @@ func (s *SpecificationService) Export(ctx context.Context, user *model.User, pro
 	if err != nil {
 		return "", err
 	}
+	docs, err := s.exportedDocuments(ctx, productID, opts)
+	if err != nil {
+		return "", err
+	}
+	// docLinks[doc ID] are the document's links; docsOf[item ID] the
+	// identifiers of the exported documents linked to the item.
+	docLinks := map[string][]*model.DocumentLink{}
+	docsOf := map[string][]string{}
+	for _, d := range docs {
+		links, err := s.documents.ListLinks(ctx, d.ID)
+		if err != nil {
+			return "", fmt.Errorf("list document links: %w", err)
+		}
+		docLinks[d.ID] = links
+		for _, l := range links {
+			docsOf[l.TargetID] = append(docsOf[l.TargetID], d.Identifier)
+		}
+	}
 
 	constraints, err := s.constraints.ListByProductID(ctx, productID, store.ConstraintFilter{})
 	if err != nil {
@@ -66,9 +118,15 @@ func (s *SpecificationService) Export(ctx context.Context, user *model.User, pro
 		return "", err
 	}
 	var conItems []itemSource
+	conPrefixes := map[string]string{}
+	for _, c := range conCats {
+		conPrefixes[c.ID] = c.Prefix
+	}
+	identifiers := map[string]string{}
 	for _, c := range constraints {
 		conItems = append(conItems, itemSource{id: c.ID, categoryID: c.CategoryID, seq: c.SequenceNumber,
-			title: c.Title, description: c.Description, capabilities: conCaps[c.ID]})
+			title: c.Title, description: c.Description, capabilities: conCaps[c.ID], documents: docsOf[c.ID]})
+		identifiers[c.ID] = model.EntityIdentifier(conPrefixes[c.CategoryID], c.SequenceNumber)
 	}
 	doc.Constraints = buildSections(conCats, conItems)
 
@@ -98,10 +156,10 @@ func (s *SpecificationService) Export(ctx context.Context, user *model.User, pro
 			taskItems = append(taskItems, it)
 			continue
 		}
+		it.documents = docsOf[r.ID]
 		it.definitionOfDone = r.DefinitionOfDone
 		reqItems = append(reqItems, it)
 	}
-	identifiers := map[string]string{}
 	for _, r := range reqs {
 		identifiers[r.ID] = model.EntityIdentifier(prefixes[r.CategoryID], r.SequenceNumber)
 	}
@@ -109,7 +167,62 @@ func (s *SpecificationService) Export(ctx context.Context, user *model.User, pro
 	if opts.Tasks {
 		doc.Tasks = buildSections(taskCats, withParents(taskItems, identifiers))
 	}
+	if docs != nil {
+		if doc.Documents, err = s.documentEntries(ctx, docs, docLinks, identifiers); err != nil {
+			return "", err
+		}
+	}
 	return specdoc.Render(doc), nil
+}
+
+// documentEntries describes the exported documents with their links. Test
+// cases are named only for a token that may read them.
+func (s *SpecificationService) documentEntries(ctx context.Context, docs []*model.Document, docLinks map[string][]*model.DocumentLink, identifiers map[string]string) ([]specdoc.DocumentEntry, error) {
+	tests := access.FromContext(ctx).Allows(access.Tests, access.Read)
+	entries := []specdoc.DocumentEntry{}
+	for _, d := range docs {
+		e := specdoc.DocumentEntry{Identifier: d.Identifier, Title: d.Title, Format: d.Format, State: d.State,
+			Revision: d.Revision, File: model.DocumentFileName(d.Identifier, d.Format)}
+		for _, l := range docLinks[d.ID] {
+			switch l.TargetType {
+			case model.DocumentLinkRequirement:
+				if id, ok := identifiers[l.TargetID]; ok {
+					e.Requirements = append(e.Requirements, id)
+				}
+			case model.DocumentLinkConstraint:
+				if id, ok := identifiers[l.TargetID]; ok {
+					e.Constraints = append(e.Constraints, id)
+				}
+			case model.DocumentLinkTestCase:
+				if !tests || s.testCases == nil {
+					continue
+				}
+				tc, err := s.testCases.GetByID(ctx, l.TargetID)
+				if err != nil {
+					return nil, fmt.Errorf("read linked test case: %w", err)
+				}
+				e.TestCases = append(e.TestCases, tc.Title)
+			}
+		}
+		sortIdentifiers(e.Requirements)
+		sortIdentifiers(e.Constraints)
+		slices.SortFunc(e.TestCases, func(a, b string) int {
+			return cmp.Or(cmp.Compare(strings.ToLower(a), strings.ToLower(b)), cmp.Compare(a, b))
+		})
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+// sortIdentifiers orders identifiers like FR-2 < FR-10 < SR-1.
+func sortIdentifiers(ids []string) {
+	slices.SortFunc(ids, func(a, b string) int {
+		ap, an, _ := strings.Cut(a, "-")
+		bp, bn, _ := strings.Cut(b, "-")
+		ai, _ := strconv.Atoi(an)
+		bi, _ := strconv.Atoi(bn)
+		return cmp.Or(cmp.Compare(ap, bp), cmp.Compare(ai, bi))
+	})
 }
 
 // structure fills in the components and the capabilities.
@@ -182,7 +295,8 @@ type itemSource struct {
 	title, description       string
 	definitionOfDone         string
 	capabilities             []string
-	parentIdentifier         string // set by withParents
+	documents                []string // identifiers of linked documents
+	parentIdentifier         string   // set by withParents
 }
 
 // withParents records each item's parent identifier.
@@ -236,6 +350,7 @@ func buildSections(cats []*model.Category, items []itemSource) []specdoc.Section
 		out := specdoc.Item{
 			Identifier: model.EntityIdentifier(cmp.Or(prefix, "?"), it.seq), Title: it.title,
 			Description: it.description, DefinitionOfDone: it.definitionOfDone, Capabilities: it.capabilities,
+			Documents: it.documents,
 		}
 		if !nested {
 			out.Refines = it.parentIdentifier

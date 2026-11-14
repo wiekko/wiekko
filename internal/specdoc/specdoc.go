@@ -8,6 +8,7 @@
 package specdoc
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -20,6 +21,10 @@ type Document struct {
 	// to no component.
 	Components   []Component
 	Capabilities []Capability
+
+	// Documents is nil when documents were not exported (FR-907), and
+	// rendered only then. Their bodies are exported as files of their own.
+	Documents []DocumentEntry
 
 	Constraints  []Section
 	Requirements []Section
@@ -56,7 +61,22 @@ type Item struct {
 	// because the parent belongs to another category or kind.
 	Refines      string
 	Capabilities []string
-	Children     []Item
+	// Documents are the identifiers of the documents linked to the item.
+	Documents []string
+	Children  []Item
+}
+
+// DocumentEntry lists one document of the specification (FR-907).
+type DocumentEntry struct {
+	Identifier string // e.g. DOC-3
+	Title      string
+	Format     string
+	State      string // draft or current
+	Revision   int
+	File       string // the file holding the body, e.g. DOC-3.md
+	// Identifiers of the requirements and constraints, and names of the test
+	// cases, the document is linked to.
+	Requirements, Constraints, TestCases []string
 }
 
 // header explains where the document comes from. It carries no timestamp
@@ -92,6 +112,9 @@ func Render(d Document) string {
 		w.capabilities(d.Capabilities)
 	}
 
+	if d.Documents != nil {
+		w.documents(d.Documents)
+	}
 	w.sections("Constraints", d.Constraints)
 	w.sections("Requirements", d.Requirements)
 	if d.Tasks != nil {
@@ -128,6 +151,41 @@ func (w *writer) capabilities(caps []Capability) {
 			b.WriteString(": " + desc + "\n") // like the entries of docs/spec/requirements.md
 		default:
 			b.WriteString("\n\n" + indent(desc, 2) + "\n")
+		}
+	}
+	w.block(b.String())
+}
+
+// documents lists the documents; each body lives in the file named.
+func (w *writer) documents(docs []DocumentEntry) {
+	w.block("## Documents")
+	if len(docs) == 0 {
+		w.block("_None._")
+		return
+	}
+	var b strings.Builder
+	for i, d := range docs {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString("* **" + d.Identifier + "**: " + oneLine(d.Title) + "\n")
+		meta := []string{"File: `" + d.File + "`.", "Format: " + d.Format + ".", "Revision " + strconv.Itoa(d.Revision) + "."}
+		if d.State != "current" {
+			meta = append(meta, "State: "+d.State+".")
+		}
+		b.WriteString("\n" + indent(strings.Join(meta, " "), 2) + "\n")
+		var links []string
+		if len(d.Requirements) > 0 {
+			links = append(links, "Requirements: "+strings.Join(d.Requirements, ", ")+".")
+		}
+		if len(d.Constraints) > 0 {
+			links = append(links, "Constraints: "+strings.Join(d.Constraints, ", ")+".")
+		}
+		if len(d.TestCases) > 0 {
+			links = append(links, "Test cases: "+strings.Join(oneLines(d.TestCases), "; ")+".")
+		}
+		if len(links) > 0 {
+			b.WriteString("\n" + indent(strings.Join(links, " "), 2) + "\n")
 		}
 	}
 	w.block(b.String())
@@ -171,6 +229,9 @@ func writeItems(b *strings.Builder, items []Item, depth int) {
 		if len(it.Capabilities) > 0 {
 			meta = append(meta, "Capabilities: "+strings.Join(oneLines(it.Capabilities), ", ")+".")
 		}
+		if len(it.Documents) > 0 {
+			meta = append(meta, "Documents: "+strings.Join(it.Documents, ", ")+".")
+		}
 		if len(meta) > 0 {
 			parts = append(parts, strings.Join(meta, " "))
 		}
@@ -188,7 +249,7 @@ func multiLine(s string) bool { return strings.Contains(normalize(s), "\n") }
 
 func hasBody(it Item) bool {
 	return normalize(it.Description) != "" || normalize(it.DefinitionOfDone) != "" ||
-		it.Refines != "" || len(it.Capabilities) > 0 || len(it.Children) > 0
+		it.Refines != "" || len(it.Capabilities) > 0 || len(it.Documents) > 0 || len(it.Children) > 0
 }
 
 // normalize makes Markdown text diff-stable: LF line endings, no trailing

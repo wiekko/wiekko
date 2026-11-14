@@ -79,7 +79,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 | Tab            | Content                                                          |
 |----------------|------------------------------------------------------------------|
-| General        | Name, description, estimation mode, workflow mode (kanban/scrum) |
+| General        | Name, description, estimation mode, workflow mode (kanban/scrum), defect and document identifier prefixes, 2FA requirement |
 | Categories     | Requirement, task and constraint categories: name, identifier prefix, order |
 | Statuses       | Requirement and defect status columns (drag to reorder)          |
 | Environments   | Runtime environment labels for test matrix                       |
@@ -210,6 +210,29 @@ action and warns about incomplete results rather than blocking (FR-332, FR-333).
 | `/products/:id/milestones/new`            | Create Milestone     | Form                                             |
 | `/products/:id/milestones/:mid`           | Milestone Detail     | Tabbed detail page                               |
 | `/products/:id/milestones/:mid/edit`      | Edit Milestone       | Form                                             |
+| `/products/:id/documents`                 | Documents List       | Table with state filter                          |
+| `/products/:id/documents/new`             | Create Document      | Form with a monospace body editor                |
+| `/products/:id/documents/:did`            | Document Detail      | Tabbed detail page                               |
+| `/products/:id/documents/:did/edit`       | Edit Document        | Form                                             |
+| `/products/:id/documents/:did/raw`        | Document content     | The body as a plain-text download, never rendered |
+
+Documents sit in the sidebar's *Definition* group, next to components, capabilities, constraints and
+milestones. A document body is user input of any format: Markdown is rendered only through the safe
+Markdown renderer (raw HTML escaped, unsafe link schemes dropped), every other format and every diff
+line is shown as escaped text, and the raw content is served as a `text/plain` attachment.
+
+**Document Detail tabs:**
+
+| Tab          | Content                                                                  |
+|--------------|--------------------------------------------------------------------------|
+| Overview     | Format, state, revision, placement, milestone, successor; the content (Markdown rendered, other formats verbatim) and its download |
+| Links        | Linked requirements, constraints and test cases; one link modal with a type choice |
+| Revisions    | Revision list with restore (owner), and the diff between two revisions    |
+| Comments     | Comment thread                                                           |
+| Attachments  | File list + upload                                                       |
+| History      | Audit trail                                                              |
+
+Requirement, constraint and test case overviews list the documents linked to them.
 
 **Component Detail tabs:**
 

@@ -1,0 +1,927 @@
+package product
+
+import (
+	"fmt"
+	"strconv"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// Documents (FR-044..FR-052): protocols, schemas and other texts that define
+// the product. Their bodies are user input of any format, so they reach the
+// page only two ways: Markdown through templates.RenderMarkdown, which escapes
+// raw HTML and drops unsafe links, and every other format as text that templ
+// escapes. Nothing here passes a body to templ.Raw by any other route.
+
+// DocumentsProps holds data for the document list page.
+type DocumentsProps struct {
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Product     *model.Product
+	Documents   []*model.Document
+	State       string // the state filter; empty = all
+	CanEdit     bool
+}
+
+templ DocumentsPage(props DocumentsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "documents",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: "Documents"},
+			})
+			if props.CanEdit {
+				@patterns.ListPageHeader("Documents", "/products/"+props.Product.ID+"/documents/new", "New Document", len(props.Documents))
+			} else {
+				@patterns.ListPageHeader("Documents", "", "", len(props.Documents))
+			}
+			@documentStateFilter(props.Product.ID, props.State)
+			if len(props.Documents) == 0 {
+				@ui.Card() {
+					if props.State != "" {
+						@ui.EmptyState("file-text", "No matching documents", "No document is in this state.", "Show all", "/products/"+props.Product.ID+"/documents")
+					} else if props.CanEdit {
+						@ui.EmptyState("file-text", "No documents yet", "Write down the protocols, schemas and contracts that define the product.", "New Document", "/products/"+props.Product.ID+"/documents/new")
+					} else {
+						@ui.EmptyState("file-text", "No documents yet", "No documents have been written for this product.", "", "")
+					}
+				}
+			} else {
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								ID
+							}
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Format
+							}
+							@ui.TableHeader() {
+								State
+							}
+							@ui.TableHeader() {
+								Revision
+							}
+							@ui.TableHeader() {
+								Updated
+							}
+							if props.CanEdit {
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
+						}
+						@ui.TableBody("") {
+							for _, d := range props.Documents {
+								@ui.TableRow("") {
+									@ui.TableCellMuted() {
+										{ d.Identifier }
+									}
+									@ui.TableCell() {
+										<a
+											href={ templ.SafeURL(documentURL(props.Product.ID, d.ID)) }
+											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+										>
+											{ d.Title }
+										</a>
+									}
+									@ui.TableCellMuted() {
+										{ documentFormatLabel(d.Format) }
+									}
+									@ui.TableCellMuted() {
+										@documentStateBadge(d.State)
+									}
+									@ui.TableCellMuted() {
+										{ strconv.Itoa(d.Revision) }
+									}
+									@ui.TableCellMuted() {
+										{ formatDate(d.UpdatedAt) }
+									}
+									if props.CanEdit {
+										@ui.TableCell() {
+											@patterns.RowActions(documentURL(props.Product.ID, d.ID)+"/edit?return=list", documentURL(props.Product.ID, d.ID), props.Meta.CSRFToken)
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
+
+templ documentStateFilter(productID, current string) {
+	<nav class="flex flex-wrap gap-2" aria-label="Filter by state">
+		for _, s := range []string{"", model.DocumentStateCurrent, model.DocumentStateDraft, model.DocumentStateSuperseded} {
+			<a
+				href={ templ.SafeURL(documentStateFilterURL(productID, s)) }
+				if s == current {
+					aria-current="page"
+					class="rounded-full bg-indigo-600 px-3 py-1 text-xs font-medium text-white"
+				} else {
+					class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+				}
+			>
+				{ documentStateFilterLabel(s) }
+			</a>
+		}
+	</nav>
+}
+
+func documentStateFilterURL(productID, state string) string {
+	u := "/products/" + productID + "/documents"
+	if state != "" {
+		u += "?state=" + state
+	}
+	return u
+}
+
+func documentStateFilterLabel(state string) string {
+	if state == "" {
+		return "All"
+	}
+	return documentStateLabel(state)
+}
+
+func documentURL(productID, documentID string) string {
+	return "/products/" + productID + "/documents/" + documentID
+}
+
+func documentStateLabel(state string) string {
+	switch state {
+	case model.DocumentStateCurrent:
+		return "Current"
+	case model.DocumentStateSuperseded:
+		return "Superseded"
+	default:
+		return "Draft"
+	}
+}
+
+templ documentStateBadge(state string) {
+	switch state {
+		case model.DocumentStateCurrent:
+			@ui.Badge("Current", "green")
+		case model.DocumentStateSuperseded:
+			@ui.Badge("Superseded", "gray")
+		default:
+			@ui.Badge("Draft", "yellow")
+	}
+}
+
+var documentFormatLabels = map[string]string{
+	model.DocumentFormatMarkdown: "Markdown",
+	model.DocumentFormatText:     "Plain text",
+	model.DocumentFormatJSON:     "JSON",
+	model.DocumentFormatYAML:     "YAML",
+	model.DocumentFormatXML:      "XML",
+	model.DocumentFormatProto:    "Protocol Buffers",
+	model.DocumentFormatSQL:      "SQL",
+	model.DocumentFormatGraphQL:  "GraphQL",
+}
+
+func documentFormatLabel(format string) string {
+	if l, ok := documentFormatLabels[format]; ok {
+		return l
+	}
+	return format
+}
+
+// DocumentDetailProps holds data for the document detail page.
+type DocumentDetailProps struct {
+	Meta           templates.PageMeta
+	DisplayName    string
+	IsAdmin        bool
+	Product        *model.Product
+	Document       *model.Document
+	SupersededBy   *model.Document // nil if none
+	ComponentName  string
+	CapabilityName string
+	MilestoneName  string
+	CanEdit        bool
+}
+
+templ DocumentDetailPage(props DocumentDetailProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "documents",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@patterns.DetailPageHeader(
+				[]templates.BreadcrumbItem{
+					{Label: "Dashboard", Href: "/"},
+					{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+					{Label: "Documents", Href: "/products/" + props.Product.ID + "/documents"},
+					{Label: props.Document.Identifier},
+				},
+				props.Document.Title,
+				props.Document.Identifier,
+				documentEditHref(props),
+				documentDeleteURL(props),
+				props.Meta.CSRFToken,
+			) {
+				@documentStateBadge(props.Document.State)
+			}
+			@ui.TabGroup(documentDetailTabs(props.Product.ID, props.Document.ID))
+			@ui.TabPanel("overview") {
+				@DocumentOverviewTabContent(props)
+			}
+			for _, tab := range []string{"links", "revisions", "comments", "attachments", "history"} {
+				@ui.TabPanelHidden(tab) {
+					@ui.LoadingSpinner("md")
+				}
+			}
+		</div>
+	}
+}
+
+templ DocumentOverviewTabContent(props DocumentDetailProps) {
+	<div class="space-y-6">
+		@ui.Card() {
+			@ui.CardBody() {
+				@patterns.DetailGrid() {
+					@patterns.DetailField("Identifier", props.Document.Identifier)
+					@patterns.DetailField("Format", documentFormatLabel(props.Document.Format))
+					@patterns.DetailFieldSlot("State") {
+						@documentStateBadge(props.Document.State)
+					}
+					@patterns.DetailField("Revision", strconv.Itoa(props.Document.Revision))
+					if props.SupersededBy != nil {
+						@constraintLinkedField("Superseded by", props.SupersededBy.Identifier+" "+props.SupersededBy.Title, documentURL(props.Product.ID, props.SupersededBy.ID))
+					}
+					if props.Document.ComponentID != "" {
+						@constraintLinkedField("Component", props.ComponentName, fmt.Sprintf("/products/%s/components/%s", props.Product.ID, props.Document.ComponentID))
+					}
+					if props.Document.CapabilityID != "" {
+						@constraintLinkedField("Capability", props.CapabilityName, fmt.Sprintf("/products/%s/capabilities/%s", props.Product.ID, props.Document.CapabilityID))
+					}
+					if props.Document.MilestoneID != "" {
+						@constraintLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Document.MilestoneID))
+					}
+					@patterns.DetailField("Last Updated", formatDate(props.Document.UpdatedAt))
+				}
+			}
+		}
+		@ui.Card() {
+			<div class="flex items-center justify-between border-b border-gray-200 px-6 py-3 dark:border-gray-700">
+				<h2 class="text-sm font-medium text-gray-900 dark:text-gray-100">Content</h2>
+				<a
+					href={ templ.SafeURL(documentURL(props.Product.ID, props.Document.ID) + "/raw") }
+					class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+				>
+					@ui.Icon("download", "sm")
+					{ model.DocumentFileName(props.Document.Identifier, props.Document.Format) }
+				</a>
+			</div>
+			@ui.CardBody() {
+				@DocumentBody(props.Document.Format, props.Document.Body)
+			}
+		}
+	</div>
+}
+
+// DocumentBody shows a body by its format: Markdown rendered safely,
+// everything else verbatim and escaped.
+templ DocumentBody(format, body string) {
+	if body == "" {
+		<p class="text-sm text-gray-500 dark:text-gray-400">This document has no content yet.</p>
+	} else if format == model.DocumentFormatMarkdown {
+		<div class="prose prose-sm dark:prose-invert max-w-none">
+			@templ.Raw(templates.RenderMarkdown(body))
+		</div>
+	} else {
+		<pre class="overflow-x-auto rounded-md bg-gray-50 p-4 text-xs leading-relaxed text-gray-900 dark:bg-gray-950 dark:text-gray-100"><code class="font-mono">{ body }</code></pre>
+	}
+}
+
+func documentDetailTabs(productID, documentID string) []templates.TabDef {
+	base := documentURL(productID, documentID) + "/tabs"
+	return []templates.TabDef{
+		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "links", Label: "Links", HxGet: base + "/links"},
+		{ID: "revisions", Label: "Revisions", HxGet: base + "/revisions"},
+		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
+		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
+		{ID: "history", Label: "History", HxGet: base + "/history"},
+	}
+}
+
+func documentEditHref(props DocumentDetailProps) string {
+	if props.CanEdit {
+		return documentURL(props.Product.ID, props.Document.ID) + "/edit"
+	}
+	return ""
+}
+
+func documentDeleteURL(props DocumentDetailProps) string {
+	if props.CanEdit {
+		return documentURL(props.Product.ID, props.Document.ID)
+	}
+	return ""
+}
+
+// DocumentLinkedItem is a requirement, constraint or test case in the links tab.
+type DocumentLinkedItem struct {
+	ID, Identifier, Title, Href string
+}
+
+// DocumentLinksTabProps holds data for the document links tab.
+type DocumentLinksTabProps struct {
+	ProductID    string
+	DocumentID   string
+	CanWrite     bool
+	Requirements []DocumentLinkedItem
+	Constraints  []DocumentLinkedItem
+	TestCases    []DocumentLinkedItem
+}
+
+templ DocumentLinksTabContent(props DocumentLinksTabProps) {
+	<div class="space-y-4">
+		if props.CanWrite {
+			<div class="flex items-center justify-end">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    documentURL(props.ProductID, props.DocumentID) + "/links/link-modal",
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		@documentLinkGroup(props, "Requirements", model.DocumentLinkRequirement, props.Requirements, "Requirements that introduce or change this document.")
+		@documentLinkGroup(props, "Constraints", model.DocumentLinkConstraint, props.Constraints, "Constraints that require conformance to this document.")
+		@documentLinkGroup(props, "Test cases", model.DocumentLinkTestCase, props.TestCases, "Test cases that verify an implementation against this document.")
+	</div>
+}
+
+templ documentLinkGroup(props DocumentLinksTabProps, title, targetType string, items []DocumentLinkedItem, hint string) {
+	@ui.Card() {
+		@ui.CardHeader(title)
+		if len(items) == 0 {
+			<p class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{ hint }</p>
+		} else {
+			<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+				for _, it := range items {
+					<li class="flex items-center justify-between gap-4 px-6 py-3">
+						<a href={ templ.SafeURL(it.Href) } class="min-w-0 truncate text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+							if it.Identifier != "" {
+								<span class="font-medium">{ it.Identifier }</span>
+							}
+							{ it.Title }
+						</a>
+						if props.CanWrite {
+							<button
+								type="button"
+								aria-label={ "Unlink " + it.Title }
+								class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+								hx-delete={ fmt.Sprintf("%s/links/%s/%s", documentURL(props.ProductID, props.DocumentID), targetType, it.ID) }
+								hx-target="#tab-panel-links"
+								hx-swap="innerHTML"
+								hx-confirm="Remove this link?"
+							>
+								@ui.Icon("trash", "sm")
+							</button>
+						}
+					</li>
+				}
+			</ul>
+		}
+	}
+}
+
+// The modal is mounted outside the app shell that sends the CSRF header, so
+// the form carries the token for the Link buttons inside it.
+templ DocumentLinkModal(productID, documentID, csrfToken string) {
+	@ui.Modal("document-link-modal", "Link to the document", "md") {
+		<form class="space-y-4" hx-headers={ templ.JSONString(map[string]string{"X-CSRF-Token": csrfToken}) } hx-get={ documentURL(productID, documentID) + "/links/link-search" } hx-target="#document-link-results" hx-trigger="change, keyup changed delay:300ms from:input[name=q], search from:input[name=q], load">
+			<div class="flex gap-2">
+				<select
+					name="type"
+					aria-label="Type"
+					class="rounded-md border-0 py-2 pl-3 pr-8 text-sm text-gray-900 ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+				>
+					<option value={ model.DocumentLinkRequirement }>Requirements</option>
+					<option value={ model.DocumentLinkConstraint }>Constraints</option>
+					<option value={ model.DocumentLinkTestCase }>Test cases</option>
+				</select>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search by identifier or title..."
+					autofocus
+					class="block w-full rounded-md border-0 px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+				/>
+			</div>
+			<div id="document-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</form>
+	}
+}
+
+templ DocumentLinkResults(productID, documentID, targetType string, candidates []DocumentLinkedItem) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">Nothing left to link.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, it := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<p class="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-gray-100">
+						if it.Identifier != "" {
+							<span class="font-medium">{ it.Identifier }</span>
+						}
+						{ it.Title }
+					</p>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ documentURL(productID, documentID) + "/links" }
+						hx-vals={ templ.JSONString(map[string]string{"type": targetType, "target_id": it.ID}) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// DocumentRevisionRow is one revision in the revisions tab.
+type DocumentRevisionRow struct {
+	Revision  int
+	Title     string
+	Format    string
+	Author    string
+	CreatedAt string
+}
+
+// DocumentDiffLine is one line of a rendered diff.
+type DocumentDiffLine struct {
+	Op       string // "equal", "delete", "insert", or "gap" between hunks
+	Text     string
+	Old, New int
+}
+
+// DocumentRevisionsTabProps holds data for the revisions tab.
+type DocumentRevisionsTabProps struct {
+	ProductID     string
+	DocumentID    string
+	CSRFToken     string
+	Current       int
+	CanRestore    bool
+	Revisions     []DocumentRevisionRow
+	From, To      int
+	TitleChanged  bool
+	FormatChanged bool
+	Diff          []DocumentDiffLine
+}
+
+templ DocumentRevisionsTabContent(props DocumentRevisionsTabProps) {
+	<div class="space-y-6">
+		@ui.Card() {
+			@ui.Table() {
+				@ui.TableHead() {
+					@ui.TableHeader() {
+						Revision
+					}
+					@ui.TableHeader() {
+						Title
+					}
+					@ui.TableHeader() {
+						Format
+					}
+					@ui.TableHeader() {
+						Author
+					}
+					@ui.TableHeader() {
+						Created
+					}
+					if props.CanRestore {
+						@ui.TableHeader() {
+							<span class="sr-only">Actions</span>
+						}
+					}
+				}
+				@ui.TableBody("") {
+					for _, rev := range props.Revisions {
+						@ui.TableRow("") {
+							@ui.TableCellMuted() {
+								{ strconv.Itoa(rev.Revision) }
+								if rev.Revision == props.Current {
+									<span class="ml-1">
+										@ui.Badge("current", "indigo")
+									</span>
+								}
+							}
+							@ui.TableCell() {
+								{ rev.Title }
+							}
+							@ui.TableCellMuted() {
+								{ documentFormatLabel(rev.Format) }
+							}
+							@ui.TableCellMuted() {
+								{ rev.Author }
+							}
+							@ui.TableCellMuted() {
+								{ formatDate(rev.CreatedAt) }
+							}
+							if props.CanRestore {
+								<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+									if rev.Revision != props.Current {
+										<button
+											type="button"
+											class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+											hx-post={ documentURL(props.ProductID, props.DocumentID) + "/restore" }
+											hx-vals={ templ.JSONString(map[string]string{"revision": strconv.Itoa(rev.Revision)}) }
+											hx-confirm={ fmt.Sprintf("Make the content of revision %d current again? It becomes a new revision.", rev.Revision) }
+										>
+											Restore
+										</button>
+									}
+								</td>
+							}
+						}
+					}
+				}
+			}
+		}
+		if len(props.Revisions) > 1 {
+			@ui.Card() {
+				<form
+					class="flex flex-wrap items-center gap-2 border-b border-gray-200 px-6 py-3 text-sm dark:border-gray-700"
+					hx-get={ documentURL(props.ProductID, props.DocumentID) + "/tabs/revisions" }
+					hx-target="#tab-panel-revisions"
+					hx-swap="innerHTML"
+					hx-trigger="change"
+				>
+					<span class="text-gray-700 dark:text-gray-300">Compare revision</span>
+					@documentRevisionSelect("from", props.Revisions, props.From)
+					<span class="text-gray-700 dark:text-gray-300">with</span>
+					@documentRevisionSelect("to", props.Revisions, props.To)
+				</form>
+				<div class="px-6 py-4">
+					if props.TitleChanged || props.FormatChanged {
+						<p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+							if props.TitleChanged {
+								The title changed.
+							}
+							if props.FormatChanged {
+								The format changed.
+							}
+						</p>
+					}
+					@DocumentDiff(props.Diff)
+				</div>
+			}
+		}
+	</div>
+}
+
+templ documentRevisionSelect(name string, revisions []DocumentRevisionRow, selected int) {
+	<select
+		name={ name }
+		aria-label={ name + " revision" }
+		class="rounded-md border-0 py-1 pl-2 pr-8 text-sm text-gray-900 ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+	>
+		for _, rev := range revisions {
+			<option value={ strconv.Itoa(rev.Revision) } selected?={ rev.Revision == selected }>{ strconv.Itoa(rev.Revision) }</option>
+		}
+	</select>
+}
+
+// DocumentDiff renders diff lines; every line is text that templ escapes.
+templ DocumentDiff(lines []DocumentDiffLine) {
+	if len(lines) == 0 {
+		<p class="text-sm text-gray-500 dark:text-gray-400">The content of these revisions is the same.</p>
+	} else {
+		<div class="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
+			<table class="min-w-full font-mono text-xs leading-5">
+				<tbody>
+					for _, l := range lines {
+						<tr class={ documentDiffRowClass(l.Op) }>
+							if l.Op == "gap" {
+								<td colspan="3" class="px-3 py-1 text-gray-500 dark:text-gray-400">…</td>
+							} else {
+								<td class="w-10 select-none px-2 text-right text-gray-400 dark:text-gray-500">{ documentDiffNumber(l.Old) }</td>
+								<td class="w-10 select-none px-2 text-right text-gray-400 dark:text-gray-500">{ documentDiffNumber(l.New) }</td>
+								<td class="whitespace-pre px-3"><span class="select-none">{ documentDiffMarker(l.Op) }</span>{ l.Text }</td>
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+func documentDiffRowClass(op string) string {
+	switch op {
+	case "delete":
+		return "bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-200"
+	case "insert":
+		return "bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-200"
+	case "gap":
+		return "bg-gray-50 dark:bg-gray-900"
+	}
+	return "text-gray-700 dark:text-gray-300"
+}
+
+func documentDiffMarker(op string) string {
+	switch op {
+	case "delete":
+		return "- "
+	case "insert":
+		return "+ "
+	}
+	return "  "
+}
+
+func documentDiffNumber(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
+}
+
+templ DocumentHistoryTabContent(entries []templates.AuditEntryView) {
+	if len(entries) == 0 {
+		@ui.Card() {
+			@ui.EmptyState("history", "No history", "Changes to this document will be recorded here.", "", "")
+		}
+	} else {
+		@patterns.AuditTimeline(entries)
+	}
+}
+
+// DocumentDeleteConfirmation renders the delete confirmation for a document.
+templ DocumentDeleteConfirmation(name, productID, documentID, csrfToken string) {
+	@patterns.DeleteConfirmation("document", name, documentURL(productID, documentID), csrfToken)
+}
+
+// DocumentFormProps holds data for the document create/edit form.
+type DocumentFormProps struct {
+	Meta         templates.PageMeta
+	DisplayName  string
+	IsAdmin      bool
+	Product      *model.Product
+	Document     *model.Document // nil for create
+	Documents    []*model.Document // candidates for superseded-by
+	Components   []*model.Component
+	Capabilities []*model.Capability
+	Milestones   []*model.Milestone
+	IsEdit       bool
+	Error        string
+	ReturnTo     string
+	// Form values (preserved on validation error).
+	Title          string
+	Body           string
+	Format         string
+	State          string
+	SupersededByID string
+	ComponentID    string
+	CapabilityID   string
+	MilestoneID    string
+}
+
+templ DocumentFormPage(props DocumentFormProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "documents",
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="mx-auto max-w-4xl space-y-6">
+			@ui.Breadcrumb(documentFormBreadcrumbs(props))
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+				if props.IsEdit {
+					Edit Document
+				} else {
+					New Document
+				}
+			</h1>
+			@patterns.FormError(props.Error)
+			@ui.Card() {
+				@ui.CardBody() {
+					<form method="post" action={ templ.SafeURL(documentFormAction(props)) } class="space-y-6">
+						<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+						if props.ReturnTo != "" {
+							<input type="hidden" name="return" value={ props.ReturnTo }/>
+						}
+						@ui.TextInput(ui.InputProps{
+							ID:          "title",
+							Name:        "title",
+							Label:       "Title",
+							Value:       props.Title,
+							Placeholder: "e.g. Sync protocol",
+							Required:    true,
+						})
+						<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+							@ui.Select(ui.SelectProps{
+								ID:       "format",
+								Name:     "format",
+								Label:    "Format",
+								Value:    props.Format,
+								Options:  documentFormatOptions(props.Format),
+								HelpText: "Markdown is rendered; every other format is kept and shown verbatim.",
+							})
+							@ui.Select(ui.SelectProps{
+								ID:       "state",
+								Name:     "state",
+								Label:    "State",
+								Value:    props.State,
+								Options:  documentStateOptions(props.State),
+								HelpText: "Only current documents are binding.",
+							})
+						</div>
+						<div>
+							<label for="body" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Content</label>
+							<div class="mt-1">
+								<textarea
+									id="body"
+									name="body"
+									rows="24"
+									spellcheck="false"
+									class="block w-full rounded-md border-0 px-3 py-2 font-mono text-sm text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600"
+								>{ "\n" + props.Body }</textarea>
+							</div>
+							<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Changing the title, content or format creates a new revision.</p>
+						</div>
+						<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+							@ui.Select(ui.SelectProps{
+								ID:       "component_id",
+								Name:     "component_id",
+								Label:    "Component",
+								Value:    props.ComponentID,
+								Options:  documentComponentOptions(props.Components, props.ComponentID),
+								HelpText: "Optional. A component or a capability, not both.",
+							})
+							@ui.Select(ui.SelectProps{
+								ID:      "capability_id",
+								Name:    "capability_id",
+								Label:   "Capability",
+								Value:   props.CapabilityID,
+								Options: documentCapabilityOptions(props.Capabilities, props.CapabilityID),
+							})
+							@ui.Select(ui.SelectProps{
+								ID:      "milestone_id",
+								Name:    "milestone_id",
+								Label:   "Milestone",
+								Value:   props.MilestoneID,
+								Options: documentMilestoneOptions(props.Milestones, props.MilestoneID),
+							})
+							@ui.Select(ui.SelectProps{
+								ID:       "superseded_by_id",
+								Name:     "superseded_by_id",
+								Label:    "Superseded by",
+								Value:    props.SupersededByID,
+								Options:  documentSuccessorOptions(props.Documents, props.Document, props.SupersededByID),
+								HelpText: "Only for superseded documents.",
+							})
+						</div>
+						@patterns.FormActions(documentSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/documents")
+					</form>
+				}
+			}
+		</div>
+	}
+}
+
+func documentFormBreadcrumbs(props DocumentFormProps) []templates.BreadcrumbItem {
+	crumbs := []templates.BreadcrumbItem{
+		{Label: "Dashboard", Href: "/"},
+		{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+		{Label: "Documents", Href: "/products/" + props.Product.ID + "/documents"},
+	}
+	if props.IsEdit {
+		return append(crumbs,
+			templates.BreadcrumbItem{Label: props.Document.Identifier, Href: documentURL(props.Product.ID, props.Document.ID)},
+			templates.BreadcrumbItem{Label: "Edit"})
+	}
+	return append(crumbs, templates.BreadcrumbItem{Label: "New"})
+}
+
+func documentFormAction(props DocumentFormProps) string {
+	if props.IsEdit {
+		return documentURL(props.Product.ID, props.Document.ID)
+	}
+	return "/products/" + props.Product.ID + "/documents"
+}
+
+func documentSubmitLabel(isEdit bool) string {
+	if isEdit {
+		return "Save Changes"
+	}
+	return "Create Document"
+}
+
+func documentFormatOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = model.DocumentFormatMarkdown
+	}
+	opts := make([]templates.SelectOption, 0, len(model.DocumentFormats))
+	for _, f := range model.DocumentFormats {
+		opts = append(opts, templates.SelectOption{Value: f, Label: documentFormatLabel(f), Selected: f == current})
+	}
+	return opts
+}
+
+func documentStateOptions(current string) []templates.SelectOption {
+	if current == "" {
+		current = model.DocumentStateDraft
+	}
+	opts := make([]templates.SelectOption, 0, len(model.DocumentStates))
+	for _, s := range model.DocumentStates {
+		opts = append(opts, templates.SelectOption{Value: s, Label: documentStateLabel(s), Selected: s == current})
+	}
+	return opts
+}
+
+func documentComponentOptions(list []*model.Component, current string) []templates.SelectOption {
+	opts := []templates.SelectOption{{Value: "", Label: "None"}}
+	for _, c := range list {
+		opts = append(opts, templates.SelectOption{Value: c.ID, Label: c.Name, Selected: c.ID == current})
+	}
+	return opts
+}
+
+func documentCapabilityOptions(list []*model.Capability, current string) []templates.SelectOption {
+	opts := []templates.SelectOption{{Value: "", Label: "None"}}
+	for _, c := range list {
+		opts = append(opts, templates.SelectOption{Value: c.ID, Label: c.Name, Selected: c.ID == current})
+	}
+	return opts
+}
+
+func documentMilestoneOptions(list []*model.Milestone, current string) []templates.SelectOption {
+	opts := []templates.SelectOption{{Value: "", Label: "None"}}
+	for _, m := range list {
+		opts = append(opts, templates.SelectOption{Value: m.ID, Label: m.Name, Selected: m.ID == current})
+	}
+	return opts
+}
+
+func documentSuccessorOptions(list []*model.Document, self *model.Document, current string) []templates.SelectOption {
+	opts := []templates.SelectOption{{Value: "", Label: "None"}}
+	for _, d := range list {
+		if self != nil && d.ID == self.ID {
+			continue
+		}
+		opts = append(opts, templates.SelectOption{Value: d.ID, Label: d.Identifier + " " + d.Title, Selected: d.ID == current})
+	}
+	return opts
+}
+
+// LinkedDocuments lists the documents linked to a requirement, constraint
+// or test case (FR-909), for its overview.
+templ LinkedDocuments(productID string, docs []*model.Document) {
+	if len(docs) > 0 {
+		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Documents</h3>
+			<ul class="mt-2 space-y-1">
+				for _, d := range docs {
+					<li class="flex items-center gap-2 text-sm">
+						<a href={ templ.SafeURL(documentURL(productID, d.ID)) } class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+							<span class="font-medium">{ d.Identifier }</span>
+							{ d.Title }
+						</a>
+						if d.State != model.DocumentStateCurrent {
+							@documentStateBadge(d.State)
+						}
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}

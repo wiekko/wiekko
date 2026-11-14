@@ -33,6 +33,10 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	discussionCtrl := controller.NewDiscussion(svc.Discussion, svc.Backlog.ResolveDefectRef)
 	auditCtrl := controller.NewAudit(svc.Audit)
 	specCtrl := controller.NewSpecification(svc.Spec)
+	documentCtrl := controller.NewDocument(svc.Document)
+	backlogCtrl.UseDocuments(svc.Document)
+	constraintCtrl.UseDocuments(svc.Document)
+	testingCtrl.UseDocuments(svc.Document)
 
 	// Requirement and constraint routes accept identifiers ("FR-12", "AC-42")
 	// wherever they take an ID in the path.
@@ -41,6 +45,11 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	conRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "id")
 	// Defect routes accept defect identifiers ("DF-17", FR-043) likewise.
 	defRef := controller.ResolveRefs(svc.Backlog.ResolveDefectRef, "id")
+	// Document routes accept document identifiers ("DOC-3", FR-050), and
+	// their link routes the identifiers of the linked items.
+	docRef := controller.ResolveRefs(svc.Document.ResolveDocumentRef, "id")
+	docTargetReqRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "targetId")
+	docTargetConRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "targetId")
 
 	// Health (public).
 	apiV1.HandleFunc("GET /health", controller.Health)
@@ -257,6 +266,31 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/attachments/{id}/download", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.DownloadAttachment))
 	api.authed("DELETE /products/{productId}/attachments/{id}", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.DeleteAttachment)))
 
+	// Documents (FR-044..FR-052): their own scope (SC-404); links need read on
+	// the scope of the linked item as well (SC-405).
+	api.authed("GET /products/{productId}/documents", need(access.R(access.Documents)), http.HandlerFunc(documentCtrl.ListDocuments))
+	api.authed("POST /products/{productId}/documents", need(access.W(access.Documents)), csrf(http.HandlerFunc(documentCtrl.CreateDocument)))
+	api.authed("GET /products/{productId}/documents/{id}", need(access.R(access.Documents)), docRef(http.HandlerFunc(documentCtrl.GetDocument)))
+	api.authed("PATCH /products/{productId}/documents/{id}", need(access.W(access.Documents)), docRef(csrf(http.HandlerFunc(documentCtrl.UpdateDocument))))
+	api.authed("DELETE /products/{productId}/documents/{id}", need(access.W(access.Documents)), docRef(csrf(http.HandlerFunc(documentCtrl.DeleteDocument))))
+	api.authed("GET /products/{productId}/documents/{id}/raw", need(access.R(access.Documents)), docRef(http.HandlerFunc(documentCtrl.Raw)))
+	api.authed("GET /products/{productId}/documents/{id}/revisions", need(access.R(access.Documents)), docRef(http.HandlerFunc(documentCtrl.ListRevisions)))
+	api.authed("GET /products/{productId}/documents/{id}/revisions/{rev}", need(access.R(access.Documents)), docRef(http.HandlerFunc(documentCtrl.GetRevision)))
+	api.authed("GET /products/{productId}/documents/{id}/diff", need(access.R(access.Documents)), docRef(http.HandlerFunc(documentCtrl.Diff)))
+	api.authed("POST /products/{productId}/documents/{id}/restore", need(access.W(access.Documents)), docRef(csrf(http.HandlerFunc(documentCtrl.Restore))))
+	api.authed("GET /products/{productId}/documents/{id}/requirements", need(access.R(access.Documents), access.R(access.Backlog)), docRef(documentCtrl.ListLinked(model.DocumentLinkRequirement)))
+	api.authed("POST /products/{productId}/documents/{id}/requirements", need(access.W(access.Documents), access.R(access.Backlog)), docRef(csrf(documentCtrl.Link(model.DocumentLinkRequirement, svc.Backlog.ResolveRequirementRef))))
+	api.authed("DELETE /products/{productId}/documents/{id}/requirements/{targetId}", need(access.W(access.Documents), access.R(access.Backlog)), docRef(docTargetReqRef(csrf(documentCtrl.Unlink(model.DocumentLinkRequirement)))))
+	api.authed("GET /products/{productId}/documents/{id}/constraints", need(access.R(access.Documents), access.R(access.Backlog)), docRef(documentCtrl.ListLinked(model.DocumentLinkConstraint)))
+	api.authed("POST /products/{productId}/documents/{id}/constraints", need(access.W(access.Documents), access.R(access.Backlog)), docRef(csrf(documentCtrl.Link(model.DocumentLinkConstraint, svc.Constraint.ResolveConstraintRef))))
+	api.authed("DELETE /products/{productId}/documents/{id}/constraints/{targetId}", need(access.W(access.Documents), access.R(access.Backlog)), docRef(docTargetConRef(csrf(documentCtrl.Unlink(model.DocumentLinkConstraint)))))
+	api.authed("GET /products/{productId}/documents/{id}/test-cases", need(access.R(access.Documents), access.R(access.Tests)), docRef(documentCtrl.ListLinked(model.DocumentLinkTestCase)))
+	api.authed("POST /products/{productId}/documents/{id}/test-cases", need(access.W(access.Documents), access.R(access.Tests)), docRef(csrf(documentCtrl.Link(model.DocumentLinkTestCase, nil))))
+	api.authed("DELETE /products/{productId}/documents/{id}/test-cases/{targetId}", need(access.W(access.Documents), access.R(access.Tests)), docRef(csrf(documentCtrl.Unlink(model.DocumentLinkTestCase))))
+	api.authed("GET /products/{productId}/requirements/{id}/documents", need(access.R(access.Backlog), access.R(access.Documents)), reqRef(documentCtrl.DocumentsOf(model.DocumentLinkRequirement)))
+	api.authed("GET /products/{productId}/constraints/{id}/documents", need(access.R(access.Backlog), access.R(access.Documents)), conRef(documentCtrl.DocumentsOf(model.DocumentLinkConstraint)))
+	api.authed("GET /products/{productId}/test-cases/{id}/documents", need(access.R(access.Tests), access.R(access.Documents)), documentCtrl.DocumentsOf(model.DocumentLinkTestCase))
+
 	// Specification export (FR-905): the structure and the backlog, as Markdown.
 	api.authed("GET /products/{productId}/specification", need(access.R(access.Structure), access.R(access.Backlog)), http.HandlerFunc(specCtrl.Export))
 
@@ -301,7 +335,7 @@ var (
 	noScope = need()
 	// readAll needs read on every product scope, for views across all of a
 	// product's data (the audit trail).
-	readAll = need(access.R(access.Structure), access.R(access.Backlog), access.R(access.Defects),
+	readAll = need(access.R(access.Structure), access.R(access.Backlog), access.R(access.Documents), access.R(access.Defects),
 		access.R(access.Tests), access.R(access.Discussion), access.R(access.Settings))
 )
 

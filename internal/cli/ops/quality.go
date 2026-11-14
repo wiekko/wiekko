@@ -307,7 +307,11 @@ func (s *Session) ShowTestCase(ctx context.Context, ref string) (*TestCaseDetail
 	if err != nil {
 		return nil, err
 	}
-	d := &TestCaseDetail{TestCaseSummary: sums[0], Description: tc.Description, Requirements: []CoverageRef{}, Environments: []string{}, Results: []ResultView{}}
+	d := &TestCaseDetail{TestCaseSummary: sums[0], Description: tc.Description, Requirements: []CoverageRef{}, Environments: []string{}, Results: []ResultView{}, Documents: []Ref{}}
+	// Lists carry no links; the single test case names its documents.
+	if full, err := s.C.TestCase(ctx, s.ProductID, tc.ID); err == nil {
+		d.Documents = documentRefs(full.Documents)
+	}
 
 	reqLinks, err := s.C.TestCaseRequirements(ctx, s.ProductID, tc.ID)
 	if err != nil {

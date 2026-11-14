@@ -20,7 +20,9 @@ func NewSpecification(spec *service.SpecificationService) *SpecificationControll
 	return &SpecificationController{spec: spec}
 }
 
-// Export handles GET /products/{productId}/specification[?tasks=true]. The
+// Export handles GET /products/{productId}/specification[?tasks=true]
+// [&drafts=true]. Documents are listed when the token may read them; their
+// bodies are fetched from the documents endpoints (FR-907). The
 // response is the Markdown document itself, not a JSON envelope; errors are
 // JSON like everywhere else.
 func (c *SpecificationController) Export(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +37,14 @@ func (c *SpecificationController) Export(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		opts.Tasks = tasks
+	}
+	if v := r.URL.Query().Get("drafts"); v != "" {
+		drafts, err := strconv.ParseBool(v)
+		if err != nil {
+			httputil.Error(w, http.StatusBadRequest, "INVALID_PARAMETER", "drafts must be true or false")
+			return
+		}
+		opts.Drafts = drafts
 	}
 
 	doc, err := c.spec.Export(r.Context(), user, productID, opts)

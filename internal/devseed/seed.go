@@ -147,6 +147,7 @@ type productSeed struct {
 	reqs       map[string]string // handle -> requirement id
 	defects    map[string]string // handle -> defect id
 	testCases  map[string]string // handle -> test case id
+	cons       map[string]string // title -> constraint id
 	// kanban products activate by column, so spec.active is ignored there:
 	// the item's status decides (FR-318).
 	kanban bool
@@ -169,6 +170,7 @@ func (s *seeder) newProduct(name, description, estimation, workflow string) *pro
 		reqs:       map[string]string{},
 		defects:    map[string]string{},
 		testCases:  map[string]string{},
+		cons:       map[string]string{},
 	}
 	if s.stopped() {
 		return p
@@ -613,10 +615,61 @@ func (p *productSeed) constraint(spec constraintSpec) {
 		p.s.fail("create constraint "+spec.title, err)
 		return
 	}
+	p.cons[spec.title] = c.ID
 
 	for _, capability := range spec.linkCaps {
 		err := p.s.svc.Constraint.LinkCapability(p.s.ctx, p.s.admin, p.id, c.ID, p.caps[capability])
 		p.s.fail("link constraint "+spec.title+" to "+capability, err)
+	}
+}
+
+// --- Documents ---
+
+// documentSpec seeds a document (FR-044). Revisions after the first are
+// written as updates, so the document arrives with a history to diff.
+type documentSpec struct {
+	title      string
+	format     string
+	state      string
+	component  string
+	capability string
+	milestone  string
+	revisions  []string // bodies, oldest first
+	linkReqs   []string // requirement handles
+	linkCons   []string // constraint titles
+	linkTests  []string // test case handles
+}
+
+func (p *productSeed) document(spec documentSpec) {
+	if p.s.stopped() {
+		return
+	}
+	d, err := p.s.svc.Document.CreateDocument(p.s.ctx, p.s.admin, service.CreateDocumentInput{
+		ProductID:    p.id,
+		Title:        spec.title,
+		Body:         spec.revisions[0],
+		Format:       spec.format,
+		State:        spec.state,
+		ComponentID:  p.components[spec.component],
+		CapabilityID: p.caps[spec.capability],
+		MilestoneID:  p.milestones[spec.milestone],
+	})
+	if err != nil {
+		p.s.fail("create document "+spec.title, err)
+		return
+	}
+	for _, body := range spec.revisions[1:] {
+		_, err := p.s.svc.Document.UpdateDocument(p.s.ctx, p.s.admin, p.id, d.ID, service.UpdateDocumentInput{Body: &body})
+		p.s.fail("revise document "+spec.title, err)
+	}
+	for _, h := range spec.linkReqs {
+		p.s.fail("link document "+spec.title, p.s.svc.Document.LinkDocument(p.s.ctx, p.s.admin, p.id, d.ID, model.DocumentLinkRequirement, p.reqs[h]))
+	}
+	for _, title := range spec.linkCons {
+		p.s.fail("link document "+spec.title, p.s.svc.Document.LinkDocument(p.s.ctx, p.s.admin, p.id, d.ID, model.DocumentLinkConstraint, p.cons[title]))
+	}
+	for _, h := range spec.linkTests {
+		p.s.fail("link document "+spec.title, p.s.svc.Document.LinkDocument(p.s.ctx, p.s.admin, p.id, d.ID, model.DocumentLinkTestCase, p.testCases[h]))
 	}
 }
 

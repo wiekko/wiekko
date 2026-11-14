@@ -22,6 +22,7 @@ func TestSwitchTargetURL(t *testing.T) {
 		{"components", "components", model.WorkflowModeKanban, "/products/p2/components"},
 		{"capabilities", "capabilities", model.WorkflowModeKanban, "/products/p2/capabilities"},
 		{"constraints", "constraints", model.WorkflowModeKanban, "/products/p2/constraints"},
+		{"documents", "documents", model.WorkflowModeKanban, "/products/p2/documents"},
 		{"milestones", "milestones", model.WorkflowModeKanban, "/products/p2/milestones"},
 		{"team", "team", model.WorkflowModeKanban, "/products/p2/team"},
 		{"settings", "settings", model.WorkflowModeKanban, "/products/p2/settings"},

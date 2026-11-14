@@ -39,7 +39,10 @@ type RequirementDetail struct {
 	Capabilities     []Ref                `json:"capabilities"`
 	TestCases        []TestCaseSummary    `json:"test_cases"`
 	Defects          []DefectSummary      `json:"defects"`
-	Comments         []CommentView        `json:"comments"`
+	// Documents are the documents that define the item (FR-909); without
+	// the documents scope, their identifiers only.
+	Documents []Ref         `json:"documents"`
+	Comments  []CommentView `json:"comments"`
 }
 
 // ConstraintSummary is one row of a constraint list.
@@ -58,6 +61,7 @@ type ConstraintDetail struct {
 	Description  string        `json:"description"`
 	Milestone    string        `json:"milestone,omitempty"`
 	Capabilities []Ref         `json:"capabilities"`
+	Documents    []Ref         `json:"documents"`
 	Comments     []CommentView `json:"comments"`
 }
 
@@ -112,6 +116,7 @@ type TestCaseDetail struct {
 	Environments []string        `json:"environments"`
 	Results      []ResultView    `json:"results"`
 	Defects      []DefectSummary `json:"defects"`
+	Documents    []Ref           `json:"documents"`
 	Comments     []CommentView   `json:"comments"`
 }
 

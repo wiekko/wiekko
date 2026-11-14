@@ -47,7 +47,7 @@ func requireOwnerScope(ctx context.Context, ownerType string) error {
 	r := access.FromContext(ctx)
 	scopes := []access.Scope{access.ScopeForOwnerType(ownerType)}
 	if ownerType == "" {
-		scopes = []access.Scope{access.Structure, access.Backlog, access.Defects, access.Tests}
+		scopes = []access.Scope{access.Structure, access.Backlog, access.Documents, access.Defects, access.Tests}
 	}
 	for _, sc := range scopes {
 		if !r.Allows(sc, access.Read) {

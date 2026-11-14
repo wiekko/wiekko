@@ -25,6 +25,7 @@ request:
   |---|---|
   | `structure` | components, capabilities, milestones, sprints |
   | `backlog` | requirements, tasks, constraints |
+  | `documents` | documents and their revisions |
   | `defects` | defects |
   | `tests` | test cases, campaigns and their results, test runs |
   | `discussion` | comments and attachments |
@@ -35,7 +36,8 @@ request:
   A request needs `read` on every resource named in its path, and `write` on the first one if it changes
   data: `POST /products/{p}/capabilities/{id}/requirements` needs `structure:write` and `backlog:read`. Side
   effects belong to the request's own scope, so uploading a test run needs only `tests:write` although it
-  files defects. Comments and attachments also need `read` on the item they belong to. The audit trail
+  files defects. Linking a document to a requirement or constraint needs `documents:write` and `backlog:read`, to a
+  test case `documents:write` and `tests:read`. Comments and attachments also need `read` on the item they belong to. The audit trail
   needs `read` on every product scope. `GET /user/me` is open to every token. A missing scope is answered
   with `403` and the code `TOKEN_SCOPE`.
 - **Role cap.** The token acts with the lower of its user's role and the cap (`developer`, `tester` or
@@ -68,12 +70,13 @@ and must lie within the limit. `GET /api/v1/user/me/tokens` lists the tokens wit
 
 ## Identifiers
 
-Wherever a path names a requirement, task, constraint or defect by ID, its identifier works as well:
+Wherever a path names a requirement, task, constraint, document or defect by ID, its identifier works as well:
 `GET /api/v1/products/{p}/defects/DF-17` is the same as using the defect's ID. Identifiers are not case
 sensitive. Responses carry both: `id` and `identifier`. Defect identifiers are also accepted for the
 `defect_id` of a campaign result and for the `owner_id` of comments and attachments on a defect. The
-defect prefix is the product's `defect_prefix`, which `PATCH /api/v1/products/{p}` changes; it must
-differ from every category prefix of the product.
+defect prefix is the product's `defect_prefix`, the document prefix (`DOC-3`) its `document_prefix`;
+`PATCH /api/v1/products/{p}` changes either. The two must differ from each other and from every category
+prefix of the product.
 
 ## Responses
 
@@ -102,11 +105,41 @@ human-readable `message`:
   `DELETE /api/v1/products/{p}/campaigns/{id}/test-cases/{testCaseId}` (owner; `tests:write`) change the
   scope of a draft campaign; an active campaign's scope is locked.
 
+### Documents
+
+Documents are the protocols, schemas and other texts that define the product. Nexmap holds them; a
+repository gets copies through the [export](#specification-export).
+
+- `GET /api/v1/products/{p}/documents` lists them, without bodies unless `?body=true`; filter with
+  `state`, `format`, `component_id`, `capability_id`, `milestone_id` and `q` (title or identifier).
+- `POST /api/v1/products/{p}/documents` (owner) creates one from `title`, `body`, `format` (`markdown`,
+  the default, or `text`, `json`, `yaml`, `xml`, `proto`, `sql`, `graphql`), `state` (`draft`, the
+  default, `current` or `superseded`), and optionally `component_id` or `capability_id` (not both),
+  `milestone_id` and, for a superseded document, `superseded_by_id`. The body is stored byte for byte, up
+  to 512 KiB of valid UTF-8 without NUL characters.
+- `GET`, `PATCH` and `DELETE /api/v1/products/{p}/documents/{id}`. A `PATCH` that changes the title, body
+  or format creates a new revision; `revision` is the number of the latest one.
+- `GET …/documents/{id}/raw[?revision=n]` returns the body itself, always as a `text/plain` attachment
+  named like `DOC-3.json`, so a browser never renders it.
+- `GET …/documents/{id}/revisions` lists the revisions, `GET …/revisions/{n}` returns one with its body,
+  `GET …/diff?from=&to=` compares two (by default the latest with the one before) as `unified` text and
+  as `lines`, and `POST …/restore` with `{"revision": n}` (owner) makes an earlier content current
+  again as a new revision.
+- `GET`, `POST` (with `{"target_id": …}`, an ID or identifier) and `DELETE …/{targetId}` on
+  `…/documents/{id}/requirements`, `…/constraints` and `…/test-cases` read and change the links (owner).
+  `GET …/requirements/{id}/documents`, `…/constraints/{id}/documents` and `…/test-cases/{id}/documents`
+  read them from the other side.
+
+A single requirement, constraint or test case (`GET …/requirements/{id}` and so on) names its documents
+in `documents`; for a token without `documents:read`, only their identifiers.
+
 ### Specification export
 
 `GET /api/v1/products/{productId}/specification` (viewer role; tokens need `structure:read` and
 `backlog:read`) returns the product's specification as Markdown (`text/markdown`), not wrapped in
-`data`: the structure, constraints and requirements, and with `?tasks=true` the tasks. The document is
+`data`: the structure, constraints and requirements, and with `?tasks=true` the tasks. For a token with
+`documents:read` it also lists the current documents, with `?drafts=true` the drafts too, each with the
+file name its body is exported under; the bodies come from the documents endpoints. The document is
 ordered by stable keys and contains no timestamps, so an unchanged product exports identically. Errors
 are JSON as usual.
 

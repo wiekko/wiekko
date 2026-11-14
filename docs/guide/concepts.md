@@ -21,6 +21,29 @@ Structure is optional, but it is what everything else hangs off: requirements, c
 defects can all be linked to capabilities, which tells you, per feature area, what is required, how it is
 tested and what is broken.
 
+## Documents
+
+A **document** is a longer text that defines part of the product: a protocol, a data schema, a file
+format, an interface contract. It belongs to the product, or to one of its components or capabilities,
+and has an identifier like `DOC-3`, from a counter of its own (the prefix `DOC` can be changed under
+**Settings → General**).
+
+- **Format.** A document is written in Markdown, or kept verbatim in a machine-readable format such as
+  JSON, YAML, XML, Protocol Buffers, SQL or GraphQL. Verbatim documents are shown and exported exactly as
+  written.
+- **State.** Only **current** documents are binding. A **draft** is work in progress; a **superseded**
+  document is history and can name the document that replaced it.
+- **Revisions.** Every change to a document's title, content or format is kept as a revision. Any two
+  revisions can be compared, and an earlier one can be made current again; that becomes a new revision,
+  so nothing is lost.
+- **Links.** Requirements that introduce or change a document, constraints that require conformance to
+  it, and test cases that verify it are linked to it. Each of them lists its documents.
+
+Nexmap is where documents are written. A repository gets copies through the
+[specification export](../cli/setup.md#exporting-the-specification), never the other way round, so
+someone (or an AI agent) with access to Nexmap has everything needed to implement the product or check
+code against it.
+
 ## Requirements, tasks and constraints
 
 These three look alike, but they are different things:
@@ -80,7 +103,7 @@ See [Testing](testing.md).
 
 ## Comments, attachments and history
 
-Requirements, tasks, constraints, defects, test cases, components, capabilities and milestones all have
+Requirements, tasks, constraints, documents, defects, test cases, components, capabilities and milestones all have
 comments and attachments, and every change to them is recorded in their **History** tab: who changed what,
 and when. Descriptions and comments are written in Markdown.
 
@@ -91,7 +114,7 @@ can do:
 
 | Role | Can |
 |---|---|
-| **Product owner** | Everything in the product: settings, team, structure, backlog, campaigns |
+| **Product owner** | Everything in the product: settings, team, structure, documents, backlog, campaigns |
 | **Developer** | Create and edit test cases; comment; change the status of requirements, tasks and defects once they are activated |
 | **Tester** | Record campaign results; create defects; comment on defects and test cases |
 | **Viewer** | Read everything, change nothing |

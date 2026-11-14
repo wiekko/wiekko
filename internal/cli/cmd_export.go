@@ -20,17 +20,21 @@ type exportView struct {
 	SHA256    string `json:"sha256"`             // hash of the document, to compare with a committed copy
 	File      string `json:"file,omitempty"`     // where it was written, with --file
 	Markdown  string `json:"markdown,omitempty"` // the document, without --file
+	// Documents lists the document files written, with --documents.
+	Documents []string `json:"documents,omitempty"`
 }
 
 func exportCommand() *command {
-	var tasks bool
-	var file string
+	var tasks, drafts bool
+	var file, documents string
 	return &command{
 		name:    "export",
-		summary: "export the product structure, constraints and requirements as a Markdown specification",
+		summary: "export the product structure, documents, constraints and requirements as a Markdown specification",
 		flags: func(fs *flag.FlagSet) {
 			fs.BoolVar(&tasks, "tasks", false, "include tasks")
+			fs.BoolVar(&drafts, "drafts", false, "include draft documents")
 			fs.StringVar(&file, "file", "", "write the specification to this file instead of stdout")
+			fs.StringVar(&documents, "documents", "", "write each listed document's content to its own file in this directory (FR-907)")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if err := noArgs("export", args); err != nil {
@@ -40,11 +44,16 @@ func exportCommand() *command {
 			if err != nil {
 				return err
 			}
-			doc, spec, err := s.Specification(ctx, ops.SpecificationQuery{Tasks: tasks})
+			doc, spec, err := s.Specification(ctx, ops.SpecificationQuery{Tasks: tasks, Drafts: drafts})
 			if err != nil {
 				return err
 			}
 			view := exportView{ProductID: s.ProductID, Tasks: tasks, SHA256: spec.SHA256}
+			if documents != "" {
+				if view.Documents, err = writeDocumentFiles(ctx, a, s, documents, drafts); err != nil {
+					return err
+				}
+			}
 			if file == "" {
 				if a.format == output.JSON {
 					view.Markdown = doc
@@ -68,6 +77,40 @@ func exportCommand() *command {
 			return err
 		},
 	}
+}
+
+// writeDocumentFiles writes the bodies of the documents the specification
+// lists into dir, byte for byte, one file each (FR-907). File names come from
+// ops.ExportedDocumentFiles, which checks them against the identifier
+// pattern, and are joined to dir only after filepath.Base: nothing the server
+// sends can place a file outside dir.
+func writeDocumentFiles(ctx context.Context, a *app, s *ops.Session, dir string, drafts bool) ([]string, error) {
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(a.io.Cwd, dir)
+	}
+	files, err := s.ExportedDocumentFiles(ctx, drafts)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create %s: %w", dir, err)
+	}
+	written := []string{}
+	for _, f := range files {
+		name := filepath.Base(f.Name)
+		if name != f.Name {
+			return nil, fmt.Errorf("refusing to write a document as %q", f.Name)
+		}
+		path := filepath.Join(dir, name)
+		if err := writeFileAtomic(path, []byte(f.Body)); err != nil {
+			return nil, err
+		}
+		written = append(written, path)
+	}
+	if a.format != output.JSON && len(written) > 0 {
+		fmt.Fprintf(a.io.Stderr, "%d document file(s) written to %s\n", len(written), dir)
+	}
+	return written, nil
 }
 
 // writeFileAtomic replaces path in one step, so an interrupted export never

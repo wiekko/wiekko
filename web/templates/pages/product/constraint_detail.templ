@@ -20,6 +20,7 @@ type ConstraintDetailProps struct {
 	CategoryPrefixes map[string]string // category ID → prefix
 	CategoryNames    map[string]string // category ID → name
 	MilestoneName    string
+	Documents        []*model.Document // linked documents (FR-909)
 	CanEdit          bool
 }
 
@@ -93,6 +94,7 @@ templ ConstraintOverviewTabContent(props ConstraintDetailProps) {
 				@patterns.DetailField("Last Updated", formatDate(props.Constraint.UpdatedAt))
 			}
 			@patterns.DetailDescription(props.Constraint.Description)
+			@LinkedDocuments(props.Product.ID, props.Documents)
 		}
 	}
 }

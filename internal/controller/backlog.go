@@ -12,8 +12,13 @@ import (
 
 // BacklogController handles requirement and defect endpoints.
 type BacklogController struct {
-	backlog *service.BacklogService
+	backlog   *service.BacklogService
+	documents *service.DocumentService
 }
+
+// UseDocuments makes single-item responses name the documents linked to the
+// item (FR-909).
+func (c *BacklogController) UseDocuments(docs *service.DocumentService) { c.documents = docs }
 
 // NewBacklog creates a BacklogController.
 func NewBacklog(backlog *service.BacklogService) *BacklogController {
@@ -106,7 +111,11 @@ func (c *BacklogController) GetRequirement(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, requirementToJSON(item, c.prefixes(r, user, productID)))
+	m := requirementToJSON(item, c.prefixes(r, user, productID))
+	if item.Kind == model.RequirementKindRequirement {
+		m = withLinkedDocuments(r, c.documents, model.DocumentLinkRequirement, item.ID, m)
+	}
+	httputil.JSON(w, http.StatusOK, m)
 }
 
 // UpdateRequirement handles PATCH /products/{productId}/requirements/{id}.

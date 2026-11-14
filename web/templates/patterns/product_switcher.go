@@ -15,6 +15,7 @@ var productSections = map[string]bool{
 	"components":   true,
 	"capabilities": true,
 	"constraints":  true,
+	"documents":    true,
 	"milestones":   true,
 	"team":         true,
 	"settings":     true,

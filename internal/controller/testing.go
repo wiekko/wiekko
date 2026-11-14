@@ -14,7 +14,12 @@ import (
 type TestingController struct {
 	testing   *service.TestingService
 	defectRef refResolver
+	documents *service.DocumentService
 }
+
+// UseDocuments makes single-item responses name the documents linked to the
+// item (FR-909).
+func (c *TestingController) UseDocuments(docs *service.DocumentService) { c.documents = docs }
 
 // NewTesting creates a TestingController.
 //
@@ -171,7 +176,7 @@ func (c *TestingController) GetTestCase(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, testCaseToJSON(item))
+	httputil.JSON(w, http.StatusOK, withLinkedDocuments(r, c.documents, model.DocumentLinkTestCase, item.ID, testCaseToJSON(item)))
 }
 
 // UpdateTestCase handles PATCH /products/{productId}/test-cases/{id}.

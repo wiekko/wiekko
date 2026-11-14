@@ -32,6 +32,7 @@ const (
 	kindComment      = "comment"
 	kindAttachment   = "attachment"
 	kindDefectLink   = "defect_link"
+	kindDocument     = model.OwnerTypeDocument
 )
 
 // ref names one entity for an ownership check. An empty ID is skipped, so
@@ -102,6 +103,8 @@ func newOwnership(st *store.Store) *ownership {
 			return productIDOf(st.Milestone.GetByID(ctx, id))
 		case kindDefect:
 			return productIDOf(st.Defect.GetByID(ctx, id))
+		case kindDocument:
+			return productIDOf(st.Document.GetByID(ctx, id))
 		case kindCampaign:
 			return productIDOf(st.TestingCampaign.GetByID(ctx, id))
 		case kindSprint:
@@ -136,7 +139,8 @@ func newOwnership(st *store.Store) *ownership {
 type productScoped interface {
 	*model.Requirement | *model.Constraint | *model.TestCase | *model.Component | *model.Capability |
 		*model.Milestone | *model.Defect | *model.TestingCampaign | *model.Sprint | *model.Status |
-		*model.PyramidLevel | *model.RuntimeEnvironment | *model.Category | *model.Comment | *model.Attachment
+		*model.PyramidLevel | *model.RuntimeEnvironment | *model.Category | *model.Comment | *model.Attachment |
+		*model.Document
 }
 
 func productIDOf[T productScoped](entity T, err error) (string, error) {
@@ -174,6 +178,8 @@ func productIDOf[T productScoped](entity T, err error) (string, error) {
 		return e.ProductID, nil
 	case *model.Attachment:
 		return e.ProductID, nil
+	case *model.Document:
+		return e.ProductID, nil
 	}
 	return "", fmt.Errorf("no product for %T", entity)
 }
@@ -189,6 +195,7 @@ var auditEntityKinds = map[string]string{
 	"constraint":          kindConstraint,
 	"test_case":           kindTestCase,
 	"defect":              kindDefect,
+	"document":            kindDocument,
 	"milestone":           kindMilestone,
 	"sprint":              kindSprint,
 	"testing_campaign":    kindCampaign,

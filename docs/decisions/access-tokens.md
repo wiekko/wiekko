@@ -10,6 +10,21 @@ questions: *where* (products), *as whom* (role cap), *on what* (scopes). The rol
 "defects, read-only", and scopes alone cannot keep a product owner's token from activating items, so
 both exist. All three are optional; a token without restrictions gets write access to all product data.
 
+## Documents have a scope of their own
+
+Documents define the product, like the structure, but are written and read for different reasons: an
+agent that maintains a protocol need not restructure components, and a token that may change the
+structure need not touch the definitions. `documents` is therefore a scope of its own rather than part
+of `structure`. Linking a document follows the general rule (write on the document, read on the linked
+item). A requirement, constraint or test case names its linked documents in its own response even to a
+token without `documents:read`, but only by identifier, so the token learns that a definition exists
+without reading it.
+
+The *Agent, spec author* preset grants what an agent maintaining the specification needs: write on
+`structure`, `backlog`, `documents` and `discussion`, read on `defects` and `tests`, nothing on
+`settings`. *Full access* and *Agent, read-only* include `documents` because they cover every product
+scope; *CI ingestion* does not need it.
+
 ## Account and admin are never granted by default
 
 A token that can manage its user's tokens can mint a token without restrictions, and an administrator's

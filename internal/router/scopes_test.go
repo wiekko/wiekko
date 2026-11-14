@@ -17,6 +17,7 @@ var resourceScopes = map[string]access.Scope{
 	"components": access.Structure, "capabilities": access.Structure,
 	"milestones": access.Structure, "sprints": access.Structure,
 	"requirements": access.Backlog, "constraints": access.Backlog,
+	"documents":  access.Documents,
 	"defects":    access.Defects,
 	"test-cases": access.Tests, "campaigns": access.Tests, "test-runs": access.Tests,
 	"comments": access.Discussion, "attachments": access.Discussion,

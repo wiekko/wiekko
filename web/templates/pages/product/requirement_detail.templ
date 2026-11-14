@@ -25,6 +25,7 @@ type RequirementDetailProps struct {
 	ParentName       string // display name of parent requirement
 	ParentIdentifier string // e.g. "FR-1"
 	Children         []*model.Requirement
+	Documents        []*model.Document // linked documents (FR-909)
 	CanEdit          bool
 }
 
@@ -113,6 +114,7 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 			}
 			@patterns.DetailDescription(props.Requirement.Description)
 			@patterns.DetailMarkdownSection("Definition of Done", props.Requirement.DefinitionOfDone)
+			@LinkedDocuments(props.Product.ID, props.Documents)
 		}
 	}
 	if len(props.Children) > 0 {

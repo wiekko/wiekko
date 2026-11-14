@@ -95,6 +95,7 @@ func commands() []*command {
 		requirementGroup("req", "requirements and tasks", ""),
 		requirementGroup("task", "tasks (shorthand for `req … --kind task`)", "task"),
 		constraintGroup(),
+		documentGroup(),
 		componentGroup(),
 		capabilityGroup(),
 		defectGroup(),

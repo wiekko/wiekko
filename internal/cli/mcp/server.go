@@ -212,9 +212,10 @@ func registerReadTools(s *sdk.Server, h *handlers) {
 		})
 
 	readTool(s, h, "export_specification", "Export the specification",
-		"The whole product specification as one Markdown document: components and capabilities, constraints and "+
-			"requirements grouped by category with identifiers, descriptions, definitions of done and capability links; "+
-			"tasks too if asked for. The order is stable and the document has no timestamps, so it can be written to a "+
+		"The whole product specification as one Markdown document: components and capabilities, the current documents "+
+			"(listed with their file names and links; read their content with get_document), constraints and "+
+			"requirements grouped by category with identifiers, descriptions, definitions of done, capability and document "+
+			"links; tasks and draft documents too if asked for. The order is stable and the document has no timestamps, so it can be written to a "+
 			"spec file in the repository as is, and an unchanged product exports identically. The document is the text "+
 			"result; the structured result carries its size and SHA-256, to check whether a committed copy is current.",
 		func(ctx context.Context, sess *ops.Session, q ops.SpecificationQuery) (*ops.SpecificationView, func(io.Writer) error, error) {
@@ -273,6 +274,7 @@ func registerReadTools(s *sdk.Server, h *handlers) {
 			v, err := sess.CampaignStatus(ctx, in.Ref)
 			return v, func(w io.Writer) error { return render.Campaign(w, v) }, err
 		})
+	registerDocumentReadTools(s, h)
 }
 
 // toolError turns an operation error into a message the model can act on.

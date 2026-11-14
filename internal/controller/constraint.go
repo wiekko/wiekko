@@ -13,7 +13,12 @@ import (
 // ConstraintController handles constraint endpoints.
 type ConstraintController struct {
 	constraint *service.ConstraintService
+	documents  *service.DocumentService
 }
+
+// UseDocuments makes single-item responses name the documents linked to the
+// item (FR-909).
+func (c *ConstraintController) UseDocuments(docs *service.DocumentService) { c.documents = docs }
 
 // NewConstraint creates a ConstraintController.
 func NewConstraint(constraint *service.ConstraintService) *ConstraintController {
@@ -89,7 +94,8 @@ func (c *ConstraintController) GetConstraint(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	httputil.JSON(w, http.StatusOK, constraintToJSON(item, c.prefixes(r, user, productID)))
+	httputil.JSON(w, http.StatusOK, withLinkedDocuments(r, c.documents, model.DocumentLinkConstraint, item.ID,
+		constraintToJSON(item, c.prefixes(r, user, productID))))
 }
 
 // UpdateConstraint handles PATCH /products/{productId}/constraints/{id}.

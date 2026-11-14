@@ -96,6 +96,7 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		EstimationMode *string `json:"estimation_mode"`
 		WorkflowMode   *string `json:"workflow_mode"`
 		DefectPrefix   *string `json:"defect_prefix"`
+		DocumentPrefix *string `json:"document_prefix"`
 		// TwoFactorRequired keeps members without 2FA out (SC-107).
 		TwoFactorRequired *bool `json:"two_factor_required"`
 	}
@@ -109,6 +110,7 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		EstimationMode: req.EstimationMode,
 		WorkflowMode:   req.WorkflowMode,
 		DefectPrefix:   req.DefectPrefix,
+		DocumentPrefix: req.DocumentPrefix,
 
 		TwoFactorRequired: req.TwoFactorRequired,
 	})
@@ -306,6 +308,7 @@ func productToJSON(p *model.Product) map[string]any {
 		"estimation_mode":     p.EstimationMode,
 		"workflow_mode":       p.WorkflowMode,
 		"defect_prefix":       p.DefectPrefix,
+		"document_prefix":     p.DocumentPrefix,
 		"two_factor_required": p.TwoFactorRequired,
 		"created_at":          p.CreatedAt,
 		"updated_at":          p.UpdatedAt,

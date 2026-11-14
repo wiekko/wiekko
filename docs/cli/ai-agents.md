@@ -44,12 +44,17 @@ agent is told. In short:
   agent can keep a spec file in the repository in sync with. The tool also returns the document's SHA-256,
   so the agent can tell whether the file is current without comparing it. The tool is available on a
   read-only server too.
+- **Work from documents:** protocols, schemas and other definitions live in Nexmap as documents
+  (`nexmap doc show DOC-3`, the `get_document` tool). A requirement, constraint or test case names the
+  documents linked to it, so an agent finds the definition it has to implement or check code against;
+  `doc diff` (the `document_diff` tool) shows what changed in a definition since the code was written.
 - **Turn documents into requirements:** Nexmap has no import. An agent can read a document you give it
   and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
   existing ones instead of duplicating them.
 - **Write:** set the status of requirements, tasks and defects, add comments, report defects, create
   tasks, create and update constraints (including whether they are met), change the product structure,
-  and link requirements, constraints and test cases to capabilities and test cases to requirements, each
+  write documents and restore their earlier revisions, link requirements, constraints and test cases to
+  capabilities and documents, and test cases to requirements, each
   only as far as the user's role allows (see below). The MCP server offers none of the CLI's deletions.
 
 ## Allowing writes
@@ -58,7 +63,9 @@ agent is told. In short:
 data. To let agents write through MCP, remove `--read-only` from the entry in `.mcp.json`. The CLI's
 write commands are always available to an agent that can run shell commands, so `--read-only` is a
 convenience, not a guarantee: give an agent that should only read a token created with the *Agent,
-read-only* preset, and the server refuses its writes.
+read-only* preset, and the server refuses its writes. The *Agent, spec author* preset suits an agent that
+maintains the specification: it writes the structure, the backlog, documents and comments, reads defects
+and tests, and cannot change the product's settings.
 
 Writes are checked by the server against the token user's role in the product, exactly as in the web UI:
 
@@ -70,6 +77,7 @@ Writes are checked by the server against the token user's role in the product, e
 | Link a test case to a requirement, capability or component; create test cases from a test run | developer |
 | Create a task | product owner |
 | Create or update a constraint, component or capability; link capabilities | product owner |
+| Create, update, link or restore a document | product owner |
 
 Each role includes the ones below it (product owner, developer, tester, viewer), and administrators may
 do everything.

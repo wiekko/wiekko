@@ -106,7 +106,9 @@ func (s *Session) findCapability(ctx context.Context, ref string) (client.Capabi
 
 // SpecificationQuery selects what the specification export contains.
 type SpecificationQuery struct {
-	Tasks bool `json:"tasks,omitempty" jsonschema:"include tasks; by default only the structure, constraints and requirements are exported"`
+	Tasks bool `json:"tasks,omitempty" jsonschema:"include tasks; by default only the structure, documents, constraints and requirements are exported"`
+	// Drafts lists draft documents besides the current ones.
+	Drafts bool `json:"drafts,omitempty" jsonschema:"include draft documents; by default only current ones are listed"`
 }
 
 // SpecificationView describes an exported specification. The document
@@ -115,6 +117,7 @@ type SpecificationQuery struct {
 type SpecificationView struct {
 	ProductID string `json:"product_id"`
 	Tasks     bool   `json:"tasks"`
+	Drafts    bool   `json:"drafts,omitempty"`
 	Bytes     int    `json:"bytes"`
 	// SHA256 is the document's hash (hex), so a caller can tell whether a
 	// committed export is still current without comparing the text.
@@ -125,10 +128,10 @@ type SpecificationView struct {
 // the structure, constraints and requirements, and tasks if asked for. The
 // server renders it, in a stable order and without timestamps.
 func (s *Session) Specification(ctx context.Context, q SpecificationQuery) (string, *SpecificationView, error) {
-	doc, err := s.C.Specification(ctx, s.ProductID, q.Tasks)
+	doc, err := s.C.Specification(ctx, s.ProductID, q.Tasks, q.Drafts)
 	if err != nil {
 		return "", nil, err
 	}
 	sum := sha256.Sum256([]byte(doc))
-	return doc, &SpecificationView{ProductID: s.ProductID, Tasks: q.Tasks, Bytes: len(doc), SHA256: hex.EncodeToString(sum[:])}, nil
+	return doc, &SpecificationView{ProductID: s.ProductID, Tasks: q.Tasks, Drafts: q.Drafts, Bytes: len(doc), SHA256: hex.EncodeToString(sum[:])}, nil
 }

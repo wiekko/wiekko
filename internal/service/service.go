@@ -27,6 +27,7 @@ type Services struct {
 	Category   *CategoryService
 	Backlog    *BacklogService
 	Constraint *ConstraintService
+	Document   *DocumentService
 	Testing    *TestingService
 	TestRun    *TestRunService
 	Discussion *DiscussionService
@@ -189,6 +190,18 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			owns:         owns,
 		},
 		Backlog: backlogSvc,
+		Document: &DocumentService{
+			documents:    st.Document,
+			products:     st.Product,
+			requirements: st.Requirement,
+			constraints:  st.Constraint,
+			testCases:    st.TestCase,
+			categories:   st.Category,
+			comments:     discussionSvc,
+			audit:        st.Audit,
+			authz:        authz,
+			owns:         owns,
+		},
 		Spec: &SpecificationService{
 			products:     st.Product,
 			components:   st.Component,
@@ -196,6 +209,8 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			categories:   st.Category,
 			requirements: st.Requirement,
 			constraints:  st.Constraint,
+			documents:    st.Document,
+			testCases:    st.TestCase,
 			authz:        authz,
 		},
 		Constraint: &ConstraintService{

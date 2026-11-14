@@ -36,10 +36,11 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string) {
 				<!-- Product landing page: a page in its own right, not a group member -->
 				@SidebarLink("Overview", "/products/"+productID, "layout-dashboard", activeSection == "overview", "")
 				<!-- Groups read top to bottom as the product lifecycle: define, deliver, verify, configure -->
-				@SidebarSection("Definition", activeSection == "components" || activeSection == "capabilities" || activeSection == "constraints" || activeSection == "milestones") {
+				@SidebarSection("Definition", activeSection == "components" || activeSection == "capabilities" || activeSection == "constraints" || activeSection == "documents" || activeSection == "milestones") {
 					@SidebarLink("Components", "/products/"+productID+"/components", "component", activeSection == "components", "")
 					@SidebarLink("Capabilities", "/products/"+productID+"/capabilities", "layers", activeSection == "capabilities", "")
 					@SidebarLink("Constraints", "/products/"+productID+"/constraints", "shield-check", activeSection == "constraints", "")
+					@SidebarLink("Documents", "/products/"+productID+"/documents", "file-text", activeSection == "documents", "")
 					@SidebarLink("Milestones", "/products/"+productID+"/milestones", "calendar", activeSection == "milestones", "")
 				}
 				@SidebarSection("Backlog", activeSection == "requirements" || activeSection == "defects" || activeSection == "tasks" || activeSection == "sprints" || activeSection == "board") {

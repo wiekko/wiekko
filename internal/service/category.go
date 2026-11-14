@@ -296,8 +296,13 @@ func (s *CategoryService) checkNameFree(ctx context.Context, productID, entityTy
 // as the same identifier.
 func (s *CategoryService) checkPrefixFree(ctx context.Context, productID, prefix, selfID string) error {
 	if s.products != nil {
-		if p, err := s.products.GetByID(ctx, productID); err == nil && p.DefectPrefix == prefix {
-			return fmt.Errorf("prefix %q is already used for defects", prefix)
+		if p, err := s.products.GetByID(ctx, productID); err == nil {
+			if p.DefectPrefix == prefix {
+				return fmt.Errorf("prefix %q is already used for defects", prefix)
+			}
+			if p.DocumentPrefix == prefix {
+				return fmt.Errorf("prefix %q is already used for documents", prefix)
+			}
 		}
 	}
 	existing, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix)
@@ -310,9 +315,18 @@ func (s *CategoryService) checkPrefixFree(ctx context.Context, productID, prefix
 // normalizeDefectPrefix validates a defect identifier prefix by the same
 // rules as category prefixes.
 func normalizeDefectPrefix(prefix string) (string, error) {
+	return normalizeEntityPrefix(prefix, "defect", model.DefaultDefectPrefix)
+}
+
+// normalizeDocumentPrefix does the same for document identifiers (FR-050).
+func normalizeDocumentPrefix(prefix string) (string, error) {
+	return normalizeEntityPrefix(prefix, "document", model.DefaultDocumentPrefix)
+}
+
+func normalizeEntityPrefix(prefix, what, example string) (string, error) {
 	prefix = strings.ToUpper(strings.TrimSpace(prefix))
 	if !prefixPattern.MatchString(prefix) {
-		return "", errors.New("defect prefix must be 1-6 letters or digits, starting with a letter (e.g. DF)")
+		return "", fmt.Errorf("%s prefix must be 1-6 letters or digits, starting with a letter (e.g. %s)", what, example)
 	}
 	return prefix, nil
 }

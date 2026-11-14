@@ -87,6 +87,7 @@ templ GeneralTabContent(p *model.Product) {
 					@settingSelect(p.ID, "estimation_mode", "Estimation Mode", estimationModeOptions(p.EstimationMode))
 					@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
 					@settingTextFieldHint(p.ID, "defect_prefix", "Defect Identifier Prefix", p.DefectPrefix, defectPrefixHint)
+					@settingTextFieldHint(p.ID, "document_prefix", "Document Identifier Prefix", p.DocumentPrefix, documentPrefixHint)
 					@settingTwoFactorToggle(p)
 				</div>
 			}
@@ -129,7 +130,9 @@ func boolString(b bool) string {
 	return "false"
 }
 
-const defectPrefixHint = "Defects are numbered like DF-17. Changing the prefix renames every defect identifier; it must differ from all category prefixes."
+const defectPrefixHint = "Defects are numbered like DF-17. Changing the prefix renames every defect identifier; it must differ from all category prefixes and the document prefix."
+
+const documentPrefixHint = "Documents are numbered like DOC-3. Changing the prefix renames every document identifier; it must differ from all category prefixes and the defect prefix."
 
 // StubTabContent renders a placeholder for unimplemented settings tabs.
 templ StubTabContent(name string) {
@@ -704,6 +707,8 @@ templ SettingField(p *model.Product, field string) {
 			@settingSelect(p.ID, "workflow_mode", "Workflow Mode", workflowModeOptions(p.WorkflowMode))
 		case "defect_prefix":
 			@settingTextFieldHint(p.ID, "defect_prefix", "Defect Identifier Prefix", p.DefectPrefix, defectPrefixHint)
+		case "document_prefix":
+			@settingTextFieldHint(p.ID, "document_prefix", "Document Identifier Prefix", p.DocumentPrefix, documentPrefixHint)
 		case "two_factor_required":
 			@settingTwoFactorToggle(p)
 	}

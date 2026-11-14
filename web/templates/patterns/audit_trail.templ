@@ -1,6 +1,8 @@
 package patterns
 
 import (
+	"strings"
+
 	"nexmap.net/web/templates"
 	"nexmap.net/web/templates/ui"
 )
@@ -84,6 +86,12 @@ func auditDescription(entry templates.AuditEntryView) string {
 		return "Created this item"
 	case "delete":
 		return "Deleted this item"
+	case "link":
+		return "Linked a " + strings.ReplaceAll(entry.FieldName, "_", " ")
+	case "unlink":
+		return "Removed the link to a " + strings.ReplaceAll(entry.FieldName, "_", " ")
+	case "restore":
+		return "Restored the content of revision " + entry.NewValue
 	default:
 		if entry.FieldName != "" {
 			desc := "Changed " + entry.FieldName
