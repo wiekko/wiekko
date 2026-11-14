@@ -3,6 +3,7 @@ package admin
 import (
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 	"nexmap.net/internal/model"
 )
@@ -13,6 +14,8 @@ type InvitationsProps struct {
 	DisplayName string
 	IsAdmin     bool
 	Invitations []*model.Invitation
+	// MailEnabled offers sending invitations by email.
+	MailEnabled bool
 }
 
 templ InvitationsPage(props InvitationsProps) {
@@ -32,8 +35,8 @@ templ InvitationsPage(props InvitationsProps) {
 				@ui.CardHeader("New Invitation") {
 				}
 				@ui.CardBody() {
-					<form class="flex flex-wrap items-end gap-4" hx-post="/admin/invitations" hx-target="#invite-result" hx-swap="innerHTML">
-						<div class="flex-1 min-w-[200px]">
+					<form class="space-y-4" hx-post="/admin/invitations" hx-target="#invite-result" hx-swap="innerHTML">
+						<div class="max-w-md">
 							@ui.TextInput(ui.InputProps{
 								ID:          "invite-email",
 								Name:        "email",
@@ -43,6 +46,7 @@ templ InvitationsPage(props InvitationsProps) {
 								Required:    true,
 							})
 						</div>
+						@patterns.InviteDelivery(props.MailEnabled)
 						@ui.Button(ui.ButtonProps{
 							Label:   "Send Invitation",
 							Variant: "primary",
@@ -124,6 +128,17 @@ templ invitationStatusBadge(acceptedAt string) {
 	} else {
 		@ui.Badge("Pending", "yellow")
 	}
+}
+
+// InviteSentResult confirms an invitation sent by email.
+templ InviteSentResult(email string) {
+	<div class="rounded-md bg-green-50 p-3 dark:bg-green-900/30">
+		<p class="text-sm font-medium text-green-800 dark:text-green-300">Invitation sent to { email }.</p>
+		<p class="mt-2 text-xs text-green-700 dark:text-green-400">
+			The link in the email works once and expires in 7 days.
+			<a href="/admin/invitations" class="underline">Reload page</a> to see the updated list.
+		</p>
+	</div>
 }
 
 // InviteResult renders the result of creating an invitation.

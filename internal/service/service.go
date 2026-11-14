@@ -3,6 +3,7 @@ package service
 import (
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/config"
+	"nexmap.net/internal/mail"
 	"nexmap.net/internal/storage"
 	"nexmap.net/internal/store"
 )
@@ -15,6 +16,11 @@ type Services struct {
 	PAT        *PATService
 	Setting    *SettingService
 	Invitation *InvitationService
+	// PasswordReset is enabled only when Mail is.
+	PasswordReset *PasswordResetService
+	// Mail delivers invitation and password reset emails; run Mail.Run in the
+	// background for the latter.
+	Mail       *Mailer
 	Product    *ProductService
 	Component  *ComponentService
 	Milestone  *MilestoneService
@@ -29,8 +35,16 @@ type Services struct {
 	Spec       *SpecificationService
 }
 
-// New creates the application service layer.
+// New creates the application service layer without mail: invitations are
+// links only and there is no password reset.
 func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs storage.Store) *Services {
+	return NewWithMail(st, provider, cfg, blobs, nil)
+}
+
+// NewWithMail creates the application service layer sending email through
+// sender (nil: no mail, as New).
+func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, blobs storage.Store, sender mail.Sender) *Services {
+	mailer := NewMailer(sender, cfg.PublicURL)
 	settingSvc := &SettingService{settings: st.Setting}
 
 	authz := &Authorizer{productRoles: st.ProductRole}
@@ -84,7 +98,19 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		owns:         owns,
 	}
 
+	userSvc := &UserService{
+		users:        st.User,
+		sessions:     st.Session,
+		settings:     st.Setting,
+		invitations:  st.Invitation,
+		products:     st.Product,
+		productRoles: st.ProductRole,
+		provider:     provider,
+		regLimiter:   newAttemptLimiter(registrationMaxPerAddress, RegistrationWindow),
+	}
+
 	return &Services{
+		Mail: mailer,
 		Auth: &AuthService{
 			users:          st.User,
 			sessions:       st.Session,
@@ -96,15 +122,14 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 			limiter:        newLoginLimiter(),
 		},
 		TwoFactor: twoFactorSvc,
-		User: &UserService{
-			users:        st.User,
-			sessions:     st.Session,
-			settings:     st.Setting,
-			invitations:  st.Invitation,
-			products:     st.Product,
-			productRoles: st.ProductRole,
-			provider:     provider,
-			regLimiter:   newAttemptLimiter(registrationMaxPerAddress, RegistrationWindow),
+		User:      userSvc,
+		PasswordReset: &PasswordResetService{
+			users:       st.User,
+			resets:      st.PasswordReset,
+			accounts:    userSvc,
+			mail:        mailer,
+			ipLimiter:   newAttemptLimiter(passwordResetsPerAddress, PasswordResetWindow),
+			userLimiter: newAttemptLimiter(passwordResetMailsPerUser, PasswordResetWindow),
 		},
 		PAT: &PATService{
 			pats:         st.PAT,
@@ -114,9 +139,12 @@ func New(st *store.Store, provider auth.Provider, cfg *config.Config, blobs stor
 		},
 		Setting: settingSvc,
 		Invitation: &InvitationService{
-			invitations: st.Invitation,
-			authz:       authz,
-			publicURL:   cfg.PublicURL,
+			invitations:      st.Invitation,
+			authz:            authz,
+			publicURL:        cfg.PublicURL,
+			mail:             mailer,
+			inviterLimiter:   newAttemptLimiter(invitationMailsPerInviter, InvitationMailWindow),
+			recipientLimiter: newAttemptLimiter(invitationMailsPerRecipient, InvitationRecipientWindow),
 		},
 		Product: &ProductService{
 			products:      st.Product,

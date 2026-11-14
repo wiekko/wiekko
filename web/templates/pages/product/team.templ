@@ -34,6 +34,8 @@ type TeamProps struct {
 	Product        *model.Product
 	Members        []TeamMemberView
 	IsOwnerOrAdmin bool
+	// MailEnabled offers sending invitations by email.
+	MailEnabled bool
 }
 
 templ TeamPage(props TeamProps) {
@@ -59,7 +61,7 @@ templ TeamPage(props TeamProps) {
 			if props.IsOwnerOrAdmin {
 				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 					@AddMemberForm(props.Product.ID, "")
-					@InviteForm(props.Product.ID, "")
+					@InviteForm(props.Product.ID, "", props.MailEnabled)
 				</div>
 			}
 			@ui.Card() {
@@ -243,7 +245,7 @@ templ UserSearchResults(results []UserSearchResult) {
 }
 
 // InviteForm renders the invite-by-email form card.
-templ InviteForm(productID string, errMsg string) {
+templ InviteForm(productID string, errMsg string, mailEnabled bool) {
 	<div id="invite-form">
 		@ui.Card() {
 			@ui.CardHeader("Invite New User") {
@@ -273,6 +275,7 @@ templ InviteForm(productID string, errMsg string) {
 						Options: roleOptions(),
 						Required: true,
 					})
+					@patterns.InviteDelivery(mailEnabled)
 					@ui.Button(ui.ButtonProps{
 						Label:   "Send Invitation",
 						Variant: "secondary",
@@ -288,7 +291,7 @@ templ InviteForm(productID string, errMsg string) {
 }
 
 // InviteFormOOB renders the invite form with error as OOB swap.
-templ InviteFormOOB(productID string, errMsg string) {
+templ InviteFormOOB(productID string, errMsg string, mailEnabled bool) {
 	<div id="invite-form" hx-swap-oob="true">
 		@ui.Card() {
 			@ui.CardHeader("Invite New User") {
@@ -318,6 +321,7 @@ templ InviteFormOOB(productID string, errMsg string) {
 						Options: roleOptions(),
 						Required: true,
 					})
+					@patterns.InviteDelivery(mailEnabled)
 					@ui.Button(ui.ButtonProps{
 						Label:   "Send Invitation",
 						Variant: "secondary",
@@ -327,6 +331,40 @@ templ InviteFormOOB(productID string, errMsg string) {
 						@ui.Icon("mail", "sm")
 					}
 				</form>
+			}
+		}
+	</div>
+}
+
+// InviteEmailSentOOB confirms an invitation sent by email; the link went to
+// the invited address only.
+templ InviteEmailSentOOB(productID string, email string) {
+	<div id="invite-form" hx-swap-oob="true">
+		@ui.Card() {
+			@ui.CardHeader("Invite New User") {
+			}
+			@ui.CardBody() {
+				<div class="space-y-4">
+					<div class="rounded-md bg-emerald-50 p-4 dark:bg-emerald-900/30">
+						<div class="flex items-start gap-3">
+							<span class="text-emerald-500">
+								@ui.Icon("check-circle", "md")
+							</span>
+							<div>
+								<p class="text-sm font-medium text-emerald-700 dark:text-emerald-400">Invitation sent to { email }.</p>
+								<p class="mt-1 text-sm text-emerald-600 dark:text-emerald-400">The link in the email works once and expires in 7 days.</p>
+							</div>
+						</div>
+					</div>
+					@ui.Button(ui.ButtonProps{
+						Label:   "Invite Another",
+						Variant: "secondary",
+						Size:    "md",
+						HxGet:   "/products/" + productID + "/team/invite-form",
+						HxTarget: "#invite-form",
+						HxSwap:   "outerHTML",
+					})
+				</div>
 			}
 		}
 	</div>

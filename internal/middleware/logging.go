@@ -26,7 +26,7 @@ func Logging(next http.Handler) http.Handler {
 
 // secretPathPrefixes are routes whose next path segment is a secret token.
 // Logging it would let anyone who reads the log use the link (SC-303).
-var secretPathPrefixes = []string{"/accept-invite/"}
+var secretPathPrefixes = []string{"/accept-invite/", "/reset-password/"}
 
 // loggablePath returns path with secret tokens replaced.
 func loggablePath(path string) string {

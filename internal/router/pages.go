@@ -9,8 +9,9 @@ import (
 )
 
 func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64) {
-	loginCtrl := controller.NewPageLogin(svc.Auth, svc.Setting, cookieSecure)
+	loginCtrl := controller.NewPageLogin(svc.Auth, svc.Setting, svc.PasswordReset, cookieSecure)
 	registerCtrl := controller.NewPageRegister(svc.User, loginCtrl)
+	resetCtrl := controller.NewPagePasswordReset(svc.PasswordReset)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product)
@@ -25,6 +26,12 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.HandleFunc("POST /register", registerCtrl.Register)
 	mux.HandleFunc("GET /accept-invite/{token}", registerCtrl.ShowAcceptInvite)
 	mux.HandleFunc("POST /accept-invite/{token}", registerCtrl.AcceptInvite)
+	// Password reset (only with mail; otherwise 404). Web only: the API has
+	// no endpoint that sends email without an authenticated inviter.
+	mux.HandleFunc("GET /forgot-password", resetCtrl.ShowForgot)
+	mux.HandleFunc("POST /forgot-password", resetCtrl.Forgot)
+	mux.HandleFunc("GET /reset-password/{token}", resetCtrl.ShowReset)
+	mux.HandleFunc("POST /reset-password/{token}", resetCtrl.Reset)
 
 	// Authenticated pages.
 	mux.Handle("GET /{$}", pageAuthed(http.HandlerFunc(dashCtrl.Show)))

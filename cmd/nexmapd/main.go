@@ -19,6 +19,7 @@ import (
 	"nexmap.net/internal/database"
 	"nexmap.net/internal/devseed"
 	"nexmap.net/internal/logging"
+	"nexmap.net/internal/mail"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/router"
 	"nexmap.net/internal/server"
@@ -101,7 +102,20 @@ func main() {
 	}
 	st := store.New(db, dialect, keys)
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
-	svc := service.New(st, provider, cfg, blobs)
+
+	// Mail for invitations and password resets (AC-104); nil when not
+	// configured, and nexmap then hands out invitation links only.
+	sender, err := mail.New(cfg.Mail)
+	if err != nil {
+		slog.Error("failed to set up mail", "err", err)
+		os.Exit(1)
+	}
+	if sender != nil {
+		slog.Info("mail enabled", "transport", sender.Name(), "max_per_hour", cfg.Mail.MaxPerHour)
+	} else {
+		slog.Info("mail disabled: invitations are links only, and there is no password reset by email")
+	}
+	svc := service.NewWithMail(st, provider, cfg, blobs, sender)
 
 	// Read the 2FA enforcement setting once, so that it is known even if the
 	// database cannot be reached later (see TwoFactorService.Enforced).
@@ -124,8 +138,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Start session cleanup goroutine.
-	go sessionCleanup(ctx, st.Session)
+	// Start the cleanup of expired sessions and reset links.
+	go cleanup(ctx, st)
+
+	// Deliver queued emails (password resets) in the background; on shutdown
+	// it sends what is still queued, for a few seconds at most.
+	mailDone := make(chan struct{})
+	go func() {
+		defer close(mailDone)
+		svc.Mail.Run(ctx)
+	}()
 
 	// Build the handler and start the server.
 	handler, err := router.New(svc, router.Options{
@@ -143,6 +165,8 @@ func main() {
 		slog.Error("server error", "err", err)
 		os.Exit(1)
 	}
+	stop()
+	<-mailDone
 
 	slog.Info("server stopped")
 }
@@ -241,7 +265,8 @@ func generateBootstrapPassword() (string, error) {
 	return string(b), nil
 }
 
-func sessionCleanup(ctx context.Context, sessions store.SessionStore) {
+// cleanup deletes expired sessions and password reset links periodically.
+func cleanup(ctx context.Context, st *store.Store) {
 	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -249,8 +274,11 @@ func sessionCleanup(ctx context.Context, sessions store.SessionStore) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := sessions.DeleteExpired(context.Background()); err != nil {
+			if err := st.Session.DeleteExpired(context.Background()); err != nil {
 				slog.Error("session cleanup failed", "err", err)
+			}
+			if err := st.PasswordReset.DeleteExpired(context.Background()); err != nil {
+				slog.Error("password reset link cleanup failed", "err", err)
 			}
 		}
 	}

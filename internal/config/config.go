@@ -3,6 +3,8 @@ package config
 import (
 	"net/netip"
 	"time"
+
+	"nexmap.net/internal/mail"
 )
 
 const (
@@ -48,4 +50,7 @@ type Config struct {
 	// TrustedProxies are the addresses whose X-Forwarded-For header is
 	// believed when determining a client's address. Empty: none.
 	TrustedProxies []netip.Prefix
+	// Mail configures the transport for invitation and password reset emails
+	// (AC-104). Its zero value means nexmap sends no mail.
+	Mail mail.Config
 }

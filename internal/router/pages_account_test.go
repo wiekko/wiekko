@@ -24,6 +24,7 @@ import (
 	"nexmap.net/internal/config"
 	"nexmap.net/internal/crypto"
 	"nexmap.net/internal/database/dbtest"
+	"nexmap.net/internal/mail"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
 	"nexmap.net/internal/storage"
@@ -45,6 +46,13 @@ type accountEnv struct {
 
 func newAccountEnv(t *testing.T, driver string, db *sql.DB) *accountEnv {
 	t.Helper()
+	return newAccountEnvWithMail(t, driver, db, nil)
+}
+
+// newAccountEnvWithMail is newAccountEnv sending email through sender (nil:
+// none), with links to accountEnvURL.
+func newAccountEnvWithMail(t *testing.T, driver string, db *sql.DB, sender mail.Sender) *accountEnv {
+	t.Helper()
 	raw := make([]byte, 32)
 	for i := range raw {
 		raw[i] = byte(i)
@@ -58,8 +66,11 @@ func newAccountEnv(t *testing.T, driver string, db *sql.DB) *accountEnv {
 		t.Fatal(err)
 	}
 	cfg := &config.Config{SessionTTL: time.Hour, PBKDF2Iterations: 1}
+	if sender != nil {
+		cfg.PublicURL = accountEnvURL
+	}
 	st := store.New(db, store.Dialect(driver), keys)
-	svc := service.New(st, builtin.New(st.User, cfg.PBKDF2Iterations), cfg, blobs)
+	svc := service.NewWithMail(st, builtin.New(st.User, cfg.PBKDF2Iterations), cfg, blobs, sender)
 
 	ctx := context.Background()
 	now := time.Now().UTC().Format(time.RFC3339)

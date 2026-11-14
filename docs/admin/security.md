@@ -97,7 +97,8 @@ unset, a random one is generated and **written to the log**.
 
 Set both variables for the first start. If you rely on the generated password, read it from the log, sign
 in, change the password right away, and keep in mind that the log still contains it. The administrator's
-email address starts out as `admin@localhost`; change it on the profile page.
+email address starts out as `admin@localhost`; change it on the profile page, or a password reset link
+could not reach you.
 
 Once users exist, both variables are ignored and can be removed.
 
@@ -118,8 +119,10 @@ Once users exist, both variables are ignored and can be removed.
 - **The last administrator cannot be locked or deleted**, by anyone including themselves, and a product
   always keeps at least one owner. There is no setting to make a user an administrator yet; the first
   administrator is the only one unless you change `is_admin` in the database.
-- **Email is not implemented yet**: there are no password reset or invitation emails. Administrators set
-  new passwords for users from the user's detail page.
+- **Forgotten passwords:** with [mail](configuration.md#mail), users can ask for a reset link on the
+  sign-in page (see [Email](#email)). Without mail, administrators set new passwords for users from the
+  user's detail page. Either way, the new password ends all of that user's sessions, and a second factor
+  stays on.
 - **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default). The database stores only a hash
   of each session token, so a database backup contains nothing that works as a session cookie. Changing a password ends the
   user's other sessions, keeping only the one the change was made from; an administrator setting a new
@@ -150,10 +153,13 @@ the log if you need to trace them later.
 People get an account in one of two ways:
 
 - **Invitation:** a product owner invites someone to their product with a role (on the product's Team
-  page), or an administrator invites someone to the installation (`/admin/invitations`). nexmap shows a
-  link (built from [`NEXMAP_PUBLIC_URL`](configuration.md#network) if set), which the inviter passes on. Whoever holds the link can create the account, so treat it as a
-  secret: it works once, expires after 7 days, and is never written to the log. Accounts created from an
-  invitation skip moderation.
+  page), or an administrator invites someone to the installation (`/admin/invitations`). With mail, the
+  inviter chooses whether nexmap emails the link to the invited address or shows it to the inviter to
+  pass on; without mail, nexmap always shows it (built from
+  [`NEXMAP_PUBLIC_URL`](configuration.md#network) if set). Whoever holds the link can create the
+  account, so treat it as a secret: it works once, expires after 7 days, and is never written to the log.
+  An emailed link is not shown to the inviter, so the new account has proven that its owner reads that
+  mailbox. Accounts created from an invitation skip moderation.
 - **Self-registration**, if *self-registration* is enabled in the instance settings: anyone who can reach
   the server can create an account on `/register`. With *moderation* enabled, such accounts wait for an
   administrator's approval under `/admin/users` before they can sign in. A self-registered account
@@ -164,6 +170,43 @@ invitations together; after that the form and the API (`429 TOO_MANY_ATTEMPTS`) 
 
 Only product owners (and administrators) can invite to a product, and only administrators can invite to
 the installation without a product.
+
+## Email
+
+nexmap sends email only when [configured](configuration.md#mail), and then only invitations and password
+reset links. It sends nothing else (no notifications), and no part of nexmap lets anyone choose what an
+email says. The safeguards:
+
+- **Fixed text.** Both emails are fixed text with the address of the installation, the link and its
+  expiry; an invitation also names the role. Nothing a user typed (product names, display names) is put
+  into an email, so nobody can use nexmap to carry their own message to an address of their choosing.
+- **One recipient.** Every email goes to exactly one plain address. Lists, display names and line breaks
+  are refused, so the recipient and headers cannot be manipulated.
+- **Invitation emails** need a signed-in product owner or administrator (or their access token with
+  `settings:write` or `admin`). Each inviter can send 20 an hour, and each address receives at most 3 a
+  day, from all inviters together. Beyond that, the form and the API (`429 TOO_MANY_ATTEMPTS`) ask to
+  wait; invitation links can still be created.
+- **Password reset links** go only to the address stored on an existing, active account, never to an
+  address typed into the form. The form at `/forgot-password` answers the same for every input, and sends
+  in the background, so neither the answer nor its timing tells whether an account exists. A client
+  address may ask 5 times an hour, and an account receives at most 3 reset emails an hour, whoever asks.
+  There is no API endpoint for it.
+- **Reset links** work once and for 60 minutes; asking again replaces the previous link. The database
+  stores only a hash of the token. Using the link sets the new password, ends all of the user's sessions,
+  and leaves two-factor authentication on: the user signs in anew with the second factor. Locked
+  accounts, and accounts awaiting approval or deletion, cannot use a reset link.
+- **A cap for the installation**, `NEXMAP_MAIL_MAX_PER_HOUR` (100 by default), limits all emails
+  together, whatever the other limits let through.
+- **Links point to `NEXMAP_PUBLIC_URL`** only, which is required with mail. A reset link built from the
+  request's `Host` header could be made to point to someone else's server.
+- **Tracking is off** for the mailer APIs that have a switch for it (Mailgun, SendGrid, Lettermint):
+  tracking would route every link, token included, through the provider's redirector.
+- **SMTP is encrypted**: with `starttls`, nexmap refuses to send through a relay that does not offer
+  STARTTLS, and it sends credentials over TLS only.
+
+The limits are kept in memory and reset when the server restarts, like the login limits. Reset links
+waiting to be sent are kept in memory too; one still queued when the server stops is lost, and the user
+asks again.
 
 ## Access tokens
 

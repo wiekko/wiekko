@@ -913,6 +913,7 @@ func (c *PageProductController) Team(w http.ResponseWriter, r *http.Request) {
 		Product:        p,
 		Members:        members,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
+		MailEnabled:    c.invitation.MailEnabled(),
 	}).Render(r.Context(), w)
 }
 
@@ -1073,26 +1074,37 @@ func (c *PageProductController) SearchUsers(w http.ResponseWriter, r *http.Reque
 func (c *PageProductController) InviteMember(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
+	mailEnabled := c.invitation.MailEnabled()
 
 	email := r.FormValue("email")
 	role := r.FormValue("role")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if email == "" || role == "" {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = productpage.InviteFormOOB(productID, "Email and role are required.").Render(r.Context(), w)
+		_ = productpage.InviteFormOOB(productID, "Email and role are required.", mailEnabled).Render(r.Context(), w)
+		return
+	}
+	delivery, ok := invitationDelivery(r.FormValue("delivery"))
+	if !ok {
+		_ = productpage.InviteFormOOB(productID, "Choose how to deliver the invitation.", mailEnabled).Render(r.Context(), w)
+		return
+	}
+
+	if delivery == service.InvitationDeliveryEmail {
+		if _, err := c.invitation.Send(r.Context(), user, email, productID, role); err != nil {
+			_ = productpage.InviteFormOOB(productID, invitationErrorText(err), mailEnabled).Render(r.Context(), w)
+			return
+		}
+		_ = productpage.InviteEmailSentOOB(productID, strings.TrimSpace(email)).Render(r.Context(), w)
 		return
 	}
 
 	result, err := c.invitation.Create(r.Context(), user, email, productID, role)
 	if err != nil {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = productpage.InviteFormOOB(productID, errorText(err)).Render(r.Context(), w)
+		_ = productpage.InviteFormOOB(productID, errorText(err), mailEnabled).Render(r.Context(), w)
 		return
 	}
-
 	inviteURL := c.invitation.AcceptURL(result.RawToken, httputil.RequestBaseURL(r))
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.InviteSuccessOOB(productID, inviteURL).Render(r.Context(), w)
 }
 
@@ -1100,7 +1112,7 @@ func (c *PageProductController) InviteMember(w http.ResponseWriter, r *http.Requ
 func (c *PageProductController) InviteFormReset(w http.ResponseWriter, r *http.Request) {
 	productID := r.PathValue("id")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.InviteForm(productID, "").Render(r.Context(), w)
+	_ = productpage.InviteForm(productID, "", c.invitation.MailEnabled()).Render(r.Context(), w)
 }
 
 // DeleteProduct handles DELETE /products/{id}.

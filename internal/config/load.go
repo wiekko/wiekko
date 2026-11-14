@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"nexmap.net/internal/mail"
 )
 
 func Load(args []string) (*Config, error) {
@@ -35,6 +37,10 @@ func Load(args []string) (*Config, error) {
 		return nil, err
 	}
 	cfg.PublicURL = publicURL
+
+	if err := loadMail(cfg); err != nil {
+		return nil, err
+	}
 
 	return cfg, nil
 }
@@ -224,4 +230,47 @@ func ParseTrustedProxies(spec string) ([]netip.Prefix, error) {
 		out = append(out, netip.PrefixFrom(addr, addr.BitLen()))
 	}
 	return out, nil
+}
+
+// loadMail reads the mail settings, from the environment only: several are
+// secrets, and command line flags are visible to every user of the machine.
+func loadMail(cfg *Config) error {
+	m := mail.Config{
+		Transport:         os.Getenv("NEXMAP_MAIL_TRANSPORT"),
+		From:              strings.TrimSpace(os.Getenv("NEXMAP_MAIL_FROM")),
+		SMTPHost:          strings.TrimSpace(os.Getenv("NEXMAP_SMTP_HOST")),
+		SMTPTLS:           os.Getenv("NEXMAP_SMTP_TLS"),
+		SMTPUsername:      os.Getenv("NEXMAP_SMTP_USERNAME"),
+		SMTPPassword:      os.Getenv("NEXMAP_SMTP_PASSWORD"),
+		APIKey:            os.Getenv("NEXMAP_MAIL_API_KEY"),
+		MailgunDomain:     strings.TrimSpace(os.Getenv("NEXMAP_MAILGUN_DOMAIN")),
+		MailgunRegion:     os.Getenv("NEXMAP_MAILGUN_REGION"),
+		ScalewayProjectID: strings.TrimSpace(os.Getenv("NEXMAP_SCALEWAY_PROJECT_ID")),
+		ScalewayRegion:    os.Getenv("NEXMAP_SCALEWAY_REGION"),
+	}
+	for name, dst := range map[string]*int{
+		"NEXMAP_MAIL_MAX_PER_HOUR": &m.MaxPerHour,
+		"NEXMAP_SMTP_PORT":         &m.SMTPPort,
+	} {
+		v := strings.TrimSpace(os.Getenv(name))
+		if v == "" {
+			continue
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return fmt.Errorf("config: %s must be a positive number", name)
+		}
+		*dst = n
+	}
+	if err := m.Validate(); err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	// Links in emails must not be built from the request: on the public
+	// "forgot password" form, the Host header is whatever the requester sends,
+	// and a reset link pointing at their server would hand them the token.
+	if m.Enabled() && cfg.PublicURL == "" {
+		return fmt.Errorf("config: sending mail (NEXMAP_MAIL_TRANSPORT) requires NEXMAP_PUBLIC_URL, the address the links in the emails point to")
+	}
+	cfg.Mail = m
+	return nil
 }

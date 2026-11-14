@@ -14,6 +14,7 @@ type Store struct {
 	PAT                PATStore
 	Setting            SettingStore
 	Invitation         InvitationStore
+	PasswordReset      PasswordResetStore
 	ProductRole        ProductRoleStore
 	Product            ProductStore
 	Component          ComponentStore
@@ -47,6 +48,7 @@ func New(conn *sql.DB, dialect Dialect, keys *crypto.KeyRing) *Store {
 		PAT:                &patStore{db: db},
 		Setting:            &settingStore{db: db},
 		Invitation:         &invitationStore{db: db, keys: keys},
+		PasswordReset:      &passwordResetStore{db: db},
 		ProductRole:        &productRoleStore{db: db},
 		Product:            &productStore{db: db},
 		Component:          &componentStore{db: db},

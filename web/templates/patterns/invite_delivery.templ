@@ -1,0 +1,27 @@
+package patterns
+
+const inviteRadioClass = "border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"
+
+// InviteDelivery lets the inviter choose how an invitation reaches the
+// invited person: by email from nexmap, or as a link they pass on themselves
+// (chat, forum message, …). Without mail only links exist, and the choice is
+// not shown.
+templ InviteDelivery(mailEnabled bool) {
+	if mailEnabled {
+		<fieldset>
+			<legend class="text-sm font-medium text-gray-700 dark:text-gray-300">Delivery</legend>
+			<div class="mt-2 space-y-2">
+				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+					<input type="radio" name="delivery" value="email" checked class={ inviteRadioClass }/>
+					Send the invitation by email
+				</label>
+				<label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+					<input type="radio" name="delivery" value="link" class={ inviteRadioClass }/>
+					Create a link to pass on myself (chat, forum message, …)
+				</label>
+			</div>
+		</fieldset>
+	} else {
+		<input type="hidden" name="delivery" value="link"/>
+	}
+}

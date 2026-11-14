@@ -17,11 +17,14 @@ type PageLoginController struct {
 	auth         *service.AuthService
 	settings     *service.SettingService
 	cookieSecure bool
+	// showForgot links the password reset page, which exists only when the
+	// installation sends email.
+	showForgot bool
 }
 
-// NewPageLogin creates a PageLoginController.
-func NewPageLogin(auth *service.AuthService, settings *service.SettingService, cookieSecure bool) *PageLoginController {
-	return &PageLoginController{auth: auth, settings: settings, cookieSecure: cookieSecure}
+// NewPageLogin creates a PageLoginController. resets may be nil.
+func NewPageLogin(auth *service.AuthService, settings *service.SettingService, resets *service.PasswordResetService, cookieSecure bool) *PageLoginController {
+	return &PageLoginController{auth: auth, settings: settings, cookieSecure: cookieSecure, showForgot: resets.Enabled()}
 }
 
 // Show renders the login page. Already-authenticated users are redirected to /.
@@ -34,7 +37,7 @@ func (c *PageLoginController) Show(w http.ResponseWriter, r *http.Request) {
 	selfReg, _ := c.settings.Get(r.Context(), "self_registration_enabled")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = login.LoginPage(selfReg == "true", "").Render(r.Context(), w)
+	_ = login.LoginPage(selfReg == "true", c.showForgot, "").Render(r.Context(), w)
 }
 
 // Login handles POST /login. Authenticates the user and redirects to /.
@@ -203,7 +206,7 @@ func (c *PageLoginController) renderLoginErrorStatus(w http.ResponseWriter, r *h
 		return
 	}
 	w.WriteHeader(status)
-	_ = login.LoginPage(selfReg == "true", message).Render(r.Context(), w)
+	_ = login.LoginPage(selfReg == "true", c.showForgot, message).Render(r.Context(), w)
 }
 
 // Logout handles POST /logout. Validates the CSRF token from the form,

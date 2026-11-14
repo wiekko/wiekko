@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
@@ -256,6 +257,7 @@ func (c *PageAdminController) Invitations(w http.ResponseWriter, r *http.Request
 		DisplayName: user.DisplayName,
 		IsAdmin:     user.IsAdmin,
 		Invitations: invitations,
+		MailEnabled: c.invitation.MailEnabled(),
 	}).Render(r.Context(), w)
 }
 
@@ -263,20 +265,31 @@ func (c *PageAdminController) Invitations(w http.ResponseWriter, r *http.Request
 func (c *PageAdminController) CreateInvitation(w http.ResponseWriter, r *http.Request) {
 	currentUser := middleware.UserFromContext(r.Context())
 	email := r.FormValue("email")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if email == "" {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = admin.InviteResult("Email is required.", "", false).Render(r.Context(), w)
+		return
+	}
+	delivery, ok := invitationDelivery(r.FormValue("delivery"))
+	if !ok {
+		_ = admin.InviteResult("Choose how to deliver the invitation.", "", false).Render(r.Context(), w)
+		return
+	}
+
+	if delivery == service.InvitationDeliveryEmail {
+		if _, err := c.invitation.Send(r.Context(), currentUser, email, "", ""); err != nil {
+			_ = admin.InviteResult(invitationErrorText(err), "", false).Render(r.Context(), w)
+			return
+		}
+		_ = admin.InviteSentResult(strings.TrimSpace(email)).Render(r.Context(), w)
 		return
 	}
 
 	result, err := c.invitation.Create(r.Context(), currentUser, email, "", "")
 	if err != nil {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = admin.InviteResult(errorText(err), "", false).Render(r.Context(), w)
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = admin.InviteResult("", c.invitation.AcceptURL(result.RawToken, httputil.RequestBaseURL(r)), true).Render(r.Context(), w)
 }
 

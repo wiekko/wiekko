@@ -12,6 +12,7 @@ import (
 
 	"nexmap.net/internal/auth"
 	"nexmap.net/internal/config"
+	"nexmap.net/internal/mail"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
@@ -35,6 +36,12 @@ type testEnv struct {
 }
 
 func newTestEnv(t *testing.T) *testEnv {
+	t.Helper()
+	return newTestEnvWithMail(t, nil)
+}
+
+// newTestEnvWithMail is newTestEnv sending email through sender (nil: none).
+func newTestEnvWithMail(t *testing.T, sender mail.Sender) *testEnv {
 	t.Helper()
 	// New accounts are checked against existing ones; default to "none".
 	notFound := func(context.Context, string) (*model.User, error) {
@@ -66,12 +73,12 @@ func newTestEnv(t *testing.T) *testEnv {
 		Invitation: invitations,
 	}
 
-	cfg := &config.Config{SessionTTL: time.Hour}
+	cfg := &config.Config{SessionTTL: time.Hour, PublicURL: "https://nexmap.example.com"}
 	blobs, err := storage.NewFS(t.TempDir(), 1<<20)
 	if err != nil {
 		t.Fatalf("storage.NewFS: %v", err)
 	}
-	svc := service.New(st, provider, cfg, blobs)
+	svc := service.NewWithMail(st, provider, cfg, blobs, sender)
 
 	return &testEnv{
 		Users:       users,

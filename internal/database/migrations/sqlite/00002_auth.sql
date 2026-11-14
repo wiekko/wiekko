@@ -94,6 +94,20 @@ CREATE TABLE IF NOT EXISTS invitations (
 );
 CREATE INDEX IF NOT EXISTS idx_invitations_token_hash ON invitations(token_hash);
 
+-- Password reset links (SC-110). Like sessions and invitations, the table
+-- stores only the SHA-256 of the token sent by email, so a copy of the
+-- database holds nothing that resets a password. A token works once
+-- (used_at) and until expires_at.
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+
 CREATE TABLE IF NOT EXISTS personal_data (
     id          TEXT PRIMARY KEY,
     owner_table TEXT NOT NULL,

@@ -100,6 +100,17 @@ func RoleRank(role string) int {
 }
 
 // Invitation represents an invitation to register.
+// PasswordResetToken is a pending password reset (SC-110). The raw token only
+// exists in the email; TokenHash is its SHA-256.
+type PasswordResetToken struct {
+	ID        string
+	UserID    string
+	TokenHash string
+	CreatedAt string
+	ExpiresAt string
+	UsedAt    string // empty until used
+}
+
 type Invitation struct {
 	ID         string
 	Email      string

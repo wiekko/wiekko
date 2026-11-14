@@ -13,6 +13,11 @@ func clearNexmapEnv(t *testing.T) {
 		"NEXMAP_PBKDF2_ITERATIONS", "NEXMAP_COOKIE_SECURE",
 		"NEXMAP_ENCRYPTION_KEY", "NEXMAP_ADMIN_USER", "NEXMAP_ADMIN_PASSWORD",
 		"NEXMAP_PUBLIC_URL",
+		"NEXMAP_MAIL_TRANSPORT", "NEXMAP_MAIL_FROM", "NEXMAP_MAIL_MAX_PER_HOUR",
+		"NEXMAP_SMTP_HOST", "NEXMAP_SMTP_PORT", "NEXMAP_SMTP_TLS",
+		"NEXMAP_SMTP_USERNAME", "NEXMAP_SMTP_PASSWORD", "NEXMAP_MAIL_API_KEY",
+		"NEXMAP_MAILGUN_DOMAIN", "NEXMAP_MAILGUN_REGION",
+		"NEXMAP_SCALEWAY_PROJECT_ID", "NEXMAP_SCALEWAY_REGION",
 	} {
 		t.Setenv(key, "")
 	}
@@ -299,5 +304,70 @@ func TestPublicURL(t *testing.T) {
 		if _, err := Load(nil); err == nil {
 			t.Errorf("Load accepted public URL %q", bad)
 		}
+	}
+}
+
+func TestMailDisabledByDefault(t *testing.T) {
+	clearNexmapEnv(t)
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Mail.Enabled() {
+		t.Errorf("mail enabled without configuration: %+v", cfg.Mail)
+	}
+}
+
+func TestMailSMTP(t *testing.T) {
+	clearNexmapEnv(t)
+	t.Setenv("NEXMAP_PUBLIC_URL", "https://nexmap.example.com")
+	t.Setenv("NEXMAP_MAIL_TRANSPORT", "smtp")
+	t.Setenv("NEXMAP_MAIL_FROM", "nexmap <noreply@example.com>")
+	t.Setenv("NEXMAP_SMTP_HOST", "mail.example.com")
+	t.Setenv("NEXMAP_SMTP_PORT", "2525")
+	t.Setenv("NEXMAP_SMTP_USERNAME", "u")
+	t.Setenv("NEXMAP_SMTP_PASSWORD", "p")
+	t.Setenv("NEXMAP_MAIL_MAX_PER_HOUR", "10")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	m := cfg.Mail
+	if !m.Enabled() || m.SMTPPort != 2525 || m.SMTPTLS != "starttls" || m.MaxPerHour != 10 || m.SMTPUsername != "u" {
+		t.Errorf("mail config = %+v", m)
+	}
+}
+
+// Without a public URL, reset links would be built from the Host header of
+// whoever asks for a reset.
+func TestMailRequiresPublicURL(t *testing.T) {
+	clearNexmapEnv(t)
+	t.Setenv("NEXMAP_MAIL_TRANSPORT", "sendgrid")
+	t.Setenv("NEXMAP_MAIL_FROM", "noreply@example.com")
+	t.Setenv("NEXMAP_MAIL_API_KEY", "k")
+	if _, err := Load(nil); err == nil {
+		t.Fatal("Load accepted mail without NEXMAP_PUBLIC_URL")
+	}
+}
+
+func TestMailInvalid(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"unknown transport": {"NEXMAP_MAIL_TRANSPORT": "pigeon"},
+		"missing from":      {"NEXMAP_MAIL_TRANSPORT": "sendgrid", "NEXMAP_MAIL_API_KEY": "k"},
+		"missing key":       {"NEXMAP_MAIL_TRANSPORT": "mailpace", "NEXMAP_MAIL_FROM": "a@example.com"},
+		"bad port":          {"NEXMAP_MAIL_TRANSPORT": "smtp", "NEXMAP_MAIL_FROM": "a@example.com", "NEXMAP_SMTP_HOST": "h", "NEXMAP_SMTP_PORT": "x"},
+		"bad cap":           {"NEXMAP_MAIL_TRANSPORT": "lettermint", "NEXMAP_MAIL_FROM": "a@example.com", "NEXMAP_MAIL_API_KEY": "k", "NEXMAP_MAIL_MAX_PER_HOUR": "-5"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			clearNexmapEnv(t)
+			t.Setenv("NEXMAP_PUBLIC_URL", "https://nexmap.example.com")
+			for k, v := range env {
+				t.Setenv(k, v)
+			}
+			if _, err := Load(nil); err == nil {
+				t.Error("Load accepted an invalid mail configuration")
+			}
+		})
 	}
 }

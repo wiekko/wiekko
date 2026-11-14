@@ -90,7 +90,12 @@ human-readable `message`:
 ### Team, workflow and campaign scope
 
 - `POST /api/v1/products/{p}/invitations` (owner; `settings:write`) invites someone who has no account
-  yet, with `{"email": …, "role": …}`, and answers with the invitation's `url`.
+  yet, with `{"email": …, "role": …}`, and answers with the invitation's `url`. With
+  `"delivery": "email"` (only if the server [sends mail](../admin/configuration.md#mail)), nexmap emails
+  the link to that address instead, and the answer carries neither `url` nor `raw_token`. Invitation
+  emails are limited per inviter and per address (`429 TOO_MANY_ATTEMPTS`); if the email cannot be sent,
+  the answer is `502 MAIL_NOT_SENT` and no invitation is left behind. `"delivery": "link"` is the
+  default.
 - `POST /api/v1/products/{p}/statuses/split` (owner; `settings:write`) gives defects a status set of
   their own. It cannot be undone.
 - `POST /api/v1/products/{p}/campaigns/{id}/test-cases` with `{"test_case_ids": […]}` and

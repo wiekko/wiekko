@@ -36,7 +36,8 @@ func TestAccountSafeguards(t *testing.T) {
 			accept := func(username, email string) error {
 				inv, err := e.svc.Invitation.Create(ctx, e.admin, email, "", "")
 				if err != nil {
-					t.Fatal(err)
+					// An invalid address is refused already when inviting.
+					return err
 				}
 				_, err = e.svc.User.AcceptInvitation(ctx, inv.RawToken, service.RegisterInput{Username: username, Password: goodPassword})
 				return err

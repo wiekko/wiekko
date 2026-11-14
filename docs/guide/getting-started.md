@@ -40,11 +40,16 @@ The roles are explained in [Concepts](concepts.md#roles).
 
 People who have no account yet can be invited:
 
-1. Under **Invite New User**, enter their email address and the role they should get, and choose
-   **Send Invitation**.
-2. nexmap shows an invitation link. It does not send emails, so pass the link on yourself, through a
-   channel only that person reads: whoever opens it can use it.
-3. The link opens a page where they choose a username and password. Their account gets the invited email
+1. Under **Invite New User**, enter their email address and the role they should get.
+2. If your installation sends email, choose how the invitation gets there:
+   - **Send the invitation by email**: nexmap mails the link to that address. You do not see the link
+     yourself, so only the owner of the mailbox can create the account.
+   - **Create a link to pass on myself**: nexmap shows the link, and you send it through a chat, a forum
+     message or any other channel only that person reads: whoever opens it can use it.
+
+   Without email, nexmap always shows the link.
+3. Choose **Send Invitation**.
+4. The link opens a page where they choose a username and password. Their account gets the invited email
    address, joins the product with the invited role, and they are signed in right away.
 
 An invitation link works once and expires after 7 days. Accounts created from an invitation never need an

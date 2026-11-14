@@ -14,7 +14,7 @@ The container image sets some variables differently from the built-in defaults; 
 |---|---|---|---|---|
 | `NEXMAP_HOST` | `--host` | `localhost` | `0.0.0.0` | Address to listen on. `0.0.0.0` listens on all interfaces |
 | `NEXMAP_PORT` | `--port` | `8080` | `8080` | Port to listen on |
-| `NEXMAP_PUBLIC_URL` | `--public-url` | empty | | The address users open nexmap at, such as `https://nexmap.example.com`. Used for the links nexmap hands out (invitations) |
+| `NEXMAP_PUBLIC_URL` | `--public-url` | empty | | The address users open nexmap at, such as `https://nexmap.example.com`. Used for the links nexmap hands out (invitations, password resets). Required when [mail](#mail) is enabled |
 | `NEXMAP_TRUSTED_PROXIES` | `--trusted-proxies` | loopback and private networks | | Addresses and CIDR ranges of the reverse proxies whose `X-Forwarded-For` header is believed, comma-separated. `none` (or empty) trusts no proxy |
 
 Without `NEXMAP_PUBLIC_URL`, invitation links are built from the address the inviter's browser used,
@@ -88,6 +88,58 @@ and a text extension rejects content recognised as an archive, PDF or media file
 uploads but is not a malware scanner. Attachments are always served as downloads, never rendered or
 executed by the browser.
 
+### Mail
+
+nexmap can send two kinds of email, and no others: invitations and password reset links. Mail is
+optional. Without it, invitations are links that the inviter passes on, and an administrator sets a new
+password for someone who forgot theirs.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NEXMAP_MAIL_TRANSPORT` | empty: no mail | `smtp`, `mailgun`, `sendgrid`, `mailpace`, `scaleway` or `lettermint` |
+| `NEXMAP_MAIL_FROM` | none, required with a transport | Sender, such as `nexmap@example.com` or `"nexmap <nexmap@example.com>"`. Its domain must be one your mail service may send for |
+| `NEXMAP_MAIL_MAX_PER_HOUR` | `100` | Most emails the server sends in an hour, all kinds together. A safety net; the limits below normally apply first |
+| `NEXMAP_SMTP_HOST` | | SMTP relay (transport `smtp`) |
+| `NEXMAP_SMTP_PORT` | `587`, or `465` with `tls` | |
+| `NEXMAP_SMTP_TLS` | `starttls` | `starttls`: the relay must offer STARTTLS, or nothing is sent. `tls`: TLS from the start (port 465). `none`: no encryption, only for a relay on the same host or network, and only without credentials |
+| `NEXMAP_SMTP_USERNAME`, `NEXMAP_SMTP_PASSWORD` | empty: no login | Credentials for the relay (AUTH PLAIN, over TLS only) |
+| `NEXMAP_MAIL_API_KEY` | | Key or token of the mailer API: the Mailgun API key, the SendGrid API key, the MailPace server token, the Scaleway secret key or the Lettermint project token |
+| `NEXMAP_MAILGUN_DOMAIN` | | Sending domain at Mailgun (transport `mailgun`) |
+| `NEXMAP_MAILGUN_REGION` | `us` | `us` or `eu` |
+| `NEXMAP_SCALEWAY_PROJECT_ID` | | Project of the Transactional Email domain (transport `scaleway`) |
+| `NEXMAP_SCALEWAY_REGION` | `fr-par` | Region of Scaleway Transactional Email |
+
+The mail settings have no command line flags: they include secrets, and a process's command line is
+visible to other users of the machine. The server does not start if the mail configuration is incomplete
+or invalid, or if a transport is set without `NEXMAP_PUBLIC_URL`. The links in emails are always built
+from `NEXMAP_PUBLIC_URL`, never from the request, so nobody can make nexmap send a reset link that points
+to another site.
+
+Services that are not in the list can be used through their SMTP relay, such as Amazon SES, Postmark or
+Brevo. Scaleway, MailPace and Lettermint can also be reached by SMTP, if you prefer that.
+
+Examples:
+
+```sh
+# An SMTP relay with STARTTLS on port 587
+NEXMAP_MAIL_TRANSPORT=smtp
+NEXMAP_MAIL_FROM='nexmap <nexmap@example.com>'
+NEXMAP_SMTP_HOST=smtp.example.com
+NEXMAP_SMTP_USERNAME=nexmap
+NEXMAP_SMTP_PASSWORD='<password>'
+
+# Scaleway Transactional Email through its API
+NEXMAP_MAIL_TRANSPORT=scaleway
+NEXMAP_MAIL_FROM=nexmap@example.com
+NEXMAP_MAIL_API_KEY='<secret key>'
+NEXMAP_SCALEWAY_PROJECT_ID='<project id>'
+```
+
+At startup the log says `mail enabled` with the transport, or `mail disabled`. Each email is logged as
+`mail sent` or `mail not sent` with its purpose (`invitation` or `password_reset`), never with the
+address or the link. See [Security](security.md#email) for what the emails contain and how they are
+limited.
+
 ### Logging
 
 | Variable | Flag | Default | Meaning |
@@ -111,6 +163,8 @@ Logs are JSON, one entry per line.
   `NEXMAP_MAX_UPLOAD_BYTES`) is ignored and the default is used, without a warning. Check the values
   carefully.
 - An unknown log level or database driver stops the server with an error.
+- The mail settings are checked strictly: an invalid number, port or option stops the server with an
+  error.
 
 ## Health check
 
