@@ -1,6 +1,6 @@
 # Testing
 
-Testing in nexmap has two parts: a catalogue of **test cases** that describes how the product is
+Testing in Nexmap has two parts: a catalogue of **test cases** that describes how the product is
 verified, and **testing campaigns** that record the results of one round of testing.
 
 ## Test cases

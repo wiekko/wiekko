@@ -1,6 +1,6 @@
 # Backup and restore
 
-nexmap does not make backups itself. A complete backup has three parts:
+Nexmap does not make backups itself. A complete backup has three parts:
 
 | Part | Where | Notes |
 |---|---|---|
@@ -9,7 +9,7 @@ nexmap does not make backups itself. A complete backup has three parts:
 | Encryption key | `NEXMAP_ENCRYPTION_KEY` | Needed to read personal data in the database |
 
 **Keep the key apart from the database backups.** Without the key, the email addresses and display names
-in a backup cannot be decrypted, and nexmap has no way to recover them. A backup stored together with
+in a backup cannot be decrypted, and Nexmap has no way to recover them. A backup stored together with
 its key, on the other hand, protects nothing. Store the key once, in a password manager or your
 platform's secret store, and again whenever you [rotate it](security.md#rotating-the-key): a backup
 needs every key that was in the list when it was taken.
@@ -68,7 +68,7 @@ A restored database is as it was at the time of the backup, sessions included: e
 then may still be signed in, and later password changes are undone. After restoring because of a
 security incident, have users change their passwords, and revoke API tokens that may have leaked.
 
-A backup from an older nexmap version can be restored into a newer one: the missing migrations run at
+A backup from an older Nexmap version can be restored into a newer one: the missing migrations run at
 startup. The reverse is refused: `nexmapd` does not start on a database migrated by a newer version.
 
 ## Upgrades

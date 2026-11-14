@@ -1,19 +1,19 @@
-# nexmap
+# Nexmap
 
 Nexmap Product Management Solution
 
-nexmap keeps a product's requirements, constraints, backlog, test cases, testing campaigns and defects in
+Nexmap keeps a product's requirements, constraints, backlog, test cases, testing campaigns and defects in
 one place. It consists of a server (`nexmapd`) with a web UI and REST API, and a command line client
 (`nexmap`) for repositories, CI pipelines and AI agents.
 
-- Using nexmap: [docs/guide/concepts.md](docs/guide/concepts.md), then
+- Using Nexmap: [docs/guide/concepts.md](docs/guide/concepts.md), then
   [getting started](docs/guide/getting-started.md)
-- Deploying and running nexmap: [docs/admin/installation.md](docs/admin/installation.md)
+- Deploying and running Nexmap: [docs/admin/installation.md](docs/admin/installation.md)
 - Setting up the CLI: [docs/cli/setup.md](docs/cli/setup.md)
 - Recording test results from CI: [docs/cli/ci-integration.md](docs/cli/ci-integration.md)
 - Giving AI agents access: [docs/cli/ai-agents.md](docs/cli/ai-agents.md)
 - All documentation: [docs.nexmap.net](https://docs.nexmap.net), or [docs/index.md](docs/index.md) in the repository
-- Building and testing nexmap itself: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Building and testing Nexmap itself: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## CLI quick start
 

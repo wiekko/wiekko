@@ -1,6 +1,6 @@
 # Setting up the CLI
 
-`nexmap` is the command line client for a nexmap server. It talks to the server only through the
+`nexmap` is the command line client for a Nexmap server. It talks to the server only through the
 [REST API](../api/rest.md), so it needs nothing but the server's URL and a personal access token.
 
 ## Installing

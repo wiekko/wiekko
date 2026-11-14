@@ -6,7 +6,7 @@ site is built and organised, see `CONTRIBUTING.md`, "Documentation site".
 
 ## Overview
 
-The site is its own Coolify application, next to the nexmap server, built from the same Forgejo
+The site is its own Coolify application, next to the Nexmap server, built from the same Forgejo
 repository (`ssh://git@forge.my-universe.com:22222/daemotron/nexmap.git`, private) on branch `main`.
 
 ```
@@ -40,7 +40,7 @@ the release tags are not in the build context. Whether Coolify clones shallow do
 
 ### 2. Coolify application
 
-1. Create an application from the private repository, in the same way as the nexmap server's: Coolify
+1. Create an application from the private repository, in the same way as the Nexmap server's: Coolify
    clones over SSH with a deploy key, which has to be registered in Forgejo (repository **Settings →
    Deploy keys**, read-only). On a new server, that is a new key.
 2. Branch `main`.

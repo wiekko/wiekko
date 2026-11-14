@@ -2,7 +2,7 @@
 
 ## Building
 
-nexmap needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is
+Nexmap needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is
 built and tested with. Older distribution packages work as well: since Go 1.21, `go` reads that line,
 fetches the named toolchain once (from the Go module proxy, verified against the Go checksum database)
 and uses it for this repository, `gopls` included. This needs automatic toolchain switching, which some
@@ -83,8 +83,8 @@ header from the app layout. A plain HTML form (no `hx-post`) must carry it itsel
 
 ## Specification and documentation
 
-`docs/spec/` holds the specification: what nexmap *shall* do, with requirement identifiers (FR-…, AC-…).
-The rest of `docs/` describes how nexmap behaves and how to use it, for administrators, users and CLI
+`docs/spec/` holds the specification: what Nexmap *shall* do, with requirement identifiers (FR-…, AC-…).
+The rest of `docs/` describes how Nexmap behaves and how to use it, for administrators, users and CLI
 users; see [docs/index.md](docs/index.md).
 
 Implementation plans live in `docs/tmp/` while their work is in progress. When a plan is done, move what

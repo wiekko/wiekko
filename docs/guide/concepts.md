@@ -1,12 +1,12 @@
 # Concepts
 
-nexmap keeps everything about a product in one place: what it is made of, what it must do, the work to
+Nexmap keeps everything about a product in one place: what it is made of, what it must do, the work to
 get there, how it is tested and what is broken. This page explains the building blocks and how they
 relate.
 
 ## Products
 
-Everything in nexmap belongs to a **product**. Each product has its own team, settings, structure,
+Everything in Nexmap belongs to a **product**. Each product has its own team, settings, structure,
 backlog and tests; nothing is shared between products. The dashboard shows the products you are a member
 of, and the product switcher in the header moves between them while staying in the same section.
 

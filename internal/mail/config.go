@@ -29,7 +29,7 @@ var scalewayRegions = []string{"fr-par"}
 // Transport) means nexmap sends no mail.
 type Config struct {
 	Transport  string
-	From       string // "nexmap <noreply@example.com>" or a bare address
+	From       string // "Nexmap <noreply@example.com>" or a bare address
 	MaxPerHour int    // messages per hour across the instance
 
 	SMTPHost     string
@@ -60,7 +60,7 @@ func (c *Config) Validate() error {
 
 	from, err := mail.ParseAddress(c.From)
 	if c.From == "" || err != nil || strings.ContainsAny(c.From, "\r\n") {
-		return fmt.Errorf("mail: NEXMAP_MAIL_FROM must be an address like nexmap@example.com or \"nexmap <nexmap@example.com>\"")
+		return fmt.Errorf("mail: NEXMAP_MAIL_FROM must be an address like nexmap@example.com or \"Nexmap <nexmap@example.com>\"")
 	}
 	if len(from.Address) > maxAddressLength {
 		return fmt.Errorf("mail: NEXMAP_MAIL_FROM is too long")

@@ -8,7 +8,7 @@ See CONTRIBUTING.md, "Documentation site".
 
 [Introduction](index.md)
 
-# Using nexmap
+# Using Nexmap
 
 - [Concepts](guide/concepts.md)
 - [Getting started](guide/getting-started.md)

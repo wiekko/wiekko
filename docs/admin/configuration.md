@@ -14,15 +14,15 @@ The container image sets some variables differently from the built-in defaults; 
 |---|---|---|---|---|
 | `NEXMAP_HOST` | `--host` | `localhost` | `0.0.0.0` | Address to listen on. `0.0.0.0` listens on all interfaces |
 | `NEXMAP_PORT` | `--port` | `8080` | `8080` | Port to listen on |
-| `NEXMAP_PUBLIC_URL` | `--public-url` | empty | | The address users open nexmap at, such as `https://nexmap.example.com`. Used for the links nexmap hands out (invitations, password resets). Required when [mail](#mail) is enabled |
+| `NEXMAP_PUBLIC_URL` | `--public-url` | empty | | The address users open Nexmap at, such as `https://nexmap.example.com`. Used for the links Nexmap hands out (invitations, password resets). Required when [mail](#mail) is enabled |
 | `NEXMAP_TRUSTED_PROXIES` | `--trusted-proxies` | loopback and private networks | | Addresses and CIDR ranges of the reverse proxies whose `X-Forwarded-For` header is believed, comma-separated. `none` (or empty) trusts no proxy |
 
 Without `NEXMAP_PUBLIC_URL`, invitation links are built from the address the inviter's browser used,
 taking the scheme from the proxy's `X-Forwarded-Proto` header. That is right behind a typical proxy, but
-set the variable if nexmap is reachable under more than one name, or if links come out with `http://`.
+set the variable if Nexmap is reachable under more than one name, or if links come out with `http://`.
 The server does not start if the value is not an absolute `http` or `https` URL.
 
-`NEXMAP_TRUSTED_PROXIES` decides whose word nexmap takes for a client's address, which the login limits
+`NEXMAP_TRUSTED_PROXIES` decides whose word Nexmap takes for a client's address, which the login limits
 count by. The default (`127.0.0.0/8`, `::1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`)
 fits a proxy on the same host or container network. Narrow it to your proxy's address if other machines
 on those networks can reach `nexmapd` directly. The server does not start if an entry is not an IP
@@ -90,14 +90,14 @@ executed by the browser.
 
 ### Mail
 
-nexmap can send two kinds of email, and no others: invitations and password reset links. Mail is
+Nexmap can send two kinds of email, and no others: invitations and password reset links. Mail is
 optional. Without it, invitations are links that the inviter passes on, and an administrator sets a new
 password for someone who forgot theirs.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `NEXMAP_MAIL_TRANSPORT` | empty: no mail | `smtp`, `mailgun`, `sendgrid`, `mailpace`, `scaleway` or `lettermint` |
-| `NEXMAP_MAIL_FROM` | none, required with a transport | Sender, such as `nexmap@example.com` or `"nexmap <nexmap@example.com>"`. Its domain must be one your mail service may send for |
+| `NEXMAP_MAIL_FROM` | none, required with a transport | Sender, such as `nexmap@example.com` or `"Nexmap <nexmap@example.com>"`. Its domain must be one your mail service may send for |
 | `NEXMAP_MAIL_MAX_PER_HOUR` | `100` | Most emails the server sends in an hour, all kinds together. A safety net; the limits below normally apply first |
 | `NEXMAP_SMTP_HOST` | | SMTP relay (transport `smtp`) |
 | `NEXMAP_SMTP_PORT` | `587`, or `465` with `tls` | |
@@ -112,7 +112,7 @@ password for someone who forgot theirs.
 The mail settings have no command line flags: they include secrets, and a process's command line is
 visible to other users of the machine. The server does not start if the mail configuration is incomplete
 or invalid, or if a transport is set without `NEXMAP_PUBLIC_URL`. The links in emails are always built
-from `NEXMAP_PUBLIC_URL`, never from the request, so nobody can make nexmap send a reset link that points
+from `NEXMAP_PUBLIC_URL`, never from the request, so nobody can make Nexmap send a reset link that points
 to another site.
 
 Services that are not in the list can be used through their SMTP relay, such as Amazon SES, Postmark or
@@ -123,7 +123,7 @@ Examples:
 ```sh
 # An SMTP relay with STARTTLS on port 587
 NEXMAP_MAIL_TRANSPORT=smtp
-NEXMAP_MAIL_FROM='nexmap <nexmap@example.com>'
+NEXMAP_MAIL_FROM='Nexmap <nexmap@example.com>'
 NEXMAP_SMTP_HOST=smtp.example.com
 NEXMAP_SMTP_USERNAME=nexmap
 NEXMAP_SMTP_PASSWORD='<password>'

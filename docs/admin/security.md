@@ -1,6 +1,6 @@
 # Security
 
-This page covers what an administrator has to set up and look after to run nexmap safely. Every setting
+This page covers what an administrator has to set up and look after to run Nexmap safely. Every setting
 mentioned is described in the [configuration reference](configuration.md).
 
 ## TLS and the reverse proxy
@@ -67,7 +67,7 @@ another user's record: it no longer decrypts there. Values written by a version 
 existed are still read and are bound the next time the record is saved.
 
 **Back up the key separately from the database.** Without it, the personal data in a database backup
-cannot be decrypted, and nexmap has no way to recover it. Conversely, a database backup stored together
+cannot be decrypted, and Nexmap has no way to recover it. Conversely, a database backup stored together
 with its key protects nothing. See [Backup and restore](backup.md).
 
 ### Rotating the key
@@ -109,7 +109,7 @@ Once users exist, both variables are ignored and can be removed.
   - **Instance-wide**, under *Two-Factor Authentication* in the instance settings (`/admin/settings`):
     for *all users*, for *administrators*, and for *product owners*, *developers*, *testers* or
     *viewers*. A role switch covers users who hold that role in at least one product. Users covered
-    are sent to the setup page after signing in and cannot use nexmap until 2FA is set up; API calls
+    are sent to the setup page after signing in and cannot use Nexmap until 2FA is set up; API calls
     with their session get `403 TOTP_SETUP_REQUIRED`. A common setup is to require it for
     administrators and product owners and leave the rest to the products.
   - **Per product**, by its owners under *Settings → General* (*Require two-factor authentication*).
@@ -169,8 +169,8 @@ People get an account in one of two ways:
 
 - **Invitation:** a product owner invites someone to their product with a role (on the product's Team
   page), or an administrator invites someone to the installation (`/admin/invitations`). With mail, the
-  inviter chooses whether nexmap emails the link to the invited address or shows it to the inviter to
-  pass on; without mail, nexmap always shows it (built from
+  inviter chooses whether Nexmap emails the link to the invited address or shows it to the inviter to
+  pass on; without mail, Nexmap always shows it (built from
   [`NEXMAP_PUBLIC_URL`](configuration.md#network) if set). Whoever holds the link can create the
   account, so treat it as a secret: it works once, expires after 7 days, and is never written to the log.
   An emailed link is not shown to the inviter, so the new account has proven that its owner reads that
@@ -188,13 +188,13 @@ the installation without a product.
 
 ## Email
 
-nexmap sends email only when [configured](configuration.md#mail), and then only invitations and password
-reset links. It sends nothing else (no notifications), and no part of nexmap lets anyone choose what an
+Nexmap sends email only when [configured](configuration.md#mail), and then only invitations and password
+reset links. It sends nothing else (no notifications), and no part of Nexmap lets anyone choose what an
 email says. The safeguards:
 
 - **Fixed text.** Both emails are fixed text with the address of the installation, the link and its
   expiry; an invitation also names the role. Nothing a user typed (product names, display names) is put
-  into an email, so nobody can use nexmap to carry their own message to an address of their choosing.
+  into an email, so nobody can use Nexmap to carry their own message to an address of their choosing.
 - **One recipient.** Every email goes to exactly one plain address. Lists, display names and line breaks
   are refused, so the recipient and headers cannot be manipulated.
 - **Invitation emails** need a signed-in product owner or administrator (or their access token with
@@ -216,7 +216,7 @@ email says. The safeguards:
   request's `Host` header could be made to point to someone else's server.
 - **Tracking is off** for the mailer APIs that have a switch for it (Mailgun, SendGrid, Lettermint):
   tracking would route every link, token included, through the provider's redirector.
-- **SMTP is encrypted**: with `starttls`, nexmap refuses to send through a relay that does not offer
+- **SMTP is encrypted**: with `starttls`, Nexmap refuses to send through a relay that does not offer
   STARTTLS, and it sends credentials over TLS only.
 
 The limits are kept in memory and reset when the server restarts, like the login limits. Reset links
@@ -243,7 +243,7 @@ last used; revoke those that are no longer needed under *API Tokens* (`/user/tok
 
 By default, every file type can be uploaded. To restrict this, set `NEXMAP_ALLOWED_UPLOAD_TYPES`; the
 server then also checks that the content matches the extension. Attachments are always served as
-downloads and never rendered by the browser, but nexmap does not scan them for malware.
+downloads and never rendered by the browser, but Nexmap does not scan them for malware.
 
 ## Development mode
 

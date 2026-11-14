@@ -1,7 +1,7 @@
 # AI agents
 
 AI coding agents working in a repository can read the product definition, backlog and QA state from
-nexmap, and, within their user's role, update it. They use either the CLI or, for agents that speak the
+Nexmap, and, within their user's role, update it. They use either the CLI or, for agents that speak the
 Model Context Protocol (Claude Code and others), the same operations as MCP tools.
 
 ## Setting up a repository
@@ -44,7 +44,7 @@ agent is told. In short:
   agent can keep a spec file in the repository in sync with. The tool also returns the document's SHA-256,
   so the agent can tell whether the file is current without comparing it. The tool is available on a
   read-only server too.
-- **Turn documents into requirements:** nexmap has no import. An agent can read a document you give it
+- **Turn documents into requirements:** Nexmap has no import. An agent can read a document you give it
   and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
   existing ones instead of duplicating them.
 - **Write:** set the status of requirements, tasks and defects, add comments, report defects, create

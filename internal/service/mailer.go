@@ -150,7 +150,7 @@ func recipientKey(email string) string {
 // invitationMessage is the invitation email. role is a validated role name
 // (empty for an invitation to the installation only).
 func (m *Mailer) invitationMessage(to, rawToken, role string, expires time.Time) mail.Message {
-	what := "to create an account on nexmap at " + m.publicURL
+	what := "to create an account on Nexmap at " + m.publicURL
 	if role != "" {
 		what += " and to join a product there as " + role
 	}
@@ -161,19 +161,19 @@ func (m *Mailer) invitationMessage(to, rawToken, role string, expires time.Time)
 		"The link works once and expires on " + expires.UTC().Format("2 January 2006 at 15:04 UTC") + ".\n\n" +
 		"If you did not expect this invitation, ignore this email: no account is\n" +
 		"created without the link.\n\n" +
-		"-- \nnexmap\n"
-	return mail.Message{To: to, Subject: "Your invitation to nexmap", Text: text}
+		"-- \nNexmap\n"
+	return mail.Message{To: to, Subject: "Your invitation to Nexmap", Text: text}
 }
 
 // passwordResetMessage is the password reset email.
 func (m *Mailer) passwordResetMessage(to, rawToken string, ttl time.Duration) mail.Message {
 	text := "Hello,\n\n" +
-		"someone asked to reset the password of your nexmap account at\n" +
+		"someone asked to reset the password of your Nexmap account at\n" +
 		m.publicURL + ". If that was you, open this link to choose a new password:\n\n" +
 		m.link("/reset-password/"+rawToken) + "\n\n" +
 		"The link works once and expires in " + strconv.Itoa(int(ttl.Minutes())) + " minutes.\n\n" +
 		"If you did not ask for this, ignore this email: your password stays as it\n" +
 		"is until someone sets a new one through the link.\n\n" +
-		"-- \nnexmap\n"
-	return mail.Message{To: to, Subject: "Reset your nexmap password", Text: text}
+		"-- \nNexmap\n"
+	return mail.Message{To: to, Subject: "Reset your Nexmap password", Text: text}
 }

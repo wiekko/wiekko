@@ -44,12 +44,12 @@ People who have no account yet can be invited:
 
 1. Under **Invite New User**, enter their email address and the role they should get.
 2. If your installation sends email, choose how the invitation gets there:
-   - **Send the invitation by email**: nexmap mails the link to that address. You do not see the link
+   - **Send the invitation by email**: Nexmap mails the link to that address. You do not see the link
      yourself, so only the owner of the mailbox can create the account.
-   - **Create a link to pass on myself**: nexmap shows the link, and you send it through a chat, a forum
+   - **Create a link to pass on myself**: Nexmap shows the link, and you send it through a chat, a forum
      message or any other channel only that person reads: whoever opens it can use it.
 
-   Without email, nexmap always shows the link.
+   Without email, Nexmap always shows the link.
 3. Choose **Send Invitation**.
 4. The link opens a page where they choose a username and password. Their account gets the invited email
    address, joins the product with the invited role, and they are signed in right away.

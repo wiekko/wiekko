@@ -6,7 +6,7 @@ it is described in [Configuration](../admin/configuration.md#mail), what it guar
 
 ## Mail is optional
 
-Without a configured transport nexmap behaves as before: invitations are links the inviter passes on, and
+Without a configured transport Nexmap behaves as before: invitations are links the inviter passes on, and
 administrators set new passwords. Small installations need no mail service, and nothing else depends on
 it. The password reset pages answer 404 without mail, and the sign-in page keeps pointing to an
 administrator.
@@ -23,7 +23,7 @@ opens.
 
 ## Invitations: email or link, the inviter decides
 
-With mail, the inviter chooses whether nexmap emails the invitation or shows the link. Links stay
+With mail, the inviter chooses whether Nexmap emails the invitation or shows the link. Links stay
 useful for people reached through chat or forum messages. An emailed link is never shown to the
 inviter, so an account created from it proves that its owner reads that mailbox. The API keeps `link` as
 its default, so existing scripts keep working, and only answers with the token for links.
@@ -61,7 +61,7 @@ a reset link pointing to their server would hand them the token. Mail therefore 
 ## Limits in memory, plus a cap
 
 The limits per inviter, per recipient, per client address and per account live in memory like the login
-limits: nexmap is a single process, and a restart clears them. Above them sits a cap on all emails per
+limits: Nexmap is a single process, and a restart clears them. Above them sits a cap on all emails per
 hour, so that a mistake or an unforeseen path costs at most that many emails rather than the sending
 domain's reputation.
 

@@ -91,7 +91,7 @@ human-readable `message`:
 
 - `POST /api/v1/products/{p}/invitations` (owner; `settings:write`) invites someone who has no account
   yet, with `{"email": …, "role": …}`, and answers with the invitation's `url`. With
-  `"delivery": "email"` (only if the server [sends mail](../admin/configuration.md#mail)), nexmap emails
+  `"delivery": "email"` (only if the server [sends mail](../admin/configuration.md#mail)), Nexmap emails
   the link to that address instead, and the answer carries neither `url` nor `raw_token`. Invitation
   emails are limited per inviter and per address (`429 TOO_MANY_ATTEMPTS`); if the email cannot be sent,
   the answer is `502 MAIL_NOT_SENT` and no invitation is left behind. `"delivery": "link"` is the

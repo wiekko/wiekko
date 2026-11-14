@@ -1,8 +1,8 @@
-# nexmap documentation
+# Nexmap documentation
 
 ## Administrators
 
-Deploying, configuring and running a nexmap server.
+Deploying, configuring and running a Nexmap server.
 
 - [Installation](admin/installation.md): container image, Coolify, first start
 - [Configuration](admin/configuration.md): every environment variable and flag of `nexmapd`
@@ -11,7 +11,7 @@ Deploying, configuring and running a nexmap server.
 
 ## Users
 
-Working with nexmap in the browser.
+Working with Nexmap in the browser.
 
 - [Concepts](guide/concepts.md): products, structure, requirements, tasks, constraints, defects, tests, roles
 - [Getting started](guide/getting-started.md): creating a product, settings, team, structure
@@ -35,7 +35,7 @@ Developers, CI pipelines and AI agents working with the `nexmap` command line cl
 
 The source repository holds the material for contributors that this documentation leaves out:
 
-- `docs/spec/`, the specification: what nexmap *shall* do, with requirement identifiers. It describes
+- `docs/spec/`, the specification: what Nexmap *shall* do, with requirement identifiers. It describes
   targets, not necessarily the current behaviour;
 - `docs/decisions/`, the design decisions and their reasoning;
 - `CONTRIBUTING.md`: building, testing, and how this documentation is organised and published.
