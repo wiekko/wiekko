@@ -105,8 +105,8 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **SC-401**: Personal access tokens can be restricted when they are created. An unrestricted token acts with all rights of its user, within the limits of SC-406.
 * **SC-402**: A token can be restricted to a set of products. It shall not reach any other product, and product listings made with it shall show only the products it is restricted to.
 * **SC-403**: A token can carry a role cap. On every product it reaches, the token acts with the lower of its user's role and the cap.
-* **SC-404**: A token can be restricted to scopes, each granted as `read` or `write` (`write` includes `read`): `structure` (components, capabilities, milestones, sprints), `backlog` (requirements, tasks, constraints), `defects`, `tests` (test cases, campaigns, results, test runs), `discussion` (comments, attachments) and `settings` (members, categories, statuses, pyramid levels, runtime environments).
-* **SC-405**: A request needs the scope of the item it addresses. Side effects that an operation causes by design are covered by that scope: uploading a test run needs `tests: write` even though it files defects (FR-502). Comments and attachments need the `discussion` scope plus `read` on the item they belong to.
+* **SC-404**: A token can be restricted to scopes, each granted as `read` or `write` (`write` includes `read`): `structure` (components, capabilities, milestones, sprints), `backlog` (requirements, tasks, constraints), `documents` (documents and their revisions), `defects`, `tests` (test cases, campaigns, results, test runs), `discussion` (comments, attachments) and `settings` (members, categories, statuses, pyramid levels, runtime environments).
+* **SC-405**: A request needs the scope of the item it addresses. Side effects that an operation causes by design are covered by that scope: uploading a test run needs `tests: write` even though it files defects (FR-502). Comments and attachments need the `discussion` scope plus `read` on the item they belong to. Linking a document to a requirement, constraint or test case (FR-048) needs `documents: write` plus `read` on the scope of the linked item; restoring a document revision (FR-051) needs `documents: write`.
 * **SC-406**: Account and token management and the administration endpoints shall be closed to tokens unless they carry the `account` or `admin` scope. A token can therefore never create a token with more rights than its own. An administrator's token without the `admin` scope acts with the administrator's product roles only.
 * **SC-407**: Token restrictions shall be evaluated on every request against the user's current rights, so a token never grants more than its user holds at that moment.
 * **SC-408**: The web UI shall offer restriction presets for common purposes, e.g. *CI ingestion* (`tests: write`) and *agent, read-only* (`read` on all product scopes).
@@ -173,7 +173,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-010**: `requirements`, `tasks` and `defects` can optionally have an estimation (e.g. story points or time-based); the estimation mechanism shall be configurable per product
 * **FR-011**: A `product` shall have a `roadmap` with `milestones`
 * **FR-012**: `milestones` shall have a `type` (e.g. planning, release, internal) to distinguish regular planning checkpoints from shippable releases
-* **FR-013**: `components`, `capabilities`, `requirements` and `constraints` can be linked to `milestones`
+* **FR-013**: `components`, `capabilities`, `documents`, `requirements` and `constraints` can be linked to `milestones`
 * **FR-014**: A `product` shall have `test cases`
 * **FR-015**: `test cases` can be linked to `components`, `capabilities` or exist directly under the `product`
 * **FR-016**: `test cases` can be linked to `requirements` or their `definition of done`
@@ -187,11 +187,11 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-024**: A `defect` shall have a `criticality` and a `status`
 * **FR-025**: A `defect` can be linked to a `milestone`
 * **FR-026**: A `defect` can have `comments` and `attachments`
-* **FR-027**: `requirements`, `tasks`, `constraints`, `test cases`, `components`, `capabilities` and `milestones` can also have `comments` and `attachments`
+* **FR-027**: `requirements`, `tasks`, `constraints`, `test cases`, `components`, `capabilities`, `documents` and `milestones` can also have `comments` and `attachments`
 * **FR-028**: A `sprint` has a start and end date, and can contain `requirements`, `tasks` and `defects`.
 * **FR-029**: A `sprint` can be linked to a `milestone` ("leads towards" / "enables")
-* **FR-030**: All text fields (descriptions, comments, definitions of done) shall support Markdown formatting
-* **FR-031**: All changes to `products`, `components`, `capabilities`, `requirements`, `constraints`, `test cases`, `defects`, `milestones` and `sprints` shall be recorded in an audit trail (who changed what, when)
+* **FR-030**: All text fields (descriptions, comments, definitions of done, bodies of `markdown` documents) shall support Markdown formatting
+* **FR-031**: All changes to `products`, `components`, `capabilities`, `requirements`, `constraints`, `documents`, `test cases`, `defects`, `milestones` and `sprints` shall be recorded in an audit trail (who changed what, when)
 * **FR-032**: `test cases` can have one `pyramid level` (or none if feature isn't used).
 * **FR-033**: `pyramid levels` are defined per product (default: "unit", "integration", "system", "acceptance")
 * **FR-034**: `pyramid levels` can be hierarchical, i.e. have a parent level (optional, max depth: 2)
@@ -204,6 +204,15 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-041**: A `testing campaign` is complete when none of its results is pending, blocked or awaiting re-test. Skipped results do not influence the campaign outcome. A campaign passes when every non-skipped result is passed.
 * **FR-042**: Every change to a campaign result status shall be recorded as an immutable event capturing the user, timestamp, previous status, new status and any linked `defect`.
 * **FR-043**: `defects` shall have a human-readable identifier (e.g. DF-17), with a prefix configurable per product (default DF) and sequence numbers from a per-product counter of their own. The REST API and the CLI shall accept it wherever a defect ID is expected.
+* **FR-044**: A `product` shall have `documents`: long-form reference texts that define part of the product and outlive the work that creates or changes them, such as a protocol, a data schema, a file format or an interface contract. A `document` is part of the product's definition, not a backlog item: it has no workflow status, no assignees and no estimation.
+* **FR-045**: Nexmap shall be the authoritative source of a `document`. Its content shall be complete in Nexmap, so that reading the product in Nexmap (web UI, REST API, CLI or MCP) is sufficient to implement it or to validate an implementation against it. Copies in repositories are derived from Nexmap (FR-907), never the other way round.
+* **FR-046**: A `document` shall have a title, a body and a `format`. The format is either `markdown` (the default, rendered like all other text, FR-030) or a verbatim machine-readable format (e.g. JSON Schema, OpenAPI, Protocol Buffers, SQL, XML Schema, plain text), which is stored, displayed and exported byte for byte, without Markdown processing.
+* **FR-047**: A `document` can belong to a `component` or a `capability`, or exist directly under the `product` (top level), like `capabilities` (FR-004).
+* **FR-048**: `documents` can be linked to `requirements`, `constraints` and `test cases` (many-to-many). A requirement links the documents it introduces or changes, a constraint the documents the product must conform to, a test case the documents it verifies. `tasks` cannot be linked to documents (FR-008d).
+* **FR-049**: `documents` shall have a `state` (draft, current, superseded). Only `current` documents are binding for the product. A superseded document can name the document that replaces it.
+* **FR-050**: `documents` shall have a human-readable identifier (e.g. DOC-3), with a prefix configurable per product (default DOC) and sequence numbers from a per-product counter of their own. The prefix shall differ from every category prefix and from the defect prefix. The REST API and the CLI shall accept it wherever a document ID is expected.
+* **FR-051**: Every change to a `document`'s title, body or format shall create a new numbered `revision`. Earlier revisions shall remain readable, and any two revisions shall be comparable as a diff. Restoring an earlier revision creates a new revision with its content; history is never rewritten.
+* **FR-052**: A `document` can be linked to a `milestone` (FR-013).
 
 #### Administration
 
@@ -213,7 +222,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-104**: Administrators shall be able to lock other user accounts
 * **FR-105**: Administrators shall be able to remove other user accounts and their data
 * **FR-106**: Administrators shall be able to assign a new password to any user account
-* **FR-107**: Administrators shall be able to create, view, edit or delete any `product`, `component`, `capability`, `requirement`, `constraint`, `test case` or `defect`
+* **FR-107**: Administrators shall be able to create, view, edit or delete any `product`, `component`, `capability`, `requirement`, `constraint`, `document`, `test case` or `defect`
 
 #### User Accounts
 
@@ -262,10 +271,12 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 * **FR-331**: Product owners shall be able to configure categories for requirements, tasks and constraints
 * **FR-332**: Closing a testing campaign shall require an explicit action by a product owner. Closing records the acting user in the audit trail and freezes all results against further changes.
 * **FR-333**: Closing a testing campaign that still has incomplete results (FR-041) shall require confirmation, but shall not be prevented
+* **FR-334**: Product owners shall be able to create, update and delete `documents`, change their `state`, link them to requirements, constraints and test cases, and restore earlier revisions (FR-051).
+* **FR-335**: Product owners shall be able to configure the document identifier prefix (FR-050).
 
 #### Development
 
-* **FR-401**: Developers shall be able to add comments to components, capabilities and requirements
+* **FR-401**: Developers shall be able to add comments to components, capabilities, requirements and documents
 * **FR-402**: Developers shall be able to create, update and delete test cases
 * **FR-403**: Developers shall be able to define which conditions re-set a test case (mainly for the webhook API)
 * **FR-404**: Developers shall be able to manually re-set a test case (slate for re-testing after a change)
@@ -292,7 +303,7 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 
 #### Search
 
-* **FR-701**: Full-text search shall be available across requirements, defects, test cases, comments and attachments
+* **FR-701**: Full-text search shall be available across requirements, documents, defects, test cases, comments and attachments
 * **FR-702**: Search results shall indicate the entity type and link directly to the item
 
 #### Bulk Operations
@@ -304,8 +315,11 @@ Both requirements and constraints belong to configurable **categories** (e.g. Fu
 #### Command Line Interface
 
 * **FR-901**: Everything a role can create, update or delete in the web UI shall also be possible via the REST API (AC-224), with the same role-based permissions.
-* **FR-902**: The CLI shall support creating, updating and deleting `components` and `capabilities` (FR-307), and linking `requirements`, `constraints` and `test cases` to `capabilities`, and `test cases` to `requirements` (FR-005a, FR-016, FR-038).
+* **FR-902**: The CLI shall support creating, updating and deleting `components` and `capabilities` (FR-307), and linking `requirements`, `constraints` and `test cases` to `capabilities`, `test cases` to `requirements`, and `requirements`, `constraints` and `test cases` to `documents` (FR-005a, FR-016, FR-038, FR-048).
 * **FR-903**: The CLI shall support creating and updating `constraints`, including setting their `compliance_state` (FR-037).
 * **FR-904**: The CLI's MCP server shall offer the same create, update and link operations as the CLI. Deletions shall not be offered via MCP.
 * **FR-905**: The CLI shall export a product's structure (`components`, `capabilities`), `constraints` and `requirements` as a Markdown specification in the style of this document: grouped by category, each item carrying its identifier, in a stable order so that exports committed to a repository diff cleanly. `tasks` shall be included only on request.
 * **FR-906**: Importing a specification is out of scope. Users turn their own documents into `requirements` and `constraints` with their own tooling (e.g. an AI agent) via the CLI or REST API. Since exports carry identifiers (FR-905), such tooling can update existing items instead of duplicating them.
+* **FR-907**: The specification export (FR-905) shall include `current` documents (and `draft` ones only on request). The specification lists each document with its identifier, title, revision and links; the body of each document is written to a file of its own, named by its identifier and an extension matching its `format` (e.g. `DOC-3.md`, `DOC-4.proto`). Verbatim formats are written byte for byte, so tooling in the repository (code generators, schema validators) can consume the exported file directly. Documents are exported only when the token holds `documents: read`; without it, the export leaves them out instead of failing.
+* **FR-908**: The CLI shall support creating, updating and reading `documents`, including setting a document's body from a local file and writing a document or one of its revisions to a local file. Setting a body from a file is an ordinary update (FR-051); it does not make the file the source of the document (FR-045), and no automatic synchronisation from a repository takes place.
+* **FR-909**: When the REST API, the CLI or MCP returns a requirement, constraint or test case, it shall name the documents linked to it, so that an agent working on an item can find the definitions that apply to it.
