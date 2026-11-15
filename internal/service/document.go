@@ -18,8 +18,10 @@ import (
 	"nexmap.net/internal/textdiff"
 )
 
-// Limits on document input. The body limit keeps a document, wrapped in a
-// JSON request, under the server's request body limit.
+// Limits on document input. The body limit keeps a document under the
+// server's request body limit (middleware.DefaultMaxBody), both wrapped in a
+// JSON request (API, CLI) and in the web form, which is multipart for this
+// reason: URL-encoding would triple every non-ASCII byte.
 const (
 	MaxDocumentTitleLength = 200        // runes
 	MaxDocumentBodyBytes   = 512 * 1024 // bytes

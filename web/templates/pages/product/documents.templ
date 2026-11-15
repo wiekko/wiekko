@@ -732,7 +732,10 @@ templ DocumentFormPage(props DocumentFormProps) {
 			@patterns.FormError(props.Error)
 			@ui.Card() {
 				@ui.CardBody() {
-					<form method="post" action={ templ.SafeURL(documentFormAction(props)) } class="space-y-6">
+					// Multipart, not URL-encoded: percent-encoding would triple every
+					// non-ASCII byte and push a body near the cap past the request
+					// body limit (middleware.DefaultMaxBody).
+					<form method="post" enctype="multipart/form-data" action={ templ.SafeURL(documentFormAction(props)) } class="space-y-6">
 						<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
 						if props.ReturnTo != "" {
 							<input type="hidden" name="return" value={ props.ReturnTo }/>

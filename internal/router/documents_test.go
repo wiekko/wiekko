@@ -1,15 +1,19 @@
 package router
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
 	"nexmap.net/internal/access"
 	"nexmap.net/internal/database/dbtest"
+	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/service"
 )
 
@@ -157,6 +161,103 @@ func TestDocumentsAPI(t *testing.T) {
 		}
 		if status, _ := call(http.MethodDelete, base+"/documents/SPEC-1", ""); status != http.StatusNoContent {
 			t.Errorf("delete: %d", status)
+		}
+	})
+}
+
+// TestDocumentFormLargeUnicodeBody submits the document web form the way a
+// browser does — multipart, with the CSRF token as a form field — with a
+// body near the cap that is mostly non-ASCII. URL-encoded, it would exceed
+// the request body limit and fail the CSRF check.
+func TestDocumentFormLargeUnicodeBody(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+		var cookie *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" && c.Value != "" {
+				cookie = c
+			}
+		}
+		if cookie == nil {
+			t.Fatalf("no session cookie, status %d", resp.StatusCode)
+		}
+		csrf := csrfToken(t, e, cookie)
+		base := "/products/" + e.product.ID + "/documents"
+
+		get := func(path string) (*http.Response, string) {
+			t.Helper()
+			req, err := http.NewRequest(http.MethodGet, e.srv.URL+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.AddCookie(cookie)
+			resp, err := e.client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return resp, readBody(t, resp)
+		}
+		submit := func(title, body string) (*http.Response, string) {
+			t.Helper()
+			var buf bytes.Buffer
+			mw := multipart.NewWriter(&buf)
+			for _, f := range [][2]string{{"_csrf", csrf}, {"title", title}, {"format", "markdown"}, {"state", "draft"}, {"body", body}} {
+				if err := mw.WriteField(f[0], f[1]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := mw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			req, err := http.NewRequest(http.MethodPost, e.srv.URL+base, &buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", mw.FormDataContentType())
+			req.AddCookie(cookie)
+			resp, err := e.client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return resp, readBody(t, resp)
+		}
+
+		// The form itself must be multipart.
+		if _, page := get(base + "/new"); !strings.Contains(page, `enctype="multipart/form-data"`) {
+			t.Fatal("the document form is not multipart")
+		}
+
+		// About 500 KiB of emoji, CJK, Cyrillic and umlauts, with the CRLF
+		// line breaks browsers send.
+		line := "Grüße 🐦🪶 鳥の観察 Наблюдение за птицами — ✓\r\n"
+		lf := strings.ReplaceAll(line, "\r\n", "\n")
+		submitted := strings.Repeat(line, 500*1024/len(lf))
+		want := strings.ReplaceAll(submitted, "\r\n", "\n")
+		if len(want) > service.MaxDocumentBodyBytes {
+			t.Fatalf("test body of %d bytes exceeds the cap", len(want))
+		}
+		if n := len(url.Values{"body": {submitted}}.Encode()); n <= middleware.DefaultMaxBody {
+			t.Fatalf("URL-encoded test body is only %d bytes; it should exceed the body limit", n)
+		}
+
+		resp, out := submit("Field guide", submitted)
+		if resp.StatusCode != http.StatusSeeOther {
+			t.Fatalf("create: status %d, body: %.300s", resp.StatusCode, out)
+		}
+		loc := resp.Header.Get("Location")
+		if !strings.HasPrefix(loc, base+"/") {
+			t.Fatalf("create redirects to %q", loc)
+		}
+		resp, raw := get(loc + "/raw")
+		if resp.StatusCode != http.StatusOK || raw != want {
+			t.Fatalf("raw: status %d, %d bytes, want %d bytes unchanged", resp.StatusCode, len(raw), len(want))
+		}
+
+		// Over the cap: the form comes back with the size error, not a 403.
+		resp, out = submit("Too long", strings.Repeat("a", service.MaxDocumentBodyBytes+1))
+		if resp.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(out, "larger than 512 KiB") {
+			t.Errorf("over the cap: status %d, body: %.300s", resp.StatusCode, out)
 		}
 	})
 }
