@@ -668,15 +668,19 @@ func campaignToJSON(c *model.TestingCampaign) map[string]any {
 
 func campaignResultToJSON(cr *model.CampaignResult) map[string]any {
 	return map[string]any{
-		"id":             cr.ID,
-		"campaign_id":    cr.CampaignID,
-		"test_case_id":   cr.TestCaseID,
-		"environment_id": cr.EnvironmentID,
-		"status":         cr.Status,
-		"defect_id":      cr.DefectID,
-		"executed_by":    cr.ExecutedBy,
-		"executed_at":    cr.ExecutedAt,
-		"updated_at":     cr.UpdatedAt,
+		"id":          cr.ID,
+		"campaign_id": cr.CampaignID,
+		// The campaign keeps its copy of the test: test_title is the title it
+		// copied; test_case_id is null once the test case has been deleted.
+		"test_case_id":     nullable(cr.TestCaseID),
+		"test_title":       cr.TestTitle,
+		"environment_id":   cr.EnvironmentID,
+		"environment_name": cr.EnvironmentName,
+		"status":           cr.Status,
+		"defect_id":        cr.DefectID,
+		"executed_by":      cr.ExecutedBy,
+		"executed_at":      cr.ExecutedAt,
+		"updated_at":       cr.UpdatedAt,
 	}
 }
 

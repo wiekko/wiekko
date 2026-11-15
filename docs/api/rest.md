@@ -112,6 +112,18 @@ whatever is current.
 - `POST /api/v1/products/{p}/campaigns/{id}/test-cases` with `{"test_case_ids": […]}` and
   `DELETE /api/v1/products/{p}/campaigns/{id}/test-cases/{testCaseId}` (owner; `tests:write`) change the
   scope of a draft campaign; an active campaign's scope is locked.
+- A campaign keeps its own copy of each test case in its scope. A draft campaign follows edits to the
+  test case; from activation on, the copy is frozen. Campaign results carry the copy's `test_title`
+  and the `environment_name` they ran in.
+  - **Deleting a test case or an environment:**
+    - Draft campaigns drop it.
+    - Active campaigns keep the results that have a verdict and drop those still `pending` or `retest`.
+    - Closed campaigns keep everything.
+  - Kept results then have `test_case_id` `null`, or `environment_id` empty, but keep their title,
+    environment name and history.
+- `DELETE /api/v1/products/{p}/requirements/{id}` deletes a requirement or task. With
+  `?children=keep`, the default, the items below it move up one level, to its parent or to the top
+  level; with `?children=delete`, they are deleted too.
 
 ### Documents
 
@@ -171,3 +183,19 @@ are JSON as usual.
 ```
 
 and answers with `recorded`, `campaign`, `environment`, a `summary` (counts per status, per outcome, `defects_created`, `defects_reused`, `total`) and per-test `results` with `outcome` (`updated`, `unchanged`, `unknown_test_case`, `not_in_campaign`, `environment_required`, `not_recorded`), `defect` (`created`, `reused`) and the defect's `defect_id` and `defect_identifier`. Uploads are limited to 32 MiB and 50,000 results; statuses are `passed`, `failed` and `skipped`.
+
+### Audit trail (administrators)
+
+The audit trail of every product, including deleted ones, is open to administrators (`admin:read`,
+purging `admin:write`). The filters `product_id`, `entity_type`, `user_id`, `action`, `from` and `to`
+(dates as `YYYY-MM-DD` or RFC 3339; `to` includes the whole day) apply to the list and the export.
+
+- `GET /api/v1/admin/audit[?limit=&offset=]` lists entries, newest first, as
+  `{"entries": […], "total": n, "limit": …, "offset": …}`; `limit` defaults to 50, at most 500.
+- `GET /api/v1/admin/audit/export?format=jsonl|csv` downloads the matching entries, oldest first, as
+  an archive file.
+- `GET /api/v1/admin/audit/deleted-products` lists deleted products whose history is still kept, with
+  their name and number of entries.
+- `DELETE /api/v1/admin/audit/products/{productId}` purges the history of a deleted product and
+  answers with `{"purged": n}`. A product that still exists keeps its history (`409 PRODUCT_EXISTS`).
+  The purge itself is recorded as one entry with the action `purge_audit`.

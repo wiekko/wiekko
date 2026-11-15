@@ -23,10 +23,13 @@ type MilestoneService struct {
 	products      store.ProductStore
 	pyramidLevels store.PyramidLevelStore
 	runtimeEnvs   store.RuntimeEnvironmentStore
-	comments      ownerPurger
-	audit         store.AuditStore
-	authz         *Authorizer
-	owns          *ownership
+	// results is consulted when an environment is deleted, so campaigns keep
+	// what they recorded on it; nil in unit tests that do not care.
+	results  store.CampaignResultStore
+	comments ownerPurger
+	audit    store.AuditStore
+	authz    *Authorizer
+	owns     *ownership
 }
 
 // --- Milestone ---
@@ -80,7 +83,7 @@ func (s *MilestoneService) CreateMilestone(ctx context.Context, user *model.User
 			return fmt.Errorf("create milestone: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "milestone", EntityID: m.ID,
+			ID: uuid.New().String(), ProductID: m.ProductID, EntityType: "milestone", EntityID: m.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -147,7 +150,7 @@ func (s *MilestoneService) UpdateMilestone(ctx context.Context, user *model.User
 				return fmt.Errorf("update milestone: %w", err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "milestone", EntityID: m.ID,
+				ID: uuid.New().String(), ProductID: m.ProductID, EntityType: "milestone", EntityID: m.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {
@@ -250,7 +253,7 @@ func (s *MilestoneService) CreateSprint(ctx context.Context, user *model.User, i
 			return fmt.Errorf("create sprint: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+			ID: uuid.New().String(), ProductID: sprint.ProductID, EntityType: "sprint", EntityID: sprint.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -330,7 +333,7 @@ func (s *MilestoneService) UpdateSprint(ctx context.Context, user *model.User, p
 				return fmt.Errorf("update sprint: %w", err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+				ID: uuid.New().String(), ProductID: sprint.ProductID, EntityType: "sprint", EntityID: sprint.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {
@@ -400,7 +403,7 @@ func (s *MilestoneService) SetSprintStatus(ctx context.Context, user *model.User
 			return fmt.Errorf("update sprint status: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+			ID: uuid.New().String(), ProductID: sprint.ProductID, EntityType: "sprint", EntityID: sprint.ID,
 			UserID: user.ID, Action: sprintStatusAction(status), CreatedAt: now,
 		})
 	}); err != nil {
@@ -445,7 +448,7 @@ func (s *MilestoneService) DeleteSprint(ctx context.Context, user *model.User, p
 			return fmt.Errorf("delete sprint: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "sprint", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "sprint", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	}); err != nil {
@@ -545,7 +548,7 @@ func (s *MilestoneService) CreateStatus(ctx context.Context, user *model.User, i
 			return fmt.Errorf("create status: %w", err)
 		}
 		if err := s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "status", EntityID: status.ID,
+			ID: uuid.New().String(), ProductID: status.ProductID, EntityType: "status", EntityID: status.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		}); err != nil {
 			return err
@@ -560,7 +563,7 @@ func (s *MilestoneService) CreateStatus(ctx context.Context, user *model.User, i
 			return fmt.Errorf("status sync: create %s status: %w", sibling.EntityType, err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+			ID: uuid.New().String(), ProductID: sibling.ProductID, EntityType: "status", EntityID: sibling.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	})
@@ -621,7 +624,7 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 			return fmt.Errorf("update status: %w", err)
 		}
 		if err := s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "status", EntityID: status.ID,
+			ID: uuid.New().String(), ProductID: status.ProductID, EntityType: "status", EntityID: status.ID,
 			UserID: user.ID, Action: "update", CreatedAt: now,
 		}); err != nil {
 			return err
@@ -645,7 +648,7 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 			return fmt.Errorf("status sync: update %s status: %w", otherType, err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+			ID: uuid.New().String(), ProductID: sibling.ProductID, EntityType: "status", EntityID: sibling.ID,
 			UserID: user.ID, Action: "update", CreatedAt: now,
 		})
 	})
@@ -677,7 +680,7 @@ func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, p
 			return fmt.Errorf("delete status: %w", err)
 		}
 		if err := s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "status", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "status", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		}); err != nil {
 			return err
@@ -695,7 +698,7 @@ func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, p
 			return fmt.Errorf("status sync: delete %s status: %w", otherType, err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+			ID: uuid.New().String(), ProductID: sibling.ProductID, EntityType: "status", EntityID: sibling.ID,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	})
@@ -759,7 +762,7 @@ func (s *MilestoneService) CreatePyramidLevel(ctx context.Context, user *model.U
 			return fmt.Errorf("create pyramid level: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: pl.ID,
+			ID: uuid.New().String(), ProductID: pl.ProductID, EntityType: "pyramid_level", EntityID: pl.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -807,7 +810,7 @@ func (s *MilestoneService) UpdatePyramidLevel(ctx context.Context, user *model.U
 			return fmt.Errorf("update pyramid level: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: pl.ID,
+			ID: uuid.New().String(), ProductID: pl.ProductID, EntityType: "pyramid_level", EntityID: pl.ID,
 			UserID: user.ID, Action: "update", CreatedAt: now,
 		})
 	}); err != nil {
@@ -832,7 +835,7 @@ func (s *MilestoneService) DeletePyramidLevel(ctx context.Context, user *model.U
 			return fmt.Errorf("delete pyramid level: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "pyramid_level", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	}); err != nil {
@@ -874,7 +877,7 @@ func (s *MilestoneService) CreateRuntimeEnvironment(ctx context.Context, user *m
 			return fmt.Errorf("create runtime environment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "runtime_environment", EntityID: env.ID,
+			ID: uuid.New().String(), ProductID: env.ProductID, EntityType: "runtime_environment", EntityID: env.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -895,11 +898,23 @@ func (s *MilestoneService) DeleteRuntimeEnvironment(ctx context.Context, user *m
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if s.results != nil {
+			campaigns, err := s.results.CampaignsWithEnvironment(ctx, id)
+			if err != nil {
+				return err
+			}
+			if err := lockCampaigns(ctx, s.tx, campaigns); err != nil {
+				return err
+			}
+			if err := s.results.DetachEnvironment(ctx, id); err != nil {
+				return fmt.Errorf("detach environment from campaigns: %w", err)
+			}
+		}
 		if err := s.runtimeEnvs.Delete(ctx, id); err != nil {
 			return fmt.Errorf("delete runtime environment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "runtime_environment", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "runtime_environment", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	}); err != nil {

@@ -162,8 +162,8 @@ templ TaskHistoryTabContent(entries []templates.AuditEntryView) {
 }
 
 // TaskDeleteConfirmation renders the delete confirmation for a task.
-templ TaskDeleteConfirmation(name, productID, taskID, csrfToken string) {
-	@patterns.DeleteConfirmation("task", name, fmt.Sprintf("/products/%s/tasks/%s", productID, taskID), csrfToken)
+templ TaskDeleteConfirmation(name, productID, taskID, csrfToken string, children []patterns.ChildItem, keepTarget string) {
+	@patterns.DeleteWithChildrenConfirmation("task", name, fmt.Sprintf("/products/%s/tasks/%s", productID, taskID), csrfToken, children, keepTarget)
 }
 
 func taskDetailTabs(productID, taskID string) []templates.TabDef {

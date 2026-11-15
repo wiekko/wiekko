@@ -23,17 +23,9 @@ func deleteOwned(ctx context.Context, t store.Transactor, purger ownerPurger, au
 	user *model.User, productID, ownerType, id string, del func(ctx context.Context, id string) error) error {
 	var afterCommit func()
 	err := inTx(ctx, t, func(ctx context.Context) error {
-		if err := del(ctx, id); err != nil {
-			return fmt.Errorf("delete %s: %w", strings.ReplaceAll(ownerType, "_", " "), err)
-		}
 		var err error
-		if afterCommit, err = purger.PurgeOwner(ctx, productID, ownerType, id); err != nil {
-			return err
-		}
-		return audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: ownerType, EntityID: id,
-			UserID: user.ID, Action: "delete", CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		})
+		afterCommit, err = deleteOwnedInTx(ctx, purger, audit, user, productID, ownerType, id, del)
+		return err
 	})
 	if err != nil {
 		return err
@@ -42,4 +34,22 @@ func deleteOwned(ctx context.Context, t store.Transactor, purger ownerPurger, au
 		afterCommit()
 	}
 	return nil
+}
+
+// deleteOwnedInTx is deleteOwned's body for a caller that already holds the
+// transaction and deletes more than one entity in it. The returned function
+// unlinks the attachment bytes and must run only after the commit.
+func deleteOwnedInTx(ctx context.Context, purger ownerPurger, audit store.AuditStore,
+	user *model.User, productID, ownerType, id string, del func(ctx context.Context, id string) error) (func(), error) {
+	if err := del(ctx, id); err != nil {
+		return nil, fmt.Errorf("delete %s: %w", strings.ReplaceAll(ownerType, "_", " "), err)
+	}
+	afterCommit, err := purger.PurgeOwner(ctx, productID, ownerType, id)
+	if err != nil {
+		return nil, err
+	}
+	return afterCommit, audit.Create(ctx, &model.AuditEntry{
+		ID: uuid.New().String(), ProductID: productID, EntityType: ownerType, EntityID: id,
+		UserID: user.ID, Action: "delete", CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	})
 }

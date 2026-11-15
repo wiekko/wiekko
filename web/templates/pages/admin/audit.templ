@@ -1,0 +1,250 @@
+package admin
+
+import (
+	"fmt"
+
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/ui"
+)
+
+// AuditFilterValues echoes the active filter back into the form.
+type AuditFilterValues struct {
+	ProductID, EntityType, UserID, Action, From, To string
+}
+
+// AuditRow is one audit entry as the admin page shows it.
+type AuditRow struct {
+	When       string
+	Product    string // "" for entries outside a product (a purge record)
+	ProductURL string // "" once the product is deleted
+	EntityType string
+	EntityID   string
+	EntityURL  string // "" when the item has no page or no longer exists
+	UserName   string
+	Action     string
+	Field      string
+	OldValue   string
+	NewValue   string
+}
+
+// DeletedProductRow is a deleted product whose history is still kept.
+type DeletedProductRow struct {
+	ID        string
+	Name      string
+	DeletedAt string
+	Entries   int
+	PurgeURL  string
+	ExportURL string
+	FilterURL string
+}
+
+// AuditProps holds the data for the admin audit page.
+type AuditProps struct {
+	Meta              templates.PageMeta
+	DisplayName       string
+	IsAdmin           bool
+	Filter            AuditFilterValues
+	ProductOptions    []templates.SelectOption
+	EntityTypeOptions []templates.SelectOption
+	UserOptions       []templates.SelectOption
+	ActionOptions     []templates.SelectOption
+	Entries           []AuditRow
+	Total             int
+	Page              int
+	PageCount         int
+	PrevURL           string
+	NextURL           string
+	ExportJSONL       string
+	ExportCSV         string
+	Deleted           []DeletedProductRow
+	Notice            string
+	Error             string
+}
+
+templ AuditPage(props AuditProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: "admin-audit",
+	}) {
+		<div class="space-y-6">
+			<div>
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Audit Trail</h1>
+				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Every recorded change across all products, including deleted ones.</p>
+			</div>
+			if props.Notice != "" {
+				<div class="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-900/30 dark:text-green-300" role="status">{ props.Notice }</div>
+			}
+			if props.Error != "" {
+				<div class="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-300" role="alert">{ props.Error }</div>
+			}
+			if len(props.Deleted) > 0 {
+				@ui.Card() {
+					@ui.CardHeader("Deleted products") {
+					}
+					@ui.CardBody() {
+						<p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+							Their history is kept until you purge it. Export it first if you want to archive it.
+						</p>
+						@ui.Table() {
+							@ui.TableHead() {
+								@ui.TableHeader() {
+									Product
+								}
+								@ui.TableHeader() {
+									Deleted
+								}
+								@ui.TableHeader() {
+									Entries
+								}
+								@ui.TableHeader() {
+									<span class="sr-only">Actions</span>
+								}
+							}
+							@ui.TableBody("") {
+								for _, p := range props.Deleted {
+									<tr>
+										@ui.TableCell() {
+											<a href={ templ.SafeURL(p.FilterURL) } class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{ p.Name }</a>
+										}
+										@ui.TableCellMuted() {
+											{ p.DeletedAt }
+										}
+										@ui.TableCellMuted() {
+											{ fmt.Sprint(p.Entries) }
+										}
+										@ui.TableCell() {
+											<div class="flex justify-end gap-4 text-sm">
+												<a href={ templ.SafeURL(p.ExportURL) } class="text-indigo-600 hover:underline dark:text-indigo-400">Export</a>
+												<button
+													type="button"
+													class="text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
+													hx-delete={ p.PurgeURL }
+													hx-swap="none"
+													hx-confirm={ fmt.Sprintf("Permanently delete all %d audit entries of %s? This cannot be undone.", p.Entries, p.Name) }
+												>
+													Purge
+												</button>
+											</div>
+										}
+									</tr>
+								}
+							}
+						}
+					}
+				}
+			}
+			<form method="get" action="/admin/audit" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				@ui.Select(ui.SelectProps{ID: "audit-product", Name: "product_id", Label: "Product", Value: props.Filter.ProductID, Options: props.ProductOptions})
+				@ui.Select(ui.SelectProps{ID: "audit-type", Name: "entity_type", Label: "Type", Value: props.Filter.EntityType, Options: props.EntityTypeOptions})
+				@ui.Select(ui.SelectProps{ID: "audit-user", Name: "user_id", Label: "User", Value: props.Filter.UserID, Options: props.UserOptions})
+				@ui.Select(ui.SelectProps{ID: "audit-action", Name: "action", Label: "Action", Value: props.Filter.Action, Options: props.ActionOptions})
+				@ui.TextInput(ui.InputProps{ID: "audit-from", Name: "from", Label: "From", Type: "date", Value: props.Filter.From})
+				@ui.TextInput(ui.InputProps{ID: "audit-to", Name: "to", Label: "To", Type: "date", Value: props.Filter.To})
+				<div class="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-3">
+					@ui.Button(ui.ButtonProps{Label: "Apply", Variant: "primary", Size: "md", Type: "submit"}) {
+						@ui.Icon("filter", "sm")
+					}
+					<a href="/admin/audit" class="text-sm text-gray-600 hover:underline dark:text-gray-400">Clear</a>
+					<span class="ml-auto flex flex-wrap gap-3 text-sm text-gray-500 dark:text-gray-400">
+						<span>{ fmt.Sprintf("%d entries", props.Total) }</span>
+						<a href={ templ.SafeURL(props.ExportJSONL) } class="text-indigo-600 hover:underline dark:text-indigo-400">Export JSONL</a>
+						<a href={ templ.SafeURL(props.ExportCSV) } class="text-indigo-600 hover:underline dark:text-indigo-400">Export CSV</a>
+					</span>
+				</div>
+			</form>
+			if len(props.Entries) == 0 {
+				@ui.EmptyState("scroll-text", "No entries", "No audit entries match the filter.", "", "")
+			} else {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							When
+						}
+						@ui.TableHeader() {
+							Product
+						}
+						@ui.TableHeader() {
+							Item
+						}
+						@ui.TableHeader() {
+							User
+						}
+						@ui.TableHeader() {
+							Action
+						}
+						@ui.TableHeader() {
+							Change
+						}
+					}
+					@ui.TableBody("") {
+						for _, e := range props.Entries {
+							@auditRow(e)
+						}
+					}
+				}
+				if props.PageCount > 1 {
+					<nav aria-label="Pagination" class="flex items-center justify-between text-sm">
+						<span class="text-gray-600 dark:text-gray-400">{ fmt.Sprintf("Page %d of %d", props.Page, props.PageCount) }</span>
+						<div class="flex gap-4">
+							if props.PrevURL != "" {
+								<a href={ templ.SafeURL(props.PrevURL) } class="text-indigo-600 hover:underline dark:text-indigo-400">Previous</a>
+							}
+							if props.NextURL != "" {
+								<a href={ templ.SafeURL(props.NextURL) } class="text-indigo-600 hover:underline dark:text-indigo-400">Next</a>
+							}
+						</div>
+					</nav>
+				}
+			}
+		</div>
+	}
+}
+
+templ auditRow(e AuditRow) {
+	<tr>
+		@ui.TableCellMuted() {
+			<span class="whitespace-nowrap">{ e.When }</span>
+		}
+		@ui.TableCell() {
+			if e.ProductURL != "" {
+				<a href={ templ.SafeURL(e.ProductURL) } class="hover:underline">{ e.Product }</a>
+			} else {
+				<span class="text-gray-500 dark:text-gray-400">{ e.Product }</span>
+			}
+		}
+		@ui.TableCell() {
+			<span class="text-gray-500 dark:text-gray-400">{ e.EntityType }</span>
+			if e.EntityURL != "" {
+				<a href={ templ.SafeURL(e.EntityURL) } class="ml-1 font-mono text-xs text-indigo-600 hover:underline dark:text-indigo-400">{ shortID(e.EntityID) }</a>
+			} else {
+				<span class="ml-1 font-mono text-xs text-gray-500 dark:text-gray-400" title={ e.EntityID }>{ shortID(e.EntityID) }</span>
+			}
+		}
+		@ui.TableCell() {
+			{ e.UserName }
+		}
+		@ui.TableCell() {
+			@ui.Badge(e.Action, "gray")
+		}
+		@ui.TableCellMuted() {
+			if e.Field != "" {
+				<span class="font-medium">{ e.Field }</span>
+				if e.OldValue != "" || e.NewValue != "" {
+					<span class="break-all">{ e.OldValue }</span>
+					<span aria-hidden="true">→</span>
+					<span class="break-all">{ e.NewValue }</span>
+				}
+			}
+		}
+	</tr>
+}
+
+func shortID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
+}

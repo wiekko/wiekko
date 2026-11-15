@@ -5169,7 +5169,7 @@ func (c *PageProductController) TestCaseCampaignsTab(w http.ResponseWriter, r *h
 		view := productpage.TestCaseCampaignResultView{
 			Result:       result,
 			CampaignName: campaignNames[result.CampaignID],
-			Environment:  envNames[result.EnvironmentID],
+			Environment:  resultEnvironment(result, envNames),
 			ExecutedBy:   c.resolveUserDisplayName(r, user, result.ExecutedBy),
 		}
 		if result.DefectID != "" {
@@ -5366,6 +5366,32 @@ var requirementsOnly = store.RequirementFilter{Kind: model.RequirementKindRequir
 
 // tasksOnly is the mirror of requirementsOnly for the task pages.
 var tasksOnly = store.RequirementFilter{Kind: model.RequirementKindTask}
+
+// deleteChildren lists the items below a requirement or task for its delete
+// confirmation, and names where kept children would move: the item's parent
+// or the top level.
+func (c *PageProductController) deleteChildren(r *http.Request, user *model.User, productID string, item *model.Requirement) ([]patterns.ChildItem, string) {
+	descendants, err := c.backlog.ListDescendants(r.Context(), user, productID, item.ID)
+	if err != nil || len(descendants) == 0 {
+		return nil, ""
+	}
+	prefixes := c.buildBacklogPrefixMap(r, user, productID)
+	children := make([]patterns.ChildItem, 0, len(descendants))
+	// Deepest first from the service; list them top-down instead.
+	for i := len(descendants) - 1; i >= 0; i-- {
+		d := descendants[i]
+		children = append(children, patterns.ChildItem{
+			Identifier: model.EntityIdentifier(prefixes[d.CategoryID], d.SequenceNumber), Title: d.Title,
+		})
+	}
+	keepTarget := "the top level"
+	if item.ParentID != "" {
+		if parent, err := c.backlog.GetRequirement(r.Context(), user, productID, item.ParentID); err == nil {
+			keepTarget = model.EntityIdentifier(prefixes[parent.CategoryID], parent.SequenceNumber) + " " + parent.Title
+		}
+	}
+	return children, keepTarget
+}
 
 // buildBacklogPrefixMap merges the requirement and task category prefixes into
 // one map, for views that render both kinds side by side (the board). Category
@@ -5794,7 +5820,8 @@ func (c *PageProductController) RequirementDelete(w http.ResponseWriter, r *http
 	productID := r.PathValue("id")
 	requirementID := r.PathValue("requirementId")
 
-	_ = c.backlog.DeleteRequirement(r.Context(), user, productID, requirementID)
+	policy, _ := service.ParseChildPolicy(r.FormValue("children"))
+	_ = c.backlog.DeleteRequirementWith(r.Context(), user, productID, requirementID, policy)
 	w.Header().Set("HX-Redirect", "/products/"+productID+"/requirements")
 	w.WriteHeader(http.StatusOK)
 }
@@ -5812,7 +5839,8 @@ func (c *PageProductController) RequirementDeleteConfirm(w http.ResponseWriter, 
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementDeleteConfirmation(req.Title, productID, requirementID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
+	children, keepTarget := c.deleteChildren(r, user, productID, req)
+	_ = productpage.RequirementDeleteConfirmation(req.Title, productID, requirementID, middleware.CSRFTokenFromContext(r.Context()), children, keepTarget).Render(r.Context(), w)
 }
 
 // RequirementOverviewTab renders GET /products/{id}/requirements/{requirementId}/tabs/overview.
@@ -6880,12 +6908,6 @@ func (c *PageProductController) buildDefectVerification(r *http.Request, user *m
 	for _, campaign := range c.listCampaignsQuietly(r, user, productID) {
 		campaignNames[campaign.ID] = campaign.Name
 	}
-	testCases, _ := c.testing.ListTestCases(r.Context(), user, productID)
-	titles := make(map[string]string, len(testCases))
-	for _, tc := range testCases {
-		titles[tc.ID] = tc.Title
-	}
-
 	// Events arrive oldest first; keep that order within each group and keep the
 	// groups in the order their first event appeared.
 	order := make([]string, 0)
@@ -6917,11 +6939,11 @@ func (c *PageProductController) buildDefectVerification(r *http.Request, user *m
 			Verified:     resultEvents[len(resultEvents)-1].ToStatus == model.CampaignResultStatusPassed,
 		}
 		if result, ok := results[resultID]; ok {
-			group.TestCase = titles[result.TestCaseID]
-			group.Environment = envs[result.EnvironmentID]
-		}
-		if group.TestCase == "" {
-			group.TestCase = "Deleted test case"
+			group.TestCase = result.TestTitle
+			if result.TestCaseID == "" {
+				group.TestCase += " (deleted)"
+			}
+			group.Environment = resultEnvironment(result, envs)
 		}
 
 		previousUser := ""

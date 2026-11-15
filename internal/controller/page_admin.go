@@ -21,11 +21,13 @@ type PageAdminController struct {
 	setting    *service.SettingService
 	invitation *service.InvitationService
 	twoFactor  *service.TwoFactorService
+	audit      *service.AuditService
+	product    *service.ProductService
 }
 
 // NewPageAdmin creates a PageAdminController.
-func NewPageAdmin(user *service.UserService, setting *service.SettingService, invitation *service.InvitationService, twoFactor *service.TwoFactorService) *PageAdminController {
-	return &PageAdminController{user: user, setting: setting, invitation: invitation, twoFactor: twoFactor}
+func NewPageAdmin(user *service.UserService, setting *service.SettingService, invitation *service.InvitationService, twoFactor *service.TwoFactorService, audit *service.AuditService, product *service.ProductService) *PageAdminController {
+	return &PageAdminController{user: user, setting: setting, invitation: invitation, twoFactor: twoFactor, audit: audit, product: product}
 }
 
 // ListUsers renders GET /admin/users.

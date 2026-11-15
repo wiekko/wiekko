@@ -263,11 +263,14 @@ func (c *DiscussionController) DeleteAttachment(w http.ResponseWriter, r *http.R
 
 // authorID renders the author of a comment or attachment: null once the
 // author's account is deleted.
-func authorID(userID string) any {
-	if userID == "" {
+func authorID(userID string) any { return nullable(userID) }
+
+// nullable renders an empty ID as JSON null rather than "".
+func nullable(id string) any {
+	if id == "" {
 		return nil
 	}
-	return userID
+	return id
 }
 
 func commentToJSON(c *model.Comment) map[string]any {

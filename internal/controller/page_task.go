@@ -275,7 +275,8 @@ func (c *PageProductController) TaskDelete(w http.ResponseWriter, r *http.Reques
 	taskID := r.PathValue("taskId")
 
 	if _, err := c.loadTask(r, user, productID, taskID); err == nil {
-		_ = c.backlog.DeleteRequirement(r.Context(), user, productID, taskID)
+		policy, _ := service.ParseChildPolicy(r.FormValue("children"))
+		_ = c.backlog.DeleteRequirementWith(r.Context(), user, productID, taskID, policy)
 	}
 	w.Header().Set("HX-Redirect", "/products/"+productID+"/tasks")
 	w.WriteHeader(http.StatusOK)
@@ -294,7 +295,8 @@ func (c *PageProductController) TaskDeleteConfirm(w http.ResponseWriter, r *http
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TaskDeleteConfirmation(task.Title, productID, taskID, middleware.CSRFTokenFromContext(r.Context())).Render(r.Context(), w)
+	children, keepTarget := c.deleteChildren(r, user, productID, task)
+	_ = productpage.TaskDeleteConfirmation(task.Title, productID, taskID, middleware.CSRFTokenFromContext(r.Context()), children, keepTarget).Render(r.Context(), w)
 }
 
 // TaskOverviewTab renders GET /products/{id}/tasks/{taskId}/tabs/overview.

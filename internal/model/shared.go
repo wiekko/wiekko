@@ -53,6 +53,7 @@ func ValidOwnerType(ownerType string) bool {
 // AuditEntry represents a single field-level change in the audit trail.
 type AuditEntry struct {
 	ID         string
+	ProductID  string // product the entity belongs to; kept after the product is deleted
 	EntityType string // "product", "component", "requirement", "constraint", etc.
 	EntityID   string
 	UserID     string
@@ -61,6 +62,15 @@ type AuditEntry struct {
 	OldValue   string // empty for create
 	NewValue   string // empty for delete
 	CreatedAt  string // RFC 3339
+}
+
+// DeletedProduct is a product the audit trail recorded as deleted, kept for
+// administrators until its history is purged.
+type DeletedProduct struct {
+	ID        string
+	Name      string // the name it had when deleted
+	DeletedAt string // RFC 3339
+	Entries   int    // audit entries still kept for it
 }
 
 // DefectLink represents a polymorphic link from a defect

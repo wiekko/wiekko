@@ -102,7 +102,7 @@ func (s *DiscussionService) CreateComment(ctx context.Context, user *model.User,
 			return fmt.Errorf("create comment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "comment", EntityID: c.ID,
+			ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "comment", EntityID: c.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -155,7 +155,7 @@ func (s *DiscussionService) UpdateComment(ctx context.Context, user *model.User,
 			return fmt.Errorf("update comment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "comment", EntityID: c.ID,
+			ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "comment", EntityID: c.ID,
 			UserID: user.ID, Action: "update", CreatedAt: now,
 		})
 	}); err != nil {
@@ -193,7 +193,7 @@ func (s *DiscussionService) DeleteComment(ctx context.Context, user *model.User,
 			return fmt.Errorf("delete comment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "comment", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "comment", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	}); err != nil {
@@ -294,7 +294,7 @@ func (s *DiscussionService) CreateAttachment(ctx context.Context, user *model.Us
 			return fmt.Errorf("create attachment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "attachment", EntityID: a.ID,
+			ID: uuid.New().String(), ProductID: a.ProductID, EntityType: "attachment", EntityID: a.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	})
@@ -368,7 +368,7 @@ func (s *DiscussionService) DeleteAttachment(ctx context.Context, user *model.Us
 			return fmt.Errorf("delete attachment: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "attachment", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "attachment", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	}); err != nil {

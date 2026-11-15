@@ -188,6 +188,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			products:      st.Product,
 			pyramidLevels: st.PyramidLevel,
 			runtimeEnvs:   st.RuntimeEnvironment,
+			results:       st.CampaignResult,
 			comments:      discussionSvc,
 			audit:         st.Audit,
 			authz:         authz,
@@ -253,9 +254,11 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		},
 		Discussion: discussionSvc,
 		Audit: &AuditService{
-			audit: st.Audit,
-			authz: authz,
-			owns:  owns,
+			audit:    st.Audit,
+			products: st.Product,
+			tx:       st.Tx,
+			authz:    authz,
+			owns:     owns,
 		},
 		Dashboard: &DashboardService{
 			products:     st.Product,

@@ -113,7 +113,7 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 			return fmt.Errorf("assign owner role: %w", err)
 		}
 		if err := s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+			ID: uuid.New().String(), ProductID: product.ID, EntityType: "product", EntityID: product.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		}); err != nil {
 			return err
@@ -354,7 +354,7 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 				}
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+				ID: uuid.New().String(), ProductID: product.ID, EntityType: "product", EntityID: product.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		})
@@ -378,12 +378,19 @@ func (s *ProductService) Delete(ctx context.Context, user *model.User, productID
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		product, err := s.products.GetByID(ctx, productID)
+		if err != nil {
+			return err
+		}
 		if err := s.products.Delete(ctx, productID); err != nil {
 			return fmt.Errorf("delete product: %w", err)
 		}
+		// The audit trail outlives the product. Its name goes into the delete
+		// entry so administrators can still tell which product the kept
+		// history belonged to.
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "product", EntityID: productID,
-			UserID: user.ID, Action: "delete", CreatedAt: now,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "product", EntityID: productID,
+			UserID: user.ID, Action: "delete", FieldName: "name", OldValue: product.Name, CreatedAt: now,
 		})
 	})
 	if err != nil {
@@ -556,7 +563,7 @@ func (s *ProductService) auditMember(ctx context.Context, actor *model.User, pro
 		newRole = "no access"
 	}
 	return s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "product", EntityID: productID,
+		ID: uuid.New().String(), ProductID: productID, EntityType: "product", EntityID: productID,
 		UserID: actor.ID, Action: "update", FieldName: "role of user " + targetUserID,
 		OldValue: oldRole, NewValue: newRole,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
@@ -650,7 +657,7 @@ func (s *ProductService) SplitStatuses(ctx context.Context, user *model.User, pr
 			return fmt.Errorf("split statuses: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+			ID: uuid.New().String(), ProductID: product.ID, EntityType: "product", EntityID: product.ID,
 			UserID: user.ID, Action: "split_statuses", CreatedAt: now,
 		})
 	}); err != nil {

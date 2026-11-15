@@ -89,7 +89,7 @@ func (s *TestingService) CreateTestCase(ctx context.Context, user *model.User, i
 			return fmt.Errorf("create test case: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "test_case", EntityID: tc.ID,
+			ID: uuid.New().String(), ProductID: tc.ProductID, EntityType: "test_case", EntityID: tc.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -167,8 +167,15 @@ func (s *TestingService) UpdateTestCase(ctx context.Context, user *model.User, p
 			if err := s.testCases.Update(ctx, tc); err != nil {
 				return fmt.Errorf("update test case: %w", err)
 			}
+			// Draft campaigns follow the test case; active and closed ones
+			// keep the copy they started with.
+			if s.campaignResults != nil {
+				if err := s.campaignResults.RefreshDraftTests(ctx, tc.ID); err != nil {
+					return fmt.Errorf("refresh draft campaigns: %w", err)
+				}
+			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "test_case", EntityID: tc.ID,
+				ID: uuid.New().String(), ProductID: tc.ProductID, EntityType: "test_case", EntityID: tc.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {
@@ -192,7 +199,36 @@ func (s *TestingService) DeleteTestCase(ctx context.Context, user *model.User, p
 		return err
 	}
 
-	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeTestCase, id, s.testCases.Delete)
+	// Campaigns keep their copy of the test case (see
+	// CampaignResultStore.DetachTestCase): the copy is detached in the same
+	// transaction, under the locks of the campaigns it changes.
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeTestCase, id,
+		func(ctx context.Context, id string) error {
+			if s.campaignResults != nil { // nil in unit tests that do not care
+				campaigns, err := s.campaignResults.CampaignsWithTestCase(ctx, id)
+				if err != nil {
+					return err
+				}
+				if err := lockCampaigns(ctx, s.tx, campaigns); err != nil {
+					return err
+				}
+				if err := s.campaignResults.DetachTestCase(ctx, id); err != nil {
+					return fmt.Errorf("detach from campaigns: %w", err)
+				}
+			}
+			return s.testCases.Delete(ctx, id)
+		})
+}
+
+// lockCampaigns takes the locks of several campaigns, in the sorted order the
+// store returns them in, so two deletions never wait on each other in a cycle.
+func lockCampaigns(ctx context.Context, t store.Transactor, ids []string) error {
+	for _, id := range ids {
+		if err := lock(ctx, t, lockCampaign(id)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ListTestCases returns all test cases for a product. Requires viewer role.
@@ -404,7 +440,7 @@ func (s *TestingService) CreateCampaign(ctx context.Context, user *model.User, i
 			return fmt.Errorf("seed campaign results: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: c.ID,
+			ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "testing_campaign", EntityID: c.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -567,7 +603,7 @@ func (s *TestingService) ActivateCampaign(ctx context.Context, user *model.User,
 		if err := s.campaigns.Update(ctx, c); err != nil {
 			return fmt.Errorf("activate campaign: %w", err)
 		}
-		return s.auditCampaignStatus(ctx, user, c.ID, model.CampaignStatusDraft, model.CampaignStatusActive, now)
+		return s.auditCampaignStatus(ctx, user, c.ProductID, c.ID, model.CampaignStatusDraft, model.CampaignStatusActive, now)
 	})
 	if err != nil {
 		return nil, err
@@ -626,7 +662,7 @@ func (s *TestingService) CloseCampaign(ctx context.Context, user *model.User, pr
 		if err := s.campaigns.Update(ctx, c); err != nil {
 			return fmt.Errorf("close campaign: %w", err)
 		}
-		return s.auditCampaignStatus(ctx, user, c.ID, model.CampaignStatusActive, model.CampaignStatusClosed, now)
+		return s.auditCampaignStatus(ctx, user, c.ProductID, c.ID, model.CampaignStatusActive, model.CampaignStatusClosed, now)
 	})
 	if err != nil {
 		return nil, err
@@ -636,9 +672,9 @@ func (s *TestingService) CloseCampaign(ctx context.Context, user *model.User, pr
 
 // auditCampaignStatus records a campaign status transition with field-level
 // detail, so the history tab names the old and new state (FR-332).
-func (s *TestingService) auditCampaignStatus(ctx context.Context, user *model.User, campaignID, from, to, now string) error {
+func (s *TestingService) auditCampaignStatus(ctx context.Context, user *model.User, productID, campaignID, from, to, now string) error {
 	return s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: campaignID,
+		ID: uuid.New().String(), ProductID: productID, EntityType: "testing_campaign", EntityID: campaignID,
 		UserID: user.ID, Action: "update", FieldName: "status",
 		OldValue: from, NewValue: to, CreatedAt: now,
 	})
@@ -704,7 +740,7 @@ func (s *TestingService) UpdateCampaign(ctx context.Context, user *model.User, p
 				return fmt.Errorf("update campaign: %w", err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: c.ID,
+				ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "testing_campaign", EntityID: c.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {
@@ -734,7 +770,7 @@ func (s *TestingService) DeleteCampaign(ctx context.Context, user *model.User, p
 			return fmt.Errorf("delete campaign: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "testing_campaign", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: now,
 		})
 	}); err != nil {
@@ -761,6 +797,18 @@ func (s *TestingService) ListCampaignResults(ctx context.Context, user *model.Us
 		return nil, err
 	}
 	return s.campaignResults.ListByCampaignID(ctx, campaignID)
+}
+
+// ListCampaignTests returns a campaign's copies of the test cases in its
+// scope. Requires viewer role.
+func (s *TestingService) ListCampaignTests(ctx context.Context, user *model.User, productID, campaignID string) ([]*model.CampaignTest, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCampaign, campaignID}); err != nil {
+		return nil, err
+	}
+	return s.campaignResults.ListTests(ctx, campaignID)
 }
 
 // ListResultsForTestCase returns a test case's results across all campaigns.

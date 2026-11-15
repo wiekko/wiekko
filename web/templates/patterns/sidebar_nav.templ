@@ -24,6 +24,7 @@ templ SidebarNav(activeSection, productID, productName, workflowMode string) {
 				@SidebarLink("Users", "/admin/users", "users", activeSection == "admin-users", "")
 				@SidebarLink("Settings", "/admin/settings", "settings", activeSection == "admin-settings", "")
 				@SidebarLink("Invitations", "/admin/invitations", "link", activeSection == "admin-invitations", "")
+				@SidebarLink("Audit Trail", "/admin/audit", "scroll-text", activeSection == "admin-audit", "")
 			} else if isAccountSection(activeSection) {
 				@SidebarHeading("Account")
 				@SidebarLink("Profile", "/user/profile", "user", activeSection == "user-profile", "")

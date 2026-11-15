@@ -91,7 +91,7 @@ func (s *CategoryService) CreateCategory(ctx context.Context, user *model.User, 
 			return fmt.Errorf("create category: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "category", EntityID: cat.ID,
+			ID: uuid.New().String(), ProductID: cat.ProductID, EntityType: "category", EntityID: cat.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -161,7 +161,7 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, user *model.User, 
 			return fmt.Errorf("update category: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "category", EntityID: cat.ID,
+			ID: uuid.New().String(), ProductID: cat.ProductID, EntityType: "category", EntityID: cat.ID,
 			UserID: user.ID, Action: "update", CreatedAt: now,
 		})
 	}); err != nil {
@@ -221,7 +221,7 @@ func (s *CategoryService) DeleteCategory(ctx context.Context, user *model.User, 
 			return fmt.Errorf("delete category: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "category", EntityID: id,
+			ID: uuid.New().String(), ProductID: productID, EntityType: "category", EntityID: id,
 			UserID: user.ID, Action: "delete", CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		})
 	})

@@ -90,7 +90,7 @@ func (s *ComponentService) CreateComponent(ctx context.Context, user *model.User
 			return fmt.Errorf("create component: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "component", EntityID: c.ID,
+			ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "component", EntityID: c.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -157,7 +157,7 @@ func (s *ComponentService) UpdateComponent(ctx context.Context, user *model.User
 				return fmt.Errorf("update component: %w", err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "component", EntityID: c.ID,
+				ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "component", EntityID: c.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {
@@ -221,7 +221,7 @@ func (s *ComponentService) CreateCapability(ctx context.Context, user *model.Use
 			return fmt.Errorf("create capability: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
+			ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "capability", EntityID: c.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -291,7 +291,7 @@ func (s *ComponentService) UpdateCapability(ctx context.Context, user *model.Use
 				return fmt.Errorf("update capability: %w", err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
+				ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "capability", EntityID: c.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {

@@ -557,12 +557,6 @@ func (c *PageProductController) buildResultHistory(r *http.Request, user *model.
 	for _, result := range results {
 		byResult[result.ID] = result
 	}
-	testCases, _ := c.testing.ListTestCases(r.Context(), user, productID)
-	titles := make(map[string]string, len(testCases))
-	for _, tc := range testCases {
-		titles[tc.ID] = tc.Title
-	}
-
 	previousUser := make(map[string]string, len(byResult))
 	entries := make([]productpage.CampaignHistoryEntry, 0, len(events))
 	for _, ev := range events {
@@ -580,11 +574,11 @@ func (c *PageProductController) buildResultHistory(r *http.Request, user *model.
 				ev.FromStatus == model.CampaignResultStatusRetest,
 		}
 		if result, ok := byResult[ev.ResultID]; ok {
-			entry.TestCase = titles[result.TestCaseID]
-			entry.Environment = envs[result.EnvironmentID]
-		}
-		if entry.TestCase == "" {
-			entry.TestCase = "Deleted test case"
+			entry.TestCase = result.TestTitle
+			if result.TestCaseID == "" {
+				entry.TestCase += " (deleted)"
+			}
+			entry.Environment = resultEnvironment(result, envs)
 		}
 		entries = append(entries, entry)
 		previousUser[ev.ResultID] = ev.UserID
@@ -698,53 +692,62 @@ func (c *PageProductController) loadMatrixProps(r *http.Request, user *model.Use
 	pyramidNames := c.buildPyramidLevelMap(r, user, productID)
 
 	// Columns: only environments this campaign actually uses, so the table stays
-	// as narrow as the data allows.
-	usedEnvs := map[string]bool{}
+	// as narrow as the data allows. A deleted environment keeps a column of its
+	// own under the name the results recorded.
+	usedEnvs := map[string]string{}
 	needsBareColumn := false
-	byTestCase := map[string][]*model.CampaignResult{}
+	byTest := map[string][]*model.CampaignResult{}
+	var testOrder []string
 	for _, result := range results {
-		if result.EnvironmentID == "" {
+		if key := matrixColumnKey(result); key == "" {
 			needsBareColumn = true
+		} else if result.EnvironmentID != "" {
+			usedEnvs[key] = envNames[result.EnvironmentID]
 		} else {
-			usedEnvs[result.EnvironmentID] = true
+			usedEnvs[key] = result.EnvironmentName + " (deleted)"
 		}
-		byTestCase[result.TestCaseID] = append(byTestCase[result.TestCaseID], result)
+		if _, seen := byTest[result.CampaignTestID]; !seen {
+			testOrder = append(testOrder, result.CampaignTestID)
+		}
+		byTest[result.CampaignTestID] = append(byTest[result.CampaignTestID], result)
 	}
 
-	envIDs := make([]string, 0, len(usedEnvs))
-	for id := range usedEnvs {
-		envIDs = append(envIDs, id)
+	envKeys := make([]string, 0, len(usedEnvs))
+	for key := range usedEnvs {
+		envKeys = append(envKeys, key)
 	}
-	sort.Slice(envIDs, func(i, j int) bool {
-		return envNames[envIDs[i]] < envNames[envIDs[j]]
+	sort.Slice(envKeys, func(i, j int) bool {
+		return usedEnvs[envKeys[i]] < usedEnvs[envKeys[j]]
 	})
 
-	columns := make([]productpage.CampaignMatrixColumn, 0, len(envIDs)+1)
-	for _, id := range envIDs {
-		columns = append(columns, productpage.CampaignMatrixColumn{ID: id, Label: envNames[id]})
+	columns := make([]productpage.CampaignMatrixColumn, 0, len(envKeys)+1)
+	for _, key := range envKeys {
+		columns = append(columns, productpage.CampaignMatrixColumn{ID: key, Label: usedEnvs[key]})
 	}
 	if needsBareColumn || len(columns) == 0 {
 		columns = append(columns, productpage.CampaignMatrixColumn{})
 	}
 
-	// Rows, bucketed by their group label.
+	// Rows, bucketed by their group label. The row shows the campaign's copy
+	// of the test case; a deleted test case gets a group of its own.
 	rowsByGroup := map[string][]productpage.CampaignMatrixRow{}
-	for testCaseID, testCaseResults := range byTestCase {
-		tc, err := c.testing.GetTestCase(r.Context(), user, productID, testCaseID)
-		if err != nil {
-			continue
-		}
+	for _, testID := range testOrder {
+		testResults := byTest[testID]
+		tc := c.campaignTestCase(r, user, productID, testResults[0])
 
-		byEnv := make(map[string]*model.CampaignResult, len(testCaseResults))
-		for _, result := range testCaseResults {
-			byEnv[result.EnvironmentID] = result
+		byEnv := make(map[string]*model.CampaignResult, len(testResults))
+		for _, result := range testResults {
+			byEnv[matrixColumnKey(result)] = result
 		}
 		cells := make([]*model.CampaignResult, len(columns))
 		for i, col := range columns {
 			cells[i] = byEnv[col.ID]
 		}
 
-		label := matrixGroupLabel(groupBy, tc, componentNames, capabilityNames, pyramidNames)
+		label := "Deleted test cases"
+		if tc.ID != "" {
+			label = matrixGroupLabel(groupBy, tc, componentNames, capabilityNames, pyramidNames)
+		}
 		rowsByGroup[label] = append(rowsByGroup[label], productpage.CampaignMatrixRow{
 			TestCase: tc,
 			Cells:    cells,
@@ -779,6 +782,47 @@ func (c *PageProductController) loadMatrixProps(r *http.Request, user *model.Use
 		CanExecute: campaign.Status == model.CampaignStatusActive && c.canExecuteTests(user, role),
 		Churn:      churn,
 	}, results, nil
+}
+
+// matrixColumnKey names a result's matrix column: its environment, the
+// recorded name of a deleted one, or "" for a test without an environment
+// matrix.
+func matrixColumnKey(result *model.CampaignResult) string {
+	switch {
+	case result.EnvironmentID != "":
+		return result.EnvironmentID
+	case result.EnvironmentName != "":
+		return "deleted:" + result.EnvironmentName
+	}
+	return ""
+}
+
+// resultEnvironment labels a result's environment, marking a deleted one.
+func resultEnvironment(result *model.CampaignResult, envNames map[string]string) string {
+	if result.EnvironmentID != "" {
+		if name, ok := envNames[result.EnvironmentID]; ok {
+			return name
+		}
+	}
+	if result.EnvironmentName != "" {
+		return result.EnvironmentName + " (deleted)"
+	}
+	return ""
+}
+
+// campaignTestCase is the test case a campaign result belongs to, as the
+// campaign knows it: the live test case under the title the campaign copied,
+// or, once the test case is deleted, a stand-in without an ID carrying just
+// that title.
+func (c *PageProductController) campaignTestCase(r *http.Request, user *model.User, productID string, result *model.CampaignResult) *model.TestCase {
+	if result.TestCaseID != "" {
+		if tc, err := c.testing.GetTestCase(r.Context(), user, productID, result.TestCaseID); err == nil {
+			copied := *tc
+			copied.Title = result.TestTitle
+			return &copied
+		}
+	}
+	return &model.TestCase{ProductID: productID, Title: result.TestTitle + " (deleted)"}
 }
 
 // matrixGroupLabel picks a row's group heading. Test cases attached to neither
@@ -923,13 +967,25 @@ func (c *PageProductController) CampaignResultStatusMenu(w http.ResponseWriter, 
 
 	events, _ := c.testing.ListEventsForResult(r.Context(), user, productID, campaignID, resultID)
 
+	// The description the campaign copied: what this campaign tested, even
+	// if the test case has been edited or deleted since.
+	description := ""
+	if tests, err := c.testing.ListCampaignTests(r.Context(), user, productID, campaignID); err == nil {
+		for _, t := range tests {
+			if t.ID == result.CampaignTestID {
+				description = t.Description
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.CampaignResultStatusMenu(productpage.CampaignResultMenuProps{
+		Description: description,
 		ProductID:   productID,
 		CampaignID:  campaignID,
 		Result:      result,
 		TestCase:    tc,
-		Environment: c.buildEnvironmentMap(r, user, productID)[result.EnvironmentID],
+		Environment: resultEnvironment(result, c.buildEnvironmentMap(r, user, productID)),
 		GroupBy:     matrixGrouping(r),
 		CSRFToken:   middleware.CSRFTokenFromContext(r.Context()),
 		CanExecute:  canExecute,
@@ -1196,11 +1252,7 @@ func (c *PageProductController) loadResultWithTestCase(r *http.Request, user *mo
 		if result.ID != resultID {
 			continue
 		}
-		tc, err := c.testing.GetTestCase(r.Context(), user, productID, result.TestCaseID)
-		if err != nil {
-			return nil, nil, err
-		}
-		return result, tc, nil
+		return result, c.campaignTestCase(r, user, productID, result), nil
 	}
 	return nil, nil, errors.New("campaign result not found")
 }

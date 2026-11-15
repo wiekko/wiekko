@@ -214,7 +214,7 @@ func (s *DocumentService) CreateDocument(ctx context.Context, user *model.User, 
 		if err := s.documents.Create(ctx, d, rev); err != nil {
 			return fmt.Errorf("create document: %w", err)
 		}
-		return s.record(ctx, user, d.ID, "create", "", "", "", now)
+		return s.record(ctx, user, d.ProductID, d.ID, "create", "", "", "", now)
 	})
 	if err != nil {
 		return nil, err
@@ -230,9 +230,9 @@ func (s *DocumentService) snapshot(d *model.Document, user *model.User, now stri
 	}
 }
 
-func (s *DocumentService) record(ctx context.Context, user *model.User, id, action, field, oldValue, newValue, now string) error {
+func (s *DocumentService) record(ctx context.Context, user *model.User, productID, id, action, field, oldValue, newValue, now string) error {
 	return s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "document", EntityID: id, UserID: user.ID,
+		ID: uuid.New().String(), ProductID: productID, EntityType: "document", EntityID: id, UserID: user.ID,
 		Action: action, FieldName: field, OldValue: oldValue, NewValue: newValue, CreatedAt: now,
 	})
 }
@@ -332,17 +332,17 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, user *model.User, 
 				return fmt.Errorf("update document: %w", err)
 			}
 			if rev != nil {
-				if err := s.record(ctx, user, d.ID, "update", "revision", strconv.Itoa(old.Revision), strconv.Itoa(d.Revision), now); err != nil {
+				if err := s.record(ctx, user, d.ProductID, d.ID, "update", "revision", strconv.Itoa(old.Revision), strconv.Itoa(d.Revision), now); err != nil {
 					return err
 				}
 			}
 			if d.State != old.State {
-				if err := s.record(ctx, user, d.ID, "update", "state", old.State, d.State, now); err != nil {
+				if err := s.record(ctx, user, d.ProductID, d.ID, "update", "state", old.State, d.State, now); err != nil {
 					return err
 				}
 			}
 			if rev == nil && d.State == old.State {
-				return s.record(ctx, user, d.ID, "update", "", "", "", now)
+				return s.record(ctx, user, d.ProductID, d.ID, "update", "", "", "", now)
 			}
 			return nil
 		})
@@ -457,7 +457,7 @@ func (s *DocumentService) RestoreRevision(ctx context.Context, user *model.User,
 		if err := s.documents.Update(ctx, d, s.snapshot(d, user, now)); err != nil {
 			return fmt.Errorf("restore document: %w", err)
 		}
-		return s.record(ctx, user, d.ID, "restore", "revision", strconv.Itoa(oldRevision), strconv.Itoa(revision), now)
+		return s.record(ctx, user, d.ProductID, d.ID, "restore", "revision", strconv.Itoa(oldRevision), strconv.Itoa(revision), now)
 	})
 	if err != nil {
 		return nil, err
@@ -510,7 +510,7 @@ func (s *DocumentService) changeLink(ctx context.Context, user *model.User, prod
 			if err := s.documents.Unlink(ctx, id, targetType, targetID); err != nil {
 				return fmt.Errorf("unlink document: %w", err)
 			}
-			return s.record(ctx, user, id, "unlink", targetType, "", targetID, now)
+			return s.record(ctx, user, productID, id, "unlink", targetType, "", targetID, now)
 		}
 		// Linking twice is no error. Look first rather than reading the
 		// unique index's complaint: a failed statement would abort the
@@ -529,7 +529,7 @@ func (s *DocumentService) changeLink(ctx context.Context, user *model.User, prod
 		}); err != nil {
 			return fmt.Errorf("link document: %w", err)
 		}
-		return s.record(ctx, user, id, "link", targetType, "", targetID, now)
+		return s.record(ctx, user, productID, id, "link", targetType, "", targetID, now)
 	})
 }
 

@@ -139,7 +139,7 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 			return fmt.Errorf("create %s: %w", input.Kind, err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
+			ID: uuid.New().String(), ProductID: r.ProductID, EntityType: r.Kind, EntityID: r.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	})
@@ -271,7 +271,7 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 				return fmt.Errorf("update %s: %w", r.Kind, err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
+				ID: uuid.New().String(), ProductID: r.ProductID, EntityType: r.Kind, EntityID: r.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {
@@ -288,6 +288,39 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 
 // DeleteRequirement removes a requirement. Requires owner role.
 func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User, productID, id string) error {
+	return s.DeleteRequirementWith(ctx, user, productID, id, KeepChildren)
+}
+
+// ChildPolicy decides what happens to the children of a deleted requirement
+// or task.
+type ChildPolicy int
+
+const (
+	// KeepChildren moves the direct children up one level, under the deleted
+	// item's own parent, or to the top level if it had none.
+	KeepChildren ChildPolicy = iota
+	// DeleteChildren deletes the whole subtree with the item.
+	DeleteChildren
+)
+
+// ParseChildPolicy reads "keep" (or "") and "delete".
+func ParseChildPolicy(v string) (ChildPolicy, error) {
+	switch v {
+	case "", "keep":
+		return KeepChildren, nil
+	case "delete":
+		return DeleteChildren, nil
+	}
+	return KeepChildren, fmt.Errorf("children must be keep or delete, not %q", v)
+}
+
+// DeleteRequirementWith deletes a requirement or task, and its children as
+// policy says, in one transaction. Requires owner role.
+//
+// Kept children are re-parented explicitly, each with an audit entry, rather
+// than left to the foreign key's SET NULL, which would turn them into
+// top-level items without a trace in their history.
+func (s *BacklogService) DeleteRequirementWith(ctx context.Context, user *model.User, productID, id string, policy ChildPolicy) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
@@ -295,13 +328,108 @@ func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User
 		return err
 	}
 
-	// The kind decides which owner type the comments were filed under.
-	kind := model.RequirementKindRequirement
-	if r, err := s.requirements.GetByID(ctx, id); err == nil {
-		kind = r.Kind
-	}
+	var afterCommit []func()
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// Held across the walk, so no child is added or moved under the item
+		// while its subtree is being resolved.
+		if err := lock(ctx, s.tx, lockOwner(id)); err != nil {
+			return err
+		}
+		r, err := s.requirements.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		now := time.Now().UTC().Format(time.RFC3339)
 
-	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, kind, id, s.requirements.Delete)
+		var doomed []*model.Requirement
+		if policy == DeleteChildren {
+			if doomed, err = s.subtree(ctx, r, true); err != nil {
+				return err
+			}
+		} else {
+			children, err := s.requirements.ListByParentID(ctx, id)
+			if err != nil {
+				return err
+			}
+			for _, child := range children {
+				if err := s.requirements.SetParent(ctx, child.ID, r.ParentID, now); err != nil {
+					return fmt.Errorf("move %s up: %w", child.Kind, err)
+				}
+				if err := s.audit.Create(ctx, &model.AuditEntry{
+					ID: uuid.New().String(), ProductID: productID, EntityType: child.Kind, EntityID: child.ID,
+					UserID: user.ID, Action: "update", FieldName: "parent_id",
+					OldValue: id, NewValue: r.ParentID, CreatedAt: now,
+				}); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Leaves first, the item itself last.
+		for _, item := range append(doomed, r) {
+			after, err := deleteOwnedInTx(ctx, s.comments, s.audit, user, productID, item.Kind, item.ID, s.requirements.Delete)
+			if err != nil {
+				return err
+			}
+			if after != nil {
+				afterCommit = append(afterCommit, after)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, fn := range afterCommit {
+		fn()
+	}
+	return nil
+}
+
+// subtree returns every descendant of r, deepest first, so each one is
+// deleted before its parent. With lockItems, which needs a transaction, each
+// descendant's lock is taken on the way, so none gains a child meanwhile.
+func (s *BacklogService) subtree(ctx context.Context, r *model.Requirement, lockItems bool) ([]*model.Requirement, error) {
+	var out []*model.Requirement
+	var walk func(parent *model.Requirement, depth int) error
+	walk = func(parent *model.Requirement, depth int) error {
+		if depth > maxParentDepth {
+			return errors.New("child items are nested too deeply")
+		}
+		children, err := s.requirements.ListByParentID(ctx, parent.ID)
+		if err != nil {
+			return err
+		}
+		for _, child := range children {
+			if lockItems {
+				if err := lock(ctx, s.tx, lockOwner(child.ID)); err != nil {
+					return err
+				}
+			}
+			if err := walk(child, depth+1); err != nil {
+				return err
+			}
+			out = append(out, child)
+		}
+		return nil
+	}
+	return out, walk(r, 0)
+}
+
+// ListDescendants returns every item below a requirement or task, for the
+// delete confirmation. Requires viewer role.
+func (s *BacklogService) ListDescendants(ctx context.Context, user *model.User, productID, id string) ([]*model.Requirement, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, id}); err != nil {
+		return nil, err
+	}
+	r, err := s.requirements.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return s.subtree(ctx, r, false)
 }
 
 // ListRequirements returns requirements for a product. Requires viewer role.
@@ -555,7 +683,7 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 			return err
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
+			ID: uuid.New().String(), ProductID: d.ProductID, EntityType: "defect", EntityID: d.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -683,7 +811,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 				}
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
+				ID: uuid.New().String(), ProductID: d.ProductID, EntityType: "defect", EntityID: d.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		})

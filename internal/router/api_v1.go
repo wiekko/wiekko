@@ -101,6 +101,12 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.admin("GET /admin/invitations", need(access.R(access.Admin)), http.HandlerFunc(invCtrl.List))
 	api.admin("DELETE /admin/invitations/{id}", need(access.W(access.Admin)), csrf(http.HandlerFunc(invCtrl.Delete)))
 
+	// Admin: audit trail across products, including deleted ones (admin only).
+	api.admin("GET /admin/audit", need(access.R(access.Admin)), http.HandlerFunc(auditCtrl.AdminList))
+	api.admin("GET /admin/audit/export", need(access.R(access.Admin)), http.HandlerFunc(auditCtrl.AdminExport))
+	api.admin("GET /admin/audit/deleted-products", need(access.R(access.Admin)), http.HandlerFunc(auditCtrl.AdminDeletedProducts))
+	api.admin("DELETE /admin/audit/products/{productId}", need(access.W(access.Admin)), csrf(http.HandlerFunc(auditCtrl.AdminPurge)))
+
 	// Products.
 	api.authed("GET /products", noScope, http.HandlerFunc(productCtrl.List))
 	api.authed("POST /products", need(access.W(access.Settings)), csrf(http.HandlerFunc(productCtrl.Create)))

@@ -105,7 +105,7 @@ func (s *ConstraintService) CreateConstraint(ctx context.Context, user *model.Us
 			return fmt.Errorf("create constraint: %w", err)
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
-			ID: uuid.New().String(), EntityType: "constraint", EntityID: c.ID,
+			ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "constraint", EntityID: c.ID,
 			UserID: user.ID, Action: "create", CreatedAt: now,
 		})
 	}); err != nil {
@@ -182,7 +182,7 @@ func (s *ConstraintService) UpdateConstraint(ctx context.Context, user *model.Us
 				return fmt.Errorf("update constraint: %w", err)
 			}
 			return s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "constraint", EntityID: c.ID,
+				ID: uuid.New().String(), ProductID: c.ProductID, EntityType: "constraint", EntityID: c.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
 			})
 		}); err != nil {

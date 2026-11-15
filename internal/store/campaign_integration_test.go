@@ -239,46 +239,139 @@ func TestCampaignResultStoreSeedingAndLookups(t *testing.T) {
 	})
 }
 
-// Deleting a runtime environment must remove its matrix rows rather than
-// collapsing them into indistinguishable NULL rows.
-func TestCampaignResultsCascadeOnEnvironmentDelete(t *testing.T) {
+// Deleting an environment keeps what a campaign recorded on it: verdicts in
+// active campaigns and everything in closed ones stay, with the environment's
+// name; results still waiting to run are dropped. Deleting both environments
+// of one test must not collide on the "no environment" unique index.
+func TestCampaignResultsSurviveEnvironmentDelete(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
 		f := seedCampaignFixture(t, db)
 		campaigns := &testingCampaignStore{db: db}
 		results := &campaignResultStore{db: db}
 		ctx := context.Background()
 
-		c := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+		active := makeCampaign(t, campaigns, f.productID, "Release 1.0", model.CampaignStatusActive)
+		closed := makeCampaign(t, campaigns, f.productID, "Release 0.9", model.CampaignStatusClosed)
 		now := Now()
 		if err := results.CreateBatch(ctx, []*model.CampaignResult{
-			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPassed, UpdatedAt: now},
-			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
-			{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: active.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusPassed, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: active.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: active.ID, TestCaseID: f.tcBare, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: closed.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: model.CampaignResultStatusFailed, UpdatedAt: now},
+			{ID: uuid.New().String(), CampaignID: closed.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
 		}); err != nil {
 			t.Fatalf("CreateBatch: %v", err)
 		}
 
-		if _, err := db.Exec(`DELETE FROM runtime_environments WHERE id = ?`, f.envA); err != nil {
-			t.Fatalf("delete environment: %v", err)
+		for _, env := range []string{f.envA, f.envB} {
+			if err := results.DetachEnvironment(ctx, env); err != nil {
+				t.Fatalf("DetachEnvironment: %v", err)
+			}
+			if _, err := db.Exec(`DELETE FROM runtime_environments WHERE id = ?`, env); err != nil {
+				t.Fatalf("delete environment: %v", err)
+			}
 		}
 
-		remaining, err := results.ListByCampaignID(ctx, c.ID)
+		remaining, err := results.ListByCampaignID(ctx, active.ID)
 		if err != nil {
 			t.Fatalf("ListByCampaignID: %v", err)
 		}
-		if len(remaining) != 2 {
-			t.Fatalf("listed %d results after deleting an environment, want 2", len(remaining))
-		}
-
-		// Exactly one environment-less row must remain: the one seeded that way.
-		bare := 0
-		for _, result := range remaining {
-			if result.EnvironmentID == "" {
-				bare++
+		// The passed linux row stays; the pending macos row is gone; the
+		// environment-less row was never touched.
+		names := map[string]string{}
+		for _, r := range remaining {
+			names[r.EnvironmentName] = r.Status
+			if r.EnvironmentID != "" {
+				t.Fatalf("result still points at a deleted environment: %+v", r)
 			}
 		}
-		if bare != 1 {
-			t.Fatalf("found %d environment-less results, want 1", bare)
+		if len(remaining) != 2 || names["linux"] != model.CampaignResultStatusPassed || names[""] != model.CampaignResultStatusPending {
+			t.Fatalf("active campaign after deleting environments = %v, want linux passed and the bare row", names)
+		}
+
+		kept, err := results.ListByCampaignID(ctx, closed.ID)
+		if err != nil {
+			t.Fatalf("ListByCampaignID: %v", err)
+		}
+		if len(kept) != 2 || kept[0].EnvironmentName != "linux" || kept[1].EnvironmentName != "macos" {
+			t.Fatalf("closed campaign = %+v, want both rows with their environment names", kept)
+		}
+	})
+}
+
+// A campaign keeps its copy of a test case: edits reach draft campaigns only,
+// and deleting the test case leaves closed campaigns and the verdicts of
+// active ones in place, while draft campaigns and unexecuted results drop it.
+func TestCampaignTestsOutliveTheTestCase(t *testing.T) {
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		campaigns := &testingCampaignStore{db: db}
+		results := &campaignResultStore{db: db}
+		ctx := context.Background()
+		now := Now()
+
+		byStatus := map[string]*model.TestingCampaign{}
+		for _, status := range []string{model.CampaignStatusDraft, model.CampaignStatusActive, model.CampaignStatusClosed} {
+			byStatus[status] = makeCampaign(t, campaigns, f.productID, "C "+status, status)
+		}
+		var batch []*model.CampaignResult
+		for status, c := range byStatus {
+			verdict := model.CampaignResultStatusPassed
+			if status == model.CampaignStatusDraft {
+				verdict = model.CampaignResultStatusPending
+			}
+			batch = append(batch,
+				&model.CampaignResult{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envA, Status: verdict, UpdatedAt: now},
+				&model.CampaignResult{ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcMatrix, EnvironmentID: f.envB, Status: model.CampaignResultStatusPending, UpdatedAt: now},
+			)
+		}
+		if err := results.CreateBatch(ctx, batch); err != nil {
+			t.Fatalf("CreateBatch: %v", err)
+		}
+
+		if _, err := db.Exec(`UPDATE test_cases SET title = 'Renamed' WHERE id = ?`, f.tcMatrix); err != nil {
+			t.Fatal(err)
+		}
+		if err := results.RefreshDraftTests(ctx, f.tcMatrix); err != nil {
+			t.Fatalf("RefreshDraftTests: %v", err)
+		}
+		for status, c := range byStatus {
+			tests, err := results.ListTests(ctx, c.ID)
+			if err != nil || len(tests) != 1 {
+				t.Fatalf("%s: tests = %v, %v", status, tests, err)
+			}
+			want := "Login rejects a bad password"
+			if status == model.CampaignStatusDraft {
+				want = "Renamed"
+			}
+			if tests[0].Title != want {
+				t.Fatalf("%s campaign title = %q, want %q", status, tests[0].Title, want)
+			}
+		}
+
+		if err := results.DetachTestCase(ctx, f.tcMatrix); err != nil {
+			t.Fatalf("DetachTestCase: %v", err)
+		}
+		if _, err := db.Exec(`DELETE FROM test_cases WHERE id = ?`, f.tcMatrix); err != nil {
+			t.Fatalf("delete test case: %v", err)
+		}
+		want := map[string]int{model.CampaignStatusDraft: 0, model.CampaignStatusActive: 1, model.CampaignStatusClosed: 2}
+		for status, c := range byStatus {
+			rows, err := results.ListByCampaignID(ctx, c.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) != want[status] {
+				t.Fatalf("%s campaign keeps %d results, want %d", status, len(rows), want[status])
+			}
+			for _, r := range rows {
+				if r.TestCaseID != "" || r.TestTitle != "Login rejects a bad password" {
+					t.Fatalf("%s campaign result = %+v, want detached with the copied title", status, r)
+				}
+			}
+		}
+		if tests, _ := results.ListTests(ctx, byStatus[model.CampaignStatusDraft].ID); len(tests) != 0 {
+			t.Fatalf("draft campaign still lists %d tests", len(tests))
 		}
 	})
 }

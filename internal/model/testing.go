@@ -45,6 +45,20 @@ type TestingCampaign struct {
 	UpdatedAt   string // RFC 3339
 }
 
+// CampaignTest is a campaign's own copy of a test case in its scope: kept in
+// step with the test case while the campaign is a draft, frozen from its
+// activation on, and kept after the test case is deleted.
+type CampaignTest struct {
+	ID             string
+	CampaignID     string
+	TestCaseID     string // empty once the test case has been deleted
+	Title          string
+	Description    string // Markdown
+	ExecutionMode  string
+	TestIdentifier string
+	CreatedAt      string // RFC 3339
+}
+
 // Campaign status constants (FR-320).
 const (
 	CampaignStatusDraft  = "draft"
@@ -65,15 +79,23 @@ func ValidCampaignStatus(status string) bool {
 // CampaignResult represents the status of a test case
 // within a campaign, optionally per runtime environment.
 type CampaignResult struct {
-	ID            string
-	CampaignID    string
-	TestCaseID    string
-	EnvironmentID string // empty if no environment matrix
-	Status        string // one of the CampaignResultStatus* constants
-	DefectID      string // defect explaining a failure (FR-502); empty otherwise
-	ExecutedBy    string // user who last set the status; empty while pending
-	ExecutedAt    string // empty while pending; RFC 3339
-	UpdatedAt     string // RFC 3339
+	ID         string
+	CampaignID string
+	// CampaignTestID is the campaign's copy of the test case (see
+	// CampaignTest); TestTitle comes from it.
+	CampaignTestID string
+	// TestCaseID is the live test case; empty once it has been deleted.
+	TestCaseID string
+	TestTitle  string
+	// EnvironmentID is empty if the test has no environment matrix, or once
+	// the environment has been deleted; EnvironmentName keeps its label.
+	EnvironmentID   string
+	EnvironmentName string
+	Status          string // one of the CampaignResultStatus* constants
+	DefectID        string // defect explaining a failure (FR-502); empty otherwise
+	ExecutedBy      string // user who last set the status; empty while pending
+	ExecutedAt      string // empty while pending; RFC 3339
+	UpdatedAt       string // RFC 3339
 }
 
 // Campaign result status constants (FR-021).

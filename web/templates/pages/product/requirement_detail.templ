@@ -650,8 +650,8 @@ templ RequirementHistoryTabContent(entries []templates.AuditEntryView) {
 }
 
 // RequirementDeleteConfirmation renders the delete confirmation for a requirement.
-templ RequirementDeleteConfirmation(name, productID, requirementID, csrfToken string) {
-	@patterns.DeleteConfirmation("requirement", name, fmt.Sprintf("/products/%s/requirements/%s", productID, requirementID), csrfToken)
+templ RequirementDeleteConfirmation(name, productID, requirementID, csrfToken string, children []patterns.ChildItem, keepTarget string) {
+	@patterns.DeleteWithChildrenConfirmation("requirement", name, fmt.Sprintf("/products/%s/requirements/%s", productID, requirementID), csrfToken, children, keepTarget)
 }
 
 func requirementDetailTabs(productID, requirementID string) []templates.TabDef {

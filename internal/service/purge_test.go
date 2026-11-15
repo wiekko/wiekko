@@ -99,11 +99,16 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			ownerType: model.OwnerTypeRequirement,
 			del: func(p *recordingPurger) error {
 				svc := &BacklogService{
-					owns:         testOwnership(),
-					requirements: &testutil.MockRequirementStore{DeleteFunc: deletesOK()},
-					comments:     p,
-					audit:        noopAudit(),
-					authz:        &Authorizer{productRoles: ownerRoles()},
+					owns: testOwnership(),
+					requirements: &testutil.MockRequirementStore{
+						DeleteFunc: deletesOK(),
+						GetByIDFunc: func(_ context.Context, id string) (*model.Requirement, error) {
+							return &model.Requirement{ID: id, ProductID: "product-001", Kind: model.RequirementKindRequirement}, nil
+						},
+					},
+					comments: p,
+					audit:    noopAudit(),
+					authz:    &Authorizer{productRoles: ownerRoles()},
 				}
 				return svc.DeleteRequirement(context.Background(), testutil.MakeUser(), "product-001", "entity-001")
 			},
@@ -192,7 +197,10 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 func TestDeleteProductPurgesBlobs(t *testing.T) {
 	purger := &recordingPurger{}
 	svc := &ProductService{
-		products:    &testutil.MockProductStore{DeleteFunc: deletesOK()},
+		products: &testutil.MockProductStore{
+			GetByIDFunc: func(context.Context, string) (*model.Product, error) { return testutil.MakeProduct(), nil },
+			DeleteFunc:  deletesOK(),
+		},
 		attachments: purger,
 		audit:       noopAudit(),
 		authz:       &Authorizer{productRoles: ownerRoles()},

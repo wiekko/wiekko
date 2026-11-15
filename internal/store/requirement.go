@@ -25,6 +25,8 @@ type RequirementStore interface {
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error)
 	ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error)
+	// SetParent moves an item under parentID ("" for top level).
+	SetParent(ctx context.Context, id, parentID, updatedAt string) error
 	ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	// GetBySequence returns the product's requirement or task with the given
@@ -124,6 +126,12 @@ func (s *requirementStore) ListByParentID(ctx context.Context, parentID string) 
 	return s.listRequirements(ctx,
 		`SELECT `+requirementColumns+` FROM requirements WHERE parent_id = ? ORDER BY priority DESC, created_at`,
 		parentID)
+}
+
+func (s *requirementStore) SetParent(ctx context.Context, id, parentID, updatedAt string) error {
+	return requireChanged(s.db.ExecContext(ctx,
+		`UPDATE requirements SET parent_id = ?, updated_at = ? WHERE id = ?`,
+		nullableText(parentID), updatedAt, id))
 }
 
 func (s *requirementStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error) {

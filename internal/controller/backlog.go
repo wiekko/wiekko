@@ -166,13 +166,19 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 	httputil.JSON(w, http.StatusOK, requirementToJSON(item, c.prefixes(r, user, productID)))
 }
 
-// DeleteRequirement handles DELETE /products/{productId}/requirements/{id}.
+// DeleteRequirement handles DELETE /products/{productId}/requirements/{id}
+// ?children=keep|delete: kept children (the default) move up one level.
 func (c *BacklogController) DeleteRequirement(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 	id := r.PathValue("id")
 
-	if err := c.backlog.DeleteRequirement(r.Context(), user, productID, id); err != nil {
+	policy, err := service.ParseChildPolicy(r.URL.Query().Get("children"))
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "INVALID_CHILDREN", err.Error())
+		return
+	}
+	if err := c.backlog.DeleteRequirementWith(r.Context(), user, productID, id, policy); err != nil {
 		writeServiceError(w, err)
 		return
 	}

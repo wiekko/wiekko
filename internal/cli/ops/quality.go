@@ -355,7 +355,7 @@ func (s *Session) ShowTestCase(ctx context.Context, ref string) (*TestCaseDetail
 	for _, r := range results {
 		c := byID[r.CampaignID]
 		d.Results = append(d.Results, ResultView{
-			Campaign: c.Name, CampaignStatus: c.Status, Environment: envNames[r.EnvironmentID],
+			Campaign: c.Name, CampaignStatus: c.Status, Environment: resultEnvironment(r, envNames),
 			Status: r.Status, DefectID: r.DefectID, Defect: defectIDs[r.DefectID], ExecutedAt: r.ExecutedAt,
 		})
 	}
@@ -459,10 +459,14 @@ func (s *Session) CampaignStatus(ctx context.Context, ref string) (*CampaignStat
 		if r.DefectID != "" && defectIDs == nil {
 			defectIDs = s.defectIdentifiers(ctx)
 		}
+		title := r.TestTitle
+		if r.TestCaseID == "" {
+			title += " (deleted)"
+		}
 		view.Attention = append(view.Attention, ResultView{
 			Campaign: c.Name, CampaignStatus: c.Status,
-			TestCase:       &Ref{ID: r.TestCaseID, Title: tc.Title},
-			TestIdentifier: tc.TestIdentifier, Environment: envNames[r.EnvironmentID],
+			TestCase:       &Ref{ID: r.TestCaseID, Title: title},
+			TestIdentifier: tc.TestIdentifier, Environment: resultEnvironment(r, envNames),
 			Status: r.Status, DefectID: r.DefectID, Defect: defectIDs[r.DefectID], ExecutedAt: r.ExecutedAt,
 		})
 	}
@@ -485,4 +489,16 @@ func (s *Session) campaignView(ctx context.Context, c client.Campaign) (*Campaig
 		ID: c.ID, Name: c.Name, Status: c.Status, StartsAt: c.StartsAt, EndsAt: c.EndsAt,
 		Verdict: p.Verdict, Total: total, Counts: p.Counts,
 	}, nil
+}
+
+// resultEnvironment labels a campaign result's environment, marking one that
+// has been deleted since by the name the result recorded.
+func resultEnvironment(r client.CampaignResult, envNames map[string]string) string {
+	if name, ok := envNames[r.EnvironmentID]; ok && r.EnvironmentID != "" {
+		return name
+	}
+	if r.EnvironmentName != "" {
+		return r.EnvironmentName + " (deleted)"
+	}
+	return ""
 }

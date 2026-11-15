@@ -272,6 +272,20 @@ func (m *MockAuditStore) Create(ctx context.Context, entry *model.AuditEntry) er
 func (m *MockAuditStore) ListByEntity(ctx context.Context, entityType, entityID string) ([]*model.AuditEntry, error) {
 	return m.ListByEntityFunc(ctx, entityType, entityID)
 }
+func (m *MockAuditStore) List(context.Context, store.AuditFilter, store.ListParams) ([]*model.AuditEntry, error) {
+	return nil, nil
+}
+func (m *MockAuditStore) Count(context.Context, store.AuditFilter) (int, error) { return 0, nil }
+func (m *MockAuditStore) Each(context.Context, store.AuditFilter, func(*model.AuditEntry) error) error {
+	return nil
+}
+func (m *MockAuditStore) DeleteByProduct(context.Context, string) (int64, error) { return 0, nil }
+func (m *MockAuditStore) DeletedEntities(context.Context, []string) (map[string]bool, error) {
+	return map[string]bool{}, nil
+}
+func (m *MockAuditStore) DeletedProducts(context.Context) ([]*model.DeletedProduct, error) {
+	return nil, nil
+}
 
 // MockComponentStore implements store.ComponentStore with configurable function fields.
 type MockComponentStore struct {
@@ -580,6 +594,7 @@ type MockRequirementStore struct {
 	DeleteFunc             func(ctx context.Context, id string) error
 	ListByProductIDFunc    func(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error)
 	ListByParentIDFunc     func(ctx context.Context, parentID string) ([]*model.Requirement, error)
+	SetParentFunc          func(ctx context.Context, id, parentID, updatedAt string) error
 	ListBySprintIDFunc     func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneIDFunc  func(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumberFunc func(ctx context.Context, productID string) (int, error)
@@ -592,6 +607,12 @@ type MockRequirementStore struct {
 
 func (m *MockRequirementStore) Create(ctx context.Context, r *model.Requirement) error {
 	return m.CreateFunc(ctx, r)
+}
+func (m *MockRequirementStore) SetParent(ctx context.Context, id, parentID, updatedAt string) error {
+	if m.SetParentFunc != nil {
+		return m.SetParentFunc(ctx, id, parentID, updatedAt)
+	}
+	return nil
 }
 func (m *MockRequirementStore) GetByID(ctx context.Context, id string) (*model.Requirement, error) {
 	if m.GetByIDFunc != nil {
@@ -609,6 +630,9 @@ func (m *MockRequirementStore) ListByProductID(ctx context.Context, productID st
 	return m.ListByProductIDFunc(ctx, productID, filter)
 }
 func (m *MockRequirementStore) ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error) {
+	if m.ListByParentIDFunc == nil {
+		return nil, nil
+	}
 	return m.ListByParentIDFunc(ctx, parentID)
 }
 func (m *MockRequirementStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error) {
@@ -938,6 +962,19 @@ type MockCampaignResultStore struct {
 	DeleteByCampaignAndTestCaseFunc func(ctx context.Context, campaignID, testCaseID string) error
 	CountsByProductIDFunc           func(ctx context.Context, productID string) (map[string]map[string]int, error)
 }
+
+func (m *MockCampaignResultStore) ListTests(context.Context, string) ([]*model.CampaignTest, error) {
+	return nil, nil
+}
+func (m *MockCampaignResultStore) RefreshDraftTests(context.Context, string) error { return nil }
+func (m *MockCampaignResultStore) CampaignsWithTestCase(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+func (m *MockCampaignResultStore) CampaignsWithEnvironment(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+func (m *MockCampaignResultStore) DetachTestCase(context.Context, string) error    { return nil }
+func (m *MockCampaignResultStore) DetachEnvironment(context.Context, string) error { return nil }
 
 func (m *MockCampaignResultStore) Create(ctx context.Context, cr *model.CampaignResult) error {
 	return m.CreateFunc(ctx, cr)

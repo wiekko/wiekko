@@ -121,14 +121,17 @@ func campaignDeleteURL(props CampaignDetailProps) string {
 // --- Matrix tab ---
 
 // CampaignMatrixColumn is one runtime environment column. An empty ID is the
-// column for test cases that define no environment matrix.
+// column for test cases that define no environment matrix; a deleted
+// environment's column is keyed by the name its results recorded.
 type CampaignMatrixColumn struct {
 	ID    string
 	Label string
 }
 
 // CampaignMatrixRow is one test case, with cells aligned to the column list.
-// A nil cell means the test case does not run in that environment.
+// A nil cell means the test case does not run in that environment. TestCase
+// carries the campaign's copy of the title; its ID is empty once the test case
+// has been deleted.
 type CampaignMatrixRow struct {
 	TestCase *model.TestCase
 	Cells    []*model.CampaignResult
@@ -195,12 +198,16 @@ templ CampaignMatrixTabContent(props CampaignMatrixProps) {
 							for _, row := range group.Rows {
 								@ui.TableRow("") {
 									@ui.TableCell() {
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.ProductID, row.TestCase.ID)) }
-											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-										>
-											{ row.TestCase.Title }
-										</a>
+										if row.TestCase.ID != "" {
+											<a
+												href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.ProductID, row.TestCase.ID)) }
+												class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+											>
+												{ row.TestCase.Title }
+											</a>
+										} else {
+											<span class="font-medium text-gray-500 dark:text-gray-400">{ row.TestCase.Title }</span>
+										}
 									}
 									for _, cell := range row.Cells {
 										@ui.TableCell() {
@@ -328,6 +335,8 @@ type CampaignResultMenuProps struct {
 	Result      *model.CampaignResult
 	TestCase    *model.TestCase
 	Environment string
+	// Description is the test's description as the campaign copied it.
+	Description string
 	// GroupBy is carried through so the matrix repaint keeps the grouping the
 	// tester was looking at.
 	GroupBy   string
@@ -341,6 +350,14 @@ templ CampaignResultStatusMenu(props CampaignResultMenuProps) {
 	@ui.Modal("result-status-modal", props.TestCase.Title, "md") {
 		if props.Environment != "" {
 			<p class="text-sm text-gray-500 dark:text-gray-400">{ props.Environment }</p>
+		}
+		if props.Description != "" {
+			<details class="mt-3 text-sm">
+				<summary class="cursor-pointer font-medium text-gray-700 dark:text-gray-300">Test description</summary>
+				<div class="prose prose-sm mt-2 max-w-none dark:prose-invert">
+					@templ.Raw(templates.RenderMarkdown(props.Description))
+				</div>
+			</details>
 		}
 		if props.CanExecute {
 			<div class="mt-4 space-y-1">

@@ -546,6 +546,9 @@ func TestDeleteRequirement(t *testing.T) {
 		deleted := false
 		svc := newBacklogService(
 			&testutil.MockRequirementStore{
+				GetByIDFunc: func(_ context.Context, id string) (*model.Requirement, error) {
+					return &model.Requirement{ID: id, ProductID: "product-001", Kind: model.RequirementKindRequirement}, nil
+				},
 				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
 			nil, noopAudit(), ownerRoles(),

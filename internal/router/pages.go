@@ -13,7 +13,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	registerCtrl := controller.NewPageRegister(svc.User, loginCtrl)
 	resetCtrl := controller.NewPagePasswordReset(svc.PasswordReset)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
-	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor)
+	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor, svc.Audit, svc.Product)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product)
 	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes)
 	productCtrl.UseDocuments(svc.Document)
@@ -453,6 +453,9 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("GET /admin/invitations", pageAdmin(http.HandlerFunc(adminCtrl.Invitations)))
 	mux.Handle("POST /admin/invitations", pageAdmin(http.HandlerFunc(adminCtrl.CreateInvitation)))
 	mux.Handle("DELETE /admin/invitations/{id}", pageAdmin(http.HandlerFunc(adminCtrl.DeleteInvitation)))
+	mux.Handle("GET /admin/audit", pageAdmin(http.HandlerFunc(adminCtrl.Audit)))
+	mux.Handle("GET /admin/audit/export", pageAdmin(http.HandlerFunc(adminCtrl.AuditExport)))
+	mux.Handle("DELETE /admin/audit/products/{productId}", pageAdmin(http.HandlerFunc(adminCtrl.PurgeAudit)))
 }
 
 // pageAuthed wraps a handler with RequireAuthPage middleware (redirect to

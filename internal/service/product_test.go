@@ -275,7 +275,8 @@ func TestProductDelete(t *testing.T) {
 		deleted := false
 		svc := newProductService(
 			&testutil.MockProductStore{
-				DeleteFunc: func(_ context.Context, _ string) error { deleted = true; return nil },
+				GetByIDFunc: func(_ context.Context, _ string) (*model.Product, error) { return testutil.MakeProduct(), nil },
+				DeleteFunc:  func(_ context.Context, _ string) error { deleted = true; return nil },
 			},
 			ownerRoles(), nil, noopAudit(),
 		)

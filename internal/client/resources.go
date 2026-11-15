@@ -167,13 +167,17 @@ type CampaignProgress struct {
 
 // CampaignResult is one test case's status in a campaign (per environment).
 type CampaignResult struct {
-	ID            string `json:"id"`
-	CampaignID    string `json:"campaign_id"`
-	TestCaseID    string `json:"test_case_id"`
-	EnvironmentID string `json:"environment_id"`
-	Status        string `json:"status"`
-	DefectID      string `json:"defect_id"`
-	ExecutedAt    string `json:"executed_at"`
+	ID         string `json:"id"`
+	CampaignID string `json:"campaign_id"`
+	// TestCaseID is empty once the test case has been deleted; TestTitle is
+	// the title the campaign copied, and stays.
+	TestCaseID      string `json:"test_case_id"`
+	TestTitle       string `json:"test_title"`
+	EnvironmentID   string `json:"environment_id"`
+	EnvironmentName string `json:"environment_name"`
+	Status          string `json:"status"`
+	DefectID        string `json:"defect_id"`
+	ExecutedAt      string `json:"executed_at"`
 }
 
 // Comment is a Markdown comment on any entity.

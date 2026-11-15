@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS runtime_environments (
 CREATE INDEX IF NOT EXISTS idx_runtime_environments_product_id ON runtime_environments(product_id);
 
 -- environment_id records where the defect was observed ("login fails in Firefox").
--- Unlike campaign_results it clears rather than cascades: a defect outlives the
+-- It clears rather than cascades: a defect outlives the
 -- environment label it was found in.
 CREATE TABLE IF NOT EXISTS defects (
     id             UUID PRIMARY KEY,
@@ -278,27 +278,49 @@ CREATE INDEX IF NOT EXISTS idx_testing_campaigns_product_id ON testing_campaigns
 -- At most one active campaign per product (FR-322)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_testing_campaigns_active ON testing_campaigns(product_id) WHERE status = 'active';
 
--- Campaign results: status per campaign x test case x environment (FR-021)
--- environment_id cascades: on environment deletion the matrix rows must disappear, not
--- collapse into NULL rows that the UNIQUE constraint below cannot deduplicate.
+-- Campaign tests: a campaign's own copy of each test case in its scope. The
+-- test case is the template; once in a campaign it becomes that campaign's
+-- test. Draft campaigns follow edits to the test case, from activation on the
+-- copy is frozen, and it outlives the test case: deleting one detaches the copy
+-- (test_case_id becomes NULL) so closed campaigns keep their history.
+CREATE TABLE IF NOT EXISTS campaign_tests (
+    id              UUID PRIMARY KEY,
+    campaign_id     UUID NOT NULL REFERENCES testing_campaigns(id) ON DELETE CASCADE,
+    test_case_id    UUID REFERENCES test_cases(id) ON DELETE SET NULL,
+    title           TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    execution_mode  TEXT NOT NULL DEFAULT 'manual',
+    test_identifier TEXT NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ NOT NULL,
+    UNIQUE(campaign_id, test_case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_campaign_tests_test_case_id ON campaign_tests(test_case_id);
+
+-- Campaign results: status per campaign test x environment (FR-021)
+-- environment_name keeps the label: deleting an environment detaches the row
+-- (environment_id becomes NULL) but the result still says where it ran. A NULL
+-- name marks a test without an environment matrix.
 CREATE TABLE IF NOT EXISTS campaign_results (
-    id             UUID PRIMARY KEY,
-    campaign_id    UUID NOT NULL REFERENCES testing_campaigns(id) ON DELETE CASCADE,
-    test_case_id   UUID NOT NULL REFERENCES test_cases(id) ON DELETE CASCADE,
-    environment_id UUID REFERENCES runtime_environments(id) ON DELETE CASCADE,
-    status         TEXT NOT NULL DEFAULT 'pending',
-    defect_id      UUID REFERENCES defects(id) ON DELETE SET NULL,
-    executed_by    UUID REFERENCES users(id) ON DELETE SET NULL,
-    executed_at    TIMESTAMPTZ,
-    updated_at     TIMESTAMPTZ NOT NULL,
-    UNIQUE(campaign_id, test_case_id, environment_id)
+    id               UUID PRIMARY KEY,
+    campaign_id      UUID NOT NULL REFERENCES testing_campaigns(id) ON DELETE CASCADE,
+    campaign_test_id UUID NOT NULL REFERENCES campaign_tests(id) ON DELETE CASCADE,
+    environment_id   UUID REFERENCES runtime_environments(id) ON DELETE SET NULL,
+    environment_name TEXT,
+    status           TEXT NOT NULL DEFAULT 'pending',
+    defect_id        UUID REFERENCES defects(id) ON DELETE SET NULL,
+    executed_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    executed_at      TIMESTAMPTZ,
+    updated_at       TIMESTAMPTZ NOT NULL,
+    UNIQUE(campaign_id, campaign_test_id, environment_id)
 );
 CREATE INDEX IF NOT EXISTS idx_campaign_results_campaign_id ON campaign_results(campaign_id);
-CREATE INDEX IF NOT EXISTS idx_campaign_results_test_case_id ON campaign_results(test_case_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_results_campaign_test_id ON campaign_results(campaign_test_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_results_environment_id ON campaign_results(environment_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_results_defect_id ON campaign_results(defect_id);
 -- The UNIQUE above treats NULLs as distinct, so it does not stop a second
--- result without an environment for the same test case.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_results_no_env ON campaign_results(campaign_id, test_case_id) WHERE environment_id IS NULL;
+-- result without an environment for the same test. Rows whose environment was
+-- deleted keep its name and stay out of this index.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_results_no_env ON campaign_results(campaign_id, campaign_test_id) WHERE environment_id IS NULL AND environment_name IS NULL;
 
 -- Campaign result events: immutable status change log (FR-042, UC-207)
 -- campaign_id is denormalised so progress-over-time is one indexed scan without a join.
@@ -494,8 +516,11 @@ CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_type, owne
 CREATE INDEX IF NOT EXISTS idx_attachments_product_id ON attachments(product_id);
 
 -- Audit trail: field-level change tracking (FR-031)
+-- product_id has no foreign key on purpose: the history outlives the product,
+-- so administrators can still read, export or purge it (admin audit page).
 CREATE TABLE IF NOT EXISTS audit_trail (
     id          UUID PRIMARY KEY,
+    product_id  UUID,
     entity_type TEXT NOT NULL,
     entity_id   UUID NOT NULL,
     user_id     UUID NOT NULL,
@@ -507,3 +532,4 @@ CREATE TABLE IF NOT EXISTS audit_trail (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_trail_entity ON audit_trail(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_trail_created_at ON audit_trail(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_trail_product ON audit_trail(product_id, created_at);
