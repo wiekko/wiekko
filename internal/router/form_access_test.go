@@ -133,6 +133,22 @@ func TestFormAccessRedirectsWithNotice(t *testing.T) {
 			}
 		}
 
+		// Campaign pages for a missing product or campaign redirect like every
+		// other page: to the dashboard, or to the campaign list.
+		missing := "/products/00000000-0000-0000-0000-000000000000"
+		for _, tc := range []struct{ path, target string }{
+			{missing + "/campaigns", "/"},
+			{missing + "/campaigns/new", "/"},
+			{missing + "/campaigns/x", "/"},
+			{missing + "/campaigns/x/edit", "/"},
+			{p + "/campaigns/x", p + "/campaigns"},
+			{p + "/campaigns/x/edit", p + "/campaigns"},
+		} {
+			if resp, _ := get(admin, tc.path); resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != tc.target {
+				t.Errorf("GET %s: status %d, Location %q, want 303 to %q", tc.path, resp.StatusCode, resp.Header.Get("Location"), tc.target)
+			}
+		}
+
 		// The product form, with product creation turned off.
 		e.setting("product_creation_enabled", "false")
 		if resp, _ := get(viewer, "/products/new"); resp.Header.Get("Location") != "/?notice=product-creation-off" {

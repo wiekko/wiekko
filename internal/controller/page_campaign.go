@@ -23,13 +23,13 @@ func (c *PageProductController) Campaigns(w http.ResponseWriter, r *http.Request
 
 	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	campaigns, err := c.testing.ListCampaigns(r.Context(), user, productID)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
 		return
 	}
 	// One grouped query for the whole product rather than one per campaign.
@@ -104,7 +104,7 @@ func (c *PageProductController) CampaignCreateForm(w http.ResponseWriter, r *htt
 
 	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	if !c.canEditCampaigns(user, role) {
@@ -196,7 +196,7 @@ func (c *PageProductController) CampaignEditForm(w http.ResponseWriter, r *http.
 
 	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	if !c.canEditCampaigns(user, role) {
@@ -206,7 +206,7 @@ func (c *PageProductController) CampaignEditForm(w http.ResponseWriter, r *http.
 
 	campaign, err := c.testing.GetCampaign(r.Context(), user, productID, campaignID)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/products/"+productID+"/campaigns", http.StatusSeeOther)
 		return
 	}
 
@@ -399,19 +399,19 @@ func (c *PageProductController) CampaignDetail(w http.ResponseWriter, r *http.Re
 
 	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	campaign, err := c.testing.GetCampaign(r.Context(), user, productID, campaignID)
 	if err != nil || campaign.ProductID != productID {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/products/"+productID+"/campaigns", http.StatusSeeOther)
 		return
 	}
 
 	matrix, results, err := c.loadMatrixProps(r, user, productID, campaign, role, matrixGrouping(r))
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		http.Redirect(w, r, "/products/"+productID+"/campaigns", http.StatusSeeOther)
 		return
 	}
 
