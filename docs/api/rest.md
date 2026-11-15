@@ -88,6 +88,14 @@ human-readable `message`:
 {"error": {"code": "…", "message": "…"}}
 ```
 
+## Concurrent edits
+
+A `PATCH` of a requirement, task, defect, constraint, component, capability, milestone, sprint,
+document, test case, campaign or product accepts `if_updated_at`: the `updated_at` of the version the
+change is based on. If the item has been changed since, nothing is written and the answer is
+`409 CONFLICT`; read it again and reapply the change. Without `if_updated_at` the change applies to
+whatever is current.
+
 ## Endpoints
 
 ### Team, workflow and campaign scope

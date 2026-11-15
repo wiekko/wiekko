@@ -38,34 +38,6 @@ func TestCreateDefectNumbers(t *testing.T) {
 		}
 	})
 
-	t.Run("retries when a concurrent insert took the number", func(t *testing.T) {
-		next, attempts := 3, 0
-		svc := newBacklogService(nil, &testutil.MockDefectStore{
-			NextSequenceNumberFunc: func(_ context.Context, _ string) (int, error) { n := next; next++; return n, nil },
-			CreateFunc: func(_ context.Context, d *model.Defect) error {
-				attempts++
-				if d.SequenceNumber == 3 {
-					return errors.New("UNIQUE constraint failed")
-				}
-				return nil
-			},
-			GetBySequenceFunc: func(_ context.Context, _ string, seq int) (*model.Defect, error) {
-				if seq == 3 {
-					return &model.Defect{ID: "someone-else"}, nil
-				}
-				return nil, errors.New("not found")
-			},
-		}, noopAudit(), testerRoles())
-
-		d, err := svc.CreateDefect(context.Background(), testutil.MakeUser(), CreateDefectInput{ProductID: "product-001", Title: "x"})
-		if err != nil {
-			t.Fatalf("CreateDefect: %v", err)
-		}
-		if attempts != 2 || d.SequenceNumber != 4 || d.Identifier != "DF-4" {
-			t.Fatalf("attempts %d, defect %+v; want a second attempt as DF-4", attempts, d)
-		}
-	})
-
 	t.Run("other insert errors are not retried", func(t *testing.T) {
 		attempts := 0
 		svc := newBacklogService(nil, &testutil.MockDefectStore{

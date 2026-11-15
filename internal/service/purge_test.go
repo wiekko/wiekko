@@ -15,6 +15,8 @@ type recordingPurger struct {
 	owners   []purgedOwner
 	products []string
 	err      error
+	// blobsPurged counts the afterCommit calls.
+	blobsPurged int
 }
 
 type purgedOwner struct {
@@ -23,9 +25,12 @@ type purgedOwner struct {
 	ownerID   string
 }
 
-func (p *recordingPurger) PurgeOwner(_ context.Context, productID, ownerType, ownerID string) error {
+func (p *recordingPurger) PurgeOwner(_ context.Context, productID, ownerType, ownerID string) (func(), error) {
 	p.owners = append(p.owners, purgedOwner{productID, ownerType, ownerID})
-	return p.err
+	if p.err != nil {
+		return nil, p.err
+	}
+	return func() { p.blobsPurged++ }, nil
 }
 
 func (p *recordingPurger) PurgeProduct(_ context.Context, productID string) error {
@@ -157,6 +162,9 @@ func TestDeleteCascadesDiscussion(t *testing.T) {
 			want := purgedOwner{"product-001", tc.ownerType, "entity-001"}
 			if len(purger.owners) != 1 || purger.owners[0] != want {
 				t.Fatalf("purged %v, want exactly [%v]", purger.owners, want)
+			}
+			if purger.blobsPurged != 1 {
+				t.Fatalf("blobs purged %d times after commit, want 1", purger.blobsPurged)
 			}
 		})
 	}

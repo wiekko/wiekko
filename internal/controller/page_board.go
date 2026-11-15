@@ -127,7 +127,8 @@ func (c *PageProductController) BoardRequirementStatus(w http.ResponseWriter, r 
 
 	statusID := strings.TrimSpace(r.FormValue("status_id"))
 	_, err := c.backlog.UpdateRequirement(r.Context(), user, productID, reqID, service.UpdateRequirementInput{
-		StatusID: &statusID,
+		IfUpdatedAt: r.FormValue("updated_at"),
+		StatusID:    &statusID,
 	})
 	if err != nil {
 		http.Error(w, errorText(err), http.StatusForbidden)
@@ -146,7 +147,8 @@ func (c *PageProductController) BoardTaskStatus(w http.ResponseWriter, r *http.R
 
 	statusID := strings.TrimSpace(r.FormValue("status_id"))
 	_, err := c.backlog.UpdateRequirement(r.Context(), user, productID, taskID, service.UpdateRequirementInput{
-		StatusID: &statusID,
+		IfUpdatedAt: r.FormValue("updated_at"),
+		StatusID:    &statusID,
 	})
 	if err != nil {
 		http.Error(w, errorText(err), http.StatusForbidden)
@@ -163,7 +165,8 @@ func (c *PageProductController) BoardDefectStatus(w http.ResponseWriter, r *http
 
 	statusID := strings.TrimSpace(r.FormValue("status_id"))
 	_, err := c.backlog.UpdateDefect(r.Context(), user, productID, defectID, service.UpdateDefectInput{
-		StatusID: &statusID,
+		IfUpdatedAt: r.FormValue("updated_at"),
+		StatusID:    &statusID,
 	})
 	if err != nil {
 		http.Error(w, errorText(err), http.StatusForbidden)

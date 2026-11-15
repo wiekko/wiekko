@@ -116,11 +116,8 @@ func (c *PageProductController) buildCommentViews(r *http.Request, user *model.U
 }
 
 func (c *PageProductController) commentView(cm *model.Comment, user *model.User, names map[string]string, productID, ownerType, ownerID string, productOwner bool) templates.CommentView {
-	author := cm.UserID
-	if dn, ok := names[cm.UserID]; ok {
-		author = dn
-	}
-	mine := cm.UserID == user.ID
+	author := userName(names, cm.UserID)
+	mine := cm.UserID != "" && cm.UserID == user.ID
 	canDelete := mine || productOwner
 
 	v := templates.CommentView{
@@ -329,6 +326,19 @@ func (c *PageProductController) displayNames(r *http.Request, user *model.User) 
 		names[u.ID] = u.DisplayName
 	}
 	return names
+}
+
+// deletedUserName labels the author of something whose account has since been
+// deleted: the comment, attachment or history entry stays, the person is gone.
+const deletedUserName = "Deleted user"
+
+// userName resolves a user ID through names (see displayNames). An empty ID,
+// or one no longer among the users, belongs to a deleted account.
+func userName(names map[string]string, userID string) string {
+	if dn, ok := names[userID]; ok && userID != "" {
+		return dn
+	}
+	return deletedUserName
 }
 
 // formatTimestamp renders an RFC 3339 timestamp for display, falling back to

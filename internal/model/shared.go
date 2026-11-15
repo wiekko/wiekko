@@ -6,7 +6,7 @@ type Comment struct {
 	ProductID string // owning product; scopes reads and writes
 	OwnerType string // one of the OwnerType* constants
 	OwnerID   string
-	UserID    string
+	UserID    string // author; "" once the author's account is deleted
 	Body      string // Markdown
 	CreatedAt string // RFC 3339
 	UpdatedAt string // RFC 3339
@@ -18,7 +18,7 @@ type Attachment struct {
 	ProductID   string // owning product; scopes reads and writes
 	OwnerType   string // one of the OwnerType* constants
 	OwnerID     string
-	UserID      string
+	UserID      string // uploader; "" once the uploader's account is deleted
 	Filename    string
 	ContentType string
 	Size        int64

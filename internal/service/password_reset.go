@@ -36,6 +36,8 @@ var ErrPasswordResetInvalid = errors.New("this password reset link is not valid 
 // PasswordResetService lets users who forgot their password set a new one
 // through a link sent by email. Without mail it is disabled.
 type PasswordResetService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx       store.Transactor
 	users    store.UserStore
 	resets   store.PasswordResetStore
 	accounts *UserService
@@ -120,20 +122,23 @@ func (s *PasswordResetService) findUser(ctx context.Context, identifier string) 
 // issue replaces the user's outstanding reset links by a new one and returns
 // its raw token. Only the newest link works.
 func (s *PasswordResetService) issue(ctx context.Context, userID string) (string, error) {
-	if err := s.resets.DeleteByUserID(ctx, userID); err != nil {
-		return "", err
-	}
 	rawToken, err := generateToken(32)
 	if err != nil {
 		return "", err
 	}
 	now := time.Now().UTC().Truncate(time.Second)
-	err = s.resets.Create(ctx, &model.PasswordResetToken{
-		ID:        uuid.NewString(),
-		UserID:    userID,
-		TokenHash: hashPATToken(rawToken),
-		CreatedAt: store.FormatTimestamp(now),
-		ExpiresAt: store.FormatTimestamp(now.Add(passwordResetTTL)),
+	// The new link replaces the old ones in one step.
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.resets.DeleteByUserID(ctx, userID); err != nil {
+			return err
+		}
+		return s.resets.Create(ctx, &model.PasswordResetToken{
+			ID:        uuid.NewString(),
+			UserID:    userID,
+			TokenHash: hashPATToken(rawToken),
+			CreatedAt: store.FormatTimestamp(now),
+			ExpiresAt: store.FormatTimestamp(now.Add(passwordResetTTL)),
+		})
 	})
 	if err != nil {
 		return "", err
@@ -167,21 +172,27 @@ func (s *PasswordResetService) Reset(ctx context.Context, rawToken, newPassword 
 	if err != nil {
 		return err
 	}
-	ok, err := s.resets.Consume(ctx, tok.ID, store.FormatTimestamp(time.Now().UTC().Truncate(time.Second)))
+	// Using up the link, setting the password and ending the old sessions
+	// happen together: a failure must neither burn the link with the password
+	// unchanged nor change the password and leave a thief's session alive.
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		ok, err := s.resets.Consume(ctx, tok.ID, store.FormatTimestamp(time.Now().UTC().Truncate(time.Second)))
+		if err != nil {
+			return fmt.Errorf("use reset link: %w", err)
+		}
+		if !ok {
+			// Used or expired between the check above and now.
+			return ErrPasswordResetInvalid
+		}
+		if err := s.users.UpdatePassword(ctx, user.ID, hash); err != nil {
+			return fmt.Errorf("set password: %w", err)
+		}
+		if err := s.resets.DeleteByUserID(ctx, user.ID); err != nil {
+			return fmt.Errorf("remove used reset links: %w", err)
+		}
+		return s.accounts.endSessions(ctx, user.ID, "")
+	})
 	if err != nil {
-		return fmt.Errorf("use reset link: %w", err)
-	}
-	if !ok {
-		// Used or expired between the check above and now.
-		return ErrPasswordResetInvalid
-	}
-	if err := s.users.UpdatePassword(ctx, user.ID, hash); err != nil {
-		return fmt.Errorf("set password: %w", err)
-	}
-	if err := s.resets.DeleteByUserID(ctx, user.ID); err != nil {
-		slog.WarnContext(ctx, "password reset: remove used links", "err", err)
-	}
-	if err := s.accounts.endSessions(ctx, user.ID, ""); err != nil {
 		return err
 	}
 	slog.InfoContext(ctx, "password reset", "user_id", user.ID)

@@ -8,6 +8,9 @@ import (
 
 // Store groups all data access interfaces.
 type Store struct {
+	// Tx runs several store calls as one transaction.
+	Tx Transactor
+
 	User               UserStore
 	Session            SessionStore
 	TwoFactor          TwoFactorStore
@@ -43,6 +46,7 @@ type Store struct {
 func New(conn *sql.DB, dialect Dialect, keys *crypto.KeyRing) *Store {
 	db := NewDB(conn, dialect)
 	return &Store{
+		Tx:                 db,
 		User:               &userStore{db: db, keys: keys},
 		Session:            &sessionStore{db: db},
 		TwoFactor:          &twoFactorStore{db: db},

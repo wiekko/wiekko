@@ -105,6 +105,9 @@ func (c *ConstraintController) UpdateConstraint(w http.ResponseWriter, r *http.R
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt     string  `json:"if_updated_at"`
 		CategoryID      *string `json:"category_id"`
 		Title           *string `json:"title"`
 		Description     *string `json:"description"`
@@ -117,6 +120,7 @@ func (c *ConstraintController) UpdateConstraint(w http.ResponseWriter, r *http.R
 	}
 
 	item, err := c.constraint.UpdateConstraint(r.Context(), user, productID, id, service.UpdateConstraintInput{
+		IfUpdatedAt:     req.IfUpdatedAt,
 		CategoryID:      req.CategoryID,
 		Title:           req.Title,
 		Description:     req.Description,

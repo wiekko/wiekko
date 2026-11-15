@@ -116,9 +116,12 @@ func (s *invitationStore) Delete(ctx context.Context, id string) error {
 	return tx.Commit()
 }
 
+// MarkAccepted uses the invitation up. It returns ErrNotChanged when the
+// invitation was already accepted (or is gone), so that of two concurrent
+// accepts only one can succeed.
 func (s *invitationStore) MarkAccepted(ctx context.Context, id, acceptedAt string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE invitations SET accepted_at = ? WHERE id = ?`, acceptedAt, id)
-	return err
+	return requireChanged(s.db.ExecContext(ctx,
+		`UPDATE invitations SET accepted_at = ? WHERE id = ? AND accepted_at IS NULL`, acceptedAt, id))
 }
 
 func (s *invitationStore) scanInvitation(sc scanner) (*model.Invitation, error) {

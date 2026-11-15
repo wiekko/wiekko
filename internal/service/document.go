@@ -27,13 +27,11 @@ const (
 	MaxDocumentBodyBytes   = 512 * 1024 // bytes
 )
 
-// documentNumberAttempts bounds the retries when concurrent creates draw the
-// same document number.
-const documentNumberAttempts = 5
-
 // DocumentService handles documents, their revisions and links
 // (FR-044..FR-052, FR-334).
 type DocumentService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	documents    store.DocumentStore
 	products     store.ProductStore
 	requirements store.RequirementStore
@@ -62,6 +60,9 @@ type CreateDocumentInput struct {
 // UpdateDocumentInput contains the fields that can be changed; nil means
 // unchanged.
 type UpdateDocumentInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt    string
 	Title          *string
 	Body           *string
 	Format         *string
@@ -199,23 +200,26 @@ func (s *DocumentService) CreateDocument(ctx context.Context, user *model.User, 
 		return nil, err
 	}
 	rev := s.snapshot(d, user, now)
-	for attempt := 1; ; attempt++ {
+	// The sequence lock holds off concurrent creates between drawing the next
+	// number and inserting it.
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockSequence("document", d.ProductID)); err != nil {
+			return err
+		}
 		seq, err := s.documents.NextSequenceNumber(ctx, d.ProductID)
 		if err != nil {
-			return nil, fmt.Errorf("next document number: %w", err)
+			return fmt.Errorf("next document number: %w", err)
 		}
 		d.SequenceNumber = seq
-		err = s.documents.Create(ctx, d, rev)
-		if err == nil {
-			break
+		if err := s.documents.Create(ctx, d, rev); err != nil {
+			return fmt.Errorf("create document: %w", err)
 		}
-		// Retry only if the number was taken meanwhile.
-		if _, lookupErr := s.documents.GetBySequence(ctx, d.ProductID, seq); lookupErr != nil || attempt == documentNumberAttempts {
-			return nil, fmt.Errorf("create document: %w", err)
-		}
+		return s.record(ctx, user, d.ID, "create", "", "", "", now)
+	})
+	if err != nil {
+		return nil, err
 	}
 	d.Identifier = model.EntityIdentifier(s.documentPrefix(ctx, d.ProductID), d.SequenceNumber)
-	s.record(ctx, user, d.ID, "create", "", "", "", now)
 	return d, nil
 }
 
@@ -226,8 +230,8 @@ func (s *DocumentService) snapshot(d *model.Document, user *model.User, now stri
 	}
 }
 
-func (s *DocumentService) record(ctx context.Context, user *model.User, id, action, field, oldValue, newValue, now string) {
-	_ = s.audit.Create(ctx, &model.AuditEntry{
+func (s *DocumentService) record(ctx context.Context, user *model.User, id, action, field, oldValue, newValue, now string) error {
+	return s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: "document", EntityID: id, UserID: user.ID,
 		Action: action, FieldName: field, OldValue: oldValue, NewValue: newValue, CreatedAt: now,
 	})
@@ -256,72 +260,99 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, user *model.User, 
 		ref{kindMilestone, opt(input.MilestoneID)}); err != nil {
 		return nil, err
 	}
-	d, err := s.documents.GetByID(ctx, id)
+	var d *model.Document
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		d, err = s.documents.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, d.UpdatedAt); err != nil {
+			return err
+		}
+		old := *d
+
+		if input.Title != nil {
+			if d.Title, err = cleanDocumentTitle(*input.Title); err != nil {
+				return err
+			}
+		}
+		if input.Body != nil {
+			if err := checkDocumentBody(*input.Body); err != nil {
+				return err
+			}
+			d.Body = *input.Body
+		}
+		if input.Format != nil {
+			if err := checkDocumentFormat(*input.Format); err != nil {
+				return err
+			}
+			d.Format = *input.Format
+		}
+		if input.State != nil {
+			if err := checkDocumentState(*input.State); err != nil {
+				return err
+			}
+			d.State = *input.State
+		}
+		if input.SupersededByID != nil {
+			d.SupersededByID = *input.SupersededByID
+		} else if d.State != model.DocumentStateSuperseded {
+			// Leaving the superseded state drops the successor it named.
+			d.SupersededByID = ""
+		}
+		if input.ComponentID != nil {
+			d.ComponentID = *input.ComponentID
+		}
+		if input.CapabilityID != nil {
+			d.CapabilityID = *input.CapabilityID
+		}
+		if input.MilestoneID != nil {
+			d.MilestoneID = *input.MilestoneID
+		}
+		if err := checkPlacement(d); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		var rev *model.DocumentRevision
+		if d.Title != old.Title || d.Body != old.Body || d.Format != old.Format {
+			d.Revision++
+			rev = s.snapshot(d, user, now)
+		}
+		d.UpdatedAt = now
+		err = inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.documents.Update(ctx, d, rev); err != nil {
+				return fmt.Errorf("update document: %w", err)
+			}
+			if rev != nil {
+				if err := s.record(ctx, user, d.ID, "update", "revision", strconv.Itoa(old.Revision), strconv.Itoa(d.Revision), now); err != nil {
+					return err
+				}
+			}
+			if d.State != old.State {
+				if err := s.record(ctx, user, d.ID, "update", "state", old.State, d.State, now); err != nil {
+					return err
+				}
+			}
+			if rev == nil && d.State == old.State {
+				return s.record(ctx, user, d.ID, "update", "", "", "", now)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	old := *d
-
-	if input.Title != nil {
-		if d.Title, err = cleanDocumentTitle(*input.Title); err != nil {
-			return nil, err
-		}
-	}
-	if input.Body != nil {
-		if err := checkDocumentBody(*input.Body); err != nil {
-			return nil, err
-		}
-		d.Body = *input.Body
-	}
-	if input.Format != nil {
-		if err := checkDocumentFormat(*input.Format); err != nil {
-			return nil, err
-		}
-		d.Format = *input.Format
-	}
-	if input.State != nil {
-		if err := checkDocumentState(*input.State); err != nil {
-			return nil, err
-		}
-		d.State = *input.State
-	}
-	if input.SupersededByID != nil {
-		d.SupersededByID = *input.SupersededByID
-	} else if d.State != model.DocumentStateSuperseded {
-		// Leaving the superseded state drops the successor it named.
-		d.SupersededByID = ""
-	}
-	if input.ComponentID != nil {
-		d.ComponentID = *input.ComponentID
-	}
-	if input.CapabilityID != nil {
-		d.CapabilityID = *input.CapabilityID
-	}
-	if input.MilestoneID != nil {
-		d.MilestoneID = *input.MilestoneID
-	}
-	if err := checkPlacement(d); err != nil {
-		return nil, err
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	var rev *model.DocumentRevision
-	if d.Title != old.Title || d.Body != old.Body || d.Format != old.Format {
-		d.Revision++
-		rev = s.snapshot(d, user, now)
-	}
-	d.UpdatedAt = now
-	if err := s.documents.Update(ctx, d, rev); err != nil {
-		return nil, fmt.Errorf("update document: %w", err)
-	}
-	if rev != nil {
-		s.record(ctx, user, d.ID, "update", "revision", strconv.Itoa(old.Revision), strconv.Itoa(d.Revision), now)
-	}
-	if d.State != old.State {
-		s.record(ctx, user, d.ID, "update", "state", old.State, d.State, now)
-	}
-	if rev == nil && d.State == old.State {
-		s.record(ctx, user, d.ID, "update", "", "", "", now)
 	}
 	return d, nil
 }
@@ -335,15 +366,7 @@ func (s *DocumentService) DeleteDocument(ctx context.Context, user *model.User, 
 	if err := s.owns.require(ctx, productID, ref{kindDocument, id}); err != nil {
 		return err
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.documents.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete document: %w", err)
-	}
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeDocument, id); err != nil {
-		return err
-	}
-	s.record(ctx, user, id, "delete", "", "", "", now)
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeDocument, id, s.documents.Delete)
 }
 
 // ListDocuments returns a page of the product's documents. Requires viewer
@@ -430,10 +453,15 @@ func (s *DocumentService) RestoreRevision(ctx context.Context, user *model.User,
 	d.Title, d.Body, d.Format = rev.Title, rev.Body, rev.Format
 	d.Revision++
 	d.UpdatedAt = now
-	if err := s.documents.Update(ctx, d, s.snapshot(d, user, now)); err != nil {
-		return nil, fmt.Errorf("restore document: %w", err)
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.documents.Update(ctx, d, s.snapshot(d, user, now)); err != nil {
+			return fmt.Errorf("restore document: %w", err)
+		}
+		return s.record(ctx, user, d.ID, "restore", "revision", strconv.Itoa(oldRevision), strconv.Itoa(revision), now)
+	})
+	if err != nil {
+		return nil, err
 	}
-	s.record(ctx, user, d.ID, "restore", "revision", strconv.Itoa(oldRevision), strconv.Itoa(revision), now)
 	return d, nil
 }
 
@@ -477,28 +505,32 @@ func (s *DocumentService) changeLink(ctx context.Context, user *model.User, prod
 		return err
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	action := "unlink"
-	if link {
-		action = "link"
-		err = s.documents.Link(ctx, &model.DocumentLink{
-			ID: uuid.New().String(), DocumentID: id, TargetType: targetType, TargetID: targetID, CreatedAt: now,
-		})
-		if err != nil {
-			// The only expected failure is the unique pair: already linked.
-			if links, lerr := s.documents.ListLinks(ctx, id); lerr == nil {
-				for _, l := range links {
-					if l.TargetType == targetType && l.TargetID == targetID {
-						return nil
-					}
-				}
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if !link {
+			if err := s.documents.Unlink(ctx, id, targetType, targetID); err != nil {
+				return fmt.Errorf("unlink document: %w", err)
 			}
+			return s.record(ctx, user, id, "unlink", targetType, "", targetID, now)
+		}
+		// Linking twice is no error. Look first rather than reading the
+		// unique index's complaint: a failed statement would abort the
+		// transaction on Postgres.
+		links, err := s.documents.ListLinks(ctx, id)
+		if err != nil {
 			return fmt.Errorf("link document: %w", err)
 		}
-	} else if err := s.documents.Unlink(ctx, id, targetType, targetID); err != nil {
-		return fmt.Errorf("unlink document: %w", err)
-	}
-	s.record(ctx, user, id, action, targetType, "", targetID, now)
-	return nil
+		for _, l := range links {
+			if l.TargetType == targetType && l.TargetID == targetID {
+				return nil
+			}
+		}
+		if err := s.documents.Link(ctx, &model.DocumentLink{
+			ID: uuid.New().String(), DocumentID: id, TargetType: targetType, TargetID: targetID, CreatedAt: now,
+		}); err != nil {
+			return fmt.Errorf("link document: %w", err)
+		}
+		return s.record(ctx, user, id, "link", targetType, "", targetID, now)
+	})
 }
 
 // ListLinks returns a document's links. Requires viewer role.

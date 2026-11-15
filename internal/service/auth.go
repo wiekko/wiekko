@@ -27,6 +27,8 @@ const (
 
 // AuthService handles authentication, session management, and PAT validation.
 type AuthService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx       store.Transactor
 	users    store.UserStore
 	sessions store.SessionStore
 	pats     store.PATStore

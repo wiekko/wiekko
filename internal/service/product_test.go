@@ -572,11 +572,12 @@ func TestProductTransferOwnership(t *testing.T) {
 		if len(updates) != 2 {
 			t.Fatalf("len(updates) = %d, want 2", len(updates))
 		}
-		if updates[0].Role != model.RoleDeveloper {
-			t.Fatalf("old owner role = %q, want %q", updates[0].Role, model.RoleDeveloper)
+		// Promote first, then demote: the product always has an owner.
+		if updates[0].UserID != "user-002" || updates[0].Role != model.RoleOwner {
+			t.Fatalf("first update = %s/%s, want user-002/owner", updates[0].UserID, updates[0].Role)
 		}
-		if updates[1].Role != model.RoleOwner {
-			t.Fatalf("new owner role = %q, want %q", updates[1].Role, model.RoleOwner)
+		if updates[1].Role != model.RoleDeveloper {
+			t.Fatalf("old owner role = %q, want %q", updates[1].Role, model.RoleDeveloper)
 		}
 	})
 

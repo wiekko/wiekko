@@ -14,6 +14,8 @@ import (
 
 // ConstraintService handles constraint CRUD.
 type ConstraintService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx          store.Transactor
 	constraints store.ConstraintStore
 	categories  store.CategoryStore
 	comments    ownerPurger
@@ -35,6 +37,9 @@ type CreateConstraintInput struct {
 
 // UpdateConstraintInput contains the fields that can be updated on a constraint.
 type UpdateConstraintInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt     string
 	CategoryID      *string
 	Title           *string
 	Description     *string
@@ -72,17 +77,11 @@ func (s *ConstraintService) CreateConstraint(ctx context.Context, user *model.Us
 		input.ComplianceState = model.ComplianceNotAssessed
 	}
 
-	seq, err := s.constraints.NextSequenceNumber(ctx, input.ProductID)
-	if err != nil {
-		return nil, fmt.Errorf("next sequence number: %w", err)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	c := &model.Constraint{
 		ID:              uuid.New().String(),
 		ProductID:       input.ProductID,
 		CategoryID:      input.CategoryID,
-		SequenceNumber:  seq,
 		Title:           input.Title,
 		Description:     input.Description,
 		ComplianceState: input.ComplianceState,
@@ -91,14 +90,27 @@ func (s *ConstraintService) CreateConstraint(ctx context.Context, user *model.Us
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
-	if err := s.constraints.Create(ctx, c); err != nil {
-		return nil, fmt.Errorf("create constraint: %w", err)
+	// The sequence lock holds off concurrent creates between drawing the next
+	// number and inserting it.
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockSequence("constraint", input.ProductID)); err != nil {
+			return err
+		}
+		seq, err := s.constraints.NextSequenceNumber(ctx, input.ProductID)
+		if err != nil {
+			return fmt.Errorf("next sequence number: %w", err)
+		}
+		c.SequenceNumber = seq
+		if err := s.constraints.Create(ctx, c); err != nil {
+			return fmt.Errorf("create constraint: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "constraint", EntityID: c.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "constraint", EntityID: c.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return c, nil
 }
@@ -126,42 +138,62 @@ func (s *ConstraintService) UpdateConstraint(ctx context.Context, user *model.Us
 		return nil, err
 	}
 
-	c, err := s.constraints.GetByID(ctx, id)
+	var c *model.Constraint
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		c, err = s.constraints.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, c.UpdatedAt); err != nil {
+			return err
+		}
+
+		if input.CategoryID != nil {
+			c.CategoryID = *input.CategoryID
+		}
+		if input.Title != nil {
+			c.Title = *input.Title
+		}
+		if input.Description != nil {
+			c.Description = *input.Description
+		}
+		if input.ComplianceState != nil {
+			c.ComplianceState = *input.ComplianceState
+		}
+		if input.MilestoneID != nil {
+			c.MilestoneID = *input.MilestoneID
+		}
+		if input.Priority != nil {
+			c.Priority = *input.Priority
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		c.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.constraints.Update(ctx, c); err != nil {
+				return fmt.Errorf("update constraint: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "constraint", EntityID: c.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	if input.CategoryID != nil {
-		c.CategoryID = *input.CategoryID
-	}
-	if input.Title != nil {
-		c.Title = *input.Title
-	}
-	if input.Description != nil {
-		c.Description = *input.Description
-	}
-	if input.ComplianceState != nil {
-		c.ComplianceState = *input.ComplianceState
-	}
-	if input.MilestoneID != nil {
-		c.MilestoneID = *input.MilestoneID
-	}
-	if input.Priority != nil {
-		c.Priority = *input.Priority
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	c.UpdatedAt = now
-
-	if err := s.constraints.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("update constraint: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "constraint", EntityID: c.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return c, nil
 }
 
@@ -174,23 +206,7 @@ func (s *ConstraintService) DeleteConstraint(ctx context.Context, user *model.Us
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.constraints.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete constraint: %w", err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeConstraint, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "constraint", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeConstraint, id, s.constraints.Delete)
 }
 
 // ListConstraints returns constraints for a product. Requires viewer role.

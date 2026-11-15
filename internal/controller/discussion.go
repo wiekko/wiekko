@@ -261,12 +261,21 @@ func (c *DiscussionController) DeleteAttachment(w http.ResponseWriter, r *http.R
 	httputil.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// authorID renders the author of a comment or attachment: null once the
+// author's account is deleted.
+func authorID(userID string) any {
+	if userID == "" {
+		return nil
+	}
+	return userID
+}
+
 func commentToJSON(c *model.Comment) map[string]any {
 	return map[string]any{
 		"id":         c.ID,
 		"owner_type": c.OwnerType,
 		"owner_id":   c.OwnerID,
-		"user_id":    c.UserID,
+		"user_id":    authorID(c.UserID),
 		"body":       c.Body,
 		"created_at": c.CreatedAt,
 		"updated_at": c.UpdatedAt,
@@ -280,7 +289,7 @@ func attachmentToJSON(a *model.Attachment) map[string]any {
 		"id":           a.ID,
 		"owner_type":   a.OwnerType,
 		"owner_id":     a.OwnerID,
-		"user_id":      a.UserID,
+		"user_id":      authorID(a.UserID),
 		"filename":     a.Filename,
 		"content_type": a.ContentType,
 		"size":         a.Size,

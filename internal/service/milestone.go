@@ -15,6 +15,8 @@ import (
 
 // MilestoneService handles milestones, sprints, statuses, pyramid levels, and runtime environments.
 type MilestoneService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx            store.Transactor
 	milestones    store.MilestoneStore
 	sprints       store.SprintStore
 	statuses      store.StatusStore
@@ -40,6 +42,9 @@ type CreateMilestoneInput struct {
 
 // UpdateMilestoneInput contains the fields that can be updated on a milestone.
 type UpdateMilestoneInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt string
 	Name        *string
 	Description *string
 	Type        *string
@@ -70,14 +75,17 @@ func (s *MilestoneService) CreateMilestone(ctx context.Context, user *model.User
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.milestones.Create(ctx, m); err != nil {
-		return nil, fmt.Errorf("create milestone: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.milestones.Create(ctx, m); err != nil {
+			return fmt.Errorf("create milestone: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "milestone", EntityID: m.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "milestone", EntityID: m.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return m, nil
 }
@@ -102,35 +110,55 @@ func (s *MilestoneService) UpdateMilestone(ctx context.Context, user *model.User
 		return nil, err
 	}
 
-	m, err := s.milestones.GetByID(ctx, id)
+	var m *model.Milestone
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		m, err = s.milestones.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, m.UpdatedAt); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.Name != nil {
+			m.Name = *input.Name
+		}
+		if input.Description != nil {
+			m.Description = *input.Description
+		}
+		if input.Type != nil {
+			m.Type = *input.Type
+		}
+		if input.DueDate != nil {
+			m.DueDate = *input.DueDate
+		}
+		m.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.milestones.Update(ctx, m); err != nil {
+				return fmt.Errorf("update milestone: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "milestone", EntityID: m.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.Name != nil {
-		m.Name = *input.Name
-	}
-	if input.Description != nil {
-		m.Description = *input.Description
-	}
-	if input.Type != nil {
-		m.Type = *input.Type
-	}
-	if input.DueDate != nil {
-		m.DueDate = *input.DueDate
-	}
-	m.UpdatedAt = now
-
-	if err := s.milestones.Update(ctx, m); err != nil {
-		return nil, fmt.Errorf("update milestone: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "milestone", EntityID: m.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return m, nil
 }
 
@@ -143,23 +171,7 @@ func (s *MilestoneService) DeleteMilestone(ctx context.Context, user *model.User
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.milestones.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete milestone: %w", err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeMilestone, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "milestone", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeMilestone, id, s.milestones.Delete)
 }
 
 // ListMilestones returns all milestones for a product. Requires viewer role.
@@ -183,6 +195,9 @@ type CreateSprintInput struct {
 
 // UpdateSprintInput contains the fields that can be updated on a sprint.
 type UpdateSprintInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt string
 	Name        *string
 	MilestoneID *string
 	Status      *string
@@ -230,14 +245,17 @@ func (s *MilestoneService) CreateSprint(ctx context.Context, user *model.User, i
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.sprints.Create(ctx, sprint); err != nil {
-		return nil, fmt.Errorf("create sprint: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.sprints.Create(ctx, sprint); err != nil {
+			return fmt.Errorf("create sprint: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return sprint, nil
 }
@@ -265,56 +283,82 @@ func (s *MilestoneService) UpdateSprint(ctx context.Context, user *model.User, p
 		return nil, err
 	}
 
-	sprint, err := s.sprints.GetByID(ctx, id)
+	var sprint *model.Sprint
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		sprint, err = s.sprints.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, sprint.UpdatedAt); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.Name != nil {
+			sprint.Name = *input.Name
+		}
+		if input.MilestoneID != nil {
+			sprint.MilestoneID = *input.MilestoneID
+		}
+		if input.StartDate != nil {
+			sprint.StartDate = *input.StartDate
+		}
+		if input.EndDate != nil {
+			sprint.EndDate = *input.EndDate
+		}
+		if err := validateSprintDates(sprint.StartDate, sprint.EndDate); err != nil {
+			return err
+		}
+		sprint.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if input.Status != nil && *input.Status != sprint.Status {
+				// Status carries its own rules (one active sprint per product),
+				// so it goes through the same path as the start/close actions.
+				if err := s.applySprintStatus(ctx, sprint, *input.Status); err != nil {
+					return err
+				}
+			}
+			if err := s.sprints.Update(ctx, sprint); err != nil {
+				return fmt.Errorf("update sprint: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.Name != nil {
-		sprint.Name = *input.Name
-	}
-	if input.MilestoneID != nil {
-		sprint.MilestoneID = *input.MilestoneID
-	}
-	if input.StartDate != nil {
-		sprint.StartDate = *input.StartDate
-	}
-	if input.EndDate != nil {
-		sprint.EndDate = *input.EndDate
-	}
-	if err := validateSprintDates(sprint.StartDate, sprint.EndDate); err != nil {
-		return nil, err
-	}
-	if input.Status != nil && *input.Status != sprint.Status {
-		// Status carries its own rules (one active sprint per product), so it
-		// goes through the same path as the start/close actions.
-		if err := s.applySprintStatus(ctx, sprint, *input.Status); err != nil {
-			return nil, err
-		}
-	}
-	sprint.UpdatedAt = now
-
-	if err := s.sprints.Update(ctx, sprint); err != nil {
-		return nil, fmt.Errorf("update sprint: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return sprint, nil
 }
 
 // applySprintStatus validates a status change and writes it onto sprint. It
 // does not persist — the caller does, so a status change can ride along with
-// other edits in a single UPDATE.
+// other edits in a single UPDATE. Call it inside the transaction that
+// persists the sprint: starting a sprint takes the product's sprint lock, so
+// two sprints cannot both pass the "none active" check (the partial unique
+// index idx_sprints_active is the backstop).
 func (s *MilestoneService) applySprintStatus(ctx context.Context, sprint *model.Sprint, status string) error {
 	if !model.ValidSprintStatus(status) {
 		return fmt.Errorf("unknown sprint status %q", status)
 	}
 	if status == model.SprintStatusActive {
+		if err := lock(ctx, s.tx, lockSprints(sprint.ProductID)); err != nil {
+			return err
+		}
 		active, err := s.sprints.GetActiveByProductID(ctx, sprint.ProductID)
 		if err != nil {
 			return fmt.Errorf("check active sprint: %w", err)
@@ -346,20 +390,22 @@ func (s *MilestoneService) SetSprintStatus(ctx context.Context, user *model.User
 	if sprint.ProductID != productID {
 		return nil, errors.New("sprint not found")
 	}
-	if err := s.applySprintStatus(ctx, sprint, status); err != nil {
-		return nil, err
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	sprint.UpdatedAt = now
-	if err := s.sprints.Update(ctx, sprint); err != nil {
-		return nil, fmt.Errorf("update sprint status: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.applySprintStatus(ctx, sprint, status); err != nil {
+			return err
+		}
+		if err := s.sprints.Update(ctx, sprint); err != nil {
+			return fmt.Errorf("update sprint status: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
+			UserID: user.ID, Action: sprintStatusAction(status), CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "sprint", EntityID: sprint.ID,
-		UserID: user.ID, Action: sprintStatusAction(status), CreatedAt: now,
-	})
 
 	return sprint, nil
 }
@@ -394,14 +440,17 @@ func (s *MilestoneService) DeleteSprint(ctx context.Context, user *model.User, p
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.sprints.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete sprint: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.sprints.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete sprint: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "sprint", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "sprint", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
 
 	return nil
 }
@@ -489,37 +538,34 @@ func (s *MilestoneService) CreateStatus(ctx context.Context, user *model.User, i
 		IsActive:   input.IsActive,
 		CreatedAt:  now,
 	}
-	if err := s.statuses.Create(ctx, status); err != nil {
-		return nil, fmt.Errorf("create status: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "status", EntityID: status.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
+	// With status sync on, the status and its mirror for the other entity
+	// type are created together, so the two sets cannot drift apart.
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.statuses.Create(ctx, status); err != nil {
+			return fmt.Errorf("create status: %w", err)
+		}
+		if err := s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "status", EntityID: status.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		if !s.statusSync(ctx, input.ProductID) {
+			return nil
+		}
+		sibling := *status
+		sibling.ID = uuid.New().String()
+		sibling.EntityType = otherEntityType(input.EntityType)
+		if err := s.statuses.Create(ctx, &sibling); err != nil {
+			return fmt.Errorf("status sync: create %s status: %w", sibling.EntityType, err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
 	})
-
-	// Sync: mirror to the other entity type if product has status_sync enabled.
-	product, err := s.products.GetByID(ctx, input.ProductID)
-	if err == nil && product.StatusSync {
-		sibling := &model.Status{
-			ID:         uuid.New().String(),
-			ProductID:  input.ProductID,
-			EntityType: otherEntityType(input.EntityType),
-			Name:       input.Name,
-			Position:   input.Position,
-			IsDefault:  input.IsDefault,
-			IsClosed:   input.IsClosed,
-			IsActive:   input.IsActive,
-			CreatedAt:  now,
-		}
-		if err := s.statuses.Create(ctx, sibling); err != nil {
-			slog.Warn("status sync: failed to create sibling", "error", err)
-		} else {
-			_ = s.audit.Create(ctx, &model.AuditEntry{
-				ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
-				UserID: user.ID, Action: "create", CreatedAt: now,
-			})
-		}
+	if err != nil {
+		return nil, err
 	}
 
 	return status, nil
@@ -569,38 +615,42 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 		status.IsActive = *input.IsActive
 	}
 
-	if err := s.statuses.Update(ctx, status); err != nil {
-		return nil, fmt.Errorf("update status: %w", err)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "status", EntityID: status.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
-	// Sync: mirror changes to sibling if product has status_sync enabled.
-	product, err := s.products.GetByID(ctx, productID)
-	if err == nil && product.StatusSync {
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.statuses.Update(ctx, status); err != nil {
+			return fmt.Errorf("update status: %w", err)
+		}
+		if err := s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "status", EntityID: status.ID,
+			UserID: user.ID, Action: "update", CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		if !s.statusSync(ctx, productID) {
+			return nil
+		}
 		otherType := otherEntityType(status.EntityType)
 		sibling, err := s.statuses.GetByProductAndName(ctx, productID, otherType, oldName)
 		if err != nil {
-			slog.Warn("status sync: sibling not found for update", "name", oldName, "entityType", otherType, "error", err)
-		} else {
-			sibling.Name = status.Name
-			sibling.Position = status.Position
-			sibling.IsDefault = status.IsDefault
-			sibling.IsClosed = status.IsClosed
-			sibling.IsActive = status.IsActive
-			if err := s.statuses.Update(ctx, sibling); err != nil {
-				slog.Warn("status sync: failed to update sibling", "error", err)
-			} else {
-				_ = s.audit.Create(ctx, &model.AuditEntry{
-					ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
-					UserID: user.ID, Action: "update", CreatedAt: now,
-				})
-			}
+			// Nothing to mirror to: the sets already differ.
+			slog.WarnContext(ctx, "status sync: sibling not found for update", "name", oldName, "entityType", otherType, "error", err)
+			return nil
 		}
+		sibling.Name = status.Name
+		sibling.Position = status.Position
+		sibling.IsDefault = status.IsDefault
+		sibling.IsClosed = status.IsClosed
+		sibling.IsActive = status.IsActive
+		if err := s.statuses.Update(ctx, sibling); err != nil {
+			return fmt.Errorf("status sync: update %s status: %w", otherType, err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+			UserID: user.ID, Action: "update", CreatedAt: now,
+		})
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return status, nil
@@ -622,35 +672,40 @@ func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, p
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.statuses.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete status: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "status", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	// Sync: delete sibling if product has status_sync enabled.
-	product, err := s.products.GetByID(ctx, productID)
-	if err == nil && product.StatusSync {
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.statuses.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete status: %w", err)
+		}
+		if err := s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "status", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		if !s.statusSync(ctx, productID) {
+			return nil
+		}
 		otherType := otherEntityType(status.EntityType)
 		sibling, err := s.statuses.GetByProductAndName(ctx, productID, otherType, status.Name)
 		if err != nil {
-			slog.Warn("status sync: sibling not found for delete", "name", status.Name, "entityType", otherType, "error", err)
-		} else {
-			if err := s.statuses.Delete(ctx, sibling.ID); err != nil {
-				slog.Warn("status sync: failed to delete sibling", "error", err)
-			} else {
-				_ = s.audit.Create(ctx, &model.AuditEntry{
-					ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
-					UserID: user.ID, Action: "delete", CreatedAt: now,
-				})
-			}
+			slog.WarnContext(ctx, "status sync: sibling not found for delete", "name", status.Name, "entityType", otherType, "error", err)
+			return nil
 		}
-	}
+		if err := s.statuses.Delete(ctx, sibling.ID); err != nil {
+			return fmt.Errorf("status sync: delete %s status: %w", otherType, err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "status", EntityID: sibling.ID,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	})
+}
 
-	return nil
+// statusSync reports whether the product keeps requirement and defect
+// statuses in step. A product that cannot be read is treated as not synced.
+func (s *MilestoneService) statusSync(ctx context.Context, productID string) bool {
+	product, err := s.products.GetByID(ctx, productID)
+	return err == nil && product.StatusSync
 }
 
 // ListStatuses returns all statuses for a product and entity type. Requires viewer role.
@@ -699,14 +754,17 @@ func (s *MilestoneService) CreatePyramidLevel(ctx context.Context, user *model.U
 		Position:  input.Position,
 		CreatedAt: now,
 	}
-	if err := s.pyramidLevels.Create(ctx, pl); err != nil {
-		return nil, fmt.Errorf("create pyramid level: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.pyramidLevels.Create(ctx, pl); err != nil {
+			return fmt.Errorf("create pyramid level: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: pl.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: pl.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return pl, nil
 }
@@ -743,15 +801,18 @@ func (s *MilestoneService) UpdatePyramidLevel(ctx context.Context, user *model.U
 		pl.Position = *input.Position
 	}
 
-	if err := s.pyramidLevels.Update(ctx, pl); err != nil {
-		return nil, fmt.Errorf("update pyramid level: %w", err)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: pl.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.pyramidLevels.Update(ctx, pl); err != nil {
+			return fmt.Errorf("update pyramid level: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: pl.ID,
+			UserID: user.ID, Action: "update", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
+	}
 
 	return pl, nil
 }
@@ -766,14 +827,17 @@ func (s *MilestoneService) DeletePyramidLevel(ctx context.Context, user *model.U
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.pyramidLevels.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete pyramid level: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.pyramidLevels.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete pyramid level: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "pyramid_level", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
 
 	return nil
 }
@@ -805,14 +869,17 @@ func (s *MilestoneService) CreateRuntimeEnvironment(ctx context.Context, user *m
 		Name:      name,
 		CreatedAt: now,
 	}
-	if err := s.runtimeEnvs.Create(ctx, env); err != nil {
-		return nil, fmt.Errorf("create runtime environment: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.runtimeEnvs.Create(ctx, env); err != nil {
+			return fmt.Errorf("create runtime environment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "runtime_environment", EntityID: env.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "runtime_environment", EntityID: env.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return env, nil
 }
@@ -827,14 +894,17 @@ func (s *MilestoneService) DeleteRuntimeEnvironment(ctx context.Context, user *m
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.runtimeEnvs.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete runtime environment: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.runtimeEnvs.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete runtime environment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "runtime_environment", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "runtime_environment", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
 
 	return nil
 }

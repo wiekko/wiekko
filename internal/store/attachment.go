@@ -27,11 +27,13 @@ const attachmentColumns = `id, product_id, owner_type, owner_id, user_id,
 
 func scanAttachment(sc scanner) (*model.Attachment, error) {
 	var a model.Attachment
-	err := sc.Scan(&a.ID, &a.ProductID, &a.OwnerType, &a.OwnerID, &a.UserID,
+	var userID sql.NullString // NULL once the uploader's account is deleted
+	err := sc.Scan(&a.ID, &a.ProductID, &a.OwnerType, &a.OwnerID, &userID,
 		&a.Filename, &a.ContentType, &a.Size, &a.StoragePath, &a.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+	a.UserID = userID.String
 	return &a, nil
 }
 

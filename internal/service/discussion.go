@@ -21,8 +21,12 @@ import (
 // owner columns, same lifecycle — and this is the only service holding the blob
 // store, so attachment bytes are created and unlinked here and nowhere else.
 type DiscussionService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx          store.Transactor
 	comments    store.CommentStore
 	attachments store.AttachmentStore
+	// defectLinks removes the defect links pointing at a deleted entity.
+	defectLinks defectLinkRemover
 	audit       store.AuditStore
 	blobs       storage.Store
 	policy      storage.Policy
@@ -90,14 +94,20 @@ func (s *DiscussionService) CreateComment(ctx context.Context, user *model.User,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := s.comments.Create(ctx, c); err != nil {
-		return nil, fmt.Errorf("create comment: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.holdOwner(ctx, productID, ownerType, ownerID); err != nil {
+			return err
+		}
+		if err := s.comments.Create(ctx, c); err != nil {
+			return fmt.Errorf("create comment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "comment", EntityID: c.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "comment", EntityID: c.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return c, nil
 }
@@ -140,14 +150,17 @@ func (s *DiscussionService) UpdateComment(ctx context.Context, user *model.User,
 	c.Body = body
 	c.UpdatedAt = now
 
-	if err := s.comments.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("update comment: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.comments.Update(ctx, c); err != nil {
+			return fmt.Errorf("update comment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "comment", EntityID: c.ID,
+			UserID: user.ID, Action: "update", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "comment", EntityID: c.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
 
 	return c, nil
 }
@@ -175,14 +188,17 @@ func (s *DiscussionService) DeleteComment(ctx context.Context, user *model.User,
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.comments.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete comment: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.comments.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete comment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "comment", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "comment", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
 
 	return nil
 }
@@ -270,16 +286,23 @@ func (s *DiscussionService) CreateAttachment(ctx context.Context, user *model.Us
 		CreatedAt:   now,
 	}
 
-	if err := s.attachments.Create(ctx, a); err != nil {
-		// Don't leave an unreferenced blob behind.
-		_ = s.blobs.Delete(ctx, path)
-		return nil, fmt.Errorf("create attachment: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "attachment", EntityID: a.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.holdOwner(ctx, productID, input.OwnerType, input.OwnerID); err != nil {
+			return err
+		}
+		if err := s.attachments.Create(ctx, a); err != nil {
+			return fmt.Errorf("create attachment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "attachment", EntityID: a.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
 	})
+	if err != nil {
+		// Don't leave an unreferenced blob behind.
+		_ = s.blobs.Delete(context.WithoutCancel(ctx), path)
+		return nil, err
+	}
 
 	return a, nil
 }
@@ -340,25 +363,44 @@ func (s *DiscussionService) DeleteAttachment(ctx context.Context, user *model.Us
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.attachments.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete attachment: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.attachments.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete attachment: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "attachment", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-	// Best effort: the row is authoritative, so a failed unlink leaves an
-	// orphan blob rather than a dangling row.
-	_ = s.blobs.Delete(ctx, a.StoragePath)
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "attachment", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
+	// Only after the commit, and best effort: the row is authoritative, so a
+	// failed unlink leaves an orphan blob rather than a dangling row.
+	_ = s.blobs.Delete(context.WithoutCancel(ctx), a.StoragePath)
 
 	return nil
 }
 
-// ownerPurger discards the comments and attachments of an entity that is being
-// deleted. Entity services depend on this narrow view of DiscussionService.
+// holdOwner takes the owner's lock for the current transaction and checks
+// that the owner still exists. PurgeOwner takes the same lock, so a comment or
+// attachment cannot be added to an entity whose delete is under way and end
+// up pointing at nothing.
+func (s *DiscussionService) holdOwner(ctx context.Context, productID, ownerType, ownerID string) error {
+	if err := lock(ctx, s.tx, lockOwner(ownerID)); err != nil {
+		return err
+	}
+	return s.owns.require(ctx, productID, ref{ownerType, ownerID})
+}
+
+// ownerPurger discards what hangs off an entity that is being deleted.
+// Entity services depend on this narrow view of DiscussionService.
 type ownerPurger interface {
-	PurgeOwner(ctx context.Context, productID, ownerType, ownerID string) error
+	PurgeOwner(ctx context.Context, productID, ownerType, ownerID string) (afterCommit func(), err error)
+}
+
+// defectLinkRemover is the part of store.DefectStore PurgeOwner needs.
+type defectLinkRemover interface {
+	RemoveLinksToTarget(ctx context.Context, targetID string) error
 }
 
 // productPurger discards the stored attachment bytes of a product that is being
@@ -367,29 +409,49 @@ type productPurger interface {
 	PurgeProduct(ctx context.Context, productID string) error
 }
 
-// PurgeOwner removes every comment and attachment belonging to one entity,
-// including the stored attachment bytes.
+// PurgeOwner removes every row that points at one entity through a
+// polymorphic column — its comments, its attachments and the defect links
+// targeting it — so no foreign key can cascade them away with the entity.
+//
+// Call it with the context of the transaction that deletes the entity: the
+// rows then go with the entity or not at all. The attachment bytes cannot
+// join a transaction, so they are left to afterCommit, which the caller runs
+// once the transaction has committed (and drops if it rolled back).
+//
+// It takes the owner's lock first, as do the inserts that attach something to
+// an owner (comments, attachments, links), so nothing can be attached between
+// this purge and the commit of the delete.
 //
 // It authorizes nothing itself: comments and attachments have no independent
 // existence, so the caller deleting the owning entity has already established
 // the right to discard them. Author-only rules deliberately do not apply here —
 // deleting an entity takes its whole thread with it, whoever wrote it.
-func (s *DiscussionService) PurgeOwner(ctx context.Context, productID, ownerType, ownerID string) error {
+func (s *DiscussionService) PurgeOwner(ctx context.Context, productID, ownerType, ownerID string) (func(), error) {
+	if err := lock(ctx, s.tx, lockOwner(ownerID)); err != nil {
+		return nil, err
+	}
 	// Read the storage paths before the rows go away.
 	attachments, err := s.attachments.ListByOwner(ctx, productID, ownerType, ownerID)
 	if err != nil {
-		return fmt.Errorf("list attachments of %s %s: %w", ownerType, ownerID, err)
+		return nil, fmt.Errorf("list attachments of %s %s: %w", ownerType, ownerID, err)
 	}
 
 	if err := s.attachments.DeleteByOwner(ctx, productID, ownerType, ownerID); err != nil {
-		return fmt.Errorf("delete attachments of %s %s: %w", ownerType, ownerID, err)
+		return nil, fmt.Errorf("delete attachments of %s %s: %w", ownerType, ownerID, err)
 	}
 	if err := s.comments.DeleteByOwner(ctx, productID, ownerType, ownerID); err != nil {
-		return fmt.Errorf("delete comments of %s %s: %w", ownerType, ownerID, err)
+		return nil, fmt.Errorf("delete comments of %s %s: %w", ownerType, ownerID, err)
+	}
+	if s.defectLinks != nil {
+		if err := s.defectLinks.RemoveLinksToTarget(ctx, ownerID); err != nil {
+			return nil, fmt.Errorf("delete defect links to %s %s: %w", ownerType, ownerID, err)
+		}
 	}
 
-	s.purgeBlobs(ctx, attachments)
-	return nil
+	// Detached from ctx: the request may be over by the time this runs, and
+	// the unlink should still happen.
+	blobCtx := context.WithoutCancel(ctx)
+	return func() { s.purgeBlobs(blobCtx, attachments) }, nil
 }
 
 // PurgeProduct removes the attachment storage of a product. The rows themselves

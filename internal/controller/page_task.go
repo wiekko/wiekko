@@ -231,6 +231,7 @@ func (c *PageProductController) TaskUpdate(w http.ResponseWriter, r *http.Reques
 	f := readTaskForm(r)
 
 	_, updateErr := c.backlog.UpdateRequirement(r.Context(), user, productID, taskID, service.UpdateRequirementInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		ParentID:    &f.ParentID,
 		Title:       &f.Title,
 		Description: &f.Description,

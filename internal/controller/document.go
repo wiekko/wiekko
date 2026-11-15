@@ -153,6 +153,9 @@ func (c *DocumentController) GetDocument(w http.ResponseWriter, r *http.Request)
 func (c *DocumentController) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt    string  `json:"if_updated_at"`
 		Title          *string `json:"title"`
 		Body           *string `json:"body"`
 		Format         *string `json:"format"`
@@ -174,7 +177,8 @@ func (c *DocumentController) UpdateDocument(w http.ResponseWriter, r *http.Reque
 		req.SupersededByID = &id
 	}
 	d, err := c.documents.UpdateDocument(r.Context(), user, r.PathValue("productId"), r.PathValue("id"), service.UpdateDocumentInput{
-		Title: req.Title, Body: req.Body, Format: req.Format, State: req.State, SupersededByID: req.SupersededByID,
+		IfUpdatedAt: req.IfUpdatedAt,
+		Title:       req.Title, Body: req.Body, Format: req.Format, State: req.State, SupersededByID: req.SupersededByID,
 		ComponentID: req.ComponentID, CapabilityID: req.CapabilityID, MilestoneID: req.MilestoneID,
 	})
 	if err != nil {

@@ -66,6 +66,9 @@ type DefectStore interface {
 	ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error)
 	AddLink(ctx context.Context, link *model.DefectLink) error
 	RemoveLink(ctx context.Context, id string) error
+	// RemoveLinksToTarget removes every link pointing at targetID. target_id
+	// is polymorphic, so no foreign key does this when the target is deleted.
+	RemoveLinksToTarget(ctx context.Context, targetID string) error
 	GetLink(ctx context.Context, id string) (*model.DefectLink, error)
 	ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error)
 	ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
@@ -264,6 +267,11 @@ func (s *defectStore) AddLink(ctx context.Context, link *model.DefectLink) error
 		 VALUES (?, ?, ?, ?, ?)`,
 		link.ID, link.DefectID, link.TargetType, link.TargetID, link.CreatedAt,
 	)
+	return err
+}
+
+func (s *defectStore) RemoveLinksToTarget(ctx context.Context, targetID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM defect_links WHERE target_id = ?`, targetID)
 	return err
 }
 

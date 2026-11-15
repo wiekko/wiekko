@@ -14,6 +14,8 @@ import (
 
 // TestingService handles test cases, campaigns, and campaign results.
 type TestingService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx              store.Transactor
 	testCases       store.TestCaseStore
 	campaigns       store.TestingCampaignStore
 	campaignResults store.CampaignResultStore
@@ -40,6 +42,9 @@ type CreateTestCaseInput struct {
 
 // UpdateTestCaseInput contains the fields that can be updated on a test case.
 type UpdateTestCaseInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt    string
 	ComponentID    *string
 	CapabilityID   *string
 	Title          *string
@@ -79,14 +84,17 @@ func (s *TestingService) CreateTestCase(ctx context.Context, user *model.User, i
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := s.testCases.Create(ctx, tc); err != nil {
-		return nil, fmt.Errorf("create test case: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.testCases.Create(ctx, tc); err != nil {
+			return fmt.Errorf("create test case: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "test_case", EntityID: tc.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "test_case", EntityID: tc.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return tc, nil
 }
@@ -114,44 +122,64 @@ func (s *TestingService) UpdateTestCase(ctx context.Context, user *model.User, p
 		return nil, err
 	}
 
-	tc, err := s.testCases.GetByID(ctx, id)
+	var tc *model.TestCase
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		tc, err = s.testCases.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, tc.UpdatedAt); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.ComponentID != nil {
+			tc.ComponentID = *input.ComponentID
+		}
+		if input.CapabilityID != nil {
+			tc.CapabilityID = *input.CapabilityID
+		}
+		if input.Title != nil {
+			tc.Title = *input.Title
+		}
+		if input.Description != nil {
+			tc.Description = *input.Description
+		}
+		if input.ExecutionMode != nil {
+			tc.ExecutionMode = *input.ExecutionMode
+		}
+		if input.TestIdentifier != nil {
+			tc.TestIdentifier = *input.TestIdentifier
+		}
+		if input.PyramidLevelID != nil {
+			tc.PyramidLevelID = *input.PyramidLevelID
+		}
+		tc.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.testCases.Update(ctx, tc); err != nil {
+				return fmt.Errorf("update test case: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "test_case", EntityID: tc.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.ComponentID != nil {
-		tc.ComponentID = *input.ComponentID
-	}
-	if input.CapabilityID != nil {
-		tc.CapabilityID = *input.CapabilityID
-	}
-	if input.Title != nil {
-		tc.Title = *input.Title
-	}
-	if input.Description != nil {
-		tc.Description = *input.Description
-	}
-	if input.ExecutionMode != nil {
-		tc.ExecutionMode = *input.ExecutionMode
-	}
-	if input.TestIdentifier != nil {
-		tc.TestIdentifier = *input.TestIdentifier
-	}
-	if input.PyramidLevelID != nil {
-		tc.PyramidLevelID = *input.PyramidLevelID
-	}
-	tc.UpdatedAt = now
-
-	if err := s.testCases.Update(ctx, tc); err != nil {
-		return nil, fmt.Errorf("update test case: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "test_case", EntityID: tc.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return tc, nil
 }
 
@@ -164,23 +192,7 @@ func (s *TestingService) DeleteTestCase(ctx context.Context, user *model.User, p
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.testCases.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete test case: %w", err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeTestCase, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "test_case", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeTestCase, id, s.testCases.Delete)
 }
 
 // ListTestCases returns all test cases for a product. Requires viewer role.
@@ -332,6 +344,9 @@ type CreateCampaignInput struct {
 
 // UpdateCampaignInput contains the fields that can be updated on a campaign.
 type UpdateCampaignInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt string
 	Name        *string
 	Description *string
 	StartsAt    *string
@@ -381,17 +396,20 @@ func (s *TestingService) CreateCampaign(ctx context.Context, user *model.User, i
 		return nil, err
 	}
 
-	if err := s.campaigns.Create(ctx, c); err != nil {
-		return nil, fmt.Errorf("create campaign: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.campaigns.Create(ctx, c); err != nil {
+			return fmt.Errorf("create campaign: %w", err)
+		}
+		if err := s.campaignResults.CreateBatch(ctx, results); err != nil {
+			return fmt.Errorf("seed campaign results: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: c.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-	if err := s.campaignResults.CreateBatch(ctx, results); err != nil {
-		return nil, fmt.Errorf("seed campaign results: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: c.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return c, nil
 }
@@ -433,6 +451,12 @@ func (s *TestingService) seedResults(ctx context.Context, campaignID, productID 
 
 // AddCampaignTestCases extends a draft campaign's scope. Requires owner role.
 func (s *TestingService) AddCampaignTestCases(ctx context.Context, user *model.User, productID, campaignID string, testCaseIDs []string) error {
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		return s.addCampaignTestCases(ctx, user, productID, campaignID, testCaseIDs)
+	})
+}
+
+func (s *TestingService) addCampaignTestCases(ctx context.Context, user *model.User, productID, campaignID string, testCaseIDs []string) error {
 	c, err := s.requireDraftCampaign(ctx, user, productID, campaignID)
 	if err != nil {
 		return err
@@ -468,16 +492,23 @@ func (s *TestingService) AddCampaignTestCases(ctx context.Context, user *model.U
 // RemoveCampaignTestCase drops a test case from a draft campaign's scope.
 // Requires owner role.
 func (s *TestingService) RemoveCampaignTestCase(ctx context.Context, user *model.User, productID, campaignID, testCaseID string) error {
-	if _, err := s.requireDraftCampaign(ctx, user, productID, campaignID); err != nil {
-		return err
-	}
-	return s.campaignResults.DeleteByCampaignAndTestCase(ctx, campaignID, testCaseID)
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if _, err := s.requireDraftCampaign(ctx, user, productID, campaignID); err != nil {
+			return err
+		}
+		return s.campaignResults.DeleteByCampaignAndTestCase(ctx, campaignID, testCaseID)
+	})
 }
 
 // requireDraftCampaign loads a campaign and rejects scope changes once it has
-// left draft state (FR-321).
+// left draft state (FR-321). Called inside a transaction, it holds the
+// campaign's lock, so the campaign stays a draft until the scope change has
+// committed.
 func (s *TestingService) requireDraftCampaign(ctx context.Context, user *model.User, productID, campaignID string) (*model.TestingCampaign, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+		return nil, err
+	}
+	if err := lock(ctx, s.tx, lockCampaign(campaignID)); err != nil {
 		return nil, err
 	}
 	c, err := s.campaigns.GetByID(ctx, campaignID)
@@ -500,33 +531,47 @@ func (s *TestingService) ActivateCampaign(ctx context.Context, user *model.User,
 		return nil, err
 	}
 
-	c, err := s.campaigns.GetByID(ctx, id)
+	var c *model.TestingCampaign
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The campaign's lock keeps its scope fixed; the product's slot lock
+		// lets only one campaign at a time pass the "none active" check.
+		if err := lock(ctx, s.tx, lockCampaign(id)); err != nil {
+			return err
+		}
+		if err := lock(ctx, s.tx, lockCampaign("active:"+productID)); err != nil {
+			return err
+		}
+		var err error
+		c, err = s.campaigns.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if c.ProductID != productID {
+			return ErrNotFound
+		}
+		if c.Status != model.CampaignStatusDraft {
+			return fmt.Errorf("only draft campaigns can be activated, this one is %s", c.Status)
+		}
+
+		active, err := s.campaigns.GetActiveByProductID(ctx, productID)
+		if err != nil {
+			return err
+		}
+		if active != nil {
+			return fmt.Errorf("campaign %q is already active; close it first", active.Name)
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		c.Status = model.CampaignStatusActive
+		c.UpdatedAt = now
+		if err := s.campaigns.Update(ctx, c); err != nil {
+			return fmt.Errorf("activate campaign: %w", err)
+		}
+		return s.auditCampaignStatus(ctx, user, c.ID, model.CampaignStatusDraft, model.CampaignStatusActive, now)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if c.ProductID != productID {
-		return nil, ErrNotFound
-	}
-	if c.Status != model.CampaignStatusDraft {
-		return nil, fmt.Errorf("only draft campaigns can be activated, this one is %s", c.Status)
-	}
-
-	active, err := s.campaigns.GetActiveByProductID(ctx, productID)
-	if err != nil {
-		return nil, err
-	}
-	if active != nil {
-		return nil, fmt.Errorf("campaign %q is already active; close it first", active.Name)
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	c.Status = model.CampaignStatusActive
-	c.UpdatedAt = now
-	if err := s.campaigns.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("activate campaign: %w", err)
-	}
-
-	s.auditCampaignStatus(ctx, user, c.ID, model.CampaignStatusDraft, model.CampaignStatusActive, now)
 	return c, nil
 }
 
@@ -538,50 +583,61 @@ func (s *TestingService) CloseCampaign(ctx context.Context, user *model.User, pr
 		return nil, err
 	}
 
-	c, err := s.campaigns.GetByID(ctx, id)
+	var c *model.TestingCampaign
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// Under the campaign's lock no result can change while the
+		// incomplete ones are counted and the campaign is closed.
+		if err := lock(ctx, s.tx, lockCampaign(id)); err != nil {
+			return err
+		}
+		var err error
+		c, err = s.campaigns.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if c.ProductID != productID {
+			return ErrNotFound
+		}
+		if c.Status != model.CampaignStatusActive {
+			return fmt.Errorf("only active campaigns can be closed, this one is %s", c.Status)
+		}
+
+		if !force {
+			results, err := s.campaignResults.ListByCampaignID(ctx, id)
+			if err != nil {
+				return err
+			}
+			incomplete := 0
+			for _, r := range results {
+				if model.IsIncompleteResultStatus(r.Status) {
+					incomplete++
+				}
+			}
+			if incomplete > 0 {
+				return &IncompleteResultsError{Incomplete: incomplete}
+			}
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		c.Status = model.CampaignStatusClosed
+		c.ClosedAt = now
+		c.ClosedBy = user.ID
+		c.UpdatedAt = now
+		if err := s.campaigns.Update(ctx, c); err != nil {
+			return fmt.Errorf("close campaign: %w", err)
+		}
+		return s.auditCampaignStatus(ctx, user, c.ID, model.CampaignStatusActive, model.CampaignStatusClosed, now)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if c.ProductID != productID {
-		return nil, ErrNotFound
-	}
-	if c.Status != model.CampaignStatusActive {
-		return nil, fmt.Errorf("only active campaigns can be closed, this one is %s", c.Status)
-	}
-
-	if !force {
-		results, err := s.campaignResults.ListByCampaignID(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		incomplete := 0
-		for _, r := range results {
-			if model.IsIncompleteResultStatus(r.Status) {
-				incomplete++
-			}
-		}
-		if incomplete > 0 {
-			return nil, &IncompleteResultsError{Incomplete: incomplete}
-		}
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	c.Status = model.CampaignStatusClosed
-	c.ClosedAt = now
-	c.ClosedBy = user.ID
-	c.UpdatedAt = now
-	if err := s.campaigns.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("close campaign: %w", err)
-	}
-
-	s.auditCampaignStatus(ctx, user, c.ID, model.CampaignStatusActive, model.CampaignStatusClosed, now)
 	return c, nil
 }
 
 // auditCampaignStatus records a campaign status transition with field-level
 // detail, so the history tab names the old and new state (FR-332).
-func (s *TestingService) auditCampaignStatus(ctx context.Context, user *model.User, campaignID, from, to, now string) {
-	_ = s.audit.Create(ctx, &model.AuditEntry{
+func (s *TestingService) auditCampaignStatus(ctx context.Context, user *model.User, campaignID, from, to, now string) error {
+	return s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: campaignID,
 		UserID: user.ID, Action: "update", FieldName: "status",
 		OldValue: from, NewValue: to, CreatedAt: now,
@@ -608,38 +664,58 @@ func (s *TestingService) UpdateCampaign(ctx context.Context, user *model.User, p
 		return nil, err
 	}
 
-	c, err := s.campaigns.GetByID(ctx, id)
+	var c *model.TestingCampaign
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		c, err = s.campaigns.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, c.UpdatedAt); err != nil {
+			return err
+		}
+		if c.Status == model.CampaignStatusClosed {
+			return errors.New("a closed campaign cannot be modified")
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.Name != nil {
+			c.Name = *input.Name
+		}
+		if input.Description != nil {
+			c.Description = *input.Description
+		}
+		if input.StartsAt != nil {
+			c.StartsAt = *input.StartsAt
+		}
+		if input.EndsAt != nil {
+			c.EndsAt = *input.EndsAt
+		}
+		c.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.campaigns.Update(ctx, c); err != nil {
+				return fmt.Errorf("update campaign: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: c.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if c.Status == model.CampaignStatusClosed {
-		return nil, errors.New("a closed campaign cannot be modified")
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.Name != nil {
-		c.Name = *input.Name
-	}
-	if input.Description != nil {
-		c.Description = *input.Description
-	}
-	if input.StartsAt != nil {
-		c.StartsAt = *input.StartsAt
-	}
-	if input.EndsAt != nil {
-		c.EndsAt = *input.EndsAt
-	}
-	c.UpdatedAt = now
-
-	if err := s.campaigns.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("update campaign: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: c.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return c, nil
 }
 
@@ -653,14 +729,17 @@ func (s *TestingService) DeleteCampaign(ctx context.Context, user *model.User, p
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.campaigns.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete campaign: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.campaigns.Delete(ctx, id); err != nil {
+			return fmt.Errorf("delete campaign: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "testing_campaign", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
 
 	return nil
 }
@@ -830,47 +909,57 @@ func (s *TestingService) SetResultStatus(ctx context.Context, user *model.User, 
 		return nil, errors.New("failing a test case requires a linked defect")
 	}
 
-	c, err := s.campaigns.GetByID(ctx, campaignID)
-	if err != nil {
-		return nil, err
-	}
-	if c.ProductID != productID {
-		return nil, ErrNotFound
-	}
-	if c.Status != model.CampaignStatusActive {
-		return nil, fmt.Errorf("results can only be changed while the campaign is active, this one is %s", c.Status)
-	}
-
-	result, err := s.campaignResults.GetByID(ctx, resultID)
-	if err != nil {
-		return nil, err
-	}
-	if result.CampaignID != campaignID {
-		return nil, ErrNotFound
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	from := result.Status
-	result.Status = status
-	// A passing or skipped result carries no defect; any other verdict keeps
-	// the defect it was given, or the one already on record.
-	switch status {
-	case model.CampaignResultStatusPassed, model.CampaignResultStatusSkipped:
-		result.DefectID = ""
-	default:
-		if defectID != "" {
-			result.DefectID = defectID
+	// Under the campaign's lock the campaign cannot close between the check
+	// below and the write.
+	var result *model.CampaignResult
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockCampaign(campaignID)); err != nil {
+			return err
 		}
-	}
-	result.ExecutedBy = user.ID
-	result.ExecutedAt = now
-	result.UpdatedAt = now
+		c, err := s.campaigns.GetByID(ctx, campaignID)
+		if err != nil {
+			return err
+		}
+		if c.ProductID != productID {
+			return ErrNotFound
+		}
+		if c.Status != model.CampaignStatusActive {
+			return fmt.Errorf("results can only be changed while the campaign is active, this one is %s", c.Status)
+		}
 
-	if err := s.campaignResults.Update(ctx, result); err != nil {
-		return nil, fmt.Errorf("update campaign result: %w", err)
-	}
-	s.recordResultEvent(ctx, result, user.ID, from, now)
+		result, err = s.campaignResults.GetByID(ctx, resultID)
+		if err != nil {
+			return err
+		}
+		if result.CampaignID != campaignID {
+			return ErrNotFound
+		}
 
+		now := time.Now().UTC().Format(time.RFC3339)
+		from := result.Status
+		result.Status = status
+		// A passing or skipped result carries no defect; any other verdict
+		// keeps the defect it was given, or the one already on record.
+		switch status {
+		case model.CampaignResultStatusPassed, model.CampaignResultStatusSkipped:
+			result.DefectID = ""
+		default:
+			if defectID != "" {
+				result.DefectID = defectID
+			}
+		}
+		result.ExecutedBy = user.ID
+		result.ExecutedAt = now
+		result.UpdatedAt = now
+
+		if err := s.campaignResults.Update(ctx, result); err != nil {
+			return fmt.Errorf("update campaign result: %w", err)
+		}
+		return s.recordResultEvent(ctx, result, user.ID, from, now)
+	})
+	if err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -883,44 +972,52 @@ func (s *TestingService) SetResultStatus(ctx context.Context, user *model.User, 
 // campaign records what was true when it was closed, and fixing a defect
 // afterwards must not rewrite that verdict.
 func (s *TestingService) MarkResultsForRetest(ctx context.Context, defectID, userID string) error {
-	results, err := s.campaignResults.ListByDefectID(ctx, defectID)
-	if err != nil {
-		return fmt.Errorf("list results for defect: %w", err)
-	}
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		results, err := s.campaignResults.ListByDefectID(ctx, defectID)
+		if err != nil {
+			return fmt.Errorf("list results for defect: %w", err)
+		}
 
-	active := make(map[string]bool)
-	now := time.Now().UTC().Format(time.RFC3339)
-	for _, result := range results {
-		if result.Status != model.CampaignResultStatusFailed {
-			continue
-		}
-		ok, cached := active[result.CampaignID]
-		if !cached {
-			campaign, err := s.campaigns.GetByID(ctx, result.CampaignID)
-			if err != nil {
-				return fmt.Errorf("look up campaign for result: %w", err)
+		active := make(map[string]bool)
+		now := time.Now().UTC().Format(time.RFC3339)
+		for _, result := range results {
+			if result.Status != model.CampaignResultStatusFailed {
+				continue
 			}
-			ok = campaign.Status == model.CampaignStatusActive
-			active[result.CampaignID] = ok
+			ok, cached := active[result.CampaignID]
+			if !cached {
+				// Hold the campaign open while its results change.
+				if err := lock(ctx, s.tx, lockCampaign(result.CampaignID)); err != nil {
+					return err
+				}
+				campaign, err := s.campaigns.GetByID(ctx, result.CampaignID)
+				if err != nil {
+					return fmt.Errorf("look up campaign for result: %w", err)
+				}
+				ok = campaign.Status == model.CampaignStatusActive
+				active[result.CampaignID] = ok
+			}
+			if !ok {
+				continue
+			}
+			from := result.Status
+			result.Status = model.CampaignResultStatusRetest
+			result.UpdatedAt = now
+			if err := s.campaignResults.Update(ctx, result); err != nil {
+				return fmt.Errorf("mark result for retest: %w", err)
+			}
+			if err := s.recordResultEvent(ctx, result, userID, from, now); err != nil {
+				return err
+			}
 		}
-		if !ok {
-			continue
-		}
-		from := result.Status
-		result.Status = model.CampaignResultStatusRetest
-		result.UpdatedAt = now
-		if err := s.campaignResults.Update(ctx, result); err != nil {
-			return fmt.Errorf("mark result for retest: %w", err)
-		}
-		s.recordResultEvent(ctx, result, userID, from, now)
-	}
-	return nil
+		return nil
+	})
 }
 
 // recordResultEvent appends to the immutable result change log (FR-042). Like
 // audit entries, a failure here must not undo the change it describes.
-func (s *TestingService) recordResultEvent(ctx context.Context, result *model.CampaignResult, userID, from, now string) {
-	_ = s.campaignEvents.Create(ctx, &model.CampaignResultEvent{
+func (s *TestingService) recordResultEvent(ctx context.Context, result *model.CampaignResult, userID, from, now string) error {
+	return s.campaignEvents.Create(ctx, &model.CampaignResultEvent{
 		ID:         uuid.New().String(),
 		ResultID:   result.ID,
 		CampaignID: result.CampaignID,

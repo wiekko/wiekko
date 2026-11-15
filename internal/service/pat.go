@@ -18,6 +18,8 @@ import (
 
 // PATService handles personal access token operations.
 type PATService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	pats         store.PATStore
 	productRoles store.ProductRoleStore
 	settings     store.SettingStore

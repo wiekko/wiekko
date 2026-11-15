@@ -856,7 +856,7 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 	field := r.FormValue("field")
 	value := r.FormValue("value")
 
-	input := service.UpdateProductInput{}
+	input := service.UpdateProductInput{IfUpdatedAt: r.FormValue("updated_at")}
 	switch field {
 	case "name":
 		input.Name = &value
@@ -1466,6 +1466,7 @@ func (c *PageProductController) MilestoneUpdate(w http.ResponseWriter, r *http.R
 	dueDate := r.FormValue("due_date")
 
 	input := service.UpdateMilestoneInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		Name:        &name,
 		Description: &description,
 		Type:        &milestoneType,
@@ -1649,6 +1650,7 @@ func (c *PageProductController) MilestoneComponentLink(w http.ResponseWriter, r 
 
 	mid := milestoneID
 	if _, err := c.component.UpdateComponent(r.Context(), user, productID, targetID, service.UpdateComponentInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &mid,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -1673,6 +1675,7 @@ func (c *PageProductController) MilestoneComponentUnlink(w http.ResponseWriter, 
 
 	empty := ""
 	if _, err := c.component.UpdateComponent(r.Context(), user, productID, targetID, service.UpdateComponentInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -1796,6 +1799,7 @@ func (c *PageProductController) MilestoneCapabilityLink(w http.ResponseWriter, r
 
 	mid := milestoneID
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, targetID, service.UpdateCapabilityInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &mid,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -1820,6 +1824,7 @@ func (c *PageProductController) MilestoneCapabilityUnlink(w http.ResponseWriter,
 
 	empty := ""
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, targetID, service.UpdateCapabilityInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -1944,6 +1949,7 @@ func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, 
 
 	mid := milestoneID
 	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &mid,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -1968,6 +1974,7 @@ func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter
 
 	empty := ""
 	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2094,6 +2101,7 @@ func (c *PageProductController) MilestoneConstraintLink(w http.ResponseWriter, r
 
 	mid := milestoneID
 	if _, err := c.constraint.UpdateConstraint(r.Context(), user, productID, targetID, service.UpdateConstraintInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &mid,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2118,6 +2126,7 @@ func (c *PageProductController) MilestoneConstraintUnlink(w http.ResponseWriter,
 
 	empty := ""
 	if _, err := c.constraint.UpdateConstraint(r.Context(), user, productID, targetID, service.UpdateConstraintInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2243,6 +2252,7 @@ func (c *PageProductController) MilestoneDefectLink(w http.ResponseWriter, r *ht
 
 	mid := milestoneID
 	if _, err := c.backlog.UpdateDefect(r.Context(), user, productID, targetID, service.UpdateDefectInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &mid,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2267,6 +2277,7 @@ func (c *PageProductController) MilestoneDefectUnlink(w http.ResponseWriter, r *
 
 	empty := ""
 	if _, err := c.backlog.UpdateDefect(r.Context(), user, productID, targetID, service.UpdateDefectInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2390,6 +2401,7 @@ func (c *PageProductController) MilestoneSprintLink(w http.ResponseWriter, r *ht
 
 	mid := milestoneID
 	if _, err := c.milestone.UpdateSprint(r.Context(), user, productID, targetID, service.UpdateSprintInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &mid,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2414,6 +2426,7 @@ func (c *PageProductController) MilestoneSprintUnlink(w http.ResponseWriter, r *
 
 	empty := ""
 	if _, err := c.milestone.UpdateSprint(r.Context(), user, productID, targetID, service.UpdateSprintInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		MilestoneID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2698,6 +2711,7 @@ func (c *PageProductController) ComponentUpdate(w http.ResponseWriter, r *http.R
 	milestoneID := r.FormValue("milestone_id")
 
 	input := service.UpdateComponentInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		Name:        &name,
 		Description: &description,
 		MilestoneID: &milestoneID,
@@ -2853,6 +2867,7 @@ func (c *PageProductController) ComponentCapabilityLink(w http.ResponseWriter, r
 
 	newCompID := componentID
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, capabilityID, service.UpdateCapabilityInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		ComponentID: &newCompID,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -2956,6 +2971,7 @@ func (c *PageProductController) ComponentCapabilityUnlink(w http.ResponseWriter,
 
 	empty := ""
 	if _, err := c.component.UpdateCapability(r.Context(), user, productID, capabilityID, service.UpdateCapabilityInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		ComponentID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -3070,6 +3086,7 @@ func (c *PageProductController) ComponentTestCaseLink(w http.ResponseWriter, r *
 
 	newCompID := componentID
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		ComponentID: &newCompID,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -3186,6 +3203,7 @@ func (c *PageProductController) ComponentTestCaseUnlink(w http.ResponseWriter, r
 
 	empty := ""
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		ComponentID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -3477,6 +3495,7 @@ func (c *PageProductController) CapabilityUpdate(w http.ResponseWriter, r *http.
 	milestoneID := r.FormValue("milestone_id")
 
 	input := service.UpdateCapabilityInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		Name:        &name,
 		Description: &description,
 		ComponentID: &componentID,
@@ -3908,6 +3927,7 @@ func (c *PageProductController) CapabilityTestCaseLink(w http.ResponseWriter, r 
 
 	newCapID := capabilityID
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		IfUpdatedAt:  r.FormValue("updated_at"),
 		CapabilityID: &newCapID,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -4024,6 +4044,7 @@ func (c *PageProductController) CapabilityTestCaseUnlink(w http.ResponseWriter, 
 
 	empty := ""
 	if _, err := c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		IfUpdatedAt:  r.FormValue("updated_at"),
 		CapabilityID: &empty,
 	}); err != nil {
 		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
@@ -4387,10 +4408,7 @@ func (c *PageProductController) buildAuditViews(r *http.Request, user *model.Use
 
 	views := make([]templates.AuditEntryView, 0, len(entries))
 	for _, e := range entries {
-		name := e.UserID
-		if dn, ok := userMap[e.UserID]; ok {
-			name = dn
-		}
+		name := userName(userMap, e.UserID)
 		views = append(views, templates.AuditEntryView{
 			ID:        e.ID,
 			UserName:  name,
@@ -4784,6 +4802,7 @@ func (c *PageProductController) TestCaseUpdate(w http.ResponseWriter, r *http.Re
 	}
 
 	_, err = c.testing.UpdateTestCase(r.Context(), user, productID, testCaseID, service.UpdateTestCaseInput{
+		IfUpdatedAt:    r.FormValue("updated_at"),
 		Title:          &title,
 		Description:    &description,
 		ExecutionMode:  &executionMode,
@@ -5708,6 +5727,7 @@ func (c *PageProductController) RequirementUpdate(w http.ResponseWriter, r *http
 	isCoarse := r.FormValue("is_coarse") == "on"
 
 	_, updateErr := c.backlog.UpdateRequirement(r.Context(), user, productID, requirementID, service.UpdateRequirementInput{
+		IfUpdatedAt:      r.FormValue("updated_at"),
 		ParentID:         &parentID,
 		Title:            &title,
 		Description:      &description,
@@ -7120,6 +7140,7 @@ func (c *PageProductController) DefectUpdate(w http.ResponseWriter, r *http.Requ
 	priority, _ := strconv.Atoi(priorityStr)
 
 	_, updateErr := c.backlog.UpdateDefect(r.Context(), user, productID, defectID, service.UpdateDefectInput{
+		IfUpdatedAt:   r.FormValue("updated_at"),
 		Title:         &title,
 		Description:   &description,
 		Criticality:   &criticality,
@@ -8173,6 +8194,7 @@ func (c *PageProductController) ConstraintUpdate(w http.ResponseWriter, r *http.
 	priority, _ := strconv.Atoi(priorityStr)
 
 	_, updateErr := c.constraint.UpdateConstraint(r.Context(), user, productID, constraintID, service.UpdateConstraintInput{
+		IfUpdatedAt:     r.FormValue("updated_at"),
 		CategoryID:      &categoryID,
 		Title:           &title,
 		Description:     &description,

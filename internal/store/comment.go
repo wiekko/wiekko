@@ -27,11 +27,13 @@ const commentColumns = `id, product_id, owner_type, owner_id, user_id, body, cre
 
 func scanComment(sc scanner) (*model.Comment, error) {
 	var c model.Comment
-	err := sc.Scan(&c.ID, &c.ProductID, &c.OwnerType, &c.OwnerID, &c.UserID,
+	var userID sql.NullString // NULL once the author's account is deleted
+	err := sc.Scan(&c.ID, &c.ProductID, &c.OwnerType, &c.OwnerID, &userID,
 		&c.Body, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	c.UserID = userID.String
 	return &c, nil
 }
 

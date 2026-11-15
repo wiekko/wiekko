@@ -666,6 +666,7 @@ type MockDefectStore struct {
 	ListAssigneesFunc       func(ctx context.Context, defectID string) ([]*model.Assignment, error)
 	AddLinkFunc             func(ctx context.Context, link *model.DefectLink) error
 	RemoveLinkFunc          func(ctx context.Context, id string) error
+	RemoveLinksToTargetFunc func(ctx context.Context, targetID string) error
 	GetLinkFunc             func(ctx context.Context, id string) (*model.DefectLink, error)
 	ListLinksFunc           func(ctx context.Context, defectID string) ([]*model.DefectLink, error)
 	ListLinksByTargetFunc   func(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
@@ -740,6 +741,12 @@ func (m *MockDefectStore) ListAssignees(ctx context.Context, defectID string) ([
 }
 func (m *MockDefectStore) AddLink(ctx context.Context, link *model.DefectLink) error {
 	return m.AddLinkFunc(ctx, link)
+}
+func (m *MockDefectStore) RemoveLinksToTarget(ctx context.Context, targetID string) error {
+	if m.RemoveLinksToTargetFunc != nil {
+		return m.RemoveLinksToTargetFunc(ctx, targetID)
+	}
+	return nil
 }
 func (m *MockDefectStore) RemoveLink(ctx context.Context, id string) error {
 	return m.RemoveLinkFunc(ctx, id)

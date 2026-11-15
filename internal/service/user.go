@@ -21,6 +21,8 @@ import (
 
 // UserService handles user account operations.
 type UserService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	users        store.UserStore
 	sessions     store.SessionStore
 	settings     store.SettingStore
@@ -190,22 +192,34 @@ func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, inp
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	if err := s.users.Create(ctx, user); err != nil {
-		return nil, fmt.Errorf("create user: %w", err)
-	}
-	if inv.ProductID != "" {
-		if err := s.productRoles.Create(ctx, &model.ProductRole{
-			ID:        uuid.New().String(),
-			UserID:    user.ID,
-			ProductID: inv.ProductID,
-			Role:      inv.Role,
-			CreatedAt: now,
-		}); err != nil {
-			return nil, fmt.Errorf("add product membership: %w", err)
+	// The account, its membership and the used-up invitation stand or fall
+	// together. MarkAccepted only succeeds for an invitation nobody accepted
+	// meanwhile, so of two concurrent accepts the second rolls back.
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.users.Create(ctx, user); err != nil {
+			return fmt.Errorf("create user: %w", err)
 		}
-	}
-	if err := s.invitations.MarkAccepted(ctx, inv.ID, now); err != nil {
-		return nil, fmt.Errorf("mark invitation accepted: %w", err)
+		if inv.ProductID != "" {
+			if err := s.productRoles.Create(ctx, &model.ProductRole{
+				ID:        uuid.New().String(),
+				UserID:    user.ID,
+				ProductID: inv.ProductID,
+				Role:      inv.Role,
+				CreatedAt: now,
+			}); err != nil {
+				return fmt.Errorf("add product membership: %w", err)
+			}
+		}
+		if err := s.invitations.MarkAccepted(ctx, inv.ID, now); err != nil {
+			if errors.Is(err, store.ErrNotChanged) {
+				return ErrInvitationAccepted
+			}
+			return fmt.Errorf("mark invitation accepted: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return user, nil
 }
@@ -400,6 +414,11 @@ var ErrLastAdmin = errors.New("this is the only active administrator and cannot 
 // ensureNotLastAdmin refuses to take the last active administrator out of
 // service (by locking or deleting the account).
 func (s *UserService) ensureNotLastAdmin(ctx context.Context, targetID string) error {
+	// Inside the caller's transaction, the lock keeps two administrators from
+	// removing each other at the same time and leaving none.
+	if err := lock(ctx, s.tx, lockAdmins); err != nil {
+		return err
+	}
 	target, err := s.users.GetByID(ctx, targetID)
 	if err != nil {
 		return err
@@ -433,15 +452,17 @@ func (s *UserService) RequestDeletion(ctx context.Context, id, password string) 
 			return err
 		}
 	}
-	if err := s.ensureNotLastAdmin(ctx, id); err != nil {
-		return err
-	}
 	moderation, _ := s.settings.Get(ctx, "moderation_enabled")
-	if moderation == "true" {
-		return s.users.UpdateStatus(ctx, id, model.UserStatusDeletionRequested)
-	}
-	// No moderation: delete immediately (FR-207).
-	return s.users.Delete(ctx, id)
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.ensureNotLastAdmin(ctx, id); err != nil {
+			return err
+		}
+		if moderation == "true" {
+			return s.users.UpdateStatus(ctx, id, model.UserStatusDeletionRequested)
+		}
+		// No moderation: delete immediately (FR-207).
+		return s.users.Delete(ctx, id)
+	})
 }
 
 // AdminSetPassword sets a new password for any user (admin only) and ends all
@@ -453,18 +474,23 @@ func (s *UserService) AdminSetPassword(ctx context.Context, targetID, newPasswor
 	if err != nil {
 		return err
 	}
-	if err := s.users.UpdatePassword(ctx, targetID, hash); err != nil {
-		return err
-	}
-	return s.endSessions(ctx, targetID, keepSessionID)
+	// The new password and the end of the old sessions go together.
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.users.UpdatePassword(ctx, targetID, hash); err != nil {
+			return err
+		}
+		return s.endSessions(ctx, targetID, keepSessionID)
+	})
 }
 
 // AdminLockUser locks a user account.
 func (s *UserService) AdminLockUser(ctx context.Context, targetID string) error {
-	if err := s.ensureNotLastAdmin(ctx, targetID); err != nil {
-		return err
-	}
-	return s.users.UpdateStatus(ctx, targetID, model.UserStatusLocked)
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.ensureNotLastAdmin(ctx, targetID); err != nil {
+			return err
+		}
+		return s.users.UpdateStatus(ctx, targetID, model.UserStatusLocked)
+	})
 }
 
 // AdminUnlockUser unlocks a user account.
@@ -474,10 +500,12 @@ func (s *UserService) AdminUnlockUser(ctx context.Context, targetID string) erro
 
 // AdminDeleteUser deletes a user account and all associated data.
 func (s *UserService) AdminDeleteUser(ctx context.Context, targetID string) error {
-	if err := s.ensureNotLastAdmin(ctx, targetID); err != nil {
-		return err
-	}
-	return s.users.Delete(ctx, targetID)
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.ensureNotLastAdmin(ctx, targetID); err != nil {
+			return err
+		}
+		return s.users.Delete(ctx, targetID)
+	})
 }
 
 // AdminApproveUser approves a pending user account.

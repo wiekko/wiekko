@@ -80,6 +80,11 @@ templ CampaignFormBody(props CampaignFormProps) {
 				class="space-y-6"
 			>
 				<input type="hidden" name="_csrf" value={ props.Meta.CSRFToken }/>
+				if props.Campaign != nil {
+					// The version being edited: a change saved meanwhile is reported
+					// as a conflict instead of being overwritten.
+					<input type="hidden" name="updated_at" value={ props.Campaign.UpdatedAt }/>
+				}
 				if props.ReturnTo != "" {
 					<input type="hidden" name="return" value={ props.ReturnTo }/>
 				}

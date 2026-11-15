@@ -242,6 +242,7 @@ func (c *PageProductController) SprintUpdate(w http.ResponseWriter, r *http.Requ
 	endRFC := sprintDateToRFC3339(endDate)
 
 	_, err = c.milestone.UpdateSprint(r.Context(), user, productID, sprintID, service.UpdateSprintInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		Name:        &name,
 		MilestoneID: &milestoneID,
 		StartDate:   &startRFC,
@@ -424,12 +425,14 @@ func (c *PageProductController) SprintItemMove(w http.ResponseWriter, r *http.Re
 	switch entityType {
 	case "defect":
 		_, err = c.backlog.UpdateDefect(r.Context(), user, productID, itemID, service.UpdateDefectInput{
-			SprintID: &sprintID,
+			IfUpdatedAt: r.FormValue("updated_at"),
+			SprintID:    &sprintID,
 		})
 	case model.RequirementKindRequirement, model.RequirementKindTask:
 		// Tasks live in the requirements table, so both take the same path.
 		_, err = c.backlog.UpdateRequirement(r.Context(), user, productID, itemID, service.UpdateRequirementInput{
-			SprintID: &sprintID,
+			IfUpdatedAt: r.FormValue("updated_at"),
+			SprintID:    &sprintID,
 		})
 	default:
 		http.Error(w, fmt.Sprintf("unknown entity type %q", entityType), http.StatusBadRequest)

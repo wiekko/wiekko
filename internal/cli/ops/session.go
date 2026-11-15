@@ -231,6 +231,15 @@ func user(usernames map[string]string, id string) string {
 	return "user:" + ShortID(id)
 }
 
+// author names the author of a comment: the server sends no author once the
+// account is deleted.
+func author(usernames map[string]string, id string) string {
+	if id == "" {
+		return "deleted user"
+	}
+	return user(usernames, id)
+}
+
 // ShortID returns the first 8 characters of an ID, enough to reference a
 // defect or test case unambiguously in practice (see matchID).
 func ShortID(id string) string {

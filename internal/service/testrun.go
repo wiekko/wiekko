@@ -93,6 +93,8 @@ type TestRunReport struct {
 // through the backlog service so they follow the same rules as any other
 // defect (FR-502).
 type TestRunService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	testCases    store.TestCaseStore
 	campaigns    store.TestingCampaignStore
 	results      store.CampaignResultStore
@@ -112,10 +114,12 @@ type TestRunService struct {
 // no results, events or defects — so CI keeps working between campaigns and
 // results only ever change inside an active campaign (FR-505).
 //
-// Results are applied one by one rather than in a single transaction. Every
-// step is idempotent (unchanged statuses are skipped, an open defect on the
-// result is reused), so a run that fails half way is completed by sending it
-// again.
+// Each result is applied in its own transaction — the defect filed for it,
+// the defect's link to the test case, the result and its event stand or fall
+// together — rather than the whole run in one, which would hold the campaign
+// for as long as a large suite takes. Every step is idempotent (unchanged
+// statuses are skipped, an open defect on the result is reused), so a run
+// that fails half way is completed by sending it again.
 func (s *TestRunService) IngestRun(ctx context.Context, user *model.User, in TestRunInput) (*TestRunReport, error) {
 	if _, err := s.authz.RequireRole(ctx, user, in.ProductID, model.RoleTester); err != nil {
 		return nil, err
@@ -183,7 +187,14 @@ func (s *TestRunService) IngestRun(ctx context.Context, user *model.User, in Tes
 				break
 			}
 			o.Outcome = TestRunUpdated
-			if err := s.apply(ctx, user, in, report, campaign, tc, g, row, &o, write, now); err != nil {
+			if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+				if write {
+					if err := s.holdActive(ctx, campaign.ID); err != nil {
+						return err
+					}
+				}
+				return s.apply(ctx, user, in, report, campaign, tc, g, row, &o, write, now)
+			}); err != nil {
 				return nil, fmt.Errorf("record %s: %w", g.identifier, err)
 			}
 		}
@@ -192,6 +203,23 @@ func (s *TestRunService) IngestRun(ctx context.Context, user *model.User, in Tes
 	report.Recorded = write
 	s.fillDefectIdentifiers(ctx, report)
 	return report, nil
+}
+
+// holdActive takes the campaign's lock for the current transaction and
+// checks that the campaign is still active: it may have been closed since the
+// run started.
+func (s *TestRunService) holdActive(ctx context.Context, campaignID string) error {
+	if err := lock(ctx, s.tx, lockCampaign(campaignID)); err != nil {
+		return err
+	}
+	c, err := s.campaigns.GetByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+	if c.Status != model.CampaignStatusActive {
+		return fmt.Errorf("the campaign was %s while the run was recorded", c.Status)
+	}
+	return nil
 }
 
 // fillDefectIdentifiers adds the identifiers of the defects the outcomes name.
@@ -252,8 +280,7 @@ func (s *TestRunService) apply(ctx context.Context, user *model.User, in TestRun
 	if err := s.results.Update(ctx, row); err != nil {
 		return fmt.Errorf("update campaign result: %w", err)
 	}
-	// Like audit entries, a failed event write must not undo the change.
-	_ = s.events.Create(ctx, &model.CampaignResultEvent{
+	return s.events.Create(ctx, &model.CampaignResultEvent{
 		ID:         uuid.New().String(),
 		ResultID:   row.ID,
 		CampaignID: row.CampaignID,
@@ -266,7 +293,6 @@ func (s *TestRunService) apply(ctx context.Context, user *model.User, in TestRun
 		Branch:     in.Branch,
 		CreatedAt:  now,
 	})
-	return nil
 }
 
 // fileDefect creates the defect explaining an automated failure and links it

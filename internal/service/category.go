@@ -22,6 +22,8 @@ var prefixPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{0,5}$`)
 
 // CategoryService handles category CRUD.
 type CategoryService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx         store.Transactor
 	categories store.CategoryStore
 	// products holds the defect prefix, which category prefixes must not
 	// take (FR-043). nil skips that check.
@@ -84,14 +86,17 @@ func (s *CategoryService) CreateCategory(ctx context.Context, user *model.User, 
 		Position:   input.Position,
 		CreatedAt:  now,
 	}
-	if err := s.categories.Create(ctx, cat); err != nil {
-		return nil, fmt.Errorf("create category: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.categories.Create(ctx, cat); err != nil {
+			return fmt.Errorf("create category: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "category", EntityID: cat.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "category", EntityID: cat.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return cat, nil
 }
@@ -150,15 +155,18 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, user *model.User, 
 		cat.Position = *input.Position
 	}
 
-	if err := s.categories.Update(ctx, cat); err != nil {
-		return nil, fmt.Errorf("update category: %w", err)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "category", EntityID: cat.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.categories.Update(ctx, cat); err != nil {
+			return fmt.Errorf("update category: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "category", EntityID: cat.ID,
+			UserID: user.ID, Action: "update", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
+	}
 
 	return cat, nil
 }
@@ -176,43 +184,47 @@ func (s *CategoryService) DeleteCategory(ctx context.Context, user *model.User, 
 		return err
 	}
 
-	cat, err := s.categories.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	count, err := s.usageCount(ctx, cat)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return fmt.Errorf("cannot delete %q: %s still assigned to it", cat.Name, pluralItems(count))
-	}
-
-	siblings, err := s.categories.ListByProductID(ctx, cat.ProductID, cat.EntityType)
-	if err != nil {
-		return fmt.Errorf("list categories: %w", err)
-	}
-	if len(siblings) <= 1 {
-		return fmt.Errorf("cannot delete the last %s category: at least one is needed to create new items", cat.EntityType)
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.categories.Delete(ctx, id); err != nil {
-		// Backstop for the gap between the usage check and the delete.
-		if strings.Contains(err.Error(), "FOREIGN KEY") || strings.Contains(err.Error(), "foreign key") ||
-			strings.Contains(err.Error(), "RESTRICT") {
-			return errors.New("cannot delete category: items are still assigned to it")
+	// The checks and the delete run under the product's category lock, so
+	// two concurrent deletes cannot both see the other category and leave a
+	// kind with none.
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockCategories(productID)); err != nil {
+			return err
 		}
-		return fmt.Errorf("delete category: %w", err)
-	}
+		cat, err := s.categories.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
 
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "category", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
+		count, err := s.usageCount(ctx, cat)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return fmt.Errorf("cannot delete %q: %s still assigned to it", cat.Name, pluralItems(count))
+		}
+
+		siblings, err := s.categories.ListByProductID(ctx, cat.ProductID, cat.EntityType)
+		if err != nil {
+			return fmt.Errorf("list categories: %w", err)
+		}
+		if len(siblings) <= 1 {
+			return fmt.Errorf("cannot delete the last %s category: at least one is needed to create new items", cat.EntityType)
+		}
+
+		if err := s.categories.Delete(ctx, id); err != nil {
+			// Backstop for an item filed under the category meanwhile.
+			if strings.Contains(err.Error(), "FOREIGN KEY") || strings.Contains(err.Error(), "foreign key") ||
+				strings.Contains(err.Error(), "RESTRICT") {
+				return errors.New("cannot delete category: items are still assigned to it")
+			}
+			return fmt.Errorf("delete category: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "category", EntityID: id,
+			UserID: user.ID, Action: "delete", CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		})
 	})
-
-	return nil
 }
 
 // ListCategories returns categories for a product and entity type. Requires viewer role.

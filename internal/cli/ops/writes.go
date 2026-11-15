@@ -260,7 +260,7 @@ func (s *Session) AddComment(ctx context.Context, in NewComment) (*CommentResult
 	return &CommentResult{
 		OwnerType: ownerType,
 		Owner:     owner,
-		Comment:   CommentView{Author: user(users, c.UserID), CreatedAt: c.CreatedAt, Body: c.Body},
+		Comment:   CommentView{Author: author(users, c.UserID), CreatedAt: c.CreatedAt, Body: c.Body},
 	}, nil
 }
 

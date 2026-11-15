@@ -91,6 +91,9 @@ func (c *PlanningController) UpdateMilestone(w http.ResponseWriter, r *http.Requ
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt string  `json:"if_updated_at"`
 		Name        *string `json:"name"`
 		Description *string `json:"description"`
 		Type        *string `json:"type"`
@@ -101,6 +104,7 @@ func (c *PlanningController) UpdateMilestone(w http.ResponseWriter, r *http.Requ
 	}
 
 	item, err := c.milestone.UpdateMilestone(r.Context(), user, productID, id, service.UpdateMilestoneInput{
+		IfUpdatedAt: req.IfUpdatedAt,
 		Name:        req.Name,
 		Description: req.Description,
 		Type:        req.Type,
@@ -200,6 +204,9 @@ func (c *PlanningController) UpdateSprint(w http.ResponseWriter, r *http.Request
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt string  `json:"if_updated_at"`
 		Name        *string `json:"name"`
 		MilestoneID *string `json:"milestone_id"`
 		Status      *string `json:"status"`
@@ -211,6 +218,7 @@ func (c *PlanningController) UpdateSprint(w http.ResponseWriter, r *http.Request
 	}
 
 	item, err := c.milestone.UpdateSprint(r.Context(), user, productID, id, service.UpdateSprintInput{
+		IfUpdatedAt: req.IfUpdatedAt,
 		Name:        req.Name,
 		MilestoneID: req.MilestoneID,
 		Status:      req.Status,

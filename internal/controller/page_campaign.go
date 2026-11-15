@@ -255,6 +255,7 @@ func (c *PageProductController) CampaignUpdate(w http.ResponseWriter, r *http.Re
 	endsAt := normalizeFormDate(r.FormValue("ends_at"))
 
 	_, err = c.testing.UpdateCampaign(r.Context(), user, productID, campaignID, service.UpdateCampaignInput{
+		IfUpdatedAt: r.FormValue("updated_at"),
 		Name:        &name,
 		Description: &description,
 		StartsAt:    &startsAt,

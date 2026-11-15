@@ -54,8 +54,10 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	// Built first: the entity services below delegate their comment and
 	// attachment cleanup to it when they delete a row.
 	discussionSvc := &DiscussionService{
+		tx:          st.Tx,
 		comments:    st.Comment,
 		attachments: st.Attachment,
+		defectLinks: st.Defect,
 		audit:       st.Audit,
 		blobs:       blobs,
 		policy:      storage.NewPolicy(cfg.AllowedUploads),
@@ -66,6 +68,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	// Built before the backlog service, which calls into it to reopen campaign
 	// results once the defect that failed them is closed (FR-504).
 	testingSvc := &TestingService{
+		tx:              st.Tx,
 		testCases:       st.TestCase,
 		campaigns:       st.TestingCampaign,
 		campaignResults: st.CampaignResult,
@@ -77,6 +80,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	}
 
 	twoFactorSvc := &TwoFactorService{
+		tx:           st.Tx,
 		users:        st.User,
 		twoFactor:    st.TwoFactor,
 		settings:     st.Setting,
@@ -89,6 +93,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	// Built before the test run service, which files defects for automated
 	// failures through it.
 	backlogSvc := &BacklogService{
+		tx:           st.Tx,
 		requirements: st.Requirement,
 		defects:      st.Defect,
 		categories:   st.Category,
@@ -102,6 +107,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	}
 
 	userSvc := &UserService{
+		tx:           st.Tx,
 		users:        st.User,
 		sessions:     st.Session,
 		settings:     st.Setting,
@@ -115,6 +121,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	return &Services{
 		Mail: mailer,
 		Auth: &AuthService{
+			tx:             st.Tx,
 			users:          st.User,
 			sessions:       st.Session,
 			pats:           st.PAT,
@@ -127,6 +134,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		TwoFactor: twoFactorSvc,
 		User:      userSvc,
 		PasswordReset: &PasswordResetService{
+			tx:          st.Tx,
 			users:       st.User,
 			resets:      st.PasswordReset,
 			accounts:    userSvc,
@@ -135,6 +143,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			userLimiter: newAttemptLimiter(passwordResetMailsPerUser, PasswordResetWindow),
 		},
 		PAT: &PATService{
+			tx:           st.Tx,
 			pats:         st.PAT,
 			productRoles: st.ProductRole,
 			settings:     st.Setting,
@@ -142,6 +151,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		},
 		Setting: settingSvc,
 		Invitation: &InvitationService{
+			tx:               st.Tx,
 			invitations:      st.Invitation,
 			authz:            authz,
 			publicURL:        cfg.PublicURL,
@@ -150,6 +160,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			recipientLimiter: newAttemptLimiter(invitationMailsPerRecipient, InvitationRecipientWindow),
 		},
 		Product: &ProductService{
+			tx:            st.Tx,
 			products:      st.Product,
 			productRoles:  st.ProductRole,
 			statuses:      st.Status,
@@ -161,6 +172,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			authz:         authz,
 		},
 		Component: &ComponentService{
+			tx:           st.Tx,
 			components:   st.Component,
 			capabilities: st.Capability,
 			comments:     discussionSvc,
@@ -169,6 +181,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			owns:         owns,
 		},
 		Milestone: &MilestoneService{
+			tx:            st.Tx,
 			milestones:    st.Milestone,
 			sprints:       st.Sprint,
 			statuses:      st.Status,
@@ -181,6 +194,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			owns:          owns,
 		},
 		Category: &CategoryService{
+			tx:           st.Tx,
 			categories:   st.Category,
 			products:     st.Product,
 			requirements: st.Requirement,
@@ -191,6 +205,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		},
 		Backlog: backlogSvc,
 		Document: &DocumentService{
+			tx:           st.Tx,
 			documents:    st.Document,
 			products:     st.Product,
 			requirements: st.Requirement,
@@ -214,6 +229,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			authz:        authz,
 		},
 		Constraint: &ConstraintService{
+			tx:          st.Tx,
 			constraints: st.Constraint,
 			categories:  st.Category,
 			comments:    discussionSvc,
@@ -223,6 +239,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		},
 		Testing: testingSvc,
 		TestRun: &TestRunService{
+			tx:           st.Tx,
 			testCases:    st.TestCase,
 			campaigns:    st.TestingCampaign,
 			results:      st.CampaignResult,

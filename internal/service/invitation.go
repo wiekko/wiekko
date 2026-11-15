@@ -39,6 +39,8 @@ var ErrInvitationNotSent = errors.New("the invitation email could not be sent; t
 
 // InvitationService handles invitation operations.
 type InvitationService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx          store.Transactor
 	invitations store.InvitationStore
 	authz       *Authorizer
 	// publicURL is the configured server address (NEXMAP_PUBLIC_URL), or
@@ -116,6 +118,10 @@ func (s *InvitationService) Send(ctx context.Context, inviter *model.User, email
 	inv := result.Invitation
 	expires, _ := time.Parse(time.RFC3339, inv.ExpiresAt)
 	msg := s.mail.invitationMessage(email, result.RawToken, role, expires)
+	// Not one transaction with the create: it would stay open for the whole
+	// SMTP exchange, and on SQLite (one connection) stall every other request
+	// meanwhile. Withdrawing the invitation compensates instead, and a failed
+	// withdrawal is reported rather than left silent.
 	if err := s.mail.send(ctx, mailPurposeInvitation, msg); err != nil {
 		// Do not leave a usable invitation behind that nobody received.
 		if delErr := s.invitations.Delete(ctx, inv.ID); delErr != nil {

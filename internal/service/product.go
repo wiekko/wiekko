@@ -15,6 +15,8 @@ import (
 
 // ProductService handles product CRUD and member management.
 type ProductService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx            store.Transactor
 	products      store.ProductStore
 	productRoles  store.ProductRoleStore
 	statuses      store.StatusStore
@@ -36,6 +38,9 @@ type CreateProductInput struct {
 
 // UpdateProductInput contains the fields that can be updated on a product.
 type UpdateProductInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt    string
 	Name           *string
 	Description    *string
 	EstimationMode *string
@@ -90,34 +95,40 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	if err := s.products.Create(ctx, product); err != nil {
-		return nil, fmt.Errorf("create product: %w", err)
-	}
-
-	// Assign creator as owner (FR-303).
-	role := &model.ProductRole{
-		ID:        uuid.New().String(),
-		UserID:    user.ID,
-		ProductID: product.ID,
-		Role:      model.RoleOwner,
-		CreatedAt: now,
-	}
-	if err := s.productRoles.Create(ctx, role); err != nil {
-		return nil, fmt.Errorf("assign owner role: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
+	// The product, its owner and its default workflow come into existence
+	// together: a product without an owner is unreachable, and one without
+	// default categories rejects new requirements.
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.products.Create(ctx, product); err != nil {
+			return fmt.Errorf("create product: %w", err)
+		}
+		// Assign creator as owner (FR-303).
+		if err := s.productRoles.Create(ctx, &model.ProductRole{
+			ID:        uuid.New().String(),
+			UserID:    user.ID,
+			ProductID: product.ID,
+			Role:      model.RoleOwner,
+			CreatedAt: now,
+		}); err != nil {
+			return fmt.Errorf("assign owner role: %w", err)
+		}
+		if err := s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		return s.seedDefaults(ctx, product.ID, now)
 	})
-
-	s.seedDefaults(ctx, product.ID, now)
+	if err != nil {
+		return nil, err
+	}
 
 	return product, nil
 }
 
 // seedDefaults creates default statuses and pyramid levels for a new product.
-func (s *ProductService) seedDefaults(ctx context.Context, productID, now string) {
+func (s *ProductService) seedDefaults(ctx context.Context, productID, now string) error {
 	// Default statuses (synced: same for both entity types).
 	// New items land in "New", which is not active: an owner activates them
 	// by moving them on (kanban, FR-318). "Done" is not active either, so
@@ -137,7 +148,7 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 
 	for _, et := range []string{"requirement", "defect"} {
 		for _, ds := range defaultStatuses {
-			_ = s.statuses.Create(ctx, &model.Status{
+			if err := s.statuses.Create(ctx, &model.Status{
 				ID:         uuid.New().String(),
 				ProductID:  productID,
 				EntityType: et,
@@ -147,7 +158,9 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 				IsClosed:   ds.IsClosed,
 				IsActive:   ds.IsActive,
 				CreatedAt:  now,
-			})
+			}); err != nil {
+				return fmt.Errorf("seed defaults: %w", err)
+			}
 		}
 	}
 
@@ -164,7 +177,7 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 	}
 
 	for _, dc := range defaultReqCategories {
-		_ = s.categories.Create(ctx, &model.Category{
+		if err := s.categories.Create(ctx, &model.Category{
 			ID:         uuid.New().String(),
 			ProductID:  productID,
 			EntityType: "requirement",
@@ -172,7 +185,9 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 			Prefix:     dc.Prefix,
 			Position:   dc.Position,
 			CreatedAt:  now,
-		})
+		}); err != nil {
+			return fmt.Errorf("seed defaults: %w", err)
+		}
 	}
 
 	// Default task categories. Tasks carry no product statement, so they get
@@ -188,7 +203,7 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 	}
 
 	for _, dc := range defaultTaskCategories {
-		_ = s.categories.Create(ctx, &model.Category{
+		if err := s.categories.Create(ctx, &model.Category{
 			ID:         uuid.New().String(),
 			ProductID:  productID,
 			EntityType: "task",
@@ -196,7 +211,9 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 			Prefix:     dc.Prefix,
 			Position:   dc.Position,
 			CreatedAt:  now,
-		})
+		}); err != nil {
+			return fmt.Errorf("seed defaults: %w", err)
+		}
 	}
 
 	// Default constraint categories.
@@ -211,7 +228,7 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 	}
 
 	for _, dc := range defaultConCategories {
-		_ = s.categories.Create(ctx, &model.Category{
+		if err := s.categories.Create(ctx, &model.Category{
 			ID:         uuid.New().String(),
 			ProductID:  productID,
 			EntityType: "constraint",
@@ -219,7 +236,9 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 			Prefix:     dc.Prefix,
 			Position:   dc.Position,
 			CreatedAt:  now,
-		})
+		}); err != nil {
+			return fmt.Errorf("seed defaults: %w", err)
+		}
 	}
 
 	// Default pyramid levels.
@@ -233,14 +252,17 @@ func (s *ProductService) seedDefaults(ctx context.Context, productID, now string
 	}
 
 	for _, dl := range defaultLevels {
-		_ = s.pyramidLevels.Create(ctx, &model.PyramidLevel{
+		if err := s.pyramidLevels.Create(ctx, &model.PyramidLevel{
 			ID:        uuid.New().String(),
 			ProductID: productID,
 			Name:      dl.Name,
 			Position:  dl.Position,
 			CreatedAt: now,
-		})
+		}); err != nil {
+			return fmt.Errorf("seed defaults: %w", err)
+		}
 	}
+	return nil
 }
 
 // GetByID returns a product by ID. Requires viewer role.
@@ -257,73 +279,94 @@ func (s *ProductService) Update(ctx context.Context, user *model.User, productID
 		return nil, err
 	}
 
-	product, err := s.products.GetByID(ctx, productID)
+	var product *model.Product
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(productID)); err != nil {
+			return err
+		}
+		var err error
+		product, err = s.products.GetByID(ctx, productID)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, product.UpdatedAt); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.Name != nil {
+			product.Name = *input.Name
+		}
+		if input.Description != nil {
+			product.Description = *input.Description
+		}
+		if input.EstimationMode != nil {
+			product.EstimationMode = *input.EstimationMode
+		}
+		if input.DefectPrefix != nil {
+			prefix, err := normalizeDefectPrefix(*input.DefectPrefix)
+			if err != nil {
+				return err
+			}
+			if cat, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix); err == nil && cat != nil {
+				return fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
+			}
+			product.DefectPrefix = prefix
+		}
+		if input.DocumentPrefix != nil {
+			prefix, err := normalizeDocumentPrefix(*input.DocumentPrefix)
+			if err != nil {
+				return err
+			}
+			if cat, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix); err == nil && cat != nil {
+				return fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
+			}
+			product.DocumentPrefix = prefix
+		}
+		if (input.DefectPrefix != nil || input.DocumentPrefix != nil) && product.DefectPrefix == product.DocumentPrefix {
+			return fmt.Errorf("defects and documents cannot share the prefix %q", product.DefectPrefix)
+		}
+		if input.TwoFactorRequired != nil {
+			if *input.TwoFactorRequired && !product.TwoFactorRequired && !user.TOTPEnabled {
+				return ErrOwnTwoFactorRequired
+			}
+			product.TwoFactorRequired = *input.TwoFactorRequired
+		}
+		switchesToScrum := false
+		if input.WorkflowMode != nil {
+			switchesToScrum = *input.WorkflowMode == model.WorkflowModeScrum && product.WorkflowMode != model.WorkflowModeScrum
+			product.WorkflowMode = *input.WorkflowMode
+		}
+		product.UpdatedAt = now
+
+		err = inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.products.Update(ctx, product); err != nil {
+				return fmt.Errorf("update product: %w", err)
+			}
+			// In kanban mode an item's column decides its activation; in scrum
+			// mode the stored flag does, so it has to start from the sprint plan.
+			if switchesToScrum {
+				if err := s.products.ResetActivationToSprints(ctx, product.ID); err != nil {
+					return err
+				}
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.Name != nil {
-		product.Name = *input.Name
-	}
-	if input.Description != nil {
-		product.Description = *input.Description
-	}
-	if input.EstimationMode != nil {
-		product.EstimationMode = *input.EstimationMode
-	}
-	if input.DefectPrefix != nil {
-		prefix, err := normalizeDefectPrefix(*input.DefectPrefix)
-		if err != nil {
-			return nil, err
-		}
-		if cat, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix); err == nil && cat != nil {
-			return nil, fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
-		}
-		product.DefectPrefix = prefix
-	}
-	if input.DocumentPrefix != nil {
-		prefix, err := normalizeDocumentPrefix(*input.DocumentPrefix)
-		if err != nil {
-			return nil, err
-		}
-		if cat, err := s.categories.GetByProductAndPrefix(ctx, productID, prefix); err == nil && cat != nil {
-			return nil, fmt.Errorf("prefix %q is already used by the %s category %q", prefix, cat.EntityType, cat.Name)
-		}
-		product.DocumentPrefix = prefix
-	}
-	if (input.DefectPrefix != nil || input.DocumentPrefix != nil) && product.DefectPrefix == product.DocumentPrefix {
-		return nil, fmt.Errorf("defects and documents cannot share the prefix %q", product.DefectPrefix)
-	}
-	if input.TwoFactorRequired != nil {
-		if *input.TwoFactorRequired && !product.TwoFactorRequired && !user.TOTPEnabled {
-			return nil, ErrOwnTwoFactorRequired
-		}
-		product.TwoFactorRequired = *input.TwoFactorRequired
-	}
-	switchesToScrum := false
-	if input.WorkflowMode != nil {
-		switchesToScrum = *input.WorkflowMode == model.WorkflowModeScrum && product.WorkflowMode != model.WorkflowModeScrum
-		product.WorkflowMode = *input.WorkflowMode
-	}
-	product.UpdatedAt = now
-
-	if err := s.products.Update(ctx, product); err != nil {
-		return nil, fmt.Errorf("update product: %w", err)
-	}
-	// In kanban mode an item's column decides its activation; in scrum mode
-	// the stored flag does, so it has to start from the sprint plan.
-	if switchesToScrum {
-		if err := s.products.ResetActivationToSprints(ctx, product.ID); err != nil {
-			return nil, err
-		}
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return product, nil
 }
 
@@ -333,24 +376,24 @@ func (s *ProductService) Delete(ctx context.Context, user *model.User, productID
 		return err
 	}
 
-	// Comment and attachment rows cascade with the product, but the stored
-	// attachment bytes are outside SQL's reach — unlink them while the rows
-	// that name their paths still exist.
-	if err := s.attachments.PurgeProduct(ctx, productID); err != nil {
+	now := time.Now().UTC().Format(time.RFC3339)
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.products.Delete(ctx, productID); err != nil {
+			return fmt.Errorf("delete product: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "product", EntityID: productID,
+			UserID: user.ID, Action: "delete", CreatedAt: now,
+		})
+	})
+	if err != nil {
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.products.Delete(ctx, productID); err != nil {
-		return fmt.Errorf("delete product: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "product", EntityID: productID,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	// Comment and attachment rows went with the product (foreign keys), but
+	// the stored attachment bytes are outside SQL's reach. Unlink them only
+	// now: had the delete failed, the product would still need them.
+	return s.attachments.PurgeProduct(context.WithoutCancel(ctx), productID)
 }
 
 // ProductWithRole pairs a product with the requesting user's role in it.
@@ -472,11 +515,12 @@ func (s *ProductService) AddMember(ctx context.Context, user *model.User, produc
 		Role:      role,
 		CreatedAt: now,
 	}
-	if err := s.productRoles.Create(ctx, pr); err != nil {
-		return err
-	}
-	s.auditMember(ctx, user, productID, targetUserID, "", role)
-	return nil
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.productRoles.Create(ctx, pr); err != nil {
+			return err
+		}
+		return s.auditMember(ctx, user, productID, targetUserID, "", role)
+	})
 }
 
 // ErrLastOwner is returned when a change would leave a product without an
@@ -504,14 +548,14 @@ func (s *ProductService) memberRole(ctx context.Context, productID, targetUserID
 // auditMember records a change to a product's team in the product's audit
 // trail: who may do what in a product is as much part of its history as its
 // content. An empty old or new role stands for "not a member".
-func (s *ProductService) auditMember(ctx context.Context, actor *model.User, productID, targetUserID, oldRole, newRole string) {
+func (s *ProductService) auditMember(ctx context.Context, actor *model.User, productID, targetUserID, oldRole, newRole string) error {
 	if oldRole == "" {
 		oldRole = "no access"
 	}
 	if newRole == "" {
 		newRole = "no access"
 	}
-	_ = s.audit.Create(ctx, &model.AuditEntry{
+	return s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), EntityType: "product", EntityID: productID,
 		UserID: actor.ID, Action: "update", FieldName: "role of user " + targetUserID,
 		OldValue: oldRole, NewValue: newRole,
@@ -519,7 +563,9 @@ func (s *ProductService) auditMember(ctx context.Context, actor *model.User, pro
 	})
 }
 
-// UpdateMember changes a member's role.
+// UpdateMember changes a member's role. The last-owner check and the change
+// run under the product's member lock, so two concurrent demotions cannot
+// both see the other owner and leave none.
 func (s *ProductService) UpdateMember(ctx context.Context, user *model.User, productID, targetUserID, role string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
@@ -527,43 +573,47 @@ func (s *ProductService) UpdateMember(ctx context.Context, user *model.User, pro
 	if roleRank(role) < 0 {
 		return fmt.Errorf("invalid role %q", role)
 	}
-	oldRole, otherOwner, err := s.memberRole(ctx, productID, targetUserID)
-	if err != nil {
-		return err
-	}
-	if oldRole == model.RoleOwner && role != model.RoleOwner && !otherOwner {
-		return ErrLastOwner
-	}
-
-	pr := &model.ProductRole{
-		UserID:    targetUserID,
-		ProductID: productID,
-		Role:      role,
-	}
-	if err := s.productRoles.Update(ctx, pr); err != nil {
-		return err
-	}
-	s.auditMember(ctx, user, productID, targetUserID, oldRole, role)
-	return nil
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockMembers(productID)); err != nil {
+			return err
+		}
+		oldRole, otherOwner, err := s.memberRole(ctx, productID, targetUserID)
+		if err != nil {
+			return err
+		}
+		if oldRole == model.RoleOwner && role != model.RoleOwner && !otherOwner {
+			return ErrLastOwner
+		}
+		if err := s.productRoles.Update(ctx, &model.ProductRole{
+			UserID: targetUserID, ProductID: productID, Role: role,
+		}); err != nil {
+			return err
+		}
+		return s.auditMember(ctx, user, productID, targetUserID, oldRole, role)
+	})
 }
 
-// RemoveMember removes a user from a product.
+// RemoveMember removes a user from a product; see UpdateMember for the lock.
 func (s *ProductService) RemoveMember(ctx context.Context, user *model.User, productID, targetUserID string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
-	oldRole, otherOwner, err := s.memberRole(ctx, productID, targetUserID)
-	if err != nil {
-		return err
-	}
-	if oldRole == model.RoleOwner && !otherOwner {
-		return ErrLastOwner
-	}
-	if err := s.productRoles.Delete(ctx, targetUserID, productID); err != nil {
-		return err
-	}
-	s.auditMember(ctx, user, productID, targetUserID, oldRole, "")
-	return nil
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockMembers(productID)); err != nil {
+			return err
+		}
+		oldRole, otherOwner, err := s.memberRole(ctx, productID, targetUserID)
+		if err != nil {
+			return err
+		}
+		if oldRole == model.RoleOwner && !otherOwner {
+			return ErrLastOwner
+		}
+		if err := s.productRoles.Delete(ctx, targetUserID, productID); err != nil {
+			return err
+		}
+		return s.auditMember(ctx, user, productID, targetUserID, oldRole, "")
+	})
 }
 
 // ListMembers returns all members of a product.
@@ -595,52 +645,66 @@ func (s *ProductService) SplitStatuses(ctx context.Context, user *model.User, pr
 	product.StatusSync = false
 	product.UpdatedAt = now
 
-	if err := s.products.Update(ctx, product); err != nil {
-		return fmt.Errorf("split statuses: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.products.Update(ctx, product); err != nil {
+			return fmt.Errorf("split statuses: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
+			UserID: user.ID, Action: "split_statuses", CreatedAt: now,
+		})
+	}); err != nil {
+		return err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "product", EntityID: product.ID,
-		UserID: user.ID, Action: "split_statuses", CreatedAt: now,
-	})
 
 	return nil
 }
 
-// TransferOwnership transfers product ownership to another user (FR-306).
+// TransferOwnership transfers product ownership to another user (FR-306):
+// the new owner is promoted (or added) and the current owner becomes a
+// developer, in one transaction, so a failure can never leave the product
+// without an owner.
 func (s *ProductService) TransferOwnership(ctx context.Context, user *model.User, productID, newOwnerID string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
 	}
-
-	// Demote current owner to developer.
-	if err := s.productRoles.Update(ctx, &model.ProductRole{
-		UserID: user.ID, ProductID: productID, Role: model.RoleDeveloper,
-	}); err != nil {
-		return fmt.Errorf("demote current owner: %w", err)
+	if newOwnerID == "" || newOwnerID == user.ID {
+		return errors.New("choose another user to transfer the ownership to")
 	}
 
-	s.auditMember(ctx, user, productID, user.ID, model.RoleOwner, model.RoleDeveloper)
-	// Check if new owner already has a role.
-	existing, err := s.productRoles.GetByUserAndProduct(ctx, newOwnerID, productID)
-	if err != nil {
-		// No existing role — create one.
-		now := time.Now().UTC().Format(time.RFC3339)
-		if err := s.productRoles.Create(ctx, &model.ProductRole{
-			ID: uuid.New().String(), UserID: newOwnerID, ProductID: productID,
-			Role: model.RoleOwner, CreatedAt: now,
-		}); err != nil {
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockMembers(productID)); err != nil {
 			return err
 		}
-		s.auditMember(ctx, user, productID, newOwnerID, "", model.RoleOwner)
-		return nil
-	}
-	// Promote to owner.
-	oldRole := existing.Role
-	existing.Role = model.RoleOwner
-	if err := s.productRoles.Update(ctx, existing); err != nil {
-		return err
-	}
-	s.auditMember(ctx, user, productID, newOwnerID, oldRole, model.RoleOwner)
-	return nil
+		// Promote first: should anything below fail, the transaction rolls
+		// back, and even without one the product keeps an owner.
+		existing, err := s.productRoles.GetByUserAndProduct(ctx, newOwnerID, productID)
+		if err != nil {
+			if err := s.productRoles.Create(ctx, &model.ProductRole{
+				ID: uuid.New().String(), UserID: newOwnerID, ProductID: productID,
+				Role: model.RoleOwner, CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			}); err != nil {
+				return fmt.Errorf("make new owner: %w", err)
+			}
+			if err := s.auditMember(ctx, user, productID, newOwnerID, "", model.RoleOwner); err != nil {
+				return err
+			}
+		} else if existing.Role != model.RoleOwner {
+			oldRole := existing.Role
+			existing.Role = model.RoleOwner
+			if err := s.productRoles.Update(ctx, existing); err != nil {
+				return fmt.Errorf("make new owner: %w", err)
+			}
+			if err := s.auditMember(ctx, user, productID, newOwnerID, oldRole, model.RoleOwner); err != nil {
+				return err
+			}
+		}
+
+		if err := s.productRoles.Update(ctx, &model.ProductRole{
+			UserID: user.ID, ProductID: productID, Role: model.RoleDeveloper,
+		}); err != nil {
+			return fmt.Errorf("demote current owner: %w", err)
+		}
+		return s.auditMember(ctx, user, productID, user.ID, model.RoleOwner, model.RoleDeveloper)
+	})
 }

@@ -472,10 +472,15 @@ func TestPurgeOwner(t *testing.T) {
 			noopAudit(), ownerRoles(), blobs,
 		)
 
-		err := svc.PurgeOwner(context.Background(), "product-001", model.OwnerTypeComponent, "component-001")
+		afterCommit, err := svc.PurgeOwner(context.Background(), "product-001", model.OwnerTypeComponent, "component-001")
 		if err != nil {
 			t.Fatalf("PurgeOwner: %v", err)
 		}
+		// The bytes stay until the caller's transaction has committed.
+		if _, ok := blobs.files["product-001/att-001"]; !ok {
+			t.Fatal("blob unlinked before commit")
+		}
+		afterCommit()
 		if !commentsPurged {
 			t.Error("comments were not deleted")
 		}
@@ -514,7 +519,7 @@ func TestPurgeOwner(t *testing.T) {
 			noopAudit(), ownerRoles(), memBlobs(),
 		)
 
-		if err := svc.PurgeOwner(context.Background(), "product-001", model.OwnerTypeComponent, "component-001"); err == nil {
+		if _, err := svc.PurgeOwner(context.Background(), "product-001", model.OwnerTypeComponent, "component-001"); err == nil {
 			t.Fatal("PurgeOwner = nil, want error")
 		}
 	})

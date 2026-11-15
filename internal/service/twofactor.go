@@ -145,6 +145,8 @@ var (
 
 // TwoFactorService manages TOTP enrollment, verification and recovery codes.
 type TwoFactorService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	users        store.UserStore
 	twoFactor    store.TwoFactorStore
 	settings     store.SettingStore
@@ -378,14 +380,25 @@ func (s *TwoFactorService) ConfirmSetup(ctx context.Context, userID, code string
 	if !ok {
 		return nil, ErrInvalidTOTPCode
 	}
-	if err := s.users.SetTOTP(ctx, user.ID, user.TOTPSecret, true); err != nil {
+	// Enabling 2FA and handing out the recovery codes happen together:
+	// 2FA switched on without codes the user ever saw is one lost phone away
+	// from a locked-out account.
+	var codes []string
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.users.SetTOTP(ctx, user.ID, user.TOTPSecret, true); err != nil {
+			return err
+		}
+		// Burn the confirmation code so it cannot be reused for a login.
+		if _, err := s.users.ConsumeTOTPStep(ctx, user.ID, step); err != nil {
+			return err
+		}
+		codes, err = s.issueRecoveryCodes(ctx, user.ID)
+		return err
+	})
+	if err != nil {
 		return nil, err
 	}
-	// Burn the confirmation code so it cannot be reused for a login.
-	if _, err := s.users.ConsumeTOTPStep(ctx, user.ID, step); err != nil {
-		return nil, err
-	}
-	return s.issueRecoveryCodes(ctx, user.ID)
+	return codes, nil
 }
 
 // Disable turns TOTP off after re-checking the password and a current code.
@@ -516,8 +529,10 @@ func (s *TwoFactorService) issueRecoveryCodes(ctx context.Context, userID string
 }
 
 func (s *TwoFactorService) clear(ctx context.Context, userID string) error {
-	if err := s.users.SetTOTP(ctx, userID, "", false); err != nil {
-		return err
-	}
-	return s.twoFactor.DeleteRecoveryCodes(ctx, userID)
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.users.SetTOTP(ctx, userID, "", false); err != nil {
+			return err
+		}
+		return s.twoFactor.DeleteRecoveryCodes(ctx, userID)
+	})
 }

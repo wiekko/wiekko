@@ -130,6 +130,8 @@ CREATE TABLE IF NOT EXISTS sprints (
 );
 CREATE INDEX IF NOT EXISTS idx_sprints_product_id ON sprints(product_id);
 CREATE INDEX IF NOT EXISTS idx_sprints_milestone_id ON sprints(milestone_id);
+-- At most one active sprint per product (FR-318), like campaigns below.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sprints_active ON sprints(product_id) WHERE status = 'active';
 
 -- Requirements: backlog items (FR-005..FR-010, FR-013)
 CREATE TABLE IF NOT EXISTS requirements (
@@ -294,6 +296,9 @@ CREATE TABLE IF NOT EXISTS campaign_results (
 CREATE INDEX IF NOT EXISTS idx_campaign_results_campaign_id ON campaign_results(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_results_test_case_id ON campaign_results(test_case_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_results_defect_id ON campaign_results(defect_id);
+-- The UNIQUE above treats NULLs as distinct, so it does not stop a second
+-- result without an environment for the same test case.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_results_no_env ON campaign_results(campaign_id, test_case_id) WHERE environment_id IS NULL;
 
 -- Campaign result events: immutable status change log (FR-042, UC-207)
 -- campaign_id is denormalised so progress-over-time is one indexed scan without a join.
@@ -462,7 +467,8 @@ CREATE TABLE IF NOT EXISTS comments (
     product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     owner_type TEXT NOT NULL,
     owner_id   TEXT NOT NULL,
-    user_id    TEXT NOT NULL REFERENCES users(id),
+    -- NULL once the author's account is deleted: the thread keeps the comment.
+    user_id    TEXT REFERENCES users(id) ON DELETE SET NULL,
     body       TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -476,7 +482,8 @@ CREATE TABLE IF NOT EXISTS attachments (
     product_id   TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     owner_type   TEXT NOT NULL,
     owner_id     TEXT NOT NULL,
-    user_id      TEXT NOT NULL REFERENCES users(id),
+    -- NULL once the uploader's account is deleted: the file stays.
+    user_id      TEXT REFERENCES users(id) ON DELETE SET NULL,
     filename     TEXT NOT NULL,
     content_type TEXT NOT NULL DEFAULT '',
     size         INTEGER NOT NULL DEFAULT 0,

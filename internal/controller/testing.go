@@ -186,6 +186,9 @@ func (c *TestingController) UpdateTestCase(w http.ResponseWriter, r *http.Reques
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt    string  `json:"if_updated_at"`
 		ComponentID    *string `json:"component_id"`
 		CapabilityID   *string `json:"capability_id"`
 		Title          *string `json:"title"`
@@ -199,6 +202,7 @@ func (c *TestingController) UpdateTestCase(w http.ResponseWriter, r *http.Reques
 	}
 
 	item, err := c.testing.UpdateTestCase(r.Context(), user, productID, id, service.UpdateTestCaseInput{
+		IfUpdatedAt:    req.IfUpdatedAt,
 		ComponentID:    req.ComponentID,
 		CapabilityID:   req.CapabilityID,
 		Title:          req.Title,
@@ -410,6 +414,9 @@ func (c *TestingController) UpdateCampaign(w http.ResponseWriter, r *http.Reques
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt string  `json:"if_updated_at"`
 		Name        *string `json:"name"`
 		Description *string `json:"description"`
 		StartsAt    *string `json:"starts_at"`
@@ -420,6 +427,7 @@ func (c *TestingController) UpdateCampaign(w http.ResponseWriter, r *http.Reques
 	}
 
 	item, err := c.testing.UpdateCampaign(r.Context(), user, productID, id, service.UpdateCampaignInput{
+		IfUpdatedAt: req.IfUpdatedAt,
 		Name:        req.Name,
 		Description: req.Description,
 		StartsAt:    req.StartsAt,

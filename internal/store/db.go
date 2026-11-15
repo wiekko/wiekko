@@ -63,11 +63,17 @@ func (d *DB) Raw() *sql.DB { return d.db }
 
 // ExecContext runs a statement that returns no rows.
 func (d *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if tx := txFrom(ctx); tx != nil {
+		return tx.ExecContext(ctx, query, args...)
+	}
 	return d.db.ExecContext(ctx, rebind(d.dialect, query), args...)
 }
 
 // QueryContext runs a query that returns rows.
 func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*Rows, error) {
+	if tx := txFrom(ctx); tx != nil {
+		return tx.QueryContext(ctx, query, args...)
+	}
 	rows, err := d.db.QueryContext(ctx, rebind(d.dialect, query), args...)
 	if err != nil {
 		return nil, err
@@ -77,6 +83,9 @@ func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*Rows
 
 // QueryRowContext runs a query expected to return at most one row.
 func (d *DB) QueryRowContext(ctx context.Context, query string, args ...any) *Row {
+	if tx := txFrom(ctx); tx != nil {
+		return tx.QueryRowContext(ctx, query, args...)
+	}
 	return &Row{row: d.db.QueryRowContext(ctx, rebind(d.dialect, query), args...)}
 }
 
@@ -90,8 +99,13 @@ func (d *DB) QueryRow(query string, args ...any) *Row {
 	return d.QueryRowContext(context.Background(), query, args...)
 }
 
-// BeginTx starts a transaction.
+// BeginTx starts a transaction. When ctx already carries one (see InTx), the
+// returned Tx joins it: its Commit and Rollback do nothing, and the outer
+// transaction decides the outcome.
 func (d *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	if outer := txFrom(ctx); outer != nil {
+		return &Tx{tx: outer.tx, dialect: d.dialect, joined: true}, nil
+	}
 	tx, err := d.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -103,6 +117,8 @@ func (d *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 type Tx struct {
 	tx      *sql.Tx
 	dialect Dialect
+	// joined marks a Tx that runs inside an outer transaction it does not own.
+	joined bool
 }
 
 // ExecContext runs a statement that returns no rows.
@@ -132,10 +148,20 @@ func (t *Tx) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error
 }
 
 // Commit commits the transaction.
-func (t *Tx) Commit() error { return t.tx.Commit() }
+func (t *Tx) Commit() error {
+	if t.joined {
+		return nil
+	}
+	return t.tx.Commit()
+}
 
 // Rollback aborts the transaction.
-func (t *Tx) Rollback() error { return t.tx.Rollback() }
+func (t *Tx) Rollback() error {
+	if t.joined {
+		return nil
+	}
+	return t.tx.Rollback()
+}
 
 // Rows wraps *sql.Rows so Scan normalises timestamps.
 type Rows struct {

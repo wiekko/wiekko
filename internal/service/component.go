@@ -14,6 +14,8 @@ import (
 
 // ComponentService handles component and capability CRUD.
 type ComponentService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	components   store.ComponentStore
 	capabilities store.CapabilityStore
 	comments     ownerPurger
@@ -32,6 +34,9 @@ type CreateComponentInput struct {
 
 // UpdateComponentInput contains the fields that can be updated on a component.
 type UpdateComponentInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt string
 	Name        *string
 	Description *string
 	MilestoneID *string
@@ -48,6 +53,9 @@ type CreateCapabilityInput struct {
 
 // UpdateCapabilityInput contains the fields that can be updated on a capability.
 type UpdateCapabilityInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt string
 	Name        *string
 	Description *string
 	ComponentID *string
@@ -77,14 +85,17 @@ func (s *ComponentService) CreateComponent(ctx context.Context, user *model.User
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.components.Create(ctx, c); err != nil {
-		return nil, fmt.Errorf("create component: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.components.Create(ctx, c); err != nil {
+			return fmt.Errorf("create component: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "component", EntityID: c.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "component", EntityID: c.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return c, nil
 }
@@ -112,32 +123,52 @@ func (s *ComponentService) UpdateComponent(ctx context.Context, user *model.User
 		return nil, err
 	}
 
-	c, err := s.components.GetByID(ctx, id)
+	var c *model.Component
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		c, err = s.components.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, c.UpdatedAt); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.Name != nil {
+			c.Name = *input.Name
+		}
+		if input.Description != nil {
+			c.Description = *input.Description
+		}
+		if input.MilestoneID != nil {
+			c.MilestoneID = *input.MilestoneID
+		}
+		c.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.components.Update(ctx, c); err != nil {
+				return fmt.Errorf("update component: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "component", EntityID: c.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.Name != nil {
-		c.Name = *input.Name
-	}
-	if input.Description != nil {
-		c.Description = *input.Description
-	}
-	if input.MilestoneID != nil {
-		c.MilestoneID = *input.MilestoneID
-	}
-	c.UpdatedAt = now
-
-	if err := s.components.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("update component: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "component", EntityID: c.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return c, nil
 }
 
@@ -150,23 +181,7 @@ func (s *ComponentService) DeleteComponent(ctx context.Context, user *model.User
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.components.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete component: %w", err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeComponent, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "component", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeComponent, id, s.components.Delete)
 }
 
 // ListComponents returns all components for a product. Requires viewer role.
@@ -201,14 +216,17 @@ func (s *ComponentService) CreateCapability(ctx context.Context, user *model.Use
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.capabilities.Create(ctx, c); err != nil {
-		return nil, fmt.Errorf("create capability: %w", err)
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.capabilities.Create(ctx, c); err != nil {
+			return fmt.Errorf("create capability: %w", err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
+		return nil, err
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return c, nil
 }
@@ -236,35 +254,55 @@ func (s *ComponentService) UpdateCapability(ctx context.Context, user *model.Use
 		return nil, err
 	}
 
-	c, err := s.capabilities.GetByID(ctx, id)
+	var c *model.Capability
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		c, err = s.capabilities.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, c.UpdatedAt); err != nil {
+			return err
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.Name != nil {
+			c.Name = *input.Name
+		}
+		if input.Description != nil {
+			c.Description = *input.Description
+		}
+		if input.ComponentID != nil {
+			c.ComponentID = *input.ComponentID
+		}
+		if input.MilestoneID != nil {
+			c.MilestoneID = *input.MilestoneID
+		}
+		c.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.capabilities.Update(ctx, c); err != nil {
+				return fmt.Errorf("update capability: %w", err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.Name != nil {
-		c.Name = *input.Name
-	}
-	if input.Description != nil {
-		c.Description = *input.Description
-	}
-	if input.ComponentID != nil {
-		c.ComponentID = *input.ComponentID
-	}
-	if input.MilestoneID != nil {
-		c.MilestoneID = *input.MilestoneID
-	}
-	c.UpdatedAt = now
-
-	if err := s.capabilities.Update(ctx, c); err != nil {
-		return nil, fmt.Errorf("update capability: %w", err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "capability", EntityID: c.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return c, nil
 }
 
@@ -277,23 +315,7 @@ func (s *ComponentService) DeleteCapability(ctx context.Context, user *model.Use
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.capabilities.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete capability: %w", err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeCapability, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "capability", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeCapability, id, s.capabilities.Delete)
 }
 
 // ListCapabilities returns all capabilities for a product. Requires viewer role.

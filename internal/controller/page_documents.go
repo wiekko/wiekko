@@ -261,7 +261,8 @@ func (c *PageProductController) DocumentUpdate(w http.ResponseWriter, r *http.Re
 	successor, component, capability, milestone := r.FormValue("superseded_by_id"), r.FormValue("component_id"), r.FormValue("capability_id"), r.FormValue("milestone_id")
 	body := formBody(r.FormValue("body"), d.Body)
 	_, updateErr := c.document.UpdateDocument(r.Context(), user, productID, documentID, service.UpdateDocumentInput{
-		Title: &title, Body: &body, Format: &format, State: &state, SupersededByID: &successor,
+		IfUpdatedAt: r.FormValue("updated_at"),
+		Title:       &title, Body: &body, Format: &format, State: &state, SupersededByID: &successor,
 		ComponentID: &component, CapabilityID: &capability, MilestoneID: &milestone,
 	})
 	if updateErr != nil {
@@ -491,7 +492,7 @@ func (c *PageProductController) DocumentRevisionsTab(w http.ResponseWriter, r *h
 	}
 	for _, rev := range revs {
 		props.Revisions = append(props.Revisions, productpage.DocumentRevisionRow{Revision: rev.Revision, Title: rev.Title,
-			Format: rev.Format, Author: names[rev.UserID], CreatedAt: rev.CreatedAt})
+			Format: rev.Format, Author: userName(names, rev.UserID), CreatedAt: rev.CreatedAt})
 	}
 	props.To, props.From = d.Revision, d.Revision-1
 	if n, err := strconv.Atoi(r.URL.Query().Get("to")); err == nil && n >= 1 {

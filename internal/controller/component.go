@@ -89,6 +89,9 @@ func (c *ComponentController) UpdateComponent(w http.ResponseWriter, r *http.Req
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt string  `json:"if_updated_at"`
 		Name        *string `json:"name"`
 		Description *string `json:"description"`
 		MilestoneID *string `json:"milestone_id"`
@@ -98,6 +101,7 @@ func (c *ComponentController) UpdateComponent(w http.ResponseWriter, r *http.Req
 	}
 
 	item, err := c.component.UpdateComponent(r.Context(), user, productID, id, service.UpdateComponentInput{
+		IfUpdatedAt: req.IfUpdatedAt,
 		Name:        req.Name,
 		Description: req.Description,
 		MilestoneID: req.MilestoneID,
@@ -196,6 +200,9 @@ func (c *ComponentController) UpdateCapability(w http.ResponseWriter, r *http.Re
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt string  `json:"if_updated_at"`
 		Name        *string `json:"name"`
 		Description *string `json:"description"`
 		ComponentID *string `json:"component_id"`
@@ -206,6 +213,7 @@ func (c *ComponentController) UpdateCapability(w http.ResponseWriter, r *http.Re
 	}
 
 	item, err := c.component.UpdateCapability(r.Context(), user, productID, id, service.UpdateCapabilityInput{
+		IfUpdatedAt: req.IfUpdatedAt,
 		Name:        req.Name,
 		Description: req.Description,
 		ComponentID: req.ComponentID,

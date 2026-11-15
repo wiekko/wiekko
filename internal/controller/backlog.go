@@ -125,6 +125,9 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt      string  `json:"if_updated_at"`
 		CategoryID       *string `json:"category_id"`
 		Title            *string `json:"title"`
 		Description      *string `json:"description"`
@@ -142,6 +145,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 	}
 
 	item, err := c.backlog.UpdateRequirement(r.Context(), user, productID, id, service.UpdateRequirementInput{
+		IfUpdatedAt:      req.IfUpdatedAt,
 		CategoryID:       req.CategoryID,
 		Title:            req.Title,
 		Description:      req.Description,
@@ -359,6 +363,9 @@ func (c *BacklogController) UpdateDefect(w http.ResponseWriter, r *http.Request)
 	id := r.PathValue("id")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt   string  `json:"if_updated_at"`
 		Title         *string `json:"title"`
 		Description   *string `json:"description"`
 		Criticality   *string `json:"criticality"`
@@ -375,6 +382,7 @@ func (c *BacklogController) UpdateDefect(w http.ResponseWriter, r *http.Request)
 	}
 
 	item, err := c.backlog.UpdateDefect(r.Context(), user, productID, id, service.UpdateDefectInput{
+		IfUpdatedAt:   req.IfUpdatedAt,
 		Title:         req.Title,
 		Description:   req.Description,
 		Criticality:   req.Criticality,

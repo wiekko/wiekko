@@ -91,6 +91,9 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 	productID := r.PathValue("productId")
 
 	var req struct {
+		// IfUpdatedAt is the updated_at the client edited: a change made
+		// meanwhile turns the update into 409 CONFLICT.
+		IfUpdatedAt    string  `json:"if_updated_at"`
 		Name           *string `json:"name"`
 		Description    *string `json:"description"`
 		EstimationMode *string `json:"estimation_mode"`
@@ -105,6 +108,7 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product, err := c.product.Update(r.Context(), user, productID, service.UpdateProductInput{
+		IfUpdatedAt:    req.IfUpdatedAt,
 		Name:           req.Name,
 		Description:    req.Description,
 		EstimationMode: req.EstimationMode,
@@ -269,6 +273,10 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	// the client, and the driver's wording must not leak into the response.
 	if errors.Is(err, sql.ErrNoRows) {
 		httputil.Error(w, http.StatusNotFound, "NOT_FOUND", "not found")
+		return
+	}
+	if errors.Is(err, service.ErrConflict) {
+		httputil.Error(w, http.StatusConflict, "CONFLICT", errorText(err))
 		return
 	}
 	if errors.Is(err, storage.ErrTooLarge) {

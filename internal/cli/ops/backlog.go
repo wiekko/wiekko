@@ -319,7 +319,7 @@ func (s *Session) comments(ctx context.Context, ownerType, ownerID string) ([]Co
 	}
 	out := make([]CommentView, 0, len(list))
 	for _, c := range list {
-		out = append(out, CommentView{Author: user(users, c.UserID), CreatedAt: c.CreatedAt, Body: c.Body})
+		out = append(out, CommentView{Author: author(users, c.UserID), CreatedAt: c.CreatedAt, Body: c.Body})
 	}
 	return out, nil
 }

@@ -66,6 +66,8 @@ func validateSetting(key, value string) error {
 
 // SettingService handles instance settings.
 type SettingService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx       store.Transactor
 	settings store.SettingStore
 }
 

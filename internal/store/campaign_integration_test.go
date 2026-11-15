@@ -57,6 +57,20 @@ func seedCampaignFixture(t *testing.T, db *DB) campaignFixture {
 	return f
 }
 
+// seedTestCase adds a bare test case to the product. A campaign holds at most
+// one result per test case and environment, so tests that need several
+// results without an environment give each its own test case.
+func seedTestCase(t *testing.T, db *DB, productID, title string) string {
+	t.Helper()
+	id := uuid.New().String()
+	now := Now()
+	if _, err := db.Exec(`INSERT INTO test_cases (id, product_id, title, description, execution_mode, created_at, updated_at)
+	      VALUES (?, ?, ?, '', 'manual', ?, ?)`, id, productID, title, now, now); err != nil {
+		t.Fatalf("seed test case: %v", err)
+	}
+	return id
+}
+
 func makeCampaign(t *testing.T, s TestingCampaignStore, productID, name, status string) *model.TestingCampaign {
 	t.Helper()
 
@@ -406,7 +420,7 @@ func TestCampaignResultEventStoreDefectTrail(t *testing.T) {
 		unrelated := uuid.New().String()
 		for _, id := range []string{verified, unrelated} {
 			if err := results.Create(ctx, &model.CampaignResult{
-				ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
+				ID: id, CampaignID: c.ID, TestCaseID: seedTestCase(t, db, f.productID, "Case "+id),
 				Status: model.CampaignResultStatusPending, UpdatedAt: now,
 			}); err != nil {
 				t.Fatalf("Create result: %v", err)
@@ -473,7 +487,7 @@ func TestCampaignResultEventStoreCountsByCampaignID(t *testing.T) {
 		untouched := uuid.New().String()
 		for _, id := range []string{changed, setOnce, untouched} {
 			if err := results.Create(ctx, &model.CampaignResult{
-				ID: id, CampaignID: c.ID, TestCaseID: f.tcBare,
+				ID: id, CampaignID: c.ID, TestCaseID: seedTestCase(t, db, f.productID, "Case "+id),
 				Status: model.CampaignResultStatusPending, UpdatedAt: now,
 			}); err != nil {
 				t.Fatalf("Create result: %v", err)
@@ -506,6 +520,29 @@ func TestCampaignResultEventStoreCountsByCampaignID(t *testing.T) {
 		// A result nobody ever set has no events and simply does not appear.
 		if _, ok := counts[untouched]; ok {
 			t.Fatalf("counts[untouched] = %d, want no entry", counts[untouched])
+		}
+	})
+}
+
+// TestCampaignResultOnePerTestCaseWithoutEnvironment: the UNIQUE constraint
+// treats NULL environments as distinct, so a partial index has to stop a
+// second environment-less result for the same test case.
+func TestCampaignResultOnePerTestCaseWithoutEnvironment(t *testing.T) {
+	forEachDB(t, func(t *testing.T, db *DB) {
+		f := seedCampaignFixture(t, db)
+		c := makeCampaign(t, &testingCampaignStore{db: db}, f.productID, "Release 1.0", model.CampaignStatusDraft)
+		results := &campaignResultStore{db: db}
+		create := func() error {
+			return results.Create(context.Background(), &model.CampaignResult{
+				ID: uuid.New().String(), CampaignID: c.ID, TestCaseID: f.tcBare,
+				Status: model.CampaignResultStatusPending, UpdatedAt: Now(),
+			})
+		}
+		if err := create(); err != nil {
+			t.Fatalf("first result: %v", err)
+		}
+		if err := create(); err == nil {
+			t.Fatal("second result without an environment was accepted")
 		}
 	})
 }

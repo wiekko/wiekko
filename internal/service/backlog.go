@@ -21,6 +21,8 @@ type campaignRetester interface {
 
 // BacklogService handles requirements and defects.
 type BacklogService struct {
+	// tx groups multi-step writes into one transaction (nil in unit tests).
+	tx           store.Transactor
 	requirements store.RequirementStore
 	defects      store.DefectStore
 	categories   store.CategoryStore
@@ -56,6 +58,9 @@ type CreateRequirementInput struct {
 
 // UpdateRequirementInput contains the fields that can be updated on a requirement.
 type UpdateRequirementInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt      string
 	ParentID         *string
 	CategoryID       *string
 	Title            *string
@@ -99,11 +104,6 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		return nil, err
 	}
 
-	seq, err := s.requirements.NextSequenceNumber(ctx, input.ProductID)
-	if err != nil {
-		return nil, fmt.Errorf("next sequence number: %w", err)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	r := &model.Requirement{
 		ID:               uuid.New().String(),
@@ -111,7 +111,6 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		Kind:             input.Kind,
 		ParentID:         input.ParentID,
 		CategoryID:       input.CategoryID,
-		SequenceNumber:   seq,
 		Title:            input.Title,
 		Description:      input.Description,
 		DefinitionOfDone: input.DefinitionOfDone,
@@ -125,17 +124,31 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
-	if err := s.requirements.Create(ctx, r); err != nil {
-		return nil, fmt.Errorf("create %s: %w", input.Kind, err)
+	// The sequence lock holds off concurrent creates between drawing the next
+	// number and inserting it.
+	err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockSequence("requirement", input.ProductID)); err != nil {
+			return err
+		}
+		seq, err := s.requirements.NextSequenceNumber(ctx, input.ProductID)
+		if err != nil {
+			return fmt.Errorf("next sequence number: %w", err)
+		}
+		r.SequenceNumber = seq
+		if err := s.requirements.Create(ctx, r); err != nil {
+			return fmt.Errorf("create %s: %w", input.Kind, err)
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	})
+	if err != nil {
+		return nil, err
 	}
 	if s.kanbanMode(ctx, input.ProductID) {
 		r.IsActive = s.columnActive(ctx, r.StatusID)
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return r, nil
 }
@@ -166,90 +179,110 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 		return nil, err
 	}
 
-	r, err := s.requirements.GetByID(ctx, id)
+	var r *model.Requirement
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		r, err = s.requirements.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, r.UpdatedAt); err != nil {
+			return err
+		}
+
+		isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+		kanban := s.kanbanMode(ctx, productID)
+		if err := checkActivationChange(r.Kind, isDeveloper, kanban, r.IsActive, input.IsActive); err != nil {
+			return err
+		}
+		if isDeveloper {
+			if err := requireActivatedForStatus(r.Kind, r.IsActive, r.StatusID, input.StatusID); err != nil {
+				return err
+			}
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		if input.StatusID != nil {
+			r.StatusID = *input.StatusID
+		}
+		if input.IsActive != nil {
+			r.IsActive = *input.IsActive
+		}
+
+		// Fields that require owner role.
+		if input.ParentID != nil || input.CategoryID != nil || input.Title != nil || input.Description != nil ||
+			input.DefinitionOfDone != nil || input.MilestoneID != nil ||
+			input.SprintID != nil || input.Estimation != nil ||
+			input.Priority != nil || input.IsCoarse != nil {
+			if isDeveloper {
+				return fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
+			}
+			if input.ParentID != nil {
+				if err := s.validateParent(ctx, productID, r.ID, r.Kind, *input.ParentID); err != nil {
+					return err
+				}
+				r.ParentID = *input.ParentID
+			}
+			if input.CategoryID != nil {
+				if err := s.checkCategoryKind(ctx, r.Kind, *input.CategoryID); err != nil {
+					return err
+				}
+				r.CategoryID = *input.CategoryID
+			}
+			if input.Title != nil {
+				r.Title = *input.Title
+			}
+			if input.Description != nil {
+				r.Description = *input.Description
+			}
+			if input.DefinitionOfDone != nil {
+				r.DefinitionOfDone = *input.DefinitionOfDone
+			}
+			if input.MilestoneID != nil {
+				r.MilestoneID = *input.MilestoneID
+			}
+			if input.SprintID != nil {
+				r.IsActive = activationAfterSprintMove(r.SprintID, *input.SprintID, r.IsActive, input.IsActive != nil)
+				r.SprintID = *input.SprintID
+			}
+			if input.Estimation != nil {
+				r.Estimation = *input.Estimation
+			}
+			if input.Priority != nil {
+				r.Priority = *input.Priority
+			}
+			if input.IsCoarse != nil {
+				r.IsCoarse = *input.IsCoarse
+			}
+		}
+		if kanban {
+			r.IsActive = s.columnActive(ctx, r.StatusID)
+		}
+		r.UpdatedAt = now
+
+		if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.requirements.Update(ctx, r); err != nil {
+				return fmt.Errorf("update %s: %w", r.Kind, err)
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
-	kanban := s.kanbanMode(ctx, productID)
-	if err := checkActivationChange(r.Kind, isDeveloper, kanban, r.IsActive, input.IsActive); err != nil {
-		return nil, err
-	}
-	if isDeveloper {
-		if err := requireActivatedForStatus(r.Kind, r.IsActive, r.StatusID, input.StatusID); err != nil {
-			return nil, err
-		}
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if input.StatusID != nil {
-		r.StatusID = *input.StatusID
-	}
-	if input.IsActive != nil {
-		r.IsActive = *input.IsActive
-	}
-
-	// Fields that require owner role.
-	if input.ParentID != nil || input.CategoryID != nil || input.Title != nil || input.Description != nil ||
-		input.DefinitionOfDone != nil || input.MilestoneID != nil ||
-		input.SprintID != nil || input.Estimation != nil ||
-		input.Priority != nil || input.IsCoarse != nil {
-		if isDeveloper {
-			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
-		}
-		if input.ParentID != nil {
-			if err := s.validateParent(ctx, productID, r.ID, r.Kind, *input.ParentID); err != nil {
-				return nil, err
-			}
-			r.ParentID = *input.ParentID
-		}
-		if input.CategoryID != nil {
-			if err := s.checkCategoryKind(ctx, r.Kind, *input.CategoryID); err != nil {
-				return nil, err
-			}
-			r.CategoryID = *input.CategoryID
-		}
-		if input.Title != nil {
-			r.Title = *input.Title
-		}
-		if input.Description != nil {
-			r.Description = *input.Description
-		}
-		if input.DefinitionOfDone != nil {
-			r.DefinitionOfDone = *input.DefinitionOfDone
-		}
-		if input.MilestoneID != nil {
-			r.MilestoneID = *input.MilestoneID
-		}
-		if input.SprintID != nil {
-			r.IsActive = activationAfterSprintMove(r.SprintID, *input.SprintID, r.IsActive, input.IsActive != nil)
-			r.SprintID = *input.SprintID
-		}
-		if input.Estimation != nil {
-			r.Estimation = *input.Estimation
-		}
-		if input.Priority != nil {
-			r.Priority = *input.Priority
-		}
-		if input.IsCoarse != nil {
-			r.IsCoarse = *input.IsCoarse
-		}
-	}
-	if kanban {
-		r.IsActive = s.columnActive(ctx, r.StatusID)
-	}
-	r.UpdatedAt = now
-
-	if err := s.requirements.Update(ctx, r); err != nil {
-		return nil, fmt.Errorf("update %s: %w", r.Kind, err)
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: r.Kind, EntityID: r.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return r, nil
 }
 
@@ -268,23 +301,7 @@ func (s *BacklogService) DeleteRequirement(ctx context.Context, user *model.User
 		kind = r.Kind
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.requirements.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete %s: %w", kind, err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, kind, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: kind, EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, kind, id, s.requirements.Delete)
 }
 
 // ListRequirements returns requirements for a product. Requires viewer role.
@@ -482,6 +499,9 @@ type CreateDefectInput struct {
 
 // UpdateDefectInput contains the fields that can be updated on a defect.
 type UpdateDefectInput struct {
+	// IfUpdatedAt is the updated_at of the version the client edited. When
+	// set and the item has changed since, the update fails with ErrConflict.
+	IfUpdatedAt   string
 	Title         *string
 	Description   *string
 	Criticality   *string
@@ -530,18 +550,21 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err := s.insertNumbered(ctx, d); err != nil {
+	if err := inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := s.insertNumbered(ctx, d); err != nil {
+			return err
+		}
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
+			UserID: user.ID, Action: "create", CreatedAt: now,
+		})
+	}); err != nil {
 		return nil, err
 	}
 	d.Identifier = model.EntityIdentifier(s.defectPrefix(ctx, input.ProductID), d.SequenceNumber)
 	if s.kanbanMode(ctx, input.ProductID) {
 		d.IsActive = s.columnActive(ctx, d.StatusID)
 	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
-		UserID: user.ID, Action: "create", CreatedAt: now,
-	})
 
 	return d, nil
 }
@@ -572,84 +595,107 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 		return nil, err
 	}
 
-	d, err := s.defects.GetByID(ctx, id)
+	var d *model.Defect
+	err = inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The entity's lock serializes concurrent edits: each one reads the
+		// row as the previous one left it, so none overwrites another's change.
+		// IfUpdatedAt carries the version the client edited, if it sent one.
+		if err := lock(ctx, s.tx, lockEntity(id)); err != nil {
+			return err
+		}
+		var err error
+		d, err = s.defects.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := checkVersion(input.IfUpdatedAt, d.UpdatedAt); err != nil {
+			return err
+		}
+
+		isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
+		kanban := s.kanbanMode(ctx, productID)
+		if err := checkActivationChange("defect", isDeveloper, kanban, d.IsActive, input.IsActive); err != nil {
+			return err
+		}
+		if isDeveloper {
+			if err := requireActivatedForStatus("defect", d.IsActive, d.StatusID, input.StatusID); err != nil {
+				return err
+			}
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		previousStatusID := d.StatusID
+		if input.StatusID != nil {
+			d.StatusID = *input.StatusID
+		}
+		if input.IsActive != nil {
+			d.IsActive = *input.IsActive
+		}
+
+		// Fields that require owner role.
+		if input.Title != nil || input.Description != nil || input.Criticality != nil ||
+			input.MilestoneID != nil || input.SprintID != nil || input.EnvironmentID != nil ||
+			input.Estimation != nil || input.Priority != nil {
+			if isDeveloper {
+				return fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
+			}
+			if input.Title != nil {
+				d.Title = *input.Title
+			}
+			if input.Description != nil {
+				d.Description = *input.Description
+			}
+			if input.Criticality != nil {
+				d.Criticality = *input.Criticality
+			}
+			if input.MilestoneID != nil {
+				d.MilestoneID = *input.MilestoneID
+			}
+			if input.SprintID != nil {
+				d.IsActive = activationAfterSprintMove(d.SprintID, *input.SprintID, d.IsActive, input.IsActive != nil)
+				d.SprintID = *input.SprintID
+			}
+			if input.EnvironmentID != nil {
+				d.EnvironmentID = *input.EnvironmentID
+			}
+			if input.Estimation != nil {
+				d.Estimation = *input.Estimation
+			}
+			if input.Priority != nil {
+				d.Priority = *input.Priority
+			}
+		}
+		if kanban {
+			d.IsActive = s.columnActive(ctx, d.StatusID)
+		}
+		d.UpdatedAt = now
+
+		// Closing a defect re-queues the results it failed (FR-504). Both happen
+		// or neither: a saved close whose re-test was lost could not be repeated,
+		// since the defect would no longer be "just closed".
+		err = inTx(ctx, s.tx, func(ctx context.Context) error {
+			if err := s.defects.Update(ctx, d); err != nil {
+				return fmt.Errorf("update defect: %w", err)
+			}
+			if s.defectJustClosed(ctx, previousStatusID, d.StatusID) && s.retester != nil {
+				if err := s.retester.MarkResultsForRetest(ctx, d.ID, user.ID); err != nil {
+					return err
+				}
+			}
+			return s.audit.Create(ctx, &model.AuditEntry{
+				ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
+				UserID: user.ID, Action: "update", CreatedAt: now,
+			})
+		})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	isDeveloper := roleRank(role) < roleRank(model.RoleOwner)
-	kanban := s.kanbanMode(ctx, productID)
-	if err := checkActivationChange("defect", isDeveloper, kanban, d.IsActive, input.IsActive); err != nil {
-		return nil, err
-	}
-	if isDeveloper {
-		if err := requireActivatedForStatus("defect", d.IsActive, d.StatusID, input.StatusID); err != nil {
-			return nil, err
-		}
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	previousStatusID := d.StatusID
-	if input.StatusID != nil {
-		d.StatusID = *input.StatusID
-	}
-	if input.IsActive != nil {
-		d.IsActive = *input.IsActive
-	}
-
-	// Fields that require owner role.
-	if input.Title != nil || input.Description != nil || input.Criticality != nil ||
-		input.MilestoneID != nil || input.SprintID != nil || input.EnvironmentID != nil ||
-		input.Estimation != nil || input.Priority != nil {
-		if isDeveloper {
-			return nil, fmt.Errorf("%w: requires owner role for full updates", ErrForbidden)
-		}
-		if input.Title != nil {
-			d.Title = *input.Title
-		}
-		if input.Description != nil {
-			d.Description = *input.Description
-		}
-		if input.Criticality != nil {
-			d.Criticality = *input.Criticality
-		}
-		if input.MilestoneID != nil {
-			d.MilestoneID = *input.MilestoneID
-		}
-		if input.SprintID != nil {
-			d.IsActive = activationAfterSprintMove(d.SprintID, *input.SprintID, d.IsActive, input.IsActive != nil)
-			d.SprintID = *input.SprintID
-		}
-		if input.EnvironmentID != nil {
-			d.EnvironmentID = *input.EnvironmentID
-		}
-		if input.Estimation != nil {
-			d.Estimation = *input.Estimation
-		}
-		if input.Priority != nil {
-			d.Priority = *input.Priority
-		}
-	}
-	if kanban {
-		d.IsActive = s.columnActive(ctx, d.StatusID)
-	}
-	d.UpdatedAt = now
-
-	if err := s.defects.Update(ctx, d); err != nil {
-		return nil, fmt.Errorf("update defect: %w", err)
-	}
-
-	if s.defectJustClosed(ctx, previousStatusID, d.StatusID) && s.retester != nil {
-		if err := s.retester.MarkResultsForRetest(ctx, d.ID, user.ID); err != nil {
-			return nil, err
-		}
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "defect", EntityID: d.ID,
-		UserID: user.ID, Action: "update", CreatedAt: now,
-	})
-
 	return d, nil
 }
 
@@ -702,32 +748,26 @@ func checkActivationChange(kind string, isDeveloper, kanban, current bool, reque
 	return nil
 }
 
-// kanbanMode reports whether the product activates items by column.
-// defectNumberAttempts bounds how often a defect insert is retried when a
-// concurrent insert took its number first.
-const defectNumberAttempts = 5
-
 // insertNumbered stores a new defect under the product's next defect number
-// (FR-043). Two concurrent inserts can draw the same number; the unique index
-// rejects the second, which then draws again. Automated test runs make this
-// realistic: parallel CI jobs file defects for the same product.
+// (FR-043). The sequence lock makes concurrent inserts — parallel CI jobs
+// filing defects for the same product — draw their numbers one after another
+// instead of colliding on the unique index. It joins the caller's
+// transaction, if any.
 func (s *BacklogService) insertNumbered(ctx context.Context, d *model.Defect) error {
-	for attempt := 1; ; attempt++ {
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockSequence("defect", d.ProductID)); err != nil {
+			return err
+		}
 		seq, err := s.defects.NextSequenceNumber(ctx, d.ProductID)
 		if err != nil {
 			return fmt.Errorf("next defect number: %w", err)
 		}
 		d.SequenceNumber = seq
-		err = s.defects.Create(ctx, d)
-		if err == nil {
-			return nil
-		}
-		// Retry only if the number was taken meanwhile; anything else is a
-		// real failure.
-		if _, lookupErr := s.defects.GetBySequence(ctx, d.ProductID, seq); lookupErr != nil || attempt == defectNumberAttempts {
+		if err := s.defects.Create(ctx, d); err != nil {
 			return fmt.Errorf("create defect: %w", err)
 		}
-	}
+		return nil
+	})
 }
 
 // defectPrefix returns the product's defect identifier prefix.
@@ -740,6 +780,7 @@ func (s *BacklogService) defectPrefix(ctx context.Context, productID string) str
 	return model.DefaultDefectPrefix
 }
 
+// kanbanMode reports whether the product activates items by column.
 func (s *BacklogService) kanbanMode(ctx context.Context, productID string) bool {
 	if s.products == nil {
 		return false
@@ -787,23 +828,7 @@ func (s *BacklogService) DeleteDefect(ctx context.Context, user *model.User, pro
 		return err
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
-	if err := s.defects.Delete(ctx, id); err != nil {
-		return fmt.Errorf("delete defect: %w", err)
-	}
-
-	// Comments and attachments hang off polymorphic owner columns, so no
-	// foreign key cascades them away with the row above.
-	if err := s.comments.PurgeOwner(ctx, productID, model.OwnerTypeDefect, id); err != nil {
-		return err
-	}
-
-	_ = s.audit.Create(ctx, &model.AuditEntry{
-		ID: uuid.New().String(), EntityType: "defect", EntityID: id,
-		UserID: user.ID, Action: "delete", CreatedAt: now,
-	})
-
-	return nil
+	return deleteOwned(ctx, s.tx, s.comments, s.audit, user, productID, model.OwnerTypeDefect, id, s.defects.Delete)
 }
 
 // ListDefects returns defects for a product. Requires viewer role.
@@ -918,17 +943,23 @@ func (s *BacklogService) AddDefectLink(ctx context.Context, user *model.User, pr
 	if targetID == "" {
 		return errors.New("target id is required")
 	}
-	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}, ref{defectLinkKind(targetType), targetID}); err != nil {
-		return err
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	return s.defects.AddLink(ctx, &model.DefectLink{
-		ID:         uuid.New().String(),
-		DefectID:   defID,
-		TargetType: targetType,
-		TargetID:   targetID,
-		CreatedAt:  now,
+	// The target's lock (taken by its delete as well, in PurgeOwner) keeps
+	// the target from vanishing between the check and the insert: target_id
+	// has no foreign key to stop a dangling link.
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockOwner(targetID)); err != nil {
+			return err
+		}
+		if err := s.owns.require(ctx, productID, ref{kindDefect, defID}, ref{defectLinkKind(targetType), targetID}); err != nil {
+			return err
+		}
+		return s.defects.AddLink(ctx, &model.DefectLink{
+			ID:         uuid.New().String(),
+			DefectID:   defID,
+			TargetType: targetType,
+			TargetID:   targetID,
+			CreatedAt:  time.Now().UTC().Format(time.RFC3339),
+		})
 	})
 }
 
