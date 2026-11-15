@@ -29,7 +29,7 @@ build: generate css
 clean:
     go clean
     rm -f nexmap nexmap.exe nexmapd nexmapd.exe
-    find . -name '*_templ.go' -delete
+    /usr/bin/find . -name '*_templ.go' -delete
     rm -rf {{ DIST }}
 
 css: copy-assets
