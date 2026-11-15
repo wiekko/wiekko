@@ -64,8 +64,14 @@ func TestDocumentStore(t *testing.T) {
 			t.Fatal(err)
 		}
 		revs, err := s.ListRevisions(ctx, proto.ID)
-		if err != nil || len(revs) != 2 || revs[0].Revision != 2 || revs[1].Body != body {
+		if err != nil || len(revs) != 2 || revs[0].Revision != 2 || revs[1].Revision != 1 {
 			t.Fatalf("revisions = %+v, %v", revs, err)
+		}
+		// The list leaves the bodies out; GetRevision loads one.
+		for _, r := range revs {
+			if r.Body != "" || r.Title != got.Title || r.Format != got.Format || r.UserID == "" || r.CreatedAt == "" {
+				t.Errorf("listed revision %d = %+v", r.Revision, r)
+			}
 		}
 		if r, err := s.GetRevision(ctx, proto.ID, 1); err != nil || r.Body != body {
 			t.Fatalf("revision 1 = %+v, %v", r, err)

@@ -55,6 +55,8 @@ type DocumentStore interface {
 	Delete(ctx context.Context, id string) error
 	ListPageByProductID(ctx context.Context, productID string, filter DocumentFilter, params ListParams) ([]*model.Document, error)
 	CountByProductID(ctx context.Context, productID string, filter DocumentFilter, search string) (int, error)
+	// ListRevisions returns a document's revisions, newest first, with empty
+	// bodies: each is a full snapshot, so GetRevision loads one when needed.
 	ListRevisions(ctx context.Context, documentID string) ([]*model.DocumentRevision, error)
 	GetRevision(ctx context.Context, documentID string, revision int) (*model.DocumentRevision, error)
 	Link(ctx context.Context, link *model.DocumentLink) error
@@ -203,7 +205,7 @@ func (s *documentStore) CountByProductID(ctx context.Context, productID string, 
 
 func (s *documentStore) ListRevisions(ctx context.Context, documentID string) ([]*model.DocumentRevision, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, document_id, revision, title, body, format, user_id, created_at
+		`SELECT id, document_id, revision, title, '', format, user_id, created_at
 		 FROM document_revisions WHERE document_id = ? ORDER BY revision DESC`, documentID)
 	if err != nil {
 		return nil, err

@@ -364,8 +364,8 @@ func (s *DocumentService) CountDocuments(ctx context.Context, user *model.User, 
 	return s.documents.CountByProductID(ctx, productID, filter, search)
 }
 
-// ListRevisions returns a document's revisions, newest first. Requires
-// viewer role.
+// ListRevisions returns a document's revisions, newest first, without
+// bodies (GetRevision returns one with its body). Requires viewer role.
 func (s *DocumentService) ListRevisions(ctx context.Context, user *model.User, productID, id string) ([]*model.DocumentRevision, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
