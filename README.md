@@ -18,6 +18,7 @@ one place. It consists of a server (`nexmapd`) with a web UI and REST API, and a
 ## CLI quick start
 
 ```sh
+curl -fsSL https://nexmap.net/install.sh | sh       # Windows: irm https://nexmap.net/install.ps1 | iex
 nexmap login --server https://nexmap.example.com   # paste a token from /user/tokens
 nexmap init                                         # writes .nexmap.json (no secrets)
 nexmap whoami

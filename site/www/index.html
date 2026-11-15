@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexmap</title>
+<meta name="description" content="Nexmap keeps a product's requirements, backlog, tests and defects in one place, with a web UI, a REST API and a command line client for repositories, CI and AI agents.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --brand: #4f46e5;
+    --brand-hover: #4338ca;
+    --link: #4f46e5;
+    --code-bg: #f1f5f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --brand: #6366f1;
+      --brand-hover: #818cf8;
+      --link: #a5b4fc;
+      --code-bg: #0b1220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  header svg { height: 44px; width: auto; color: var(--text); }
+  nav { display: flex; gap: 20px; font-size: 14px; font-weight: 500; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .lead { font-size: 20px; margin: 48px 0 12px; }
+  .muted { color: var(--muted); }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0 56px; }
+  .button {
+    display: inline-block; padding: 9px 18px; border-radius: 8px;
+    font-size: 14px; font-weight: 500; border: 1px solid var(--border); color: var(--text); background: var(--surface);
+  }
+  .button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .button.primary:hover { background: var(--brand-hover); }
+  .button:hover { text-decoration: none; }
+  h2 { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+  h3 { font-size: 14px; font-weight: 600; margin: 20px 0 6px; color: var(--muted); }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .cmd { display: flex; align-items: stretch; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; }
+  .cmd code {
+    flex: 1; padding: 10px 12px; overflow-x: auto; white-space: nowrap;
+    font: 14px/1.5 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .cmd button {
+    border: 0; border-left: 1px solid var(--border); background: none; color: var(--muted);
+    padding: 0 14px; font: inherit; font-size: 13px; cursor: pointer; border-radius: 0 8px 8px 0;
+  }
+  .cmd button:hover { color: var(--text); }
+  section p { margin: 16px 0 0; font-size: 14px; }
+  footer { margin-top: 40px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a href="/" aria-label="Nexmap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" fill="none" role="img" aria-label="Nexmap">
+        <circle cx="32" cy="32" r="30" fill="#4f46e5"/>
+        <circle cx="32" cy="32" r="22" fill="none" stroke="#c7d2fe" stroke-width="1.5" opacity="0.3"/>
+        <circle cx="18.8" cy="38.8" r="3.8" fill="#c7d2fe"/>
+        <circle cx="26.16" cy="19.44" r="4.2" fill="#c7d2fe"/>
+        <path d="M20 36 L24 22" stroke="#c7d2fe" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M28 21 L35 30" stroke="#c7d2fe" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="m41.04 30.96 12-6" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <path d="m47.253 23.338 6.395 0.32-1.716 6.169" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="37.36" cy="32.64" r="4" fill="#c7d2fe"/>
+        <circle cx="30" cy="44" r="2" fill="#c7d2fe" opacity="0.5"/>
+        <text x="76" y="42" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700"><tspan fill="var(--brand)">Nex</tspan><tspan fill="currentColor">map</tspan></text>
+      </svg>
+    </a>
+    <nav>
+      <a href="https://docs.nexmap.net/">Documentation</a>
+      <a href="/releases/">Downloads</a>
+    </nav>
+  </header>
+
+  <p class="lead">Requirements, backlog, tests and defects of a product, in one place.</p>
+  <p class="muted">Nexmap is a server with a web UI and a REST API, and a command line client that connects
+    repositories, CI pipelines and AI agents to it.</p>
+
+  <div class="actions">
+    <a class="button primary" href="https://cloud.nexmap.net/">Sign in</a>
+    <a class="button" href="https://docs.nexmap.net/">Read the documentation</a>
+  </div>
+
+  <section>
+    <h2>Install the CLI</h2>
+    <h3>Linux and macOS</h3>
+    <div class="cmd"><code>curl -fsSL https://nexmap.net/install.sh | sh</code><button type="button">Copy</button></div>
+    <h3>Windows (PowerShell)</h3>
+    <div class="cmd"><code>irm https://nexmap.net/install.ps1 | iex</code><button type="button">Copy</button></div>
+    <p class="muted">The scripts verify the download against the release's checksums. To pin a version, set
+      <code>NEXMAP_VERSION</code>, e.g. <code>v1.0.0</code>. Archives for every platform are under
+      <a href="/releases/">Downloads</a>; then see <a href="https://docs.nexmap.net/stable/cli/setup.html">Setting up the CLI</a>.</p>
+  </section>
+
+  <footer class="muted">Nexmap</footer>
+</main>
+<script>
+  for (const button of document.querySelectorAll(".cmd button")) {
+    button.addEventListener("click", async () => {
+      const text = button.previousElementSibling.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select";
+      }
+      setTimeout(() => { button.textContent = "Copy"; }, 1500);
+    });
+  }
+</script>
+</body>
+</html>

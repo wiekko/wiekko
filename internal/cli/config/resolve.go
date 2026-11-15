@@ -70,7 +70,7 @@ func Resolve(cwd string, getenv func(string) string, o Overrides) (*Settings, er
 	set(&s.Product, &s.ProductSource, o.Product, "--product")
 	set(&s.Output, &outputSource, o.Output, "--output")
 
-	s.AllowHTTP = o.AllowHTTP || truthy(getenv(EnvAllowHTTP))
+	s.AllowHTTP = o.AllowHTTP || Truthy(getenv(EnvAllowHTTP))
 
 	if t := getenv(EnvToken); t != "" {
 		s.Token, s.TokenSource = t, EnvToken
@@ -82,7 +82,9 @@ func Resolve(cwd string, getenv func(string) string, o Overrides) (*Settings, er
 	return s, nil
 }
 
-func truthy(v string) bool {
+// Truthy reports whether an environment variable value means "on" (1, true,
+// yes, on; case-insensitive).
+func Truthy(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "1", "true", "yes", "on":
 		return true

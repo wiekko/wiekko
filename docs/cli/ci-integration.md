@@ -39,7 +39,7 @@ Each status change is recorded in the result history with the token's user, the 
    `nexmap utest`. New test cases join campaigns created afterwards; an active campaign keeps the scope it
    was created with.
 3. **Check the mapping** before wiring CI: `go test -json ./... | nexmap utest --dry-run` shows how each test maps to a test case and what would change.
-4. **Install the CLI** in the job (see [Setup](setup.md#installing)): a release binary, or `go install nexmap.net/cmd/nexmap@<version>` where your Go proxy can reach the module (the snippets below assume the latter).
+4. **Install the CLI** in the job with the install script (see [Setup](setup.md#installing)), pinned to a version so a new release never changes a build unannounced: `curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh`. As root (most CI containers) it installs into `/usr/local/bin`, otherwise into `~/.local/bin`, which may need adding to the job's `PATH`. The update notice stays off in CI.
 5. **Configure the job** with `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and the secret `NEXMAP_TOKEN`. The product may come from a committed `.nexmap.json` instead (see [Setup](setup.md#configuration)), but set the server in the job: the token goes to whatever server is configured, and a branch that changes the file must not be able to send it elsewhere. The CLI prints a warning when it sends `NEXMAP_TOKEN` to a server taken from `.nexmap.json`.
 
 ## Options
@@ -73,7 +73,9 @@ jobs:
         with:
           go-version: stable
       - name: Install nexmap
-        run: go install nexmap.net/cmd/nexmap@latest
+        run: |
+          curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Test
         env:
           NEXMAP_SERVER: https://nexmap.example.com
@@ -94,7 +96,7 @@ test:
     NEXMAP_PRODUCT: "<product id>"
     # NEXMAP_TOKEN: set as a masked CI/CD variable
   script:
-    - go install nexmap.net/cmd/nexmap@latest
+    - curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh
     - go test -json ./... | nexmap utest --env linux-amd64 --exit-code
 ```
 
@@ -111,7 +113,7 @@ jobs:
       image: golang:1.26
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v4
-      - run: go install nexmap.net/cmd/nexmap@latest
+      - run: curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh
       - env:
           NEXMAP_SERVER: https://nexmap.example.com
           NEXMAP_PRODUCT: ${{ vars.NEXMAP_PRODUCT }}

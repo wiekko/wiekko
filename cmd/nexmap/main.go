@@ -30,12 +30,14 @@ func processIO() cli.IO {
 	}
 	stdinFD := int(os.Stdin.Fd())
 	return cli.IO{
-		Stdin:      os.Stdin,
-		Stdout:     os.Stdout,
-		Stderr:     os.Stderr,
-		Getenv:     os.Getenv,
-		Cwd:        cwd,
-		StdinIsTTY: term.IsTerminal(stdinFD),
+		Stdin:       os.Stdin,
+		Stdout:      os.Stdout,
+		Stderr:      os.Stderr,
+		Getenv:      os.Getenv,
+		Cwd:         cwd,
+		StdinIsTTY:  term.IsTerminal(stdinFD),
+		StderrIsTTY: term.IsTerminal(int(os.Stderr.Fd())),
+		Executable:  os.Executable,
 		ReadSecret: func() (string, error) {
 			b, err := term.ReadPassword(stdinFD)
 			return string(b), err

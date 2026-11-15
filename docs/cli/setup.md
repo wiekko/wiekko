@@ -5,15 +5,58 @@
 
 ## Installing
 
-Where your Go module proxy can reach the module:
+`nexmap` is a single binary without runtime dependencies, published for Linux, macOS and Windows on
+amd64 and arm64 at [nexmap.net](https://nexmap.net/).
+
+On Linux and macOS:
 
 ```sh
-go install nexmap.net/cmd/nexmap@<version>
+curl -fsSL https://nexmap.net/install.sh | sh
 ```
 
-Alternatively, build it from a checkout of the `stable` branch or a release tag (`just build`, or
-`just container-build` for release binaries; see `CONTRIBUTING.md` in the repository). The binary has
-no runtime dependencies.
+On Windows, in PowerShell:
+
+```powershell
+irm https://nexmap.net/install.ps1 | iex
+```
+
+The scripts download the latest release for your platform, verify it against the release's checksums
+and install it:
+
+- `install.sh` into `~/.local/bin`, or `/usr/local/bin` when run as root. It tells you when that directory
+  is not on your `PATH`.
+- `install.ps1` into `%LOCALAPPDATA%\Programs\nexmap`, which it adds to your user `PATH`.
+
+They read these environment variables:
+
+| Variable | Meaning |
+|---|---|
+| `NEXMAP_VERSION` | Version to install, e.g. `v1.0.0`; default: the latest release |
+| `NEXMAP_INSTALL_DIR` | Directory to install into |
+
+To pin a version on Linux or macOS: `curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh`.
+In PowerShell, set `$env:NEXMAP_VERSION = 'v1.0.0'` first.
+
+To install by hand, download the archive for your platform from
+[nexmap.net/releases](https://nexmap.net/releases/), check it against the release's `SHA256SUMS`
+(on Linux: `sha256sum -c SHA256SUMS --ignore-missing`), and put the binary on your `PATH`.
+
+## Updating
+
+`nexmap update` replaces the running binary with the latest release; `nexmap update v1.0.0` installs a
+given version, which may be an older one. `nexmap update --check` only reports whether a newer release
+exists. The download is verified against the release's checksums before anything is replaced.
+
+`update` refuses to install a release that needs a newer API than the configured server offers (see
+`nexmap version`), since that client could not talk to it; `--force` installs it anyway, and also
+reinstalls the current version. If the binary sits in a directory you cannot write to, run the update
+with the rights to write there, e.g. `sudo nexmap update`.
+
+Once a day, `nexmap` looks for a newer release in the background and prints a one-line notice on stderr
+if there is one. The check never delays a command by more than two seconds and stays silent on errors.
+It is off where an extra line could get in the way: when stderr is not a terminal (scripts, pipes), when
+`CI` is set, for `nexmap mcp`, and for development builds. `NEXMAP_NO_UPDATE_CHECK=1` turns it off
+altogether.
 
 ## Logging in
 
@@ -90,6 +133,10 @@ The user configuration directory is `nexmap` inside the operating system's confi
 `$XDG_CONFIG_HOME/nexmap` (usually `~/.config/nexmap`) on Linux, `~/Library/Application Support/nexmap`
 on macOS, `%AppData%\nexmap` on Windows. Set `NEXMAP_CONFIG_DIR` to use another directory.
 
+Two more variables concern updates (see [Updating](#updating)): `NEXMAP_NO_UPDATE_CHECK` turns off the
+daily check for a newer release, and `NEXMAP_RELEASES_URL` points `update` and the check at another
+location than `https://nexmap.net/releases`, e.g. a mirror.
+
 ### Plain HTTP
 
 The CLI refuses `http://` servers unless they run on the local machine (`localhost`, `*.localhost` or a
@@ -103,6 +150,7 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `login`, `logout`, `whoami` | Manage the stored token, show what is in effect |
 | `init` | Write `.nexmap.json`; with `--agents`, set up AI agents |
 | `version` | Client version and, if a server is configured, the server version |
+| `update` | Install the latest or a given release, see [Updating](#updating) |
 | `context` | Product briefing: structure, constraints, work in progress, defects, testing status |
 | `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create` |
 | `constraint` | `list`, `show`, `create`, `update` (e.g. `--compliance met`) |

@@ -83,6 +83,24 @@ container-build os="linux" arch="amd64":
         {{ CONTAINER }} cp "$id:/out/." build/{{ os }}-{{ arch }}/; rc=$?; \
         {{ CONTAINER }} rm "$id" >/dev/null; exit $rc
 
+# Build the CLI release archives for every platform into build/dist/<version>/,
+# as the download site does (site/Dockerfile). Without a version, the tree
+# must be a release (a tagged commit); `just dist v9.9.9` makes a test build.
+dist version="":
+    {{ CONTAINER }} build -f site/Dockerfile --target export -t nexmap-dist \
+        --build-arg VERSION={{ version }} .
+    mkdir -p build/dist
+    id=`{{ CONTAINER }} create nexmap-dist /none` && \
+        {{ CONTAINER }} cp "$id:/dist/." build/dist/; rc=$?; \
+        {{ CONTAINER }} rm "$id" >/dev/null; exit $rc
+
+# Stop it with Ctrl+C. Releases live in the container only, unless you mount a
+# volume at /data. As with dist, a +dev tree needs a test version.
+# Build the download site image and serve it on http://localhost:8080
+site-container version="":
+    {{ CONTAINER }} build -f site/Dockerfile -t nexmap-site --build-arg VERSION={{ version }} .
+    {{ CONTAINER }} run --rm -p 8080:8080 nexmap-site
+
 # Needs mdbook on the PATH. Shows the working tree only, without other versions.
 # Serve the documentation with live reload on http://localhost:3000
 docs:

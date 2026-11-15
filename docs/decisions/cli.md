@@ -86,3 +86,31 @@ it stands alone and says which item it refines, so every item stays in its own c
 There is no import (FR-906). Turning prose into formal requirements needs judgement that an AI agent
 brings and a parser does not; the agent creates items through the CLI or REST API, and the identifiers
 in an export let it update items instead of duplicating them.
+
+## Distribution through nexmap.net, built on the server
+
+The repository is private, so `go install nexmap.net/cmd/nexmap` cannot work for anyone else: the module
+is neither on a public proxy nor reachable through a `go-import` tag. The CLI is distributed as prebuilt
+archives on nexmap.net instead, with install scripts for sh and PowerShell (FR-910).
+
+The archives are built by the download site's own image (`site/`), which Coolify deploys from `stable`, the
+same way the documentation site is built. What is published is exactly what was tagged, built with the
+pinned toolchain, and releasing needs no upload step. Binaries are never committed to git, where every
+release would grow every clone for good.
+
+Each image builds only its own release, so deployments stay fast however many releases exist. Older
+releases collect on a volume instead, and are never overwritten there: CI jobs pin versions, and their
+checksums must not change. A lost volume is not lost data, since every release can be rebuilt from its
+tag (`just dist`). Signing the checksums is left for later; it would need a key outside the server.
+
+## Update notice once a day, on a terminal only
+
+`nexmap update` replaces the binary in place: next to it, then by rename, which Windows allows for a
+running executable when the old file is renamed first. It refuses binaries from `go install`, which belong
+to the Go toolchain, and releases that need a higher API level than the configured server offers.
+
+The background check for a newer release exists because users would otherwise keep old clients for
+good. It must never cost anything in automation, so it only runs with stderr on a terminal, not in CI, not
+for `nexmap mcp` (whose stdio belongs to the agent), not for development builds, and at most once a day.
+It runs in parallel with the command and is dropped after two seconds, so a slow or unreachable site
+never delays work.

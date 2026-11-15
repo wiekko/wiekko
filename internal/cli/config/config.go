@@ -28,6 +28,11 @@ const (
 	// EnvConfigDir overrides the user config directory (default:
 	// os.UserConfigDir()/nexmap).
 	EnvConfigDir = "NEXMAP_CONFIG_DIR"
+	// EnvNoUpdateCheck turns off the daily check for a newer release.
+	EnvNoUpdateCheck = "NEXMAP_NO_UPDATE_CHECK"
+	// EnvReleasesURL overrides where releases are looked up and downloaded
+	// (default: update.DefaultBaseURL).
+	EnvReleasesURL = "NEXMAP_RELEASES_URL"
 )
 
 // Repo is the content of .nexmap.json. Unknown fields are ignored so an older

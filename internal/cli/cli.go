@@ -42,6 +42,13 @@ type IO struct {
 	// ReadSecret reads one line from the terminal without echo. Only called
 	// when StdinIsTTY is true.
 	ReadSecret func() (string, error)
+
+	// StderrIsTTY enables the daily update notice, which is shown on a
+	// terminal only.
+	StderrIsTTY bool
+	// Executable returns the path of the running binary, for `update`; nil
+	// means os.Executable.
+	Executable func() (string, error)
 }
 
 // globals are the flags accepted by every command.
@@ -86,6 +93,7 @@ type command struct {
 func commands() []*command {
 	return []*command{
 		versionCommand(),
+		updateCommand(),
 		loginCommand(),
 		logoutCommand(),
 		whoamiCommand(),
@@ -191,10 +199,13 @@ func Run(ctx context.Context, args []string, io IO) int {
 	if err := a.setup(); err != nil {
 		return a.fail(err)
 	}
+	check := a.startUpdateCheck(ctx, cmd)
+	code := ExitOK
 	if err := cmd.run(ctx, a, positional); err != nil {
-		return a.fail(err)
+		code = a.fail(err)
 	}
-	return ExitOK
+	check.finish(a)
+	return code
 }
 
 // sub returns the group member "<group> <name>", if any.

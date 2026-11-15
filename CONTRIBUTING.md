@@ -31,6 +31,7 @@ just test-pg   # also PostgreSQL, on a throwaway server in a container
 For release binaries, `just container-build [os] [arch]` builds in a container (podman, else docker;
 override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Dockerfile`, and
 writes the binaries to `build/<os>-<arch>/`. The host needs only the container engine and `just`.
+The CLI release archives for every platform come from `just dist` (see "Download site" below).
 
 ## Releasing
 
@@ -60,6 +61,9 @@ to the release commit (the tagged one, not the `+dev` commit after it), in the s
 commits and the tag. Deployments track `stable`, so they get releases only; pre-releases and releases
 from `release/*` branches leave it alone. The push only fast-forwards `stable`: never commit to it or
 move it by hand, or the next release's push fails.
+
+Moving `stable` also publishes the release's CLI binaries on nexmap.net (see "Download site" below);
+releases from `release/*` branches are published there by hand.
 
 The tags still matter: the documentation site publishes one version per tag (see below). The
 `VERSION` build argument of the `Dockerfile` overrides the version from the source tree, for special
@@ -127,3 +131,33 @@ build publishes `/latest/` only and says so; with a token that fails, the build 
 The site is deployed as its own Coolify application. [docs-site/DEPLOYMENT.md](docs-site/DEPLOYMENT.md)
 describes the setup (Forgejo token, Coolify settings, webhook), what to check in the deployment log,
 releases, and moving to another server.
+
+## Download site
+
+nexmap.net serves a landing page, the CLI install scripts (`install.sh`, `install.ps1`) and the CLI release
+archives under `/releases/`, which `nexmap update` also reads. Everything for it lives in `site/`:
+
+- `site/www/`: the landing page and the install scripts, served as they are. `site/www/favicon.svg` is a
+  copy of `docs-site/theme/favicon.svg`, and `index.html` inlines a copy of `web/static/img/logo.svg`;
+  update them when the logo changes.
+- `site/dist.sh`: builds the CLI for linux, darwin and windows on amd64 and arm64, and writes per release
+  `nexmap_<version>_<os>_<arch>.tar.gz` (`.zip` for windows), `SHA256SUMS` and `release.json`
+  (`{"version", "api_level"}`). Only release versions are packaged; a `+dev` tree fails.
+- `site/Dockerfile`: runs `dist.sh` with the pinned Go toolchain and serves the result with nginx on port
+  8080. Each image holds only the release it was built from.
+- `site/publish-releases.sh`: runs when the container starts and copies the image's release to the volume
+  at `/data/releases/`, where releases collect, and points `latest.json` at it.
+
+The archive and file names are a contract with `internal/cli/update` and the install scripts; change them
+together.
+
+- **Build the archives:** `just dist` from a release tag, or `just dist v9.9.9` for a test build of the
+  working tree; the result lands in `build/dist/<version>/`.
+- **Preview:** `just site-container v9.9.9` serves the site on port 8080. To try an update, run a CLI with
+  `NEXMAP_RELEASES_URL=http://localhost:8080/releases`.
+
+### Deployment
+
+The site is its own Coolify application tracking `stable`, with a volume at `/data`.
+[site/DEPLOYMENT.md](site/DEPLOYMENT.md) describes the setup, publishing a release by hand, and moving to
+another server.
