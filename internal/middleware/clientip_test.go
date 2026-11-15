@@ -75,12 +75,22 @@ func TestLimitBody(t *testing.T) {
 		h := middleware.LimitBody(maxUpload)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			_, readErr = io.Copy(io.Discard, r.Body)
 		}))
-		r := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(make([]byte, tc.size)))
-		h.ServeHTTP(httptest.NewRecorder(), r)
 
+		// Without a Content-Length, the cap trips while reading.
+		readErr = nil
+		r := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(make([]byte, tc.size)))
+		r.ContentLength = -1
+		h.ServeHTTP(httptest.NewRecorder(), r)
 		var tooBig *http.MaxBytesError
 		if got := errors.As(readErr, &tooBig); got != tc.tooBig {
-			t.Errorf("%s %s with %d bytes: too big = %v (err %v), want %v", tc.method, tc.path, tc.size, got, readErr, tc.tooBig)
+			t.Errorf("chunked %s %s with %d bytes: too big = %v (err %v), want %v", tc.method, tc.path, tc.size, got, readErr, tc.tooBig)
+		}
+
+		// With one, the request is answered with 413 before it is read.
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, bytes.NewReader(make([]byte, tc.size))))
+		if got := w.Code == http.StatusRequestEntityTooLarge; got != tc.tooBig {
+			t.Errorf("%s %s with Content-Length %d: status %d, want 413: %v", tc.method, tc.path, tc.size, w.Code, tc.tooBig)
 		}
 	}
 }

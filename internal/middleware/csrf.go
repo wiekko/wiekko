@@ -2,12 +2,16 @@ package middleware
 
 import (
 	"crypto/subtle"
+	"errors"
 	"net/http"
 
 	"nexmap.net/internal/httputil"
 )
 
 const csrfHeader = "X-CSRF-Token"
+
+// formMemory matches what r.FormValue uses when it parses a multipart body.
+const formMemory = 32 << 20
 
 // CSRF validates the CSRF token for session-authenticated state-changing requests.
 // PAT-authenticated requests are exempt (bearer tokens are inherently CSRF-safe).
@@ -27,6 +31,25 @@ func CSRF(next http.Handler) http.Handler {
 		expected := CSRFTokenFromContext(r.Context())
 		provided := r.Header.Get(csrfHeader)
 		if provided == "" {
+			// Parse the form explicitly: r.FormValue would swallow a parse
+			// error and report a body over the cap as a missing token.
+			// ParseForm first: ParseMultipartForm reports ErrNotMultipart for a
+			// url-encoded body even when reading it failed.
+			err := r.ParseForm()
+			if err == nil {
+				if err = r.ParseMultipartForm(formMemory); errors.Is(err, http.ErrNotMultipart) {
+					err = nil
+				}
+			}
+			if err != nil {
+				if IsTooLarge(err) {
+					DrainBody(r.Body)
+					WriteBodyError(w, r, http.StatusRequestEntityTooLarge, TooLargeMessage(limitOf(r)))
+					return
+				}
+				WriteBodyError(w, r, http.StatusBadRequest, unreadableMessage)
+				return
+			}
 			provided = r.FormValue("_csrf")
 		}
 		if expected == "" || provided == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) != 1 {

@@ -97,6 +97,47 @@ func TestHardeningOverHTTP(t *testing.T) {
 			}
 		})
 
+		// A web form over the cap gets a page saying so, not a CSRF error:
+		// rejected on its Content-Length, or — sent chunked — when CSRF reads
+		// the token.
+		t.Run("oversized web form", func(t *testing.T) {
+			resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+			var cookie *http.Cookie
+			for _, c := range resp.Cookies() {
+				if c.Name == "nexmap_session" && c.Value != "" {
+					cookie = c
+				}
+			}
+			if cookie == nil {
+				t.Fatalf("no session cookie, status %d", resp.StatusCode)
+			}
+			form := url.Values{"_csrf": {csrfToken(t, e, cookie)}, "title": {"Big"}, "body": {strings.Repeat("a", middleware.DefaultMaxBody)}}.Encode()
+			for _, chunked := range []bool{false, true} {
+				req, err := http.NewRequest(http.MethodPost, e.srv.URL+"/products/"+e.product.ID+"/documents", strings.NewReader(form))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if chunked {
+					req.ContentLength = -1
+				}
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req.AddCookie(cookie)
+				resp, err := e.client().Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				body := readBody(t, resp)
+				if resp.StatusCode != http.StatusRequestEntityTooLarge || !strings.Contains(body, "The limit is 1 MiB.") || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+					t.Errorf("chunked=%v: status %d, Content-Type %q, body %.200s", chunked, resp.StatusCode, resp.Header.Get("Content-Type"), body)
+				}
+			}
+
+			resp, body := e.post("/login", url.Values{"username": {"root"}, "password": {strings.Repeat("a", middleware.DefaultMaxBody)}})
+			if resp.StatusCode != http.StatusRequestEntityTooLarge || !strings.Contains(body, "The limit is 1 MiB.") {
+				t.Errorf("oversized login: status %d, body %.200s", resp.StatusCode, body)
+			}
+		})
+
 		t.Run("security headers", func(t *testing.T) {
 			resp, _ := e.get("/login")
 			if resp.Header.Get("Content-Security-Policy") == "" {

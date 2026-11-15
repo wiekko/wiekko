@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -371,7 +370,7 @@ func (c *PageProductController) LimitUploadBody(next http.Handler) http.Handler 
 		if err := r.ParseMultipartForm(uploadMemoryLimit); err != nil {
 			var tooBig *http.MaxBytesError
 			if errors.As(err, &tooBig) {
-				drainRemainder(body)
+				middleware.DrainBody(body)
 				c.writeDiscussionError(w, r, patterns.AttachmentsErrorRegion,
 					http.StatusRequestEntityTooLarge, oversizeMessage(c.maxUploadBytes))
 				return
@@ -387,23 +386,6 @@ func (c *PageProductController) LimitUploadBody(next http.Handler) http.Handler 
 
 func oversizeMessage(maxBytes int64) string {
 	return patterns.OversizeMessage(maxBytes)
-}
-
-// maxDrainBytes bounds how much of a rejected upload is read and discarded.
-const maxDrainBytes = 32 << 20
-
-// drainRemainder consumes what is left of an oversize request body.
-//
-// When the body cap trips, Go sets Connection: close and stops reading. If the
-// client is still uploading, the connection is torn down before it can read
-// the response, so the rejection never reaches it. Consuming the rest lets the
-// client finish and receive the reply. The bound keeps a deliberately huge
-// upload from costing us the whole transfer — past that the connection simply
-// closes, which is the correct outcome for a client ignoring the limit.
-//
-// Browsers never reach this: the upload form checks the size before sending.
-func drainRemainder(body io.Reader) {
-	_, _ = io.CopyN(io.Discard, body, maxDrainBytes)
 }
 
 // discussionErrorHeader marks a response as a rejection even though it carries

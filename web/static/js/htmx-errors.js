@@ -15,7 +15,6 @@
     403: "You are not allowed to do that.",
     404: "That item could not be found. Try reloading the page.",
     405: "That action is not available here.",
-    413: "That file is too large to upload.",
     429: "Too many requests. Please wait a moment and try again.",
   };
 
