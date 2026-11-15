@@ -173,9 +173,14 @@ func documentFormValues(props *productpage.DocumentFormProps, r *http.Request, b
 // DocumentCreateForm renders GET /products/{id}/documents/new.
 func (c *PageProductController) DocumentCreateForm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
-	p, _, err := c.loadProductWithRole(r, user, r.PathValue("id"))
+	productID := r.PathValue("id")
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if !c.canEditDocuments(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/documents", noticeNeedsOwner)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -214,12 +219,17 @@ func (c *PageProductController) DocumentCreate(w http.ResponseWriter, r *http.Re
 func (c *PageProductController) DocumentEditForm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	documentID := r.PathValue("documentId")
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	d, err := c.document.GetDocument(r.Context(), user, productID, r.PathValue("documentId"))
+	if !c.canEditDocuments(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/documents/"+documentID, noticeNeedsOwner)
+		return
+	}
+	d, err := c.document.GetDocument(r.Context(), user, productID, documentID)
 	if err != nil {
 		http.Redirect(w, r, "/products/"+productID+"/documents", http.StatusSeeOther)
 		return

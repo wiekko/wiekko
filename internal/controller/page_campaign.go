@@ -108,7 +108,7 @@ func (c *PageProductController) CampaignCreateForm(w http.ResponseWriter, r *htt
 		return
 	}
 	if !c.canEditCampaigns(user, role) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		redirectWithNotice(w, r, "/products/"+productID+"/campaigns", noticeNeedsOwner)
 		return
 	}
 
@@ -200,7 +200,7 @@ func (c *PageProductController) CampaignEditForm(w http.ResponseWriter, r *http.
 		return
 	}
 	if !c.canEditCampaigns(user, role) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		redirectWithNotice(w, r, "/products/"+productID+"/campaigns/"+campaignID, noticeNeedsOwner)
 		return
 	}
 

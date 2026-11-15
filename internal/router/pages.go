@@ -462,8 +462,10 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 //
 // The SameSite=Strict session cookie alone is not enough: browsers count
 // sibling subdomains (another app on *.example.com) as the same site.
+//
+// Every authenticated page can show a notice (controller.WithNotice).
 func pageAuthed(h http.Handler) http.Handler {
-	return middleware.RequireAuthPage(middleware.CSRF(h))
+	return middleware.RequireAuthPage(middleware.CSRF(controller.WithNotice(h)))
 }
 
 // pageUpload guards a file-upload route. The controller caps and parses the
@@ -477,5 +479,5 @@ func pageUpload(productCtrl *controller.PageProductController) func(http.Handler
 // pageAdmin wraps a handler with RequireAdminPage middleware (redirect to / for
 // non-admins) and the CSRF check, like pageAuthed.
 func pageAdmin(h http.Handler) http.Handler {
-	return middleware.RequireAdminPage(middleware.CSRF(h))
+	return middleware.RequireAdminPage(middleware.CSRF(controller.WithNotice(h)))
 }

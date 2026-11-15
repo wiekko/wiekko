@@ -90,9 +90,13 @@ func (c *PageProductController) TaskCreateForm(w http.ResponseWriter, r *http.Re
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if !c.canEditRequirements(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/tasks", noticeNeedsOwner)
 		return
 	}
 
@@ -164,9 +168,13 @@ func (c *PageProductController) TaskEditForm(w http.ResponseWriter, r *http.Requ
 	productID := r.PathValue("id")
 	taskID := r.PathValue("taskId")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if !c.canEditRequirements(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/tasks/"+taskID, noticeNeedsOwner)
 		return
 	}
 

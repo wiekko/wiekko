@@ -82,7 +82,7 @@ func (c *PageProductController) CreateForm(w http.ResponseWriter, r *http.Reques
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 
 	if !c.canCreateProduct(r, user) {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		redirectWithNotice(w, r, "/", noticeProductCreationOff)
 		return
 	}
 
@@ -103,7 +103,7 @@ func (c *PageProductController) Create(w http.ResponseWriter, r *http.Request) {
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 
 	if !c.canCreateProduct(r, user) {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		redirectWithNotice(w, r, "/", noticeProductCreationOff)
 		return
 	}
 
@@ -1336,7 +1336,7 @@ func (c *PageProductController) MilestoneCreateForm(w http.ResponseWriter, r *ht
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, "/products/"+productID+"/milestones", http.StatusSeeOther)
+		redirectWithNotice(w, r, "/products/"+productID+"/milestones", noticeNeedsOwner)
 		return
 	}
 
@@ -1412,7 +1412,7 @@ func (c *PageProductController) MilestoneEditForm(w http.ResponseWriter, r *http
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID), http.StatusSeeOther)
+		redirectWithNotice(w, r, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID), noticeNeedsOwner)
 		return
 	}
 
@@ -2565,7 +2565,7 @@ func (c *PageProductController) ComponentCreateForm(w http.ResponseWriter, r *ht
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, "/products/"+productID+"/components", http.StatusSeeOther)
+		redirectWithNotice(w, r, "/products/"+productID+"/components", noticeNeedsOwner)
 		return
 	}
 
@@ -2643,7 +2643,7 @@ func (c *PageProductController) ComponentEditForm(w http.ResponseWriter, r *http
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, fmt.Sprintf("/products/%s/components/%s", productID, componentID), http.StatusSeeOther)
+		redirectWithNotice(w, r, fmt.Sprintf("/products/%s/components/%s", productID, componentID), noticeNeedsOwner)
 		return
 	}
 
@@ -3333,7 +3333,7 @@ func (c *PageProductController) CapabilityCreateForm(w http.ResponseWriter, r *h
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, "/products/"+productID+"/capabilities", http.StatusSeeOther)
+		redirectWithNotice(w, r, "/products/"+productID+"/capabilities", noticeNeedsOwner)
 		return
 	}
 
@@ -3418,7 +3418,7 @@ func (c *PageProductController) CapabilityEditForm(w http.ResponseWriter, r *htt
 	}
 
 	if !user.IsAdmin && role != model.RoleOwner {
-		http.Redirect(w, r, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID), http.StatusSeeOther)
+		redirectWithNotice(w, r, fmt.Sprintf("/products/%s/capabilities/%s", productID, capabilityID), noticeNeedsOwner)
 		return
 	}
 
@@ -4505,9 +4505,14 @@ func (c *PageProductController) TestCaseCreateForm(w http.ResponseWriter, r *htt
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditTestCases(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/test-cases", noticeNeedsDeveloper)
 		return
 	}
 
@@ -4659,9 +4664,14 @@ func (c *PageProductController) TestCaseEditForm(w http.ResponseWriter, r *http.
 	productID := r.PathValue("id")
 	testCaseID := r.PathValue("testCaseId")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditTestCases(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/test-cases/"+testCaseID, noticeNeedsDeveloper)
 		return
 	}
 
@@ -5482,9 +5492,14 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditRequirements(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/requirements", noticeNeedsOwner)
 		return
 	}
 
@@ -5604,9 +5619,14 @@ func (c *PageProductController) RequirementEditForm(w http.ResponseWriter, r *ht
 	productID := r.PathValue("id")
 	requirementID := r.PathValue("requirementId")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditRequirements(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/requirements/"+requirementID, noticeNeedsOwner)
 		return
 	}
 
@@ -6906,9 +6926,14 @@ func (c *PageProductController) DefectCreateForm(w http.ResponseWriter, r *http.
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canCreateDefects(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/defects", noticeNeedsTester)
 		return
 	}
 
@@ -7014,9 +7039,14 @@ func (c *PageProductController) DefectEditForm(w http.ResponseWriter, r *http.Re
 	productID := r.PathValue("id")
 	defectID := r.PathValue("defectId")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditDefects(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/defects/"+defectID, noticeNeedsOwner)
 		return
 	}
 
@@ -7977,9 +8007,14 @@ func (c *PageProductController) ConstraintCreateForm(w http.ResponseWriter, r *h
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditConstraints(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/constraints", noticeNeedsOwner)
 		return
 	}
 
@@ -8067,9 +8102,14 @@ func (c *PageProductController) ConstraintEditForm(w http.ResponseWriter, r *htt
 	productID := r.PathValue("id")
 	constraintID := r.PathValue("constraintId")
 
-	p, _, err := c.loadProductWithRole(r, user, productID)
+	p, role, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if !c.canEditConstraints(user, role) {
+		redirectWithNotice(w, r, "/products/"+productID+"/constraints/"+constraintID, noticeNeedsOwner)
 		return
 	}
 

@@ -106,7 +106,7 @@ func (c *PageProductController) SprintCreateForm(w http.ResponseWriter, r *http.
 		return
 	}
 	if !isOwnerOrAdmin(user, role) {
-		http.Redirect(w, r, "/products/"+productID+"/sprints", http.StatusSeeOther)
+		redirectWithNotice(w, r, "/products/"+productID+"/sprints", noticeNeedsOwner)
 		return
 	}
 
@@ -184,7 +184,7 @@ func (c *PageProductController) SprintEditForm(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if !isOwnerOrAdmin(user, role) {
-		http.Redirect(w, r, fmt.Sprintf("/products/%s/sprints/%s", productID, sprintID), http.StatusSeeOther)
+		redirectWithNotice(w, r, fmt.Sprintf("/products/%s/sprints/%s", productID, sprintID), noticeNeedsOwner)
 		return
 	}
 

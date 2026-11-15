@@ -9,6 +9,7 @@ This document defines the UI page tree, navigation structure, and related design
 3. **Tabs over pages for related data**: detail pages use tabs for comments, attachments, linked items, and history rather than separate routes.
 4. **URL = state**: filters, sort order, and active tab are reflected in the URL so views are bookmarkable and shareable.
 5. **Consistent CRUD pattern**: every entity follows list > detail (tabbed) > create/edit.
+6. **Show only what the role can do**: actions the user's role does not allow are not offered. A create or edit form opened without the role to save it (a bookmark, a typed URL) redirects to what the user can read instead: the list for a create form, the detail page for an edit form. That page shows a notice naming the role required.
 
 ## Navigation Structure
 

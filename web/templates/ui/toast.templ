@@ -1,14 +1,33 @@
 package ui
 
+import "nexmap.net/web/templates"
+
 // ToastContainer renders a fixed-position container for toast notifications.
 // Toasts are injected via htmx OOB swaps targeting this container.
+//
+// A notice for the page (templates.NoticeFrom, e.g. why a form redirected
+// here) is rendered into it as a warning toast, and the ?notice= parameter
+// that carried it is taken out of the address bar, so reloading the page or
+// copying its address does not repeat it.
 //
 // The trailing <template> holds an empty error toast that htmx-errors.js clones
 // to report failed requests, so client-side toasts stay markup-identical to the
 // server-rendered ones.
 templ ToastContainer() {
 	<div id="toast-container" class="pointer-events-none fixed right-0 top-0 z-50 flex flex-col items-end gap-2 p-4">
+		if notice := templates.NoticeFrom(ctx); notice != "" {
+			@Toast(notice, "warning")
+		}
 	</div>
+	if templates.NoticeFrom(ctx) != "" {
+		<script>
+			(function () {
+				var url = new URL(window.location.href);
+				url.searchParams.delete("notice");
+				window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+			})();
+		</script>
+	}
 	<template id="toast-error-template">
 		@Toast("", "error")
 	</template>
