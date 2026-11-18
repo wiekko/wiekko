@@ -63,6 +63,9 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 			@ui.TabPanelHidden("requirements") {
 				@ui.LoadingSpinner("md")
 			}
+			@ui.TabPanelHidden("tasks") {
+				@ui.LoadingSpinner("md")
+			}
 			@ui.TabPanelHidden("constraints") {
 				@ui.LoadingSpinner("md")
 			}
@@ -457,13 +460,50 @@ templ MilestoneCapabilityLinkResults(productID, milestoneID string, candidates [
 }
 
 // MilestoneRequirementsTabProps holds data for the milestone requirements tab.
+// MilestoneRequirementsTabProps holds data for the milestone requirements
+// tab, or for the tasks tab when Kind is a task (DF-4).
 type MilestoneRequirementsTabProps struct {
-	ProductID   string
-	MilestoneID string
-	CSRFToken   string
-	CanWrite    bool
-	Requirements []*model.Requirement
+	ProductID        string
+	MilestoneID      string
+	Kind             string // model.RequirementKindRequirement or model.RequirementKindTask
+	CSRFToken        string
+	CanWrite         bool
+	Requirements     []*model.Requirement
 	CategoryPrefixes map[string]string
+}
+
+// TabID is the tab the props render: "requirements" or "tasks".
+func (p MilestoneRequirementsTabProps) TabID() string {
+	return milestoneBacklogSegment(p.Kind)
+}
+
+// milestoneBacklogSegment is the path segment and tab ID of a backlog kind.
+func milestoneBacklogSegment(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "tasks"
+	}
+	return "requirements"
+}
+
+// milestoneBacklogNoun names one item of a backlog kind.
+func milestoneBacklogNoun(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "task"
+	}
+	return "requirement"
+}
+
+// milestoneBacklogLabel is the capitalised plural of a backlog kind.
+func milestoneBacklogLabel(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "Tasks"
+	}
+	return "Requirements"
+}
+
+// milestoneBacklogItemHref links an item to its own detail page.
+func milestoneBacklogItemHref(productID string, item *model.Requirement) string {
+	return fmt.Sprintf("/products/%s/%s/%s", productID, milestoneBacklogSegment(item.Kind), item.ID)
 }
 
 templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
@@ -474,7 +514,7 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 					Label:    "Link existing",
 					Variant:  "secondary",
 					Size:     "sm",
-					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/requirements/link-modal", props.ProductID, props.MilestoneID),
+					HxGet:    fmt.Sprintf("/products/%s/milestones/%s/%s/link-modal", props.ProductID, props.MilestoneID, props.TabID()),
 					HxTarget: "#modal",
 					HxSwap:   "innerHTML",
 				}) {
@@ -484,7 +524,7 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 		}
 		if len(props.Requirements) == 0 {
 			@ui.Card() {
-				@ui.EmptyState("clipboard-list", "No linked requirements", "Requirements assigned to this milestone will appear here.", "", "")
+				@ui.EmptyState("clipboard-list", fmt.Sprintf("No linked %s", props.TabID()), fmt.Sprintf("%s assigned to this milestone will appear here.", milestoneBacklogLabel(props.Kind)), "", "")
 			}
 		} else {
 			@ui.Card() {
@@ -509,7 +549,7 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 								}
 								@ui.TableCell() {
 									<a
-										href={ templ.SafeURL(fmt.Sprintf("/products/%s/requirements/%s", props.ProductID, req.ID)) }
+										href={ templ.SafeURL(milestoneBacklogItemHref(props.ProductID, req)) }
 										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
 									>
 										{ req.Title }
@@ -519,12 +559,12 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
 										<button
 											type="button"
-											aria-label="Unlink requirement"
+											aria-label={ "Unlink " + milestoneBacklogNoun(props.Kind) }
 											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
-											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/requirements/%s", props.ProductID, props.MilestoneID, req.ID) }
-											hx-target="#tab-panel-requirements"
+											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/%s/%s", props.ProductID, props.MilestoneID, props.TabID(), req.ID) }
+											hx-target={ "#tab-panel-" + props.TabID() }
 											hx-swap="innerHTML"
-											hx-confirm="Remove this requirement from the milestone?"
+											hx-confirm={ fmt.Sprintf("Remove this %s from the milestone?", milestoneBacklogNoun(props.Kind)) }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -539,9 +579,10 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 	</div>
 }
 
-// MilestoneRequirementLinkModal renders the "link existing requirement" modal.
-templ MilestoneRequirementLinkModal(productID, milestoneID string) {
-	@ui.Modal("requirements-link-modal", "Link existing requirement", "md") {
+// MilestoneRequirementLinkModal renders the "link existing requirement" or
+// "link existing task" modal.
+templ MilestoneRequirementLinkModal(productID, milestoneID, kind string) {
+	@ui.Modal("requirements-link-modal", "Link existing "+milestoneBacklogNoun(kind), "md") {
 		<div class="space-y-4">
 			<p class="text-xs text-gray-500 dark:text-gray-400">Linking an item sets its milestone to this one.</p>
 			<div class="relative">
@@ -551,10 +592,10 @@ templ MilestoneRequirementLinkModal(productID, milestoneID string) {
 				<input
 					type="search"
 					name="q"
-					placeholder="Search requirements..."
+					placeholder={ fmt.Sprintf("Search %s...", milestoneBacklogSegment(kind)) }
 					autofocus
 					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
-					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/requirements/link-search", productID, milestoneID) }
+					hx-get={ fmt.Sprintf("/products/%s/milestones/%s/%s/link-search", productID, milestoneID, milestoneBacklogSegment(kind)) }
 					hx-target="#requirements-link-results"
 					hx-swap="innerHTML"
 					hx-trigger="keyup changed delay:300ms, search, load"
@@ -567,9 +608,9 @@ templ MilestoneRequirementLinkModal(productID, milestoneID string) {
 	}
 }
 
-templ MilestoneRequirementLinkResults(productID, milestoneID string, candidates []*model.Requirement, milestoneNames map[string]string, prefixes map[string]string) {
+templ MilestoneRequirementLinkResults(productID, milestoneID, kind string, candidates []*model.Requirement, milestoneNames map[string]string, prefixes map[string]string) {
 	if len(candidates) == 0 {
-		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching requirements.</p>
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("No matching %s.", milestoneBacklogSegment(kind)) }</p>
 	} else {
 		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
 			for _, req := range candidates {
@@ -586,7 +627,7 @@ templ MilestoneRequirementLinkResults(productID, milestoneID string, candidates 
 					<button
 						type="button"
 						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/requirements/link", productID, milestoneID) }
+						hx-post={ fmt.Sprintf("/products/%s/milestones/%s/%s/link", productID, milestoneID, milestoneBacklogSegment(kind)) }
 						hx-vals={ fmt.Sprintf(`{"requirement_id":"%s"}`, req.ID) }
 						hx-target="#modal"
 						hx-swap="innerHTML"
@@ -1052,6 +1093,7 @@ func milestoneDetailTabs(productID, milestoneID, workflowMode string) []template
 		{ID: "components", Label: "Components", HxGet: base + "/components"},
 		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
 		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
+		{ID: "tasks", Label: "Tasks", HxGet: base + "/tasks"},
 		{ID: "constraints", Label: "Constraints", HxGet: base + "/constraints"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
 		{ID: "sprints", Label: "Sprints", HxGet: base + "/sprints"},

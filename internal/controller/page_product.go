@@ -1908,13 +1908,66 @@ func (c *PageProductController) writeMilestoneCapabilitiesTabOOB(w http.Response
 	c.writeTabOOB(w, r, "capabilities", productpage.MilestoneCapabilitiesTabContent(props))
 }
 
+// The milestone page lists requirements and tasks on separate tabs (DF-4),
+// as the backlog does. Both tabs share the handlers below, which take the
+// kind they serve: the routes under /requirements serve requirements, those
+// under /tasks serve tasks.
+
 // MilestoneRequirementsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/requirements.
 func (c *PageProductController) MilestoneRequirementsTab(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	productID := r.PathValue("id")
-	milestoneID := r.PathValue("milestoneId")
+	c.milestoneBacklogTab(w, r, model.RequirementKindRequirement)
+}
 
-	props, err := c.loadMilestoneRequirementsTabProps(r, user, productID, milestoneID)
+// MilestoneTasksTab renders GET /products/{id}/milestones/{milestoneId}/tabs/tasks.
+func (c *PageProductController) MilestoneTasksTab(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogTab(w, r, model.RequirementKindTask)
+}
+
+// MilestoneRequirementLinkModal renders GET /products/{id}/milestones/{milestoneId}/requirements/link-modal.
+func (c *PageProductController) MilestoneRequirementLinkModal(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogLinkModal(w, r, model.RequirementKindRequirement)
+}
+
+// MilestoneTaskLinkModal renders GET /products/{id}/milestones/{milestoneId}/tasks/link-modal.
+func (c *PageProductController) MilestoneTaskLinkModal(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogLinkModal(w, r, model.RequirementKindTask)
+}
+
+// MilestoneRequirementLinkSearch renders GET /products/{id}/milestones/{milestoneId}/requirements/link-search.
+// Candidates already on another milestone are offered too, labelled with it.
+func (c *PageProductController) MilestoneRequirementLinkSearch(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogLinkSearch(w, r, model.RequirementKindRequirement)
+}
+
+// MilestoneTaskLinkSearch renders GET /products/{id}/milestones/{milestoneId}/tasks/link-search.
+func (c *PageProductController) MilestoneTaskLinkSearch(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogLinkSearch(w, r, model.RequirementKindTask)
+}
+
+// MilestoneRequirementLink handles POST /products/{id}/milestones/{milestoneId}/requirements/link.
+func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogLink(w, r, model.RequirementKindRequirement)
+}
+
+// MilestoneTaskLink handles POST /products/{id}/milestones/{milestoneId}/tasks/link.
+func (c *PageProductController) MilestoneTaskLink(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogLink(w, r, model.RequirementKindTask)
+}
+
+// MilestoneRequirementUnlink handles DELETE /products/{id}/milestones/{milestoneId}/requirements/{requirementId}.
+// The path parameter is the requirement's own ID; unlinking clears its milestone FK.
+func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogUnlink(w, r, model.RequirementKindRequirement)
+}
+
+// MilestoneTaskUnlink handles DELETE /products/{id}/milestones/{milestoneId}/tasks/{requirementId}.
+func (c *PageProductController) MilestoneTaskUnlink(w http.ResponseWriter, r *http.Request) {
+	c.milestoneBacklogUnlink(w, r, model.RequirementKindTask)
+}
+
+func (c *PageProductController) milestoneBacklogTab(w http.ResponseWriter, r *http.Request, kind string) {
+	user := middleware.UserFromContext(r.Context())
+	props, err := c.loadMilestoneBacklogTabProps(r, user, r.PathValue("id"), r.PathValue("milestoneId"), kind)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -1923,24 +1976,18 @@ func (c *PageProductController) MilestoneRequirementsTab(w http.ResponseWriter, 
 	_ = productpage.MilestoneRequirementsTabContent(props).Render(r.Context(), w)
 }
 
-// MilestoneRequirementLinkModal renders GET /products/{id}/milestones/{milestoneId}/requirements/link-modal.
-func (c *PageProductController) MilestoneRequirementLinkModal(w http.ResponseWriter, r *http.Request) {
+func (c *PageProductController) milestoneBacklogLinkModal(w http.ResponseWriter, r *http.Request, kind string) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
-	milestoneID := r.PathValue("milestoneId")
-
 	if !c.canEditMilestoneLinksFor(r, user, productID) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneRequirementLinkModal(productID, milestoneID).Render(r.Context(), w)
+	_ = productpage.MilestoneRequirementLinkModal(productID, r.PathValue("milestoneId"), kind).Render(r.Context(), w)
 }
 
-// MilestoneRequirementLinkSearch renders GET /products/{id}/milestones/{milestoneId}/requirements/link-search.
-// Candidates already on another milestone are offered too, labelled with it.
-func (c *PageProductController) MilestoneRequirementLinkSearch(w http.ResponseWriter, r *http.Request) {
+func (c *PageProductController) milestoneBacklogLinkSearch(w http.ResponseWriter, r *http.Request, kind string) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 	milestoneID := r.PathValue("milestoneId")
@@ -1951,7 +1998,7 @@ func (c *PageProductController) MilestoneRequirementLinkSearch(w http.ResponseWr
 	}
 
 	query := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("q")))
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{Kind: kind})
 
 	candidates := make([]*model.Requirement, 0, len(all))
 	for _, req := range all {
@@ -1965,14 +2012,24 @@ func (c *PageProductController) MilestoneRequirementLinkSearch(w http.ResponseWr
 	}
 
 	milestoneNames := c.buildMilestoneMap(r, user, productID)
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, kind)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneRequirementLinkResults(productID, milestoneID, candidates, milestoneNames, prefixes).Render(r.Context(), w)
+	_ = productpage.MilestoneRequirementLinkResults(productID, milestoneID, kind, candidates, milestoneNames, prefixes).Render(r.Context(), w)
 }
 
-// MilestoneRequirementLink handles POST /products/{id}/milestones/{milestoneId}/requirements/link.
-func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, r *http.Request) {
+// milestoneBacklogItem checks that the item a link or unlink names is of the
+// kind the route serves, so neither tab changes the other's items.
+func (c *PageProductController) milestoneBacklogItem(w http.ResponseWriter, r *http.Request, user *model.User, productID, id, kind string) bool {
+	item, err := c.backlog.GetRequirement(r.Context(), user, productID, id)
+	if err != nil || item.Kind != kind {
+		http.Error(w, "not found", http.StatusNotFound)
+		return false
+	}
+	return true
+}
+
+func (c *PageProductController) milestoneBacklogLink(w http.ResponseWriter, r *http.Request, kind string) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 	milestoneID := r.PathValue("milestoneId")
@@ -1986,6 +2043,9 @@ func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, 
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
+	if !c.milestoneBacklogItem(w, r, user, productID, targetID, kind) {
+		return
+	}
 
 	mid := milestoneID
 	if _, err := c.backlog.UpdateRequirement(r.Context(), user, productID, targetID, service.UpdateRequirementInput{
@@ -1996,12 +2056,15 @@ func (c *PageProductController) MilestoneRequirementLink(w http.ResponseWriter, 
 		return
 	}
 
-	c.writeMilestoneRequirementsTabOOB(w, r, user, productID, milestoneID)
+	props, err := c.loadMilestoneBacklogTabProps(r, user, productID, milestoneID, kind)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	c.writeTabOOB(w, r, props.TabID(), productpage.MilestoneRequirementsTabContent(props))
 }
 
-// MilestoneRequirementUnlink handles DELETE /products/{id}/milestones/{milestoneId}/requirements/{requirementId}.
-// The path parameter is the requirement's own ID; unlinking clears its milestone FK.
-func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter, r *http.Request) {
+func (c *PageProductController) milestoneBacklogUnlink(w http.ResponseWriter, r *http.Request, kind string) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
 	milestoneID := r.PathValue("milestoneId")
@@ -2009,6 +2072,9 @@ func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter
 
 	if !c.canEditMilestoneLinksFor(r, user, productID) {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if !c.milestoneBacklogItem(w, r, user, productID, targetID, kind) {
 		return
 	}
 
@@ -2021,7 +2087,7 @@ func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter
 		return
 	}
 
-	props, err := c.loadMilestoneRequirementsTabProps(r, user, productID, milestoneID)
+	props, err := c.loadMilestoneBacklogTabProps(r, user, productID, milestoneID, kind)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -2030,7 +2096,9 @@ func (c *PageProductController) MilestoneRequirementUnlink(w http.ResponseWriter
 	_ = productpage.MilestoneRequirementsTabContent(props).Render(r.Context(), w)
 }
 
-func (c *PageProductController) loadMilestoneRequirementsTabProps(r *http.Request, user *model.User, productID, milestoneID string) (productpage.MilestoneRequirementsTabProps, error) {
+// loadMilestoneBacklogTabProps loads the milestone's requirements or its
+// tasks, with the category prefixes of that kind.
+func (c *PageProductController) loadMilestoneBacklogTabProps(r *http.Request, user *model.User, productID, milestoneID, kind string) (productpage.MilestoneRequirementsTabProps, error) {
 	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 
 	_, role, err := c.loadProductWithRole(r, user, productID)
@@ -2038,26 +2106,23 @@ func (c *PageProductController) loadMilestoneRequirementsTabProps(r *http.Reques
 		return productpage.MilestoneRequirementsTabProps{}, err
 	}
 
-	items, _ := c.backlog.ListRequirementsByMilestone(r.Context(), user, productID, milestoneID)
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+	all, _ := c.backlog.ListRequirementsByMilestone(r.Context(), user, productID, milestoneID)
+	items := make([]*model.Requirement, 0, len(all))
+	for _, item := range all {
+		if item.Kind == kind {
+			items = append(items, item)
+		}
+	}
 
 	return productpage.MilestoneRequirementsTabProps{
 		ProductID:        productID,
 		MilestoneID:      milestoneID,
+		Kind:             kind,
 		CSRFToken:        csrfToken,
 		CanWrite:         c.canEditMilestoneLinks(user, role),
 		Requirements:     items,
-		CategoryPrefixes: prefixes,
+		CategoryPrefixes: c.buildCategoryPrefixMap(r, user, productID, kind),
 	}, nil
-}
-
-func (c *PageProductController) writeMilestoneRequirementsTabOOB(w http.ResponseWriter, r *http.Request, user *model.User, productID, milestoneID string) {
-	props, err := c.loadMilestoneRequirementsTabProps(r, user, productID, milestoneID)
-	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	c.writeTabOOB(w, r, "requirements", productpage.MilestoneRequirementsTabContent(props))
 }
 
 // MilestoneConstraintsTab renders GET /products/{id}/milestones/{milestoneId}/tabs/constraints.

@@ -184,13 +184,15 @@ func (c *PageProductController) defectTabCounts(r *http.Request, user *model.Use
 func (c *PageProductController) milestoneTabCounts(r *http.Request, user *model.User, productID, id, workflowMode string) map[string]int {
 	comps, compsErr := c.loadMilestoneComponentsTabProps(r, user, productID, id)
 	caps, capsErr := c.loadMilestoneCapabilitiesTabProps(r, user, productID, id)
-	reqs, reqsErr := c.loadMilestoneRequirementsTabProps(r, user, productID, id)
+	reqs, reqsErr := c.loadMilestoneBacklogTabProps(r, user, productID, id, model.RequirementKindRequirement)
+	tasks, tasksErr := c.loadMilestoneBacklogTabProps(r, user, productID, id, model.RequirementKindTask)
 	cons, consErr := c.loadMilestoneConstraintsTabProps(r, user, productID, id)
 	defs, defsErr := c.loadMilestoneDefectsTabProps(r, user, productID, id)
 	counts := map[string]int{
 		"components":   countOf(comps, compsErr, func(p productpage.MilestoneComponentsTabProps) int { return len(p.Components) + len(p.Affected) }),
 		"capabilities": countOf(caps, capsErr, func(p productpage.MilestoneCapabilitiesTabProps) int { return len(p.Capabilities) + len(p.Affected) }),
 		"requirements": countOf(reqs, reqsErr, func(p productpage.MilestoneRequirementsTabProps) int { return len(p.Requirements) }),
+		"tasks":        countOf(tasks, tasksErr, func(p productpage.MilestoneRequirementsTabProps) int { return len(p.Requirements) }),
 		"constraints":  countOf(cons, consErr, func(p productpage.MilestoneConstraintsTabProps) int { return len(p.Constraints) }),
 		"defects":      countOf(defs, defsErr, func(p productpage.MilestoneDefectsTabProps) int { return len(p.Defects) }),
 	}
