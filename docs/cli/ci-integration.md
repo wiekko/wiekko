@@ -1,6 +1,6 @@
 # CI Integration
 
-`nexmap utest` records automated test results in the product's active testing campaign (FR-018, FR-409). It reads a test report from stdin or from files, maps each test to an automatic test case by its **test identifier**, and uploads the run in one request.
+`nexmap utest` records automated test results in the product's active testing campaign (FR-24, FR-118). It reads a test report from stdin or from files, maps each test to an automatic test case by its **test identifier**, and uploads the run in one request.
 
 ```sh
 go test -json ./... | nexmap utest --env linux-amd64
@@ -20,7 +20,7 @@ nexmap utest --format junit reports/*.xml
 | No automatic test case has the identifier, or the test case is not in the campaign | Not recorded, no defect; failures are still listed in the build log |
 | **No active campaign** | The upload is accepted, nothing is written (no results, events or defects), and the CLI prints `no active campaign — results not recorded` |
 
-The FR-504 loop works with automation: closing the defect moves the result to re-test, and the next green run marks it passed. A later failure files a new defect, since the old one is closed.
+The FR-123 loop works with automation: closing the defect moves the result to re-test, and the next green run marks it passed. A later failure files a new defect, since the old one is closed.
 
 Each status change is recorded in the result history with the token's user, the report format (`go-test`, `junit`), and the revision and branch.
 

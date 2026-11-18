@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT INTO settings (key, value) VALUES ('self_registration_enabled', 'false');
 INSERT INTO settings (key, value) VALUES ('moderation_enabled', 'false');
 INSERT INTO settings (key, value) VALUES ('2fa_enforced', 'false');
--- Scoped 2FA enforcement (SC-107): administrators, and users holding a role
+-- Scoped 2FA enforcement (SC-34): administrators, and users holding a role
 -- in at least one product.
 INSERT INTO settings (key, value) VALUES ('2fa_enforced_admins', 'false');
 INSERT INTO settings (key, value) VALUES ('2fa_enforced_owner', 'false');
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS personal_access_tokens (
     expires_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL,
     revoked_at   TIMESTAMPTZ,
-    -- Restrictions (SC-401 – SC-406): space-separated "scope:level" grants,
+    -- Restrictions (SC-51 – SC-56): space-separated "scope:level" grants,
     -- an optional role cap, and whether only the products listed in
     -- personal_access_token_products (00003) are reachable.
     scopes       TEXT NOT NULL,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS invitations (
 );
 CREATE INDEX IF NOT EXISTS idx_invitations_token_hash ON invitations(token_hash);
 
--- Password reset links (SC-110). Like sessions and invitations, the table
+-- Password reset links (SC-37). Like sessions and invitations, the table
 -- stores only the SHA-256 of the token sent by email, so a copy of the
 -- database holds nothing that resets a password. A token works once
 -- (used_at) and until expires_at.

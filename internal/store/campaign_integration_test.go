@@ -145,7 +145,7 @@ func TestTestingCampaignStoreNoActiveCampaign(t *testing.T) {
 	})
 }
 
-// The partial unique index is what actually enforces FR-322.
+// The partial unique index is what actually enforces FR-95.
 func TestTestingCampaignStoreOneActivePerProduct(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
 		f := seedCampaignFixture(t, db)

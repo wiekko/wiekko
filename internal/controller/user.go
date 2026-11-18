@@ -22,7 +22,7 @@ func NewUser(user *service.UserService) *UserController {
 // GetMe handles GET /user/me.
 //
 // For token-authenticated requests the response carries a "token" object
-// with the token's restriction (SC-401 – SC-406).
+// with the token's restriction (SC-51 – SC-56).
 func (c *UserController) GetMe(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	resp := userToJSON(user)

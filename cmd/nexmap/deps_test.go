@@ -7,7 +7,7 @@ import (
 )
 
 // allowedModulePackages lists the nexmap.net packages the CLI may link. The CLI
-// talks to the server through the REST API only (AC-224); importing server
+// talks to the server through the REST API only (AC-16); importing server
 // packages would couple it to server internals and bloat the binary with the
 // database drivers, templates and web assets.
 var allowedModulePackages = []string{

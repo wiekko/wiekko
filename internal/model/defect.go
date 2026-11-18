@@ -4,7 +4,7 @@ package model
 type Defect struct {
 	ID        string
 	ProductID string
-	// SequenceNumber numbers the product's defects (FR-043); with the product's
+	// SequenceNumber numbers the product's defects (FR-49); with the product's
 	// defect prefix it forms the identifier, e.g. DF-17.
 	SequenceNumber int
 	// Identifier is the human-readable identifier, filled in when read from

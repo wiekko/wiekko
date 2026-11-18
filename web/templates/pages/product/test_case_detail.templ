@@ -21,7 +21,7 @@ type TestCaseDetailProps struct {
 	CapabilityName    string
 	PyramidLevelName  string
 	EnvironmentNames  []string
-	Documents         []*model.Document // linked documents (FR-909)
+	Documents         []*model.Document // linked documents (FR-141)
 	CanEdit           bool // developer, owner, or admin
 }
 
@@ -104,7 +104,7 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 }
 
 // testCaseEnvironmentsField lists the runtime environments the test case runs
-// in. Each one becomes a column of the campaign matrix (FR-019).
+// in. Each one becomes a column of the campaign matrix (FR-25).
 templ testCaseEnvironmentsField(names []string) {
 	<div>
 		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Environments</dt>

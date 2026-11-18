@@ -14,7 +14,7 @@ import (
 )
 
 // Commands that change the product structure, constraints and traceability
-// links (FR-902, FR-903). Like every write, the server decides what the
+// links (FR-134, FR-135). Like every write, the server decides what the
 // token's user may do.
 
 // flagsSet reports which flags were given on the command line, so update

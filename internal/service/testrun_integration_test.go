@@ -1,6 +1,6 @@
 package service_test
 
-// Automated test run ingestion (FR-409, FR-502, FR-504) through the real
+// Automated test run ingestion (FR-118, FR-121, FR-123) through the real
 // service layer and SQL, on both engines.
 
 import (
@@ -313,7 +313,7 @@ func TestIngestRun(t *testing.T) {
 	})
 }
 
-// FR-504 with automation: closing the defect sends the result to re-test, a
+// FR-123 with automation: closing the defect sends the result to re-test, a
 // green run passes it, and a later failure files a new defect because the old
 // one is closed. An open defect on the result is reused.
 func TestIngestRunRetestLoop(t *testing.T) {

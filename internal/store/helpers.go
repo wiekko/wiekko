@@ -25,7 +25,7 @@ func nullableText(s string) any {
 // activeColumn is the select expression for a backlog item's is_active, for
 // the requirements or defects table (or its alias) named by table.
 //
-// In a kanban product, activation is a property of the column (FR-318): an
+// In a kanban product, activation is a property of the column (FR-91): an
 // item is active while its status is marked is_active, and the stored flag is
 // not consulted. In a scrum product the stored flag holds, set when an item is
 // planned into a sprint. Computing it here, rather than copying the column's

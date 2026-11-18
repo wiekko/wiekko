@@ -56,7 +56,7 @@ Dashboard > [Product Name] > [Section] > [Entity Title]
 |-----------------|----------------|----------------------------------------------------------------------|
 | `/`             | Dashboard      | Product cards with key metrics; doubles as product switcher          |
 | `/products/new` | Create Product | New product form (if globally enabled or admin)                      |
-| `/user/profile` | User Profile   | Display name, email, password, TOTP setup, theme preference (UC-009) |
+| `/user/profile` | User Profile   | Display name, email, password, TOTP setup, theme preference (UC-68) |
 | `/user/tokens`  | API Tokens     | List, create, revoke personal access tokens                          |
 
 The **Dashboard** shows all products the user has access to. Each product card displays:
@@ -90,11 +90,11 @@ The **Dashboard** shows all products the user has access to. Each product card d
 
 | Route                                  | Page               | Purpose                                                   |
 |----------------------------------------|--------------------|-----------------------------------------------------------|
-| `/products/:id/requirements`           | Requirements List  | Table view with filters, sort, multi-select (UC-103..105) |
+| `/products/:id/requirements`           | Requirements List  | Table view with filters, sort, multi-select (UC-71..UC-76) |
 | `/products/:id/requirements/new`       | Create Requirement | Form                                                      |
 | `/products/:id/requirements/:rid`      | Requirement Detail | Tabbed detail page (see below)                            |
 | `/products/:id/requirements/:rid/edit` | Edit Requirement   | Form                                                      |
-| `/products/:id/defects`                | Defects List       | Table view with search, facet filters, sort, pagination (UC-104..107); returns the table fragment for htmx requests |
+| `/products/:id/defects`                | Defects List       | Table view with search, facet filters, sort, pagination (UC-72..UC-78); returns the table fragment for htmx requests |
 | `/products/:id/defects/board`          | Defects Board      | Kanban board view                                         |
 | `/products/:id/defects/new`            | Create Defect      | Form                                                      |
 | `/products/:id/defects/:did`           | Defect Detail      | Tabbed detail page                                        |
@@ -107,7 +107,7 @@ The **Dashboard** shows all products the user has access to. Each product card d
 | `/products/:id/constraints/new`        | Create Constraint  | Form                                                      |
 | `/products/:id/constraints/:cid`       | Constraint Detail  | Tabbed detail page                                        |
 | `/products/:id/constraints/:cid/edit`  | Edit Constraint    | Form                                                      |
-| `/products/:id/board`                  | Backlog Board      | Kanban board view (only in kanban mode) (UC-101..102)     |
+| `/products/:id/board`                  | Backlog Board      | Kanban board view (only in kanban mode) (UC-69..UC-70)     |
 | `/products/:id/sprints`                | Sprints List       | Table (only in scrum mode)                                |
 | `/products/:id/sprints/new`            | Create Sprint      | Form                                                      |
 | `/products/:id/sprints/:sid`           | Sprint Detail      | Tabbed detail page, board first (see below)               |
@@ -169,20 +169,20 @@ statement about the product, so there is nothing to trace or acceptance-test.
 | `/products/:id/test-cases/:tid`      | Test Case Detail | Tabbed detail page                                                                   |
 | `/products/:id/test-cases/:tid/edit` | Edit Test Case   | Form                                                                                 |
 | `/products/:id/campaigns`            | Campaigns List   | Table of testing campaigns with status and progress summary                          |
-| `/products/:id/campaigns/new`        | Create Campaign  | Form (name, dates, test case selection with filters and select-all) (UC-206)         |
-| `/products/:id/campaigns/:cid`       | Campaign Detail  | Tabbed detail page; execution matrix grouped by component or pyramid level (UC-201..205) |
+| `/products/:id/campaigns/new`        | Create Campaign  | Form (name, dates, test case selection with filters and select-all) (UC-84)         |
+| `/products/:id/campaigns/:cid`       | Campaign Detail  | Tabbed detail page; execution matrix grouped by component or pyramid level (UC-79..UC-83) |
 
 **Campaign Detail tabs:**
 
 | Tab      | Content                                                                   |
 |----------|---------------------------------------------------------------------------|
-| Matrix   | Execution matrix (test cases x environments) with grouping toggle (UC-201) |
-| Progress | Status breakdown, percentages, progress over time (UC-204, UC-207)        |
+| Matrix   | Execution matrix (test cases x environments) with grouping toggle (UC-79) |
+| Progress | Status breakdown, percentages, progress over time (UC-82, UC-85)        |
 | History  | Audit trail                                                               |
 
-Campaigns move through draft > active > closed (FR-320). Scope is editable while draft and locked once
-active (FR-321); results are writable only while active (FR-505). Closing is an explicit product owner
-action and warns about incomplete results rather than blocking (FR-332, FR-333).
+Campaigns move through draft > active > closed (FR-93). Scope is editable while draft and locked once
+active (FR-94); results are writable only while active (FR-124). Closing is an explicit product owner
+action and warns about incomplete results rather than blocking (FR-106, FR-107).
 
 **Test Case Detail tabs:**
 
@@ -296,7 +296,7 @@ would need per-day snapshots persisted alongside the sprint.
 |----------------------|-------------------|------------------------------------------------------------------------|
 | `/admin/users`       | Users List        | All users with status, filter by status                                |
 | `/admin/users/:uid`  | User Detail       | Account status, roles, actions (lock, reset password, delete)          |
-| `/admin/settings`    | Instance Settings | Registration, moderation, product creation toggles (UC-006: auto-save) |
+| `/admin/settings`    | Instance Settings | Registration, moderation, product creation toggles (UC-65: auto-save) |
 | `/admin/invitations` | Invitations       | List + create new invitations                                          |
 
 ### Development (dev mode only)

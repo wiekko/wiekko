@@ -253,7 +253,7 @@ func testSeed(t *testing.T, driver string, db *sql.DB) {
 	})
 
 	t.Run("closing a defect pushed its result to re-test", func(t *testing.T) {
-		// FR-504: closing a defect moves the results it failed to re-test. The
+		// FR-123: closing a defect moves the results it failed to re-test. The
 		// fixture closes the photo defect while its campaign is still running,
 		// so a result in the active campaign must carry that status.
 		campaigns, err := svc.Testing.ListCampaigns(ctx, admin, aviary.ID)

@@ -8,10 +8,10 @@ type Product struct {
 	EstimationMode string // "disabled", "story_points", "tshirt_sizes", "hours"
 	WorkflowMode   string // "kanban", "scrum"
 	StatusSync     bool   // true = statuses synced between requirements and defects
-	DefectPrefix   string // prefix of defect identifiers, e.g. "DF" in DF-17 (FR-043)
-	// DocumentPrefix is the prefix of document identifiers, e.g. "DOC" in DOC-3 (FR-050).
+	DefectPrefix   string // prefix of defect identifiers, e.g. "DF" in DF-17 (FR-49)
+	// DocumentPrefix is the prefix of document identifiers, e.g. "DOC" in DOC-3 (FR-56).
 	DocumentPrefix string
-	// TwoFactorRequired keeps members without 2FA out of the product (SC-107).
+	// TwoFactorRequired keeps members without 2FA out of the product (SC-34).
 	TwoFactorRequired bool
 	CreatedAt         string // RFC 3339
 	UpdatedAt         string // RFC 3339

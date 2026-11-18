@@ -26,7 +26,7 @@ type CategoryService struct {
 	tx         store.Transactor
 	categories store.CategoryStore
 	// products holds the defect prefix, which category prefixes must not
-	// take (FR-043). nil skips that check.
+	// take (FR-49). nil skips that check.
 	products     store.ProductStore
 	requirements store.RequirementStore
 	constraints  store.ConstraintStore
@@ -330,7 +330,7 @@ func normalizeDefectPrefix(prefix string) (string, error) {
 	return normalizeEntityPrefix(prefix, "defect", model.DefaultDefectPrefix)
 }
 
-// normalizeDocumentPrefix does the same for document identifiers (FR-050).
+// normalizeDocumentPrefix does the same for document identifiers (FR-56).
 func normalizeDocumentPrefix(prefix string) (string, error) {
 	return normalizeEntityPrefix(prefix, "document", model.DefaultDocumentPrefix)
 }

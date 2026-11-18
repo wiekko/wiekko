@@ -94,7 +94,7 @@ func (s *BacklogService) ResolveRequirementRef(ctx context.Context, user *model.
 }
 
 // ResolveDefectRef turns a defect reference into its ID: the ID itself,
-// returned unchanged, or an identifier such as "DF-17" (FR-043). The prefix
+// returned unchanged, or an identifier such as "DF-17" (FR-49). The prefix
 // must be the product's current defect prefix, so a requirement identifier
 // never resolves to a defect. Requires viewer role.
 func (s *BacklogService) ResolveDefectRef(ctx context.Context, user *model.User, productID, ref string) (string, error) {

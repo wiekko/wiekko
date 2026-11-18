@@ -1,5 +1,5 @@
 // Package client is a typed client for the Nexmap REST API (/api/v1). It is the
-// only way the CLI talks to a server (AC-224) and must not import any server
+// only way the CLI talks to a server (AC-16) and must not import any server
 // package: the JSON wire format is the contract.
 package client
 
@@ -29,7 +29,7 @@ const (
 
 // ErrInsecureServer is returned by New for a plain-HTTP server that is not on
 // the local machine: a personal access token must not cross the network
-// unencrypted (SC-001).
+// unencrypted (SC-26).
 var ErrInsecureServer = errors.New("refusing to send credentials over plain HTTP to a non-local server; use https:// (or allow plain HTTP explicitly)")
 
 // Client talks to one Nexmap server.

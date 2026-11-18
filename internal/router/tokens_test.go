@@ -13,7 +13,7 @@ import (
 )
 
 // TestRestrictedTokens drives restricted personal access tokens over HTTP
-// (SC-401 – SC-406).
+// (SC-51 – SC-56).
 func TestRestrictedTokens(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
 		e := newAccountEnv(t, driver, db)

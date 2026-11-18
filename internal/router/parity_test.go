@@ -14,7 +14,7 @@ import (
 )
 
 // TestAPIParityEndpoints covers the REST endpoints added so that everything
-// the web UI changes can be changed through the API as well (FR-901):
+// the web UI changes can be changed through the API as well (FR-133):
 // product invitations, splitting statuses and a draft campaign's scope.
 func TestAPIParityEndpoints(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
@@ -42,7 +42,7 @@ func TestAPIParityEndpoints(t *testing.T) {
 			return resp.StatusCode, readBody(t, resp)
 		}
 
-		// Product owners invite with a role (FR-305).
+		// Product owners invite with a role (FR-77).
 		status, body := call(http.MethodPost, "/invitations", `{"email":"new@example.com","role":"tester"}`)
 		if status != http.StatusCreated || !strings.Contains(body, `"url"`) || !strings.Contains(body, `"role":"tester"`) {
 			t.Fatalf("invite: %d %s", status, body)
@@ -66,7 +66,7 @@ func TestAPIParityEndpoints(t *testing.T) {
 			t.Errorf("requirement statuses changed by the split: %d -> %d", len(reqStatuses), len(after))
 		}
 
-		// A draft campaign's scope can be edited (FR-321).
+		// A draft campaign's scope can be edited (FR-94).
 		tc1, err := e.svc.Testing.CreateTestCase(ctx, admin, service.CreateTestCaseInput{ProductID: pid, Title: "one", ExecutionMode: "manual"})
 		must(err)
 		tc2, err := e.svc.Testing.CreateTestCase(ctx, admin, service.CreateTestCaseInput{ProductID: pid, Title: "two", ExecutionMode: "manual"})

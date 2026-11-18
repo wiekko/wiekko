@@ -100,7 +100,7 @@ func (c *ProductController) Update(w http.ResponseWriter, r *http.Request) {
 		WorkflowMode   *string `json:"workflow_mode"`
 		DefectPrefix   *string `json:"defect_prefix"`
 		DocumentPrefix *string `json:"document_prefix"`
-		// TwoFactorRequired keeps members without 2FA out (SC-107).
+		// TwoFactorRequired keeps members without 2FA out (SC-34).
 		TwoFactorRequired *bool `json:"two_factor_required"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
@@ -150,7 +150,7 @@ func (c *ProductController) ListMembers(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Usernames are pseudonyms (SC-306) and visible to every product member
+	// Usernames are pseudonyms (SC-50) and visible to every product member
 	// in the web UI; display names and emails stay out of the API listing.
 	items := make([]map[string]any, 0, len(members))
 	for _, m := range members {

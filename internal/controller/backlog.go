@@ -17,7 +17,7 @@ type BacklogController struct {
 }
 
 // UseDocuments makes single-item responses name the documents linked to the
-// item (FR-909).
+// item (FR-141).
 func (c *BacklogController) UseDocuments(docs *service.DocumentService) { c.documents = docs }
 
 // NewBacklog creates a BacklogController.
@@ -262,7 +262,7 @@ func (c *BacklogController) UnassignRequirement(w http.ResponseWriter, r *http.R
 }
 
 // LinkedDefects returns a handler for GET .../{targetType}s/{id}/defects:
-// the defects linked to that entity (FR-023, FR-501).
+// the defects linked to that entity (FR-29, FR-120).
 func (c *BacklogController) LinkedDefects(targetType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.UserFromContext(r.Context())

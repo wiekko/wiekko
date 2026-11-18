@@ -13,7 +13,7 @@ import (
 )
 
 // TestDefectIdentifiersAPI drives defect identifiers over the REST API
-// (FR-043): they resolve in paths and bodies, and follow the product's prefix.
+// (FR-49): they resolve in paths and bodies, and follow the product's prefix.
 func TestDefectIdentifiersAPI(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
 		e := newAccountEnv(t, driver, db)

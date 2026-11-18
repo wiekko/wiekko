@@ -59,7 +59,7 @@ type CampaignTest struct {
 	CreatedAt      string // RFC 3339
 }
 
-// Campaign status constants (FR-320).
+// Campaign status constants (FR-93).
 const (
 	CampaignStatusDraft  = "draft"
 	CampaignStatusActive = "active"
@@ -92,13 +92,13 @@ type CampaignResult struct {
 	EnvironmentID   string
 	EnvironmentName string
 	Status          string // one of the CampaignResultStatus* constants
-	DefectID        string // defect explaining a failure (FR-502); empty otherwise
+	DefectID        string // defect explaining a failure (FR-121); empty otherwise
 	ExecutedBy      string // user who last set the status; empty while pending
 	ExecutedAt      string // empty while pending; RFC 3339
 	UpdatedAt       string // RFC 3339
 }
 
-// Campaign result status constants (FR-021).
+// Campaign result status constants (FR-27).
 const (
 	CampaignResultStatusPending = "pending"
 	CampaignResultStatusPassed  = "passed"
@@ -120,7 +120,7 @@ func ValidCampaignResultStatus(status string) bool {
 }
 
 // IsIncompleteResultStatus reports whether a result still awaits testing and
-// therefore leaves its campaign incomplete (FR-041).
+// therefore leaves its campaign incomplete (FR-47).
 func IsIncompleteResultStatus(status string) bool {
 	switch status {
 	case CampaignResultStatusPending, CampaignResultStatusBlocked, CampaignResultStatusRetest:
@@ -130,7 +130,7 @@ func IsIncompleteResultStatus(status string) bool {
 	}
 }
 
-// Campaign verdict constants, derived from result counts and never stored (FR-041).
+// Campaign verdict constants, derived from result counts and never stored (FR-47).
 const (
 	CampaignVerdictIncomplete = "incomplete"
 	CampaignVerdictPassed     = "passed"
@@ -139,7 +139,7 @@ const (
 
 // CampaignVerdict derives the outcome of a campaign from its result counts,
 // keyed by result status. Skipped results are ignored: a campaign passes when
-// every non-skipped result passed, and fails as soon as one failed (FR-041).
+// every non-skipped result passed, and fails as soon as one failed (FR-47).
 func CampaignVerdict(counts map[string]int) string {
 	for status, n := range counts {
 		if n > 0 && IsIncompleteResultStatus(status) {
@@ -153,7 +153,7 @@ func CampaignVerdict(counts map[string]int) string {
 }
 
 // CampaignResultEvent records one status change of a campaign result. Events are
-// immutable and drive campaign progress over time (FR-042, UC-207).
+// immutable and drive campaign progress over time (FR-48, UC-85).
 type CampaignResultEvent struct {
 	ID         string
 	ResultID   string
@@ -163,7 +163,7 @@ type CampaignResultEvent struct {
 	ToStatus   string
 	DefectID   string // defect linked at the time of the change; empty otherwise
 	// Source, Revision and Branch describe the automated run that made the
-	// change (FR-409); all empty for changes made by a person.
+	// change (FR-118); all empty for changes made by a person.
 	Source    string // e.g. "go-test", "junit"
 	Revision  string // VCS revision the run tested
 	Branch    string // VCS branch the run tested

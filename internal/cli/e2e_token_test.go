@@ -1,6 +1,6 @@
 package cli_test
 
-// Restricted personal access tokens (SC-401 – SC-406) through the CLI.
+// Restricted personal access tokens (SC-51 – SC-56) through the CLI.
 
 import (
 	"strings"
@@ -53,7 +53,7 @@ func TestE2ETokenCIIngestion(t *testing.T) {
 		filed = filed || res.DefectID != ""
 	}
 	if !filed {
-		t.Error("a failing test filed no defect, although tests:write covers it (SC-405)")
+		t.Error("a failing test filed no defect, although tests:write covers it (SC-55)")
 	}
 
 	// The same token cannot read the backlog or defects.

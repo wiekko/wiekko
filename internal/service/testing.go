@@ -374,7 +374,7 @@ type CreateCampaignInput struct {
 	StartsAt    string
 	EndsAt      string
 	// TestCaseIDs is the campaign scope, selected explicitly by the product
-	// owner and snapshotted at creation (FR-321).
+	// owner and snapshotted at creation (FR-94).
 	TestCaseIDs []string
 }
 
@@ -391,7 +391,7 @@ type UpdateCampaignInput struct {
 
 // IncompleteResultsError reports that a campaign still has results awaiting
 // testing. Closing is allowed anyway, but only with an explicit confirmation
-// from the product owner (FR-333).
+// from the product owner (FR-107).
 type IncompleteResultsError struct {
 	Incomplete int
 }
@@ -452,7 +452,7 @@ func (s *TestingService) CreateCampaign(ctx context.Context, user *model.User, i
 
 // seedResults builds the pending result rows for a set of test cases: one row
 // per linked runtime environment, or a single environment-less row when the
-// test case defines no matrix (FR-021).
+// test case defines no matrix (FR-27).
 func (s *TestingService) seedResults(ctx context.Context, campaignID, productID string, testCaseIDs []string, now string) ([]*model.CampaignResult, error) {
 	var results []*model.CampaignResult
 	for _, tcID := range testCaseIDs {
@@ -537,7 +537,7 @@ func (s *TestingService) RemoveCampaignTestCase(ctx context.Context, user *model
 }
 
 // requireDraftCampaign loads a campaign and rejects scope changes once it has
-// left draft state (FR-321). Called inside a transaction, it holds the
+// left draft state (FR-94). Called inside a transaction, it holds the
 // campaign's lock, so the campaign stays a draft until the scope change has
 // committed.
 func (s *TestingService) requireDraftCampaign(ctx context.Context, user *model.User, productID, campaignID string) (*model.TestingCampaign, error) {
@@ -561,7 +561,7 @@ func (s *TestingService) requireDraftCampaign(ctx context.Context, user *model.U
 }
 
 // ActivateCampaign moves a draft campaign to active. A product may have at most
-// one active campaign (FR-322). Requires owner role.
+// one active campaign (FR-95). Requires owner role.
 func (s *TestingService) ActivateCampaign(ctx context.Context, user *model.User, productID, id string) (*model.TestingCampaign, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return nil, err
@@ -611,9 +611,9 @@ func (s *TestingService) ActivateCampaign(ctx context.Context, user *model.User,
 	return c, nil
 }
 
-// CloseCampaign closes an active campaign, freezing its results (FR-332).
+// CloseCampaign closes an active campaign, freezing its results (FR-106).
 // Without force, a campaign that still has incomplete results is refused with an
-// *IncompleteResultsError so the caller can confirm (FR-333). Requires owner role.
+// *IncompleteResultsError so the caller can confirm (FR-107). Requires owner role.
 func (s *TestingService) CloseCampaign(ctx context.Context, user *model.User, productID, id string, force bool) (*model.TestingCampaign, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return nil, err
@@ -671,7 +671,7 @@ func (s *TestingService) CloseCampaign(ctx context.Context, user *model.User, pr
 }
 
 // auditCampaignStatus records a campaign status transition with field-level
-// detail, so the history tab names the old and new state (FR-332).
+// detail, so the history tab names the old and new state (FR-106).
 func (s *TestingService) auditCampaignStatus(ctx context.Context, user *model.User, productID, campaignID, from, to, now string) error {
 	return s.audit.Create(ctx, &model.AuditEntry{
 		ID: uuid.New().String(), ProductID: productID, EntityType: "testing_campaign", EntityID: campaignID,
@@ -824,7 +824,7 @@ func (s *TestingService) ListResultsForTestCase(ctx context.Context, user *model
 }
 
 // ListResultEvents returns the status change log for a campaign, ordered
-// oldest first. Requires viewer role (FR-042, UC-207).
+// oldest first. Requires viewer role (FR-48, UC-85).
 func (s *TestingService) ListResultEvents(ctx context.Context, user *model.User, productID, campaignID string) ([]*model.CampaignResultEvent, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
@@ -837,7 +837,7 @@ func (s *TestingService) ListResultEvents(ctx context.Context, user *model.User,
 
 // ListEventsForResult returns the status change log for a single result, oldest
 // first, so a tester can see who set the current verdict before changing it.
-// Requires viewer role (FR-042).
+// Requires viewer role (FR-48).
 func (s *TestingService) ListEventsForResult(ctx context.Context, user *model.User, productID, campaignID, resultID string) ([]*model.CampaignResultEvent, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
@@ -940,8 +940,8 @@ func (s *TestingService) ListCampaignProgress(ctx context.Context, user *model.U
 }
 
 // SetResultStatus records a tester's verdict on one campaign result. Results are
-// writable only while their campaign is active (FR-505), and marking one failed
-// requires a defect that explains the failure (FR-502). Requires tester role.
+// writable only while their campaign is active (FR-124), and marking one failed
+// requires a defect that explains the failure (FR-121). Requires tester role.
 func (s *TestingService) SetResultStatus(ctx context.Context, user *model.User, productID, campaignID, resultID, status, defectID string) (*model.CampaignResult, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleTester); err != nil {
 		return nil, err
@@ -1014,7 +1014,7 @@ func (s *TestingService) SetResultStatus(ctx context.Context, user *model.User, 
 // MarkResultsForRetest moves every failed result blamed on the given defect to
 // re-test. Called by the backlog service once a defect is closed, which has
 // already authorized the caller, so this performs no role check of its own.
-// A closed defect never marks a result as passed — only a tester can (FR-504).
+// A closed defect never marks a result as passed — only a tester can (FR-123).
 //
 // Results in a campaign that is no longer active are left alone: a closed
 // campaign records what was true when it was closed, and fixing a defect
@@ -1062,7 +1062,7 @@ func (s *TestingService) MarkResultsForRetest(ctx context.Context, defectID, use
 	})
 }
 
-// recordResultEvent appends to the immutable result change log (FR-042). Like
+// recordResultEvent appends to the immutable result change log (FR-48). Like
 // audit entries, a failure here must not undo the change it describes.
 func (s *TestingService) recordResultEvent(ctx context.Context, result *model.CampaignResult, userID, from, now string) error {
 	return s.campaignEvents.Create(ctx, &model.CampaignResultEvent{

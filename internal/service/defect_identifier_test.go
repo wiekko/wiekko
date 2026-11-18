@@ -9,7 +9,7 @@ import (
 	"nexmap.net/internal/testutil"
 )
 
-// Defect identifiers (FR-043).
+// Defect identifiers (FR-49).
 
 func prefixedProducts(prefix string) *testutil.MockProductStore {
 	return &testutil.MockProductStore{

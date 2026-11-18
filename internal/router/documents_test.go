@@ -17,8 +17,8 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// TestDocumentsAPI drives documents over the REST API (FR-044..FR-052,
-// FR-909, SC-404, SC-405).
+// TestDocumentsAPI drives documents over the REST API (FR-50..FR-58,
+// FR-141, SC-54, SC-55).
 func TestDocumentsAPI(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
 		e := newAccountEnv(t, driver, db)
@@ -127,13 +127,13 @@ func TestDocumentsAPI(t *testing.T) {
 			t.Errorf("FR-1 does not name its documents: %d %s", status, out)
 		}
 
-		// FR-909: without documents:read only the identifiers show.
+		// FR-141: without documents:read only the identifiers show.
 		backlogOnly := token(access.Grants{access.Backlog: access.Read})
 		resp, out = do(backlogOnly, http.MethodGet, base+"/requirements/FR-1", "")
 		if resp.StatusCode != http.StatusOK || !strings.Contains(out, `"documents":[{"identifier":"DOC-1"}]`) {
 			t.Errorf("FR-1 for a token without documents:read: %d %s", resp.StatusCode, out)
 		}
-		// SC-404/405: documents need their scope, links the linked item's too.
+		// SC-54/405: documents need their scope, links the linked item's too.
 		if resp, _ := do(backlogOnly, http.MethodGet, base+"/documents/DOC-1", ""); resp.StatusCode != http.StatusForbidden {
 			t.Errorf("document read without the documents scope: %d", resp.StatusCode)
 		}

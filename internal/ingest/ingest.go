@@ -1,5 +1,5 @@
 // Package ingest turns test runner reports into test results for upload to a
-// Nexmap campaign (FR-409). Format-specific parsers live in subpackages; this
+// Nexmap campaign (FR-118). Format-specific parsers live in subpackages; this
 // package holds the shared result type, format detection and the dispatcher.
 //
 // It is part of the CLI and must not import server packages.

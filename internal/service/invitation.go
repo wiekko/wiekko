@@ -77,7 +77,7 @@ type CreateInvitationResult struct {
 
 // Create generates a new invitation whose link the inviter passes on. An
 // invitation to a product carries the role the new user gets there and
-// requires the owner role in that product (FR-305); an invitation without a
+// requires the owner role in that product (FR-77); an invitation without a
 // product requires an administrator.
 func (s *InvitationService) Create(ctx context.Context, inviter *model.User, email, productID, role string) (*CreateInvitationResult, error) {
 	email, err := s.authorize(ctx, inviter, email, productID, role)
@@ -88,7 +88,7 @@ func (s *InvitationService) Create(ctx context.Context, inviter *model.User, ema
 }
 
 // Send creates an invitation like Create and emails its link to the invited
-// address (SC-109). The link is not returned: only the mailbox owner gets it,
+// address (SC-36). The link is not returned: only the mailbox owner gets it,
 // so an account created from it has proven the address. Sending is limited
 // per inviter and per address. If the email cannot be sent, the invitation is
 // deleted again and ErrInvitationNotSent returned.

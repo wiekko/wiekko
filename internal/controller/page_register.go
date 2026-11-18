@@ -12,7 +12,7 @@ import (
 )
 
 // PageRegisterController serves the public account pages: self-registration
-// (FR-201, FR-203) and accepting an invitation (FR-202, FR-204, FR-305).
+// (FR-66, FR-68) and accepting an invitation (FR-67, FR-69, FR-77).
 type PageRegisterController struct {
 	users *service.UserService
 	login *PageLoginController

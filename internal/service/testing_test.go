@@ -30,7 +30,7 @@ func newTestingService(
 }
 
 // activeCampaign returns a campaign store whose GetByID yields an active
-// campaign, the state in which results are writable (FR-505).
+// campaign, the state in which results are writable (FR-124).
 func activeCampaign() *testutil.MockTestingCampaignStore {
 	return &testutil.MockTestingCampaignStore{
 		GetByIDFunc: func(_ context.Context, id string) (*model.TestingCampaign, error) {
@@ -423,7 +423,7 @@ func TestCreateCampaign(t *testing.T) {
 		if created == nil {
 			t.Fatal("campaign was not created")
 		}
-		// One result per linked environment (FR-021).
+		// One result per linked environment (FR-27).
 		if len(seeded) != 2 {
 			t.Fatalf("seeded %d results, want 2", len(seeded))
 		}
@@ -617,7 +617,7 @@ func TestCloseCampaign(t *testing.T) {
 		if updated == nil {
 			t.Fatal("campaign was not persisted")
 		}
-		// The audit entry must name the transition (FR-332).
+		// The audit entry must name the transition (FR-106).
 		if len(entries) != 1 {
 			t.Fatalf("recorded %d audit entries, want 1", len(entries))
 		}
@@ -654,7 +654,7 @@ func TestCloseCampaign(t *testing.T) {
 		if !errors.As(err, &incomplete) {
 			t.Fatalf("err = %v, want *IncompleteResultsError", err)
 		}
-		// Pending and blocked count; skipped does not (FR-041).
+		// Pending and blocked count; skipped does not (FR-47).
 		if incomplete.Incomplete != 2 {
 			t.Fatalf("Incomplete = %d, want 2", incomplete.Incomplete)
 		}
@@ -1005,7 +1005,7 @@ func TestMarkResultsForRetest(t *testing.T) {
 		if len(updated) != 1 {
 			t.Fatalf("updated %d results, want 1", len(updated))
 		}
-		// Never straight to passed — a tester must confirm (FR-504).
+		// Never straight to passed — a tester must confirm (FR-123).
 		if updated[0].Status != model.CampaignResultStatusRetest {
 			t.Fatalf("Status = %q, want %q", updated[0].Status, model.CampaignResultStatusRetest)
 		}

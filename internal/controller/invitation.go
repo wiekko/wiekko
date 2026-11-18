@@ -43,7 +43,7 @@ func (c *InvitationController) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateForProduct handles POST /products/{productId}/invitations: a product
-// owner invites a not-yet-registered user with a role (FR-305), as the team
+// owner invites a not-yet-registered user with a role (FR-77), as the team
 // page does.
 func (c *InvitationController) CreateForProduct(w http.ResponseWriter, r *http.Request) {
 	var req struct {

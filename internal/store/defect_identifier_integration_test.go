@@ -7,7 +7,7 @@ import (
 	"nexmap.net/internal/model"
 )
 
-// TestDefectIdentifiers covers defect numbering and identifiers (FR-043).
+// TestDefectIdentifiers covers defect numbering and identifiers (FR-49).
 func TestDefectIdentifiers(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
 		ctx := context.Background()

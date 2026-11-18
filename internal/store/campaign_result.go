@@ -80,7 +80,7 @@ func (s *campaignResultStore) Create(ctx context.Context, cr *model.CampaignResu
 }
 
 // CreateBatch seeds a campaign's result matrix in a single transaction, so a
-// campaign never ends up half-populated (FR-321). Each test case joining the
+// campaign never ends up half-populated (FR-94). Each test case joining the
 // campaign is copied into it first.
 func (s *campaignResultStore) CreateBatch(ctx context.Context, results []*model.CampaignResult) error {
 	if len(results) == 0 {

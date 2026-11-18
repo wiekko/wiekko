@@ -10,7 +10,7 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// SpecificationController serves the specification export (FR-905).
+// SpecificationController serves the specification export (FR-137).
 type SpecificationController struct {
 	spec *service.SpecificationService
 }
@@ -22,7 +22,7 @@ func NewSpecification(spec *service.SpecificationService) *SpecificationControll
 
 // Export handles GET /products/{productId}/specification[?tasks=true]
 // [&drafts=true]. Documents are listed when the token may read them; their
-// bodies are fetched from the documents endpoints (FR-907). The
+// bodies are fetched from the documents endpoints (FR-139). The
 // response is the Markdown document itself, not a JSON envelope; errors are
 // JSON like everywhere else.
 func (c *SpecificationController) Export(w http.ResponseWriter, r *http.Request) {

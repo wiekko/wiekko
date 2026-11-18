@@ -134,7 +134,7 @@ func (s *Session) ShowRequirement(ctx context.Context, ref string) (*Requirement
 		return nil, err
 	}
 
-	// Tasks take no part in traceability (FR-008d): no capabilities, tests.
+	// Tasks take no part in traceability (FR-13): no capabilities, tests.
 	if r.Kind != "task" {
 		links, err := s.C.RequirementCapabilityLinks(ctx, s.ProductID, r.ID)
 		if err != nil {

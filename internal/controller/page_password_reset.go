@@ -11,7 +11,7 @@ import (
 	login "nexmap.net/web/templates/pages/login"
 )
 
-// PagePasswordResetController serves the password reset pages (SC-110):
+// PagePasswordResetController serves the password reset pages (SC-37):
 // asking for a link, and choosing a new password through it. Both exist only
 // when the installation sends email; otherwise they answer 404 and the login
 // page keeps telling people to ask an administrator.

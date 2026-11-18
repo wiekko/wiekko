@@ -45,7 +45,7 @@ func minRoleForOwnerType(ownerType string) string {
 }
 
 // requireOwnerScope checks that a token may read the item a comment or
-// attachment belongs to (SC-405). The discussion scope itself is checked per
+// attachment belongs to (SC-55). The discussion scope itself is checked per
 // route. An empty owner type stands for items of every type.
 func requireOwnerScope(ctx context.Context, ownerType string) error {
 	r := access.FromContext(ctx)

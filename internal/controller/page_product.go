@@ -1549,7 +1549,7 @@ func (c *PageProductController) MilestoneOverviewTab(w http.ResponseWriter, r *h
 	_ = productpage.MilestoneOverviewTabContent(m).Render(r.Context(), w)
 }
 
-// --- Milestone link tabs (FR-013, FR-025, FR-029) ---
+// --- Milestone link tabs (FR-19, FR-31, FR-35) ---
 //
 // A milestone link is a nullable FK on the child entity, so linking is an
 // update of that column and unlinking clears it. Every write path requires
@@ -4640,7 +4640,7 @@ func (c *PageProductController) TestCaseCreate(w http.ResponseWriter, r *http.Re
 
 // syncTestCaseEnvironments reconciles a test case's environment links with the
 // submitted selection, adding and removing only what changed. The links decide
-// how many matrix columns a campaign seeds for this test case (FR-019).
+// how many matrix columns a campaign seeds for this test case (FR-25).
 func (c *PageProductController) syncTestCaseEnvironments(r *http.Request, user *model.User, productID, testCaseID string, want []string) error {
 	current, err := c.testing.ListTestCaseEnvironments(r.Context(), user, productID, testCaseID)
 	if err != nil {
@@ -5492,7 +5492,7 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 
 	// Load categories for prefix and name mapping.
 	// Merged across kinds: a requirement can be refined into child tasks
-	// (FR-326), so the children table has to resolve task prefixes too.
+	// (FR-100), so the children table has to resolve task prefixes too.
 	prefixes := c.buildBacklogPrefixMap(r, user, productID)
 	catNames := c.buildCategoryNameMap(r, user, productID, "requirement")
 
@@ -5862,7 +5862,7 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 	}
 
 	// Merged across kinds: a requirement can be refined into child tasks
-	// (FR-326), so the children table has to resolve task prefixes too.
+	// (FR-100), so the children table has to resolve task prefixes too.
 	prefixes := c.buildBacklogPrefixMap(r, user, productID)
 	catNames := c.buildCategoryNameMap(r, user, productID, "requirement")
 
@@ -6674,7 +6674,7 @@ func (c *PageProductController) RequirementHistoryTab(w http.ResponseWriter, r *
 
 // --- Defect Pages ---
 
-// defectsPageSize is the number of defects shown per page (UC-106). Fixed
+// defectsPageSize is the number of defects shown per page (UC-77). Fixed
 // rather than user-selectable: another dimension of URL state buys little when
 // sorting and filtering already narrow the list.
 const defectsPageSize = 50
@@ -7264,7 +7264,7 @@ func (c *PageProductController) DefectOverviewTab(w http.ResponseWriter, r *http
 	_ = productpage.DefectOverviewTabContent(c.buildDefectOverview(r, user, p, d)).Render(r.Context(), w)
 }
 
-// --- Defect link tabs (FR-023, FR-501) ---
+// --- Defect link tabs (FR-29, FR-120) ---
 
 // DefectComponentsTab renders GET /products/{id}/defects/{defectId}/tabs/components.
 func (c *PageProductController) DefectComponentsTab(w http.ResponseWriter, r *http.Request) {

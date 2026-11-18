@@ -6,10 +6,10 @@ Decisions behind the `nexmap` command line client and its MCP server: what was c
 
 The server binary embeds the web assets, templ output, both SQL drivers and the migrations. CI runners and
 agent sandboxes should download a small client instead, so the CLI is a separate binary. The CLI name
-matches the `nexmap utest` wording of FR-409; the server, previously `cmd/nexmap`, became `nexmapd`.
-AC-101 (the server ships as a single executable) still holds.
+matches the `nexmap utest` wording of FR-118; the server, previously `cmd/nexmap`, became `nexmapd`.
+AC-7 (the server ships as a single executable) still holds.
 
-The CLI is a pure REST client (AC-224) with no business logic of its own (AC-201). It must not import the
+The CLI is a pure REST client (AC-16) with no business logic of its own (AC-11). It must not import the
 server's `internal/store`, `internal/service`, `internal/database` or `web/` packages; `cmd/nexmap/deps_test.go`
 enforces this.
 
@@ -28,12 +28,12 @@ impractical.
 
 There is no `--token` flag, since a token on the command line leaks through shell history and process
 listings; `nexmap login` reads it from a hidden prompt or stdin. Password login is not offered: the CLI
-authenticates with personal access tokens only (SC-105).
+authenticates with personal access tokens only (SC-32).
 
 ## Plain HTTP only to the local machine
 
 `http://` servers are refused unless they are on the local machine, so a token never crosses the network
-unencrypted (SC-001). `--allow-http` overrides this deliberately.
+unencrypted (SC-26). `--allow-http` overrides this deliberately.
 
 ## Output does not depend on the terminal
 
@@ -74,7 +74,7 @@ categories; it shares the category prefixes' namespace so that no identifier is 
 ## The specification export is rendered by the server
 
 `nexmap export` fetches a finished Markdown document from `GET /products/{p}/specification` rather than
-assembling it from the list endpoints. Choosing what goes in and in which order is product logic (AC-201),
+assembling it from the list endpoints. Choosing what goes in and in which order is product logic (AC-11),
 one request is cheaper than dozens, and other clients of the REST API get the same document.
 
 The document is made for version control: categories in their configured order, items by number, the
@@ -83,7 +83,7 @@ whitespace, and no timestamp, status, priority or compliance state, all of which
 specification changing. An item is nested below its parent only within one category; across categories
 it stands alone and says which item it refines, so every item stays in its own category's section.
 
-There is no import (FR-906). Turning prose into formal requirements needs judgement that an AI agent
+There is no import (FR-138). Turning prose into formal requirements needs judgement that an AI agent
 brings and a parser does not; the agent creates items through the CLI or REST API, and the identifiers
 in an export let it update items instead of duplicating them.
 
@@ -91,7 +91,7 @@ in an export let it update items instead of duplicating them.
 
 The repository is private, so `go install nexmap.net/cmd/nexmap` cannot work for anyone else: the module
 is neither on a public proxy nor reachable through a `go-import` tag. The CLI is distributed as prebuilt
-archives on nexmap.net instead, with install scripts for sh and PowerShell (FR-910).
+archives on nexmap.net instead, with install scripts for sh and PowerShell (FR-142).
 
 The archives are built by the download site's own image (`site/`), which Coolify deploys from `stable`, the
 same way the documentation site is built. What is published is exactly what was tagged, built with the

@@ -14,7 +14,7 @@ import (
 
 // campaignRetester reopens campaign results for re-testing once the defect that
 // failed them is closed. Narrow interface so the backlog service does not depend
-// on the whole testing service (FR-504).
+// on the whole testing service (FR-123).
 type campaignRetester interface {
 	MarkResultsForRetest(ctx context.Context, defectID, userID string) error
 }
@@ -28,7 +28,7 @@ type BacklogService struct {
 	categories   store.CategoryStore
 	statuses     store.StatusStore
 	// products tells kanban from scrum products, which activate items
-	// differently (FR-318). nil is treated as scrum.
+	// differently (FR-91). nil is treated as scrum.
 	products store.ProductStore
 	comments ownerPurger
 	retester campaignRetester
@@ -120,7 +120,7 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		Estimation:       input.Estimation,
 		Priority:         input.Priority,
 		IsCoarse:         input.IsCoarse,
-		IsActive:         input.SprintID != "", // planning into a sprint activates (FR-318)
+		IsActive:         input.SprintID != "", // planning into a sprint activates (FR-91)
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -165,7 +165,7 @@ func (s *BacklogService) GetRequirement(ctx context.Context, user *model.User, p
 }
 
 // UpdateRequirement modifies a requirement. Developers can change the status of
-// an activated item (FR-407); activating it and full field updates require the
+// an activated item (FR-116); activating it and full field updates require the
 // owner role.
 func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User, productID, id string, input UpdateRequirementInput) (*model.Requirement, error) {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
@@ -674,7 +674,7 @@ func (s *BacklogService) CreateDefect(ctx context.Context, user *model.User, inp
 		EnvironmentID: input.EnvironmentID,
 		Estimation:    input.Estimation,
 		Priority:      input.Priority,
-		IsActive:      input.SprintID != "", // planning into a sprint activates (FR-318)
+		IsActive:      input.SprintID != "", // planning into a sprint activates (FR-91)
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -709,7 +709,7 @@ func (s *BacklogService) GetDefect(ctx context.Context, user *model.User, produc
 }
 
 // UpdateDefect modifies a defect. Developers can change the status of an
-// activated defect (FR-405, FR-407); activating it and full field updates
+// activated defect (FR-114, FR-116); activating it and full field updates
 // require the owner role.
 func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, productID, id string, input UpdateDefectInput) (*model.Defect, error) {
 	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
@@ -798,7 +798,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 		}
 		d.UpdatedAt = now
 
-		// Closing a defect re-queues the results it failed (FR-504). Both happen
+		// Closing a defect re-queues the results it failed (FR-123). Both happen
 		// or neither: a saved close whose re-test was lost could not be repeated,
 		// since the defect would no longer be "just closed".
 		err = inTx(ctx, s.tx, func(ctx context.Context) error {
@@ -828,7 +828,7 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 }
 
 // activationAfterSprintMove returns an item's is_active after its sprint changes
-// from oldSprintID to newSprintID (FR-318). Planning into a sprint, or moving
+// from oldSprintID to newSprintID (FR-91). Planning into a sprint, or moving
 // to another one, activates the item. Taking it out of a sprint deactivates it:
 // back in the backlog, it is the product owner's responsibility again. An
 // unchanged sprint (forms re-send it on every save) keeps the current state, as
@@ -840,11 +840,11 @@ func activationAfterSprintMove(oldSprintID, newSprintID string, isActive, explic
 	return newSprintID != ""
 }
 
-// requireActivatedForStatus enforces FR-407 for developers: they may change the
+// requireActivatedForStatus enforces FR-116 for developers: they may change the
 // status of a backlog item only if it was activated upfront. isActive is the
 // item's activation as read from the store: in kanban mode, whether its
 // current column is active; in scrum mode, the stored flag, set when the item
-// is planned into a sprint and cleared when it leaves one (FR-318). So a
+// is planned into a sprint and cleared when it leaves one (FR-91). So a
 // developer may move an item out of an active column to any column, but not
 // out of an inactive one. "Upfront" means the state before this update, so
 // activating and moving an item in the same request is refused. Re-sending the
@@ -860,7 +860,7 @@ func requireActivatedForStatus(kind string, isActive bool, currentStatusID strin
 }
 
 // checkActivationChange decides whether is_active may be set directly to
-// requested (FR-318). Re-sending the current value is not a change. Only
+// requested (FR-91). Re-sending the current value is not a change. Only
 // owners activate; in kanban mode not even they set the flag, since an item is
 // active exactly while it sits in an active column.
 func checkActivationChange(kind string, isDeveloper, kanban, current bool, requested *bool) error {
@@ -877,7 +877,7 @@ func checkActivationChange(kind string, isDeveloper, kanban, current bool, reque
 }
 
 // insertNumbered stores a new defect under the product's next defect number
-// (FR-043). The sequence lock makes concurrent inserts — parallel CI jobs
+// (FR-49). The sequence lock makes concurrent inserts — parallel CI jobs
 // filing defects for the same product — draw their numbers one after another
 // instead of colliding on the unique index. It joins the caller's
 // transaction, if any.

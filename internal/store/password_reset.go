@@ -10,7 +10,7 @@ import (
 )
 
 // PasswordResetStore defines data access operations for password reset
-// tokens (SC-110). Callers pass and receive token hashes, never raw tokens.
+// tokens (SC-37). Callers pass and receive token hashes, never raw tokens.
 type PasswordResetStore interface {
 	Create(ctx context.Context, t *model.PasswordResetToken) error
 	GetByTokenHash(ctx context.Context, hash string) (*model.PasswordResetToken, error)

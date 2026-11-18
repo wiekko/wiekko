@@ -16,7 +16,7 @@ type ProductSummary struct {
 	ActiveDefects    int
 	CurrentSprint    string // name of the active sprint, or ""
 	// TwoFactorLocked is set when the product requires 2FA and the user has
-	// not set it up; the counts above are left empty then (SC-107).
+	// not set it up; the counts above are left empty then (SC-34).
 	TwoFactorLocked bool
 }
 

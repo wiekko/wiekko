@@ -1,7 +1,7 @@
 package cli_test
 
-// `nexmap doc` and the documents in `nexmap export` (FR-044..FR-052,
-// FR-907..FR-909) against the seeded Aviary product.
+// `nexmap doc` and the documents in `nexmap export` (FR-50..FR-58,
+// FR-139..FR-141) against the seeded Aviary product.
 
 import (
 	"encoding/json"
@@ -79,7 +79,7 @@ func TestE2EDocuments(t *testing.T) {
 		t.Errorf("doc get = %q", got)
 	}
 
-	// Links, named on the requirement too (FR-909).
+	// Links, named on the requirement too (FR-141).
 	d = decode[docView](t, e.mustRun("", "doc", "link", ref, "FR-1", "-o", "json").stdout)
 	if len(d.Requirements) != 1 || d.Requirements[0].Identifier != "FR-1" {
 		t.Fatalf("linked = %+v", d)

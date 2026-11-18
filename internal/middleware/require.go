@@ -66,7 +66,7 @@ func RequireAdmin(next http.Handler) http.Handler {
 }
 
 // RequireScopes rejects token-authenticated requests whose token lacks one of
-// the given scopes (SC-404) with 403 TOKEN_SCOPE. Session requests are not
+// the given scopes (SC-54) with 403 TOKEN_SCOPE. Session requests are not
 // restricted and pass through.
 func RequireScopes(need ...access.Need) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

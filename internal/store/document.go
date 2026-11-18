@@ -42,7 +42,7 @@ var documentLinkTables = map[string][2]string{
 	model.DocumentLinkTestCase:    {"test_case_documents", "test_case_id"},
 }
 
-// DocumentStore defines data access operations for documents (FR-044..FR-052).
+// DocumentStore defines data access operations for documents (FR-50..FR-58).
 type DocumentStore interface {
 	// Create inserts the document together with its first revision.
 	Create(ctx context.Context, d *model.Document, rev *model.DocumentRevision) error
@@ -50,7 +50,7 @@ type DocumentStore interface {
 	GetBySequence(ctx context.Context, productID string, seq int) (*model.Document, error)
 	NextSequenceNumber(ctx context.Context, productID string) (int, error)
 	// Update writes the document's fields. When rev is not nil, the revision
-	// is inserted in the same transaction (FR-051).
+	// is inserted in the same transaction (FR-57).
 	Update(ctx context.Context, d *model.Document, rev *model.DocumentRevision) error
 	Delete(ctx context.Context, id string) error
 	ListPageByProductID(ctx context.Context, productID string, filter DocumentFilter, params ListParams) ([]*model.Document, error)
@@ -326,7 +326,7 @@ func (s *documentStore) list(ctx context.Context, query string, args ...any) ([]
 }
 
 // documentFrom joins the product for the identifier prefix, so every read
-// yields the identifier with the prefix currently configured (FR-050).
+// yields the identifier with the prefix currently configured (FR-56).
 const documentFrom = ` FROM documents d JOIN products p ON d.product_id = p.id`
 
 // documentColumns lists the columns scanDocument reads; without the body, an

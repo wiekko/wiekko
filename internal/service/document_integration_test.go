@@ -18,7 +18,7 @@ import (
 func strp(s string) *string { return &s }
 
 // TestDocuments drives documents through the service layer on every engine
-// (FR-044..FR-052, FR-334, FR-335).
+// (FR-50..FR-58, FR-108, FR-109).
 func TestDocuments(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, driver string, conn *sql.DB) {
 		ctx := context.Background()
@@ -171,7 +171,7 @@ func TestDocuments(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// The three kinds of prefix stay apart (FR-050).
+		// The three kinds of prefix stay apart (FR-56).
 		if _, err := svc.Product.Update(ctx, owner, pid, service.UpdateProductInput{DocumentPrefix: strp("df")}); err == nil {
 			t.Error("documents took the defect prefix")
 		}
@@ -191,7 +191,7 @@ func TestDocuments(t *testing.T) {
 			t.Errorf("identifier after renaming = %q", got.Identifier)
 		}
 
-		// Comments need the documents scope on a token (SC-405).
+		// Comments need the documents scope on a token (SC-55).
 		readOnly := access.WithRestriction(ctx, &access.Restriction{Grants: access.Grants{access.Discussion: access.Write}})
 		if _, err := svc.Discussion.CreateComment(readOnly, owner, pid, model.OwnerTypeDocument, d.ID, "hi"); !errors.Is(err, service.ErrForbidden) {
 			t.Errorf("comment without the documents scope: %v", err)

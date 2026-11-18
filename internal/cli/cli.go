@@ -1,5 +1,5 @@
 // Package cli implements the nexmap command line client. It talks to a Nexmap
-// server exclusively through internal/client (AC-224) and never imports server
+// server exclusively through internal/client (AC-16) and never imports server
 // packages.
 package cli
 

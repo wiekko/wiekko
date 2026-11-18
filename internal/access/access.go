@@ -1,5 +1,5 @@
 // Package access models the restrictions a personal access token can carry
-// (SC-401 – SC-409): the products it reaches, a cap on the role it acts with,
+// (SC-51 – SC-59): the products it reaches, a cap on the role it acts with,
 // and the scopes it may read or write. It is shared by the middleware, which
 // enforces scopes per route, and the services, which enforce products, the
 // role cap and the scopes of comment and attachment owners.
@@ -114,7 +114,7 @@ func (g Grants) String() string {
 }
 
 // FullAccess grants write on every product scope, but not Account or Admin,
-// which a token only receives when asked for explicitly (SC-406).
+// which a token only receives when asked for explicitly (SC-56).
 func FullAccess() Grants {
 	g := Grants{}
 	for _, sc := range ProductScopes {
@@ -123,7 +123,7 @@ func FullAccess() Grants {
 	return g
 }
 
-// Preset is a named set of grants offered when creating a token (SC-408).
+// Preset is a named set of grants offered when creating a token (SC-58).
 type Preset struct {
 	Name   string
 	Label  string
@@ -196,7 +196,7 @@ func (r *Restriction) CapRole(role string) string {
 	return role
 }
 
-// SubsetOf reports whether r grants nothing that o does not (SC-406). Any
+// SubsetOf reports whether r grants nothing that o does not (SC-56). Any
 // restriction is a subset of no restriction.
 func (r *Restriction) SubsetOf(o *Restriction) bool {
 	if o == nil {
@@ -249,7 +249,7 @@ func (r *Restriction) Missing(needs []Need) (Need, bool) {
 }
 
 // ScopeForOwnerType returns the scope of an item that carries comments and
-// attachments (SC-405).
+// attachments (SC-55).
 func ScopeForOwnerType(ownerType string) Scope {
 	switch ownerType {
 	case model.OwnerTypeRequirement, model.OwnerTypeTask, model.OwnerTypeConstraint:

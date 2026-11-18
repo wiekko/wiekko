@@ -10,9 +10,9 @@ import (
 	"nexmap.net/internal/client"
 )
 
-// Documents (FR-044..FR-052, FR-908): long-form texts that define part of
+// Documents (FR-50..FR-58, FR-140): long-form texts that define part of
 // the product, such as protocols and schemas. Nexmap is their source; files
-// in a repository are written from it (FR-045, FR-907).
+// in a repository are written from it (FR-51, FR-139).
 
 // DocumentSummary is one row of a document list.
 type DocumentSummary struct {
@@ -65,7 +65,7 @@ func documentSummary(d client.Document) DocumentSummary {
 		State: d.State, Revision: d.Revision, File: d.FileName, UpdatedAt: d.UpdatedAt}
 }
 
-// documentRefs turns the documents named on an item into refs (FR-909).
+// documentRefs turns the documents named on an item into refs (FR-141).
 func documentRefs(list []client.DocumentRef) []Ref {
 	out := make([]Ref, 0, len(list))
 	for _, d := range list {
@@ -224,7 +224,7 @@ func optional(s string) *string {
 	return &s
 }
 
-// CreateDocument creates a document (owner role, FR-334).
+// CreateDocument creates a document (owner role, FR-108).
 func (s *Session) CreateDocument(ctx context.Context, in NewDocument) (*DocumentDetail, error) {
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
@@ -253,7 +253,7 @@ func (s *Session) CreateDocument(ctx context.Context, in NewDocument) (*Document
 }
 
 // DocumentChange updates a document; omitted fields stay as they are. A
-// change to title, body or format creates a new revision (FR-051).
+// change to title, body or format creates a new revision (FR-57).
 type DocumentChange struct {
 	Ref          string  `json:"ref" jsonschema:"the document, e.g. DOC-3"`
 	Title        *string `json:"title,omitempty" jsonschema:"new title"`
@@ -266,7 +266,7 @@ type DocumentChange struct {
 	SupersededBy *string `json:"superseded_by,omitempty" jsonschema:"the replacing document, e.g. DOC-4; empty clears it"`
 }
 
-// UpdateDocument changes a document (owner role, FR-334).
+// UpdateDocument changes a document (owner role, FR-108).
 func (s *Session) UpdateDocument(ctx context.Context, in DocumentChange) (*DocumentDetail, error) {
 	d, err := s.document(ctx, in.Ref)
 	if err != nil {
@@ -309,7 +309,7 @@ type DocumentLinks struct {
 	Unlink   bool     `json:"-"`
 }
 
-// LinkDocument links (or unlinks) a document (owner role, FR-334).
+// LinkDocument links (or unlinks) a document (owner role, FR-108).
 func (s *Session) LinkDocument(ctx context.Context, in DocumentLinks) (*DocumentDetail, error) {
 	if len(in.Items) == 0 {
 		return nil, errors.New("name at least one requirement, constraint or test case, e.g. FR-12")
@@ -418,7 +418,7 @@ type RestoreRevision struct {
 	Revision int    `json:"revision" jsonschema:"the revision whose content becomes current again, as a new revision"`
 }
 
-// RestoreDocument restores a revision (owner role, FR-051).
+// RestoreDocument restores a revision (owner role, FR-57).
 func (s *Session) RestoreDocument(ctx context.Context, in RestoreRevision) (*DocumentDetail, error) {
 	if in.Revision < 1 {
 		return nil, errors.New("name the revision to restore")
@@ -497,7 +497,7 @@ func (s *Session) ExportedDocumentFiles(ctx context.Context, drafts bool) ([]Doc
 	return files, nil
 }
 
-// extensionOf mirrors the server's format → extension mapping (FR-907).
+// extensionOf mirrors the server's format → extension mapping (FR-139).
 func extensionOf(format string) string {
 	switch format {
 	case "markdown":

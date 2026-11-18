@@ -740,7 +740,7 @@ func (s *seeder) aviaryCampaigns(p *productSeed) {
 	)
 
 	// Closing a defect moves the results it failed into re-test, which is the
-	// flow FR-504 describes. Doing it here rather than at defect creation time
+	// flow FR-123 describes. Doing it here rather than at defect creation time
 	// means there are results for it to act on.
 	//
 	// The photo defect belongs to the campaign that is still running, so its

@@ -12,7 +12,7 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// TestScopedTwoFactorEnforcement drives the product and role rules of SC-107
+// TestScopedTwoFactorEnforcement drives the product and role rules of SC-34
 // over HTTP: a product that requires 2FA keeps members without it out of
 // itself only, tokens are exempt, and a role rule forces enrollment.
 func TestScopedTwoFactorEnforcement(t *testing.T) {

@@ -1,5 +1,9 @@
 # Requirements & Constraints
 
+> **Superseded.** These requirements and constraints now live in Nexmap (see `CONTRIBUTING.md`), with new
+> identifiers. Code and docs use the Nexmap identifiers; each item in Nexmap names its identifier from
+> this file as its legacy ID. This file is no longer maintained.
+
 This document defines both **requirements** (implementable work items) and **constraints** (ongoing rules that are either met or violated). Requirements represent discrete deliverables that move through a workflow. Constraints define boundaries and standards that must be maintained throughout the product lifecycle.
 
 Both requirements and constraints belong to configurable **categories** (e.g. Functionality/FR, Architecture/AC). Categories are defined per product and per entity type, each with a name and prefix used for human-readable identifiers.

@@ -36,7 +36,7 @@ func (c StatusChange) validate() error {
 }
 
 // SetRequirementStatus moves a requirement or task to another status
-// (developer role, FR-407).
+// (developer role, FR-116).
 func (s *Session) SetRequirementStatus(ctx context.Context, in StatusChange) (*RequirementDetail, error) {
 	if err := in.validate(); err != nil {
 		return nil, err
@@ -114,8 +114,8 @@ type NewBacklogItem struct {
 	DefinitionOfDone string `json:"definition_of_done,omitempty" jsonschema:"Markdown definition of done"`
 }
 
-// CreateBacklogItem creates a requirement or task (owner role, FR-308a and
-// FR-326). Kind defaults to task: splitting work is the common agent case.
+// CreateBacklogItem creates a requirement or task (owner role, FR-81 and
+// FR-100). Kind defaults to task: splitting work is the common agent case.
 func (s *Session) CreateBacklogItem(ctx context.Context, in NewBacklogItem) (*RequirementDetail, error) {
 	kind := strings.ToLower(strings.TrimSpace(in.Kind))
 	if kind == "" {

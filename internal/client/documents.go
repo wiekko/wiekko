@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// Document is a long-form reference text of a product (FR-044).
+// Document is a long-form reference text of a product (FR-50).
 type Document struct {
 	ID             string `json:"id"`
 	Identifier     string `json:"identifier"` // e.g. "DOC-3"
@@ -23,13 +23,13 @@ type Document struct {
 	CapabilityID   string `json:"capability_id"`
 	MilestoneID    string `json:"milestone_id"`
 	Revision       int    `json:"revision"`
-	FileName       string `json:"file_name"` // e.g. "DOC-3.md" (FR-907)
+	FileName       string `json:"file_name"` // e.g. "DOC-3.md" (FR-139)
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
 }
 
 // DocumentRef names a document linked to a requirement, constraint or test
-// case (FR-909). Without the documents scope only Identifier is set.
+// case (FR-141). Without the documents scope only Identifier is set.
 type DocumentRef struct {
 	ID         string `json:"id,omitempty"`
 	Identifier string `json:"identifier"`
@@ -37,7 +37,7 @@ type DocumentRef struct {
 	State      string `json:"state,omitempty"`
 }
 
-// DocumentRevision is one revision of a document (FR-051).
+// DocumentRevision is one revision of a document (FR-57).
 type DocumentRevision struct {
 	Revision  int    `json:"revision"`
 	Title     string `json:"title"`
@@ -146,7 +146,7 @@ type DocumentCreate struct {
 	MilestoneID    string `json:"milestone_id,omitempty"`
 }
 
-// CreateDocument creates a document (owner role, FR-334).
+// CreateDocument creates a document (owner role, FR-108).
 func (c *Client) CreateDocument(ctx context.Context, productID string, in DocumentCreate) (*Document, error) {
 	return send[Document](ctx, c, http.MethodPost, productPath(productID, "documents"), in)
 }

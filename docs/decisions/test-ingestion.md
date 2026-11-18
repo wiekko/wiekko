@@ -7,26 +7,26 @@ Decisions behind recording automated test results in testing campaigns (`nexmap 
 ## A dedicated upload endpoint
 
 Campaign results could already be set one by one, but that endpoint requires a defect for every failure
-(FR-502) and knows nothing about test identifiers. A whole run is therefore uploaded in one request to a
+(FR-121) and knows nothing about test identifiers. A whole run is therefore uploaded in one request to a
 dedicated endpoint, which maps identifiers to automatic test cases on the server. Matching happens in
 memory against the product's automatic test cases; manual test cases are never touched.
 
 ## Failures create or reuse a defect
 
-FR-502 requires a defect for every failed result. For automated runs, the server creates one per failing
+FR-121 requires a defect for every failed result. For automated runs, the server creates one per failing
 test, titled *Automated test failed: \<identifier\>*, with the run metadata and the test's captured
 output (the last 64 KiB, where the assertion usually is). An open defect already recorded on the result is
 reused instead. Defects are filed through the same service as manual ones, so they get the default
 status, audit entries and validation.
 
-This keeps the FR-504 loop working without anyone in the web UI: closing the defect moves the result to
+This keeps the FR-123 loop working without anyone in the web UI: closing the defect moves the result to
 re-test, and the next green run marks it passed.
 
 ## No active campaign: accept and discard
 
 An upload when no campaign is active is accepted and nothing is written: no results, no events, no
 defects. CI does not break between campaigns, and the data model stays unchanged (results exist only
-inside a campaign, FR-505).
+inside a campaign, FR-124).
 
 Defects are only created for results that are actually recorded. A failure that is discarded (no active
 campaign, unknown identifier, test case outside the campaign) creates none, because an automated defect
@@ -36,7 +36,7 @@ Such failures are still reported back and printed in the build log.
 ## Unchanged results are not written again
 
 A result whose status did not change since the last run is skipped, so repeated CI runs do not flood the
-result history (FR-042) with identical events.
+result history (FR-48) with identical events.
 
 ## No single transaction
 

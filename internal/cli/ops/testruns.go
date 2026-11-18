@@ -35,7 +35,7 @@ type SyncResult struct {
 }
 
 // TestSync describes which test cases SyncTestCases creates and where it
-// files them (FR-409a).
+// files them (FR-119).
 type TestSync struct {
 	// Identifiers are the test identifiers of a run. The MCP tool may give a
 	// Report instead, which is parsed like `nexmap test sync` input.
@@ -51,7 +51,7 @@ type TestSync struct {
 
 // SyncTestCases creates an automatic test case for every identifier that has
 // none yet (developer role), so a repository can bootstrap its test catalogue
-// from a test run (FR-409a). Subtests roll up into their parent and get no
+// from a test run (FR-119). Subtests roll up into their parent and get no
 // test case of their own. Every option is resolved before the first test case
 // is created, so a bad name creates nothing.
 func (s *Session) SyncTestCases(ctx context.Context, in TestSync) (*SyncResult, error) {

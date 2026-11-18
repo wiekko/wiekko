@@ -10,7 +10,7 @@ import (
 )
 
 // Writes to the product structure, constraints and traceability links
-// (FR-902, FR-903). Like the other writes, names and identifiers are resolved
+// (FR-134, FR-135). Like the other writes, names and identifiers are resolved
 // before the first request, and every operation returns the view the
 // matching show operation returns.
 
@@ -56,7 +56,7 @@ type NewComponent struct {
 	Description string `json:"description,omitempty" jsonschema:"Markdown description"`
 }
 
-// CreateComponent creates a component (owner role, FR-307).
+// CreateComponent creates a component (owner role, FR-79).
 func (s *Session) CreateComponent(ctx context.Context, in NewComponent) (*ComponentView, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
@@ -77,7 +77,7 @@ type ComponentChange struct {
 	Description *string `json:"description,omitempty" jsonschema:"new Markdown description; empty clears it"`
 }
 
-// UpdateComponent changes a component (owner role, FR-307).
+// UpdateComponent changes a component (owner role, FR-79).
 func (s *Session) UpdateComponent(ctx context.Context, in ComponentChange) (*ComponentView, error) {
 	if in.Name == nil && in.Description == nil {
 		return nil, errors.New("nothing to change: give a new name or description")
@@ -99,7 +99,7 @@ func (s *Session) UpdateComponent(ctx context.Context, in ComponentChange) (*Com
 }
 
 // DeleteComponent deletes a component (owner role). Its capabilities stay,
-// without a component. Not offered via MCP (FR-904).
+// without a component. Not offered via MCP (FR-136).
 func (s *Session) DeleteComponent(ctx context.Context, ref string) (*Ref, error) {
 	c, err := s.findComponent(ctx, ref)
 	if err != nil {
@@ -119,7 +119,7 @@ type NewCapability struct {
 	Description string `json:"description,omitempty" jsonschema:"Markdown description"`
 }
 
-// CreateCapability creates a capability (owner role, FR-307).
+// CreateCapability creates a capability (owner role, FR-79).
 func (s *Session) CreateCapability(ctx context.Context, in NewCapability) (*CapabilityDetail, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
@@ -149,7 +149,7 @@ type CapabilityChange struct {
 	Description *string `json:"description,omitempty" jsonschema:"new Markdown description; empty clears it"`
 }
 
-// UpdateCapability changes a capability (owner role, FR-307).
+// UpdateCapability changes a capability (owner role, FR-79).
 func (s *Session) UpdateCapability(ctx context.Context, in CapabilityChange) (*CapabilityDetail, error) {
 	if in.Name == nil && in.Component == nil && in.Description == nil {
 		return nil, errors.New("nothing to change: give a new name, component or description")
@@ -183,7 +183,7 @@ func (s *Session) UpdateCapability(ctx context.Context, in CapabilityChange) (*C
 }
 
 // DeleteCapability deletes a capability (owner role). Not offered via MCP
-// (FR-904).
+// (FR-136).
 func (s *Session) DeleteCapability(ctx context.Context, ref string) (*Ref, error) {
 	c, err := s.findCapability(ctx, ref)
 	if err != nil {
@@ -206,7 +206,7 @@ type CapabilityLinks struct {
 }
 
 // LinkCapability links (or unlinks) requirements and constraints to a
-// capability (owner role; FR-005a, FR-038). Every item is resolved before
+// capability (owner role; FR-6, FR-44). Every item is resolved before
 // the first change, so a bad identifier changes nothing.
 func (s *Session) LinkCapability(ctx context.Context, in CapabilityLinks) (*CapabilityDetail, error) {
 	if len(in.Items) == 0 {
@@ -277,8 +277,8 @@ type TestCaseLinks struct {
 	Unlink bool `json:"-"`
 }
 
-// LinkTestCase links (or unlinks) a test case (developer role; FR-015,
-// FR-016).
+// LinkTestCase links (or unlinks) a test case (developer role; FR-21,
+// FR-22).
 func (s *Session) LinkTestCase(ctx context.Context, in TestCaseLinks) (*TestCaseDetail, error) {
 	if in.Requirement == "" && in.Capability == "" && in.Component == "" {
 		return nil, errors.New("name a requirement, capability or component")
@@ -360,7 +360,7 @@ type NewConstraint struct {
 	Compliance  string `json:"compliance,omitempty" jsonschema:"not_assessed (default), met or violated"`
 }
 
-// CreateConstraint creates a constraint (owner role, FR-330, FR-903).
+// CreateConstraint creates a constraint (owner role, FR-104, FR-135).
 func (s *Session) CreateConstraint(ctx context.Context, in NewConstraint) (*ConstraintDetail, error) {
 	if strings.TrimSpace(in.Title) == "" {
 		return nil, errors.New("a title is required")
@@ -390,10 +390,10 @@ type ConstraintChange struct {
 	Title       *string `json:"title,omitempty" jsonschema:"new title"`
 	Category    *string `json:"category,omitempty" jsonschema:"new category prefix or name; the identifier changes with it"`
 	Description *string `json:"description,omitempty" jsonschema:"new Markdown description; empty clears it"`
-	Compliance  *string `json:"compliance,omitempty" jsonschema:"not_assessed, met or violated (FR-037)"`
+	Compliance  *string `json:"compliance,omitempty" jsonschema:"not_assessed, met or violated (FR-43)"`
 }
 
-// UpdateConstraint changes a constraint (owner role, FR-330, FR-903).
+// UpdateConstraint changes a constraint (owner role, FR-104, FR-135).
 func (s *Session) UpdateConstraint(ctx context.Context, in ConstraintChange) (*ConstraintDetail, error) {
 	if in.Title == nil && in.Category == nil && in.Description == nil && in.Compliance == nil {
 		return nil, errors.New("nothing to change: give a title, category, description or compliance state")

@@ -18,13 +18,13 @@ type TestingController struct {
 }
 
 // UseDocuments makes single-item responses name the documents linked to the
-// item (FR-909).
+// item (FR-141).
 func (c *TestingController) UseDocuments(docs *service.DocumentService) { c.documents = docs }
 
 // NewTesting creates a TestingController.
 //
 // defectRef resolves defect identifiers given for a campaign result's defect
-// (FR-043); nil accepts IDs only.
+// (FR-49); nil accepts IDs only.
 func NewTesting(testing *service.TestingService, defectRef refResolver) *TestingController {
 	return &TestingController{testing: testing, defectRef: defectRef}
 }
@@ -527,7 +527,7 @@ func (c *TestingController) ActivateCampaign(w http.ResponseWriter, r *http.Requ
 }
 
 // AddCampaignTestCases handles POST /products/{productId}/campaigns/{id}/test-cases:
-// it adds test cases to a draft campaign's scope (FR-321).
+// it adds test cases to a draft campaign's scope (FR-94).
 func (c *TestingController) AddCampaignTestCases(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
@@ -556,7 +556,7 @@ func (c *TestingController) AddCampaignTestCases(w http.ResponseWriter, r *http.
 }
 
 // RemoveCampaignTestCase handles DELETE /products/{productId}/campaigns/{id}/test-cases/{testCaseId}:
-// it takes a test case out of a draft campaign's scope (FR-321).
+// it takes a test case out of a draft campaign's scope (FR-94).
 func (c *TestingController) RemoveCampaignTestCase(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	if err := c.testing.RemoveCampaignTestCase(r.Context(), user, r.PathValue("productId"), r.PathValue("id"), r.PathValue("testCaseId")); err != nil {

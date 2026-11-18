@@ -1,4 +1,4 @@
-// Package specdoc renders a product specification as Markdown (FR-905): the
+// Package specdoc renders a product specification as Markdown (FR-137): the
 // product structure, constraints, requirements and, on request, tasks, in
 // the style of docs/spec/requirements.md.
 //
@@ -22,7 +22,7 @@ type Document struct {
 	Components   []Component
 	Capabilities []Capability
 
-	// Documents is nil when documents were not exported (FR-907), and
+	// Documents is nil when documents were not exported (FR-139), and
 	// rendered only then. Their bodies are exported as files of their own.
 	Documents []DocumentEntry
 
@@ -66,7 +66,7 @@ type Item struct {
 	Children  []Item
 }
 
-// DocumentEntry lists one document of the specification (FR-907).
+// DocumentEntry lists one document of the specification (FR-139).
 type DocumentEntry struct {
 	Identifier string // e.g. DOC-3
 	Title      string

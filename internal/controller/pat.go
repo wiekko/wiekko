@@ -43,7 +43,7 @@ func (c *PATController) List(w http.ResponseWriter, r *http.Request) {
 //
 // Without "scopes" the token gets write access to all product data;
 // "products" restricts it to the listed products, and "role_cap" caps the
-// role it acts with (SC-401 – SC-406).
+// role it acts with (SC-51 – SC-56).
 func (c *PATController) Create(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 

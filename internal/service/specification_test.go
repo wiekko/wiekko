@@ -43,7 +43,7 @@ func TestBuildSections(t *testing.T) {
 }
 
 func TestBuildSectionsSurvivesACycle(t *testing.T) {
-	// Parent links cannot form a cycle (FR-008c); a corrupt one must still
+	// Parent links cannot form a cycle (FR-12); a corrupt one must still
 	// render rather than recurse forever. Items in a pure cycle have no root,
 	// so they drop out instead of looping.
 	cats := []*model.Category{{ID: "fr", Name: "Functionality", Prefix: "FR"}}

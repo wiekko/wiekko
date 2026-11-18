@@ -34,7 +34,7 @@ func exportCommand() *command {
 			fs.BoolVar(&tasks, "tasks", false, "include tasks")
 			fs.BoolVar(&drafts, "drafts", false, "include draft documents")
 			fs.StringVar(&file, "file", "", "write the specification to this file instead of stdout")
-			fs.StringVar(&documents, "documents", "", "write each listed document's content to its own file in this directory (FR-907)")
+			fs.StringVar(&documents, "documents", "", "write each listed document's content to its own file in this directory (FR-139)")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if err := noArgs("export", args); err != nil {
@@ -80,7 +80,7 @@ func exportCommand() *command {
 }
 
 // writeDocumentFiles writes the bodies of the documents the specification
-// lists into dir, byte for byte, one file each (FR-907). File names come from
+// lists into dir, byte for byte, one file each (FR-139). File names come from
 // ops.ExportedDocumentFiles, which checks them against the identifier
 // pattern, and are joined to dir only after filepath.Base: nothing the server
 // sends can place a file outside dir.

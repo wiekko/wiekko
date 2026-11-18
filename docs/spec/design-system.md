@@ -2,7 +2,7 @@
 
 ## Color Scheme
 
-All colors use standard Tailwind CSS palettes. The tables below give the light mode values; dark mode (UC-009) uses Tailwind's `dark:` variant on the same palettes.
+All colors use standard Tailwind CSS palettes. The tables below give the light mode values; dark mode (UC-68) uses Tailwind's `dark:` variant on the same palettes.
 
 ### Primary: Indigo
 

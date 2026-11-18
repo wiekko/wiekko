@@ -1,4 +1,4 @@
--- Product: top-level entity (FR-001)
+-- Product: top-level entity (FR-1)
 CREATE TABLE IF NOT EXISTS products (
     id              UUID PRIMARY KEY,
     name            TEXT NOT NULL UNIQUE,
@@ -6,19 +6,19 @@ CREATE TABLE IF NOT EXISTS products (
     estimation_mode TEXT NOT NULL DEFAULT 'disabled',
     workflow_mode   TEXT NOT NULL DEFAULT 'kanban',
     status_sync    BOOLEAN NOT NULL DEFAULT TRUE,
-    -- Prefix of defect identifiers such as DF-17 (FR-043). Unique within the
+    -- Prefix of defect identifiers such as DF-17 (FR-49). Unique within the
     -- product together with the category prefixes, see categories.
     defect_prefix   TEXT NOT NULL DEFAULT 'DF',
-    -- Prefix of document identifiers such as DOC-3 (FR-050). Unique within
+    -- Prefix of document identifiers such as DOC-3 (FR-56). Unique within
     -- the product together with the defect and category prefixes.
     document_prefix TEXT NOT NULL DEFAULT 'DOC',
-    -- Members must have 2FA set up to reach the product (SC-107).
+    -- Members must have 2FA set up to reach the product (SC-34).
     two_factor_required BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL,
     updated_at      TIMESTAMPTZ NOT NULL
 );
 
--- Product roles: relocated from 00002 with proper FK (SC-201..SC-206)
+-- Product roles: relocated from 00002 with proper FK (SC-39..SC-44)
 CREATE TABLE IF NOT EXISTS product_roles (
     id         UUID PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS product_roles (
 CREATE INDEX IF NOT EXISTS idx_product_roles_user_id ON product_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_product_roles_product_id ON product_roles(product_id);
 
--- Products a restricted personal access token reaches (SC-402). Deleting a
+-- Products a restricted personal access token reaches (SC-52). Deleting a
 -- product removes it here while the token stays restricted, so the token
 -- reaches less rather than more.
 CREATE TABLE IF NOT EXISTS personal_access_token_products (
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS personal_access_token_products (
 );
 CREATE INDEX IF NOT EXISTS idx_pat_products_product_id ON personal_access_token_products(product_id);
 
--- Milestones: product roadmap (FR-011, FR-012)
+-- Milestones: product roadmap (FR-17, FR-18)
 CREATE TABLE IF NOT EXISTS milestones (
     id          UUID PRIMARY KEY,
     product_id  UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS milestones (
 );
 CREATE INDEX IF NOT EXISTS idx_milestones_product_id ON milestones(product_id);
 
--- Components: product decomposition (FR-002)
+-- Components: product decomposition (FR-2)
 CREATE TABLE IF NOT EXISTS components (
     id           UUID PRIMARY KEY,
     product_id   UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS components (
 CREATE INDEX IF NOT EXISTS idx_components_product_id ON components(product_id);
 CREATE INDEX IF NOT EXISTS idx_components_milestone_id ON components(milestone_id);
 
--- Capabilities: linked to components or top-level (FR-003, FR-004)
+-- Capabilities: linked to components or top-level (FR-3, FR-4)
 CREATE TABLE IF NOT EXISTS capabilities (
     id           UUID PRIMARY KEY,
     product_id   UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -82,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_capabilities_product_id ON capabilities(product_i
 CREATE INDEX IF NOT EXISTS idx_capabilities_component_id ON capabilities(component_id);
 CREATE INDEX IF NOT EXISTS idx_capabilities_milestone_id ON capabilities(milestone_id);
 
--- Configurable statuses for requirements and defects (FR-323)
+-- Configurable statuses for requirements and defects (FR-96)
 CREATE TABLE IF NOT EXISTS statuses (
     id          UUID PRIMARY KEY,
     product_id  UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS statuses (
     position    INTEGER NOT NULL DEFAULT 0,
     is_default  BOOLEAN NOT NULL DEFAULT FALSE,
     is_closed   BOOLEAN NOT NULL DEFAULT FALSE,
-    -- Kanban: items in an active column are activated for work (FR-318, FR-323a)
+    -- Kanban: items in an active column are activated for work (FR-91, FR-97)
     is_active   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ NOT NULL,
     UNIQUE(product_id, entity_type, name)
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 CREATE INDEX IF NOT EXISTS idx_categories_product_id ON categories(product_id, entity_type);
 
--- Sprints: time-boxed iterations (FR-028, FR-029)
+-- Sprints: time-boxed iterations (FR-34, FR-35)
 CREATE TABLE IF NOT EXISTS sprints (
     id           UUID PRIMARY KEY,
     product_id   UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -130,10 +130,10 @@ CREATE TABLE IF NOT EXISTS sprints (
 );
 CREATE INDEX IF NOT EXISTS idx_sprints_product_id ON sprints(product_id);
 CREATE INDEX IF NOT EXISTS idx_sprints_milestone_id ON sprints(milestone_id);
--- At most one active sprint per product (FR-318), like campaigns below.
+-- At most one active sprint per product (FR-91), like campaigns below.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sprints_active ON sprints(product_id) WHERE status = 'active';
 
--- Requirements: backlog items (FR-005..FR-010, FR-013)
+-- Requirements: backlog items (FR-5..FR-16, FR-19)
 CREATE TABLE IF NOT EXISTS requirements (
     id                 UUID PRIMARY KEY,
     product_id         UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -163,8 +163,8 @@ CREATE INDEX IF NOT EXISTS idx_requirements_milestone_id ON requirements(milesto
 CREATE INDEX IF NOT EXISTS idx_requirements_sprint_id ON requirements(sprint_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_requirements_product_seq ON requirements(product_id, sequence_number);
 
--- Defects: bugs and issues (FR-022..FR-025)
--- Runtime environments: freely definable labels (FR-019, FR-020).
+-- Defects: bugs and issues (FR-28..FR-31)
+-- Runtime environments: freely definable labels (FR-25, FR-26).
 -- Defined before defects, which reference an environment.
 CREATE TABLE IF NOT EXISTS runtime_environments (
     id         UUID PRIMARY KEY,
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS defects (
     estimation     TEXT,
     priority       INTEGER NOT NULL DEFAULT 0,
     is_active      BOOLEAN NOT NULL DEFAULT FALSE,
-    -- Defects number from a per-product counter of their own (FR-043).
+    -- Defects number from a per-product counter of their own (FR-49).
     sequence_number INTEGER NOT NULL DEFAULT 0,
     created_at     TIMESTAMPTZ NOT NULL,
     updated_at     TIMESTAMPTZ NOT NULL
@@ -222,7 +222,7 @@ CREATE INDEX IF NOT EXISTS idx_constraints_category_id ON constraints(category_i
 CREATE INDEX IF NOT EXISTS idx_constraints_milestone_id ON constraints(milestone_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_constraints_product_seq ON constraints(product_id, sequence_number);
 
--- Pyramid levels: test categorization hierarchy (FR-032..FR-035)
+-- Pyramid levels: test categorization hierarchy (FR-38..FR-41)
 CREATE TABLE IF NOT EXISTS pyramid_levels (
     id         UUID PRIMARY KEY,
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS pyramid_levels (
 );
 CREATE INDEX IF NOT EXISTS idx_pyramid_levels_product_id ON pyramid_levels(product_id);
 
--- Test cases (FR-014..FR-018, FR-032)
+-- Test cases (FR-20..FR-24, FR-38)
 CREATE TABLE IF NOT EXISTS test_cases (
     id               UUID PRIMARY KEY,
     product_id       UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -251,7 +251,7 @@ CREATE TABLE IF NOT EXISTS test_cases (
 CREATE INDEX IF NOT EXISTS idx_test_cases_product_id ON test_cases(product_id);
 CREATE INDEX IF NOT EXISTS idx_test_cases_pyramid_level_id ON test_cases(pyramid_level_id);
 
--- Test case environment matrix (FR-019)
+-- Test case environment matrix (FR-25)
 CREATE TABLE IF NOT EXISTS test_case_environments (
     id             UUID PRIMARY KEY,
     test_case_id   UUID NOT NULL REFERENCES test_cases(id) ON DELETE CASCADE,
@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS test_case_environments (
 );
 CREATE INDEX IF NOT EXISTS idx_test_case_environments_test_case_id ON test_case_environments(test_case_id);
 
--- Testing campaigns (FR-320, FR-322, FR-332)
+-- Testing campaigns (FR-93, FR-95, FR-106)
 CREATE TABLE IF NOT EXISTS testing_campaigns (
     id          UUID PRIMARY KEY,
     product_id  UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS testing_campaigns (
     updated_at  TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_testing_campaigns_product_id ON testing_campaigns(product_id);
--- At most one active campaign per product (FR-322)
+-- At most one active campaign per product (FR-95)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_testing_campaigns_active ON testing_campaigns(product_id) WHERE status = 'active';
 
 -- Campaign tests: a campaign's own copy of each test case in its scope. The
@@ -296,7 +296,7 @@ CREATE TABLE IF NOT EXISTS campaign_tests (
 );
 CREATE INDEX IF NOT EXISTS idx_campaign_tests_test_case_id ON campaign_tests(test_case_id);
 
--- Campaign results: status per campaign test x environment (FR-021)
+-- Campaign results: status per campaign test x environment (FR-27)
 -- environment_name keeps the label: deleting an environment detaches the row
 -- (environment_id becomes NULL) but the result still says where it ran. A NULL
 -- name marks a test without an environment matrix.
@@ -322,7 +322,7 @@ CREATE INDEX IF NOT EXISTS idx_campaign_results_defect_id ON campaign_results(de
 -- deleted keep its name and stay out of this index.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_results_no_env ON campaign_results(campaign_id, campaign_test_id) WHERE environment_id IS NULL AND environment_name IS NULL;
 
--- Campaign result events: immutable status change log (FR-042, UC-207)
+-- Campaign result events: immutable status change log (FR-48, UC-85)
 -- campaign_id is denormalised so progress-over-time is one indexed scan without a join.
 CREATE TABLE IF NOT EXISTS campaign_result_events (
     id          UUID PRIMARY KEY,
@@ -332,7 +332,7 @@ CREATE TABLE IF NOT EXISTS campaign_result_events (
     from_status TEXT NOT NULL DEFAULT '',
     to_status   TEXT NOT NULL,
     defect_id   UUID REFERENCES defects(id) ON DELETE SET NULL,
-    -- Automated runs (FR-409): where the verdict came from; empty for people.
+    -- Automated runs (FR-118): where the verdict came from; empty for people.
     source      TEXT NOT NULL DEFAULT '',
     revision    TEXT NOT NULL DEFAULT '',
     branch      TEXT NOT NULL DEFAULT '',
@@ -343,7 +343,7 @@ CREATE INDEX IF NOT EXISTS idx_campaign_result_events_campaign ON campaign_resul
 -- Serves the defect verification trail: find the results a defect ever touched.
 CREATE INDEX IF NOT EXISTS idx_campaign_result_events_defect_id ON campaign_result_events(defect_id);
 
--- Requirement assignments: users assigned to requirements (FR-009)
+-- Requirement assignments: users assigned to requirements (FR-15)
 CREATE TABLE IF NOT EXISTS requirement_assignments (
     id             UUID PRIMARY KEY,
     requirement_id UUID NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
@@ -353,7 +353,7 @@ CREATE TABLE IF NOT EXISTS requirement_assignments (
 );
 CREATE INDEX IF NOT EXISTS idx_requirement_assignments_requirement_id ON requirement_assignments(requirement_id);
 
--- Defect assignments: users assigned to defects (FR-009)
+-- Defect assignments: users assigned to defects (FR-15)
 CREATE TABLE IF NOT EXISTS defect_assignments (
     id         UUID PRIMARY KEY,
     defect_id  UUID NOT NULL REFERENCES defects(id) ON DELETE CASCADE,
@@ -363,7 +363,7 @@ CREATE TABLE IF NOT EXISTS defect_assignments (
 );
 CREATE INDEX IF NOT EXISTS idx_defect_assignments_defect_id ON defect_assignments(defect_id);
 
--- Test case to requirement links (FR-016)
+-- Test case to requirement links (FR-22)
 CREATE TABLE IF NOT EXISTS test_case_requirements (
     id             UUID PRIMARY KEY,
     test_case_id   UUID NOT NULL REFERENCES test_cases(id) ON DELETE CASCADE,
@@ -375,7 +375,7 @@ CREATE TABLE IF NOT EXISTS test_case_requirements (
 CREATE INDEX IF NOT EXISTS idx_test_case_requirements_test_case_id ON test_case_requirements(test_case_id);
 CREATE INDEX IF NOT EXISTS idx_test_case_requirements_requirement_id ON test_case_requirements(requirement_id);
 
--- Requirement to capability links (FR-005a)
+-- Requirement to capability links (FR-6)
 CREATE TABLE IF NOT EXISTS requirement_capabilities (
     id             UUID PRIMARY KEY,
     requirement_id UUID NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
@@ -398,7 +398,7 @@ CREATE INDEX IF NOT EXISTS idx_constraint_capabilities_constraint_id ON constrai
 CREATE INDEX IF NOT EXISTS idx_constraint_capabilities_capability_id ON constraint_capabilities(capability_id);
 
 -- Documents: long-form reference texts that define part of the product
--- (FR-044..FR-052). body is stored byte for byte; format says how it is shown
+-- (FR-50..FR-58). body is stored byte for byte; format says how it is shown
 -- and exported. A document sits under a component or a capability, or
 -- directly under the product.
 CREATE TABLE IF NOT EXISTS documents (
@@ -425,7 +425,7 @@ CREATE INDEX IF NOT EXISTS idx_documents_milestone_id ON documents(milestone_id)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_product_seq ON documents(product_id, sequence_number);
 
 -- Document revisions: a full snapshot per change of title, body or format
--- (FR-051). Like the audit trail, user_id has no foreign key so the history
+-- (FR-57). Like the audit trail, user_id has no foreign key so the history
 -- outlives the account that wrote it.
 CREATE TABLE IF NOT EXISTS document_revisions (
     id          UUID PRIMARY KEY,
@@ -440,7 +440,7 @@ CREATE TABLE IF NOT EXISTS document_revisions (
 );
 CREATE INDEX IF NOT EXISTS idx_document_revisions_document_id ON document_revisions(document_id);
 
--- Document links (FR-048)
+-- Document links (FR-54)
 CREATE TABLE IF NOT EXISTS requirement_documents (
     id             UUID PRIMARY KEY,
     requirement_id UUID NOT NULL REFERENCES requirements(id) ON DELETE CASCADE,
@@ -471,7 +471,7 @@ CREATE TABLE IF NOT EXISTS test_case_documents (
 CREATE INDEX IF NOT EXISTS idx_test_case_documents_test_case_id ON test_case_documents(test_case_id);
 CREATE INDEX IF NOT EXISTS idx_test_case_documents_document_id ON test_case_documents(document_id);
 
--- Defect links: polymorphic links to components, capabilities, test cases (FR-023)
+-- Defect links: polymorphic links to components, capabilities, test cases (FR-29)
 CREATE TABLE IF NOT EXISTS defect_links (
     id          UUID PRIMARY KEY,
     defect_id   UUID NOT NULL REFERENCES defects(id) ON DELETE CASCADE,
@@ -483,7 +483,7 @@ CREATE TABLE IF NOT EXISTS defect_links (
 CREATE INDEX IF NOT EXISTS idx_defect_links_defect_id ON defect_links(defect_id);
 CREATE INDEX IF NOT EXISTS idx_defect_links_target ON defect_links(target_type, target_id);
 
--- Comments: polymorphic (FR-026, FR-027)
+-- Comments: polymorphic (FR-32, FR-33)
 CREATE TABLE IF NOT EXISTS comments (
     id         UUID PRIMARY KEY,
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -498,7 +498,7 @@ CREATE TABLE IF NOT EXISTS comments (
 CREATE INDEX IF NOT EXISTS idx_comments_owner ON comments(owner_type, owner_id);
 CREATE INDEX IF NOT EXISTS idx_comments_product_id ON comments(product_id);
 
--- Attachments: polymorphic (FR-026, FR-027)
+-- Attachments: polymorphic (FR-32, FR-33)
 CREATE TABLE IF NOT EXISTS attachments (
     id           UUID PRIMARY KEY,
     product_id   UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -515,7 +515,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_type, owner_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_product_id ON attachments(product_id);
 
--- Audit trail: field-level change tracking (FR-031)
+-- Audit trail: field-level change tracking (FR-37)
 -- product_id has no foreign key on purpose: the history outlives the product,
 -- so administrators can still read, export or purge it (admin audit page).
 CREATE TABLE IF NOT EXISTS audit_trail (

@@ -149,7 +149,7 @@ templ campaignStatusBadge(status string) {
 // an incomplete verdict depends on the campaign's own status: results still
 // awaiting testing mean the campaign is in flight while it is open, but a closed
 // campaign is never "in progress" — it simply never reached a verdict, which a
-// force-close leaves behind (FR-041).
+// force-close leaves behind (FR-47).
 templ campaignVerdictBadge(verdict, campaignStatus string) {
 	switch verdict {
 		case model.CampaignVerdictPassed:
@@ -165,7 +165,7 @@ templ campaignVerdictBadge(verdict, campaignStatus string) {
 	}
 }
 
-// campaignResultIcon renders a result status as a coloured icon (UC-202).
+// campaignResultIcon renders a result status as a coloured icon (UC-80).
 // An empty status marks a cell where the test case does not run.
 templ campaignResultIcon(status string) {
 	if status == "" {

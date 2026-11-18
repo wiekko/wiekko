@@ -1,6 +1,6 @@
 package cli_test
 
-// Structure, constraint and link writes (FR-902 – FR-904) end to end, as the
+// Structure, constraint and link writes (FR-134 – FR-136) end to end, as the
 // product owner (root) unless noted.
 
 import (
@@ -70,7 +70,7 @@ func TestE2EStructureWrites(t *testing.T) {
 		t.Fatalf("test case links after unlink = %q %+v", d.Capability, d.Requirements)
 	}
 
-	// Constraints: create and record compliance (FR-903).
+	// Constraints: create and record compliance (FR-135).
 	c := decode[ops.ConstraintDetail](t, e.mustRun("", "constraint", "create", "--title", "Logs never contain tokens", "--category", "SC", "--compliance", "met", "-o", "json").stdout)
 	if !strings.HasPrefix(c.Identifier, "SC-") || c.Compliance != "met" {
 		t.Fatalf("constraint = %+v", c)

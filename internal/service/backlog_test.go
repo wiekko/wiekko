@@ -395,7 +395,7 @@ func TestUpdateRequirement(t *testing.T) {
 		}
 	})
 
-	// FR-407: developers may change the status only of activated items.
+	// FR-116: developers may change the status only of activated items.
 	t.Run("developer status change requires activation", func(t *testing.T) {
 		newStatus := "status-002"
 		active := true
@@ -433,7 +433,7 @@ func TestUpdateRequirement(t *testing.T) {
 		}
 	})
 
-	// FR-318: planning into a sprint activates, going back to the backlog deactivates.
+	// FR-91: planning into a sprint activates, going back to the backlog deactivates.
 	t.Run("sprint assignment and activation", func(t *testing.T) {
 		sprint, other, none := "sprint-001", "sprint-002", ""
 		inSprint := func(r *model.Requirement) { r.SprintID = sprint; r.IsActive = true }
@@ -1460,7 +1460,7 @@ func TestListDefectsByMilestone(t *testing.T) {
 	})
 }
 
-// --- Defect close hook (FR-504) ---
+// --- Defect close hook (FR-123) ---
 
 // retestRecorder captures calls from the backlog service into the testing service.
 type retestRecorder struct {

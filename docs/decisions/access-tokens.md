@@ -1,6 +1,6 @@
 # Access token decisions
 
-Decisions behind restricted personal access tokens (SC-401 – SC-409): what was chosen, and why. What each
+Decisions behind restricted personal access tokens (SC-51 – SC-59): what was chosen, and why. What each
 scope covers is described in the [REST API reference](../api/rest.md#restricted-tokens).
 
 ## Three independent limits

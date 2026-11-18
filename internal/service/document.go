@@ -28,7 +28,7 @@ const (
 )
 
 // DocumentService handles documents, their revisions and links
-// (FR-044..FR-052, FR-334).
+// (FR-50..FR-58, FR-108).
 type DocumentService struct {
 	// tx groups multi-step writes into one transaction (nil in unit tests).
 	tx           store.Transactor
@@ -110,7 +110,7 @@ func cleanDocumentTitle(title string) (string, error) {
 }
 
 // checkDocumentBody validates a body. It is otherwise kept byte for byte
-// (FR-046): active content is neutralised where a body is rendered (Markdown
+// (FR-52): active content is neutralised where a body is rendered (Markdown
 // through the safe renderer, everything else escaped) and served (as an
 // attachment of type text/plain), never by rewriting what the author wrote.
 func checkDocumentBody(body string) error {
@@ -141,8 +141,8 @@ func checkDocumentState(state string) error {
 }
 
 // checkPlacement enforces that a document sits under a component or a
-// capability, not both (FR-047), and that only a superseded document names
-// a successor other than itself (FR-049).
+// capability, not both (FR-53), and that only a superseded document names
+// a successor other than itself (FR-55).
 func checkPlacement(d *model.Document) error {
 	if d.ComponentID != "" && d.CapabilityID != "" {
 		return errors.New("a document belongs to a component or a capability, not both")
@@ -159,7 +159,7 @@ func checkPlacement(d *model.Document) error {
 }
 
 // CreateDocument creates a document with its first revision. Requires owner
-// role (FR-334).
+// role (FR-108).
 func (s *DocumentService) CreateDocument(ctx context.Context, user *model.User, input CreateDocumentInput) (*model.Document, error) {
 	if _, err := s.authz.RequireRole(ctx, user, input.ProductID, model.RoleOwner); err != nil {
 		return nil, err
@@ -249,7 +249,7 @@ func (s *DocumentService) GetDocument(ctx context.Context, user *model.User, pro
 }
 
 // UpdateDocument changes a document. A change to its title, body or format
-// creates a new revision (FR-051); state, placement and milestone changes do
+// creates a new revision (FR-57); state, placement and milestone changes do
 // not, and are recorded in the audit trail only. Requires owner role.
 func (s *DocumentService) UpdateDocument(ctx context.Context, user *model.User, productID, id string, input UpdateDocumentInput) (*model.Document, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
@@ -414,7 +414,7 @@ func (s *DocumentService) GetRevision(ctx context.Context, user *model.User, pro
 	return rev, nil
 }
 
-// Diff compares two revisions of a document (FR-051). Requires viewer role.
+// Diff compares two revisions of a document (FR-57). Requires viewer role.
 func (s *DocumentService) Diff(ctx context.Context, user *model.User, productID, id string, from, to int) (*DocumentDiff, error) {
 	a, err := s.GetRevision(ctx, user, productID, id, from)
 	if err != nil {
@@ -431,7 +431,7 @@ func (s *DocumentService) Diff(ctx context.Context, user *model.User, productID,
 }
 
 // RestoreRevision makes the content of an earlier revision current again by
-// writing it as a new revision; history is never rewritten (FR-051).
+// writing it as a new revision; history is never rewritten (FR-57).
 // Requires owner role.
 func (s *DocumentService) RestoreRevision(ctx context.Context, user *model.User, productID, id string, revision int) (*model.Document, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
@@ -466,7 +466,7 @@ func (s *DocumentService) RestoreRevision(ctx context.Context, user *model.User,
 }
 
 // linkKind maps a link target type to its ownership kind. Requirements are
-// checked as requirements, so a task never passes (FR-048).
+// checked as requirements, so a task never passes (FR-54).
 func linkKind(targetType string) (string, error) {
 	switch targetType {
 	case model.DocumentLinkRequirement:
@@ -480,7 +480,7 @@ func linkKind(targetType string) (string, error) {
 }
 
 // LinkDocument links a document to a requirement, constraint or test case.
-// Requires owner role (FR-334).
+// Requires owner role (FR-108).
 func (s *DocumentService) LinkDocument(ctx context.Context, user *model.User, productID, id, targetType, targetID string) error {
 	return s.changeLink(ctx, user, productID, id, targetType, targetID, true)
 }
@@ -545,7 +545,7 @@ func (s *DocumentService) ListLinks(ctx context.Context, user *model.User, produ
 }
 
 // DocumentsFor returns the documents linked to a requirement, constraint or
-// test case, without bodies (FR-909). Requires viewer role.
+// test case, without bodies (FR-141). Requires viewer role.
 func (s *DocumentService) DocumentsFor(ctx context.Context, user *model.User, productID, targetType, targetID string) ([]*model.Document, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
@@ -564,7 +564,7 @@ func (s *DocumentService) DocumentsFor(ctx context.Context, user *model.User, pr
 }
 
 // ResolveDocumentRef turns a document reference into its ID: the ID itself,
-// returned unchanged, or an identifier such as "DOC-3" (FR-050) with the
+// returned unchanged, or an identifier such as "DOC-3" (FR-56) with the
 // product's current document prefix. Requires viewer role.
 func (s *DocumentService) ResolveDocumentRef(ctx context.Context, user *model.User, productID, ref string) (string, error) {
 	prefix, seq, ok := parseRef(ref)

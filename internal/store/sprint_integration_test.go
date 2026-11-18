@@ -123,7 +123,7 @@ func TestSprintStoreGetActiveByProductID(t *testing.T) {
 }
 
 // Deleting a sprint sends its items back to the backlog: out of the sprint and
-// no longer active (FR-318). Items outside the sprint keep their activation.
+// no longer active (FR-91). Items outside the sprint keep their activation.
 func TestSprintStoreDeleteReleasesItems(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
 		f := seedDefectFixture(t, db, "Nexmap")

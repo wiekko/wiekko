@@ -13,7 +13,7 @@ import (
 var ErrForbidden = fmt.Errorf("forbidden")
 
 // ErrTwoFactorRequired is returned when a product requires two-factor
-// authentication of its members and the user has not set it up (SC-107). It
+// authentication of its members and the user has not set it up (SC-34). It
 // wraps ErrForbidden.
 var ErrTwoFactorRequired = fmt.Errorf("%w: this product requires two-factor authentication; set it up on your profile to access it", ErrForbidden)
 
@@ -29,10 +29,10 @@ type Authorizer struct {
 }
 
 // RequireRole checks that the user has at least minRole on the product.
-// Admins bypass the role lookup (SC-202). Returns the user's effective role.
+// Admins bypass the role lookup (SC-40). Returns the user's effective role.
 //
 // For token-authenticated requests the token's restriction applies on top
-// (SC-402, SC-403): a product outside the token's set is not reachable, and
+// (SC-52, SC-53): a product outside the token's set is not reachable, and
 // the effective role is capped, for administrators as well.
 func (a *Authorizer) RequireRole(ctx context.Context, user *model.User, productID, minRole string) (string, error) {
 	restriction := access.FromContext(ctx)
@@ -62,7 +62,7 @@ func (a *Authorizer) RequireRole(ctx context.Context, user *model.User, productI
 }
 
 // checkTwoFactor keeps session users without 2FA out of products that require
-// it (SC-107), administrators included. Token-authenticated requests are
+// it (SC-34), administrators included. Token-authenticated requests are
 // exempt: a token is a separate credential, as with the instance-level rules.
 func (a *Authorizer) checkTwoFactor(ctx context.Context, user *model.User, productID string) error {
 	if a.products == nil || user.TOTPEnabled || access.ViaToken(ctx) {

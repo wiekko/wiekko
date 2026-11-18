@@ -148,7 +148,7 @@ func TestScopeForOwnerType(t *testing.T) {
 	}
 }
 
-// TestPresets checks what each preset grants (SC-408): every product scope,
+// TestPresets checks what each preset grants (SC-58): every product scope,
 // documents included, in the full and read-only presets, and a spec author
 // that writes the product's definition but no settings.
 func TestPresets(t *testing.T) {

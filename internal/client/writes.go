@@ -40,7 +40,7 @@ type RequirementPatch struct {
 }
 
 // UpdateRequirement patches a requirement or task by identifier or ID.
-// Developers may change status and activation only (FR-407).
+// Developers may change status and activation only (FR-116).
 func (c *Client) UpdateRequirement(ctx context.Context, productID, ref string, p RequirementPatch) (*Requirement, error) {
 	return send[Requirement](ctx, c, http.MethodPatch, productPath(productID, "requirements", ref), p)
 }

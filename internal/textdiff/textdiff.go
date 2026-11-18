@@ -1,5 +1,5 @@
 // Package textdiff computes line-based differences between two texts, for
-// comparing document revisions (FR-051). It implements Myers' O(ND)
+// comparing document revisions (FR-57). It implements Myers' O(ND)
 // algorithm with a bound on the edit distance it explores: two texts that
 // differ in more lines than the bound are reported as one replacement rather
 // than spending unbounded time and memory on a minimal diff.

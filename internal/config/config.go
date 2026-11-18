@@ -51,6 +51,6 @@ type Config struct {
 	// believed when determining a client's address. Empty: none.
 	TrustedProxies []netip.Prefix
 	// Mail configures the transport for invitation and password reset emails
-	// (AC-104). Its zero value means nexmap sends no mail.
+	// (AC-10). Its zero value means nexmap sends no mail.
 	Mail mail.Config
 }

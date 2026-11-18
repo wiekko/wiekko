@@ -412,7 +412,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/attachments/{attachmentId}/download", pageAuthed(http.HandlerFunc(productCtrl.AttachmentDownload)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/history", pageAuthed(http.HandlerFunc(productCtrl.ConstraintHistoryTab)))
 
-	// Document pages (FR-044..FR-052).
+	// Document pages (FR-50..FR-58).
 	mux.Handle("GET /products/{id}/documents", pageAuthed(http.HandlerFunc(productCtrl.Documents)))
 	mux.Handle("GET /products/{id}/documents/new", pageAuthed(http.HandlerFunc(productCtrl.DocumentCreateForm)))
 	mux.Handle("POST /products/{id}/documents", pageAuthed(http.HandlerFunc(productCtrl.DocumentCreate)))

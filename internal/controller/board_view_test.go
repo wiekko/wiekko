@@ -248,7 +248,7 @@ func TestBuildBoardSurface(t *testing.T) {
 	})
 }
 
-// FR-407: developers see inactive cards locked; owners can move every card.
+// FR-116: developers see inactive cards locked; owners can move every card.
 // Kanban boards mark the active columns, scrum boards do not.
 func TestBoardActivation(t *testing.T) {
 	reqStatuses := []*model.Status{

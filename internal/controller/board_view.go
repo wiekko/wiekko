@@ -13,7 +13,7 @@ import (
 // honouring the product's StatusSync setting (one merged board vs two tabbed
 // ones). Pass nil for either entity slice to leave that type off the board.
 // canMove says whether the viewer may move cards at all, moveInactive whether
-// that includes items not activated for work (owners only, FR-407).
+// that includes items not activated for work (owners only, FR-116).
 func buildBoardSurface(
 	productID string,
 	p *model.Product,

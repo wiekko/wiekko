@@ -11,7 +11,7 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// Documents (FR-044..FR-052): protocols, schemas and other texts that define
+// Documents (FR-50..FR-58): protocols, schemas and other texts that define
 // the product. Their bodies are user input of any format, so they reach the
 // page only two ways: Markdown through templates.RenderMarkdown, which escapes
 // raw HTML and drops unsafe links, and every other format as text that templ
@@ -910,7 +910,7 @@ func documentSuccessorOptions(list []*model.Document, self *model.Document, curr
 }
 
 // LinkedDocuments lists the documents linked to a requirement, constraint
-// or test case (FR-909), for its overview.
+// or test case (FR-141), for its overview.
 templ LinkedDocuments(productID string, docs []*model.Document) {
 	if len(docs) > 0 {
 		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">

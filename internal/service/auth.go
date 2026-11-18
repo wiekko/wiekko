@@ -236,7 +236,7 @@ func (s *AuthService) ValidateSession(ctx context.Context, sessionID string) (*m
 }
 
 // ValidatePAT checks a raw personal access token and returns the associated
-// user and the token's restriction (SC-401 – SC-406). Unless the token carries
+// user and the token's restriction (SC-51 – SC-56). Unless the token carries
 // the admin scope, the user is returned as a copy without administrator
 // rights, so no admin check anywhere can be reached through the token.
 func (s *AuthService) ValidatePAT(ctx context.Context, rawToken string) (*model.User, *access.Restriction, error) {
@@ -280,7 +280,7 @@ func (s *AuthService) ValidatePAT(ctx context.Context, rawToken string) (*model.
 		user = &u
 	}
 
-	// Record the last use (best-effort; SC-409).
+	// Record the last use (best-effort; SC-59).
 	now := time.Now().UTC().Format(time.RFC3339)
 	_ = s.pats.UpdateLastUsed(ctx, pat.ID, now)
 

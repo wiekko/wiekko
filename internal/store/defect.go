@@ -357,7 +357,7 @@ func (s *defectStore) listDefects(ctx context.Context, query string, args ...any
 // defectColumns reads is_active through activeColumn, like requirementColumns.
 //
 // The product's defect prefix comes along through a subquery, so every read
-// yields the identifier with the prefix currently configured (FR-043).
+// yields the identifier with the prefix currently configured (FR-49).
 var defectColumns = `id, product_id, sequence_number,
 	(SELECT dp.defect_prefix FROM products dp WHERE dp.id = defects.product_id),
 	title, description, criticality,

@@ -1,6 +1,6 @@
 package cli_test
 
-// Defect identifiers (FR-043) through the CLI.
+// Defect identifiers (FR-49) through the CLI.
 
 import (
 	"regexp"

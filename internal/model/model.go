@@ -58,7 +58,7 @@ type PAT struct {
 	CreatedAt   string
 	RevokedAt   string // empty if not revoked
 
-	// Restrictions (SC-401 – SC-406), interpreted by package access.
+	// Restrictions (SC-51 – SC-56), interpreted by package access.
 	Scopes             string   // space-separated "scope:level" grants
 	RoleCap            string   // empty if the token's role is not capped
 	ProductsRestricted bool     // true if the token reaches only ProductIDs
@@ -100,7 +100,7 @@ func RoleRank(role string) int {
 }
 
 // Invitation represents an invitation to register.
-// PasswordResetToken is a pending password reset (SC-110). The raw token only
+// PasswordResetToken is a pending password reset (SC-37). The raw token only
 // exists in the email; TokenHash is its SHA-256.
 type PasswordResetToken struct {
 	ID        string

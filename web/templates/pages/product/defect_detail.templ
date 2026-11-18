@@ -89,7 +89,7 @@ type DefectOverviewProps struct {
 	SprintName      string
 	EnvironmentName string
 	// Verification is the campaign result trail behind this defect, one entry
-	// per result it ever failed (FR-042, FR-504).
+	// per result it ever failed (FR-48, FR-123).
 	Verification []DefectVerificationGroup
 }
 
@@ -209,7 +209,7 @@ templ defectLinkedField(label, name, href string) {
 	</div>
 }
 
-// --- Components tab (FR-023) ---
+// --- Components tab (FR-29) ---
 
 // DefectComponentsTabProps holds data for the defect components tab.
 type DefectComponentsTabProps struct {
@@ -351,7 +351,7 @@ templ DefectComponentLinkResults(productID, defectID string, candidates []*model
 	}
 }
 
-// --- Capabilities tab (FR-023) ---
+// --- Capabilities tab (FR-29) ---
 
 // DefectCapabilitiesTabProps holds data for the defect capabilities tab.
 type DefectCapabilitiesTabProps struct {
@@ -494,11 +494,11 @@ templ DefectCapabilityLinkResults(productID, defectID string, candidates []*mode
 	}
 }
 
-// --- Test cases tab (FR-023) ---
+// --- Test cases tab (FR-29) ---
 
 // DefectTestCasesTabProps holds data for the defect test cases tab.
 // CanLink and CanCreate are gated separately: testers may link an existing test
-// case to a defect, but only developers and owners may create one (FR-405).
+// case to a defect, but only developers and owners may create one (FR-114).
 type DefectTestCasesTabProps struct {
 	ProductID string
 	DefectID  string
@@ -651,7 +651,7 @@ templ DefectTestCaseLinkResults(productID, defectID string, candidates []*model.
 	}
 }
 
-// --- Requirements tab (FR-501) ---
+// --- Requirements tab (FR-120) ---
 
 // DefectRequirementsTabProps holds data for the defect requirements tab.
 type DefectRequirementsTabProps struct {

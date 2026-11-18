@@ -37,7 +37,7 @@ The backlog and defects have both table views (`/requirements`, `/tasks`, `/defe
 
 ## List state lives in the URL, on the list's own route
 
-Sortable, filterable tables (UC-104..107) keep their whole state in one canonical
+Sortable, filterable tables (UC-72..UC-78) keep their whole state in one canonical
 parameter set: `sort`, `dir`, `q`, the facet names, and `page`. The rules are:
 
 - Changing the sort or a filter resets to page 1 — the row that was 51st under
@@ -82,7 +82,7 @@ a sprint is *scheduled*; status says whether the team has actually started it, a
 Owners move a sprint with the **Start Sprint** / **Close Sprint** actions on the detail page.
 
 **At most one sprint per product may be active**, mirroring the single-active-campaign rule
-(FR-322). Starting a second one fails and names the sprint already running. The dashboard's
+(FR-95). Starting a second one fails and names the sprint already running. The dashboard's
 "current sprint" prefers the active sprint and only falls back to the date range when none is started.
 
 ## One board implementation, three surfaces
@@ -99,9 +99,9 @@ stays one implementation.
 ## Sprint planning requires owner role
 
 Assigning an item to a sprint is a full requirement update, which the service layer restricts to
-owners (developers may only change the status of activated items, FR-407). The Planning tab therefore gates
+owners (developers may only change the status of activated items, FR-116). The Planning tab therefore gates
 drag on owner-or-admin, unlike the board, which developers can also use.
 
-## Settings pages use auto-save (UC-006)
+## Settings pages use auto-save (UC-65)
 
 Product settings (statuses, environments, pyramid levels) and admin instance settings use auto-save on change. Entity create/edit forms use explicit submit buttons. This distinction is reflected in the form patterns used on each page.

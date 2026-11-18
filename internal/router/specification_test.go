@@ -19,7 +19,7 @@ import (
 var updateSpec = flag.Bool("update-spec", false, "rewrite testdata/specification.md")
 
 // TestSpecificationExport exports a small product over the REST API
-// (FR-905) and compares it with a golden file, which is what the export of
+// (FR-137) and compares it with a golden file, which is what the export of
 // a real product looks like.
 func TestSpecificationExport(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
@@ -125,7 +125,7 @@ func TestSpecificationExport(t *testing.T) {
 			t.Errorf("export without the structure scope: status %d", status)
 		}
 
-		// Documents (FR-907): listed for a token that may read them, current
+		// Documents (FR-139): listed for a token that may read them, current
 		// ones by default, drafts on request; left out silently otherwise.
 		protocol, err := e.svc.Document.CreateDocument(ctx, admin, service.CreateDocumentInput{ProductID: pid,
 			Title: "Sync protocol", Body: "# Sync\n", State: model.DocumentStateCurrent})

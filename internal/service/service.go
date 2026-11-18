@@ -66,7 +66,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	}
 
 	// Built before the backlog service, which calls into it to reopen campaign
-	// results once the defect that failed them is closed (FR-504).
+	// results once the defect that failed them is closed (FR-123).
 	testingSvc := &TestingService{
 		tx:              st.Tx,
 		testCases:       st.TestCase,

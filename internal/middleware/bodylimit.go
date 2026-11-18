@@ -16,7 +16,7 @@ const (
 	// document. Nothing the application accepts outside the two exceptions
 	// below comes near it.
 	DefaultMaxBody = 1 << 20
-	// MaxTestRunBody bounds a test run upload (FR-409). Passing tests carry no
+	// MaxTestRunBody bounds a test run upload (FR-118). Passing tests carry no
 	// output and failures a capped amount each, so this leaves room for large
 	// suites.
 	MaxTestRunBody = 32 << 20

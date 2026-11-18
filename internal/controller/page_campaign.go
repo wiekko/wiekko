@@ -84,7 +84,7 @@ func campaignView(campaign *model.TestingCampaign, counts map[string]int) produc
 }
 
 // canEditCampaigns reports whether the user may schedule, edit, activate or
-// close campaigns (owner or admin, per FR-320 and FR-332).
+// close campaigns (owner or admin, per FR-93 and FR-106).
 func (c *PageProductController) canEditCampaigns(user *model.User, role string) bool {
 	return user.IsAdmin || role == model.RoleOwner
 }
@@ -345,7 +345,7 @@ func (c *PageProductController) CampaignActivate(w http.ResponseWriter, r *http.
 }
 
 // CampaignCloseConfirm renders GET /products/{id}/campaigns/{campaignId}/close/confirm.
-// The dialog states how many results are still open (FR-333).
+// The dialog states how many results are still open (FR-107).
 func (c *PageProductController) CampaignCloseConfirm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")
@@ -603,7 +603,7 @@ func matchesHistoryFilter(entry productpage.CampaignHistoryEntry, filter string)
 }
 
 // buildProgressTimeline replays the event log into a cumulative count of
-// settled results (UC-207).
+// settled results (UC-85).
 //
 // One point per event turns a real campaign into hundreds of near-identical
 // bars, so the series is bucketed to the last state of each day. The individual
@@ -675,7 +675,7 @@ func (c *PageProductController) loadMatrixTabProps(r *http.Request, user *model.
 
 // loadMatrixProps assembles the execution matrix: one row per test case, one
 // column per runtime environment in use, plus a trailing column for test cases
-// that define no environment (UC-201).
+// that define no environment (UC-79).
 func (c *PageProductController) loadMatrixProps(r *http.Request, user *model.User, productID string, campaign *model.TestingCampaign, role, groupBy string) (productpage.CampaignMatrixProps, []*model.CampaignResult, error) {
 	results, err := c.testing.ListCampaignResults(r.Context(), user, productID, campaign.ID)
 	if err != nil {
@@ -778,7 +778,7 @@ func (c *PageProductController) loadMatrixProps(r *http.Request, user *model.Use
 		GroupBy:    groupBy,
 		Columns:    columns,
 		Groups:     groups,
-		// Results are writable only while the campaign is active (FR-505).
+		// Results are writable only while the campaign is active (FR-124).
 		CanExecute: campaign.Status == model.CampaignStatusActive && c.canExecuteTests(user, role),
 		Churn:      churn,
 	}, results, nil
@@ -826,7 +826,7 @@ func (c *PageProductController) campaignTestCase(r *http.Request, user *model.Us
 }
 
 // matrixGroupLabel picks a row's group heading. Test cases attached to neither
-// a component nor a capability sit at product level (UC-203).
+// a component nor a capability sit at product level (UC-81).
 func matrixGroupLabel(groupBy string, tc *model.TestCase, components, capabilities, pyramids map[string]string) string {
 	if groupBy == "pyramid" {
 		if name, ok := pyramids[tc.PyramidLevelID]; ok && name != "" {
@@ -961,7 +961,7 @@ func (c *PageProductController) CampaignResultStatusMenu(w http.ResponseWriter, 
 	}
 
 	// The panel is readable at viewer level so a closed campaign can still be
-	// traced back; only the status picker is gated (FR-505). The write itself is
+	// traced back; only the status picker is gated (FR-124). The write itself is
 	// authorized again in SetResultStatus.
 	canExecute := campaign.Status == model.CampaignStatusActive && c.canExecuteTests(user, role)
 
@@ -1086,7 +1086,7 @@ func (c *PageProductController) CampaignResultSetStatus(w http.ResponseWriter, r
 
 // CampaignResultDefectModal renders GET .../results/{resultId}/defect-modal.
 // Failing a result requires a defect, so the tester lands on the defect form
-// with the campaign result carried through as the link target (FR-502).
+// with the campaign result carried through as the link target (FR-121).
 func (c *PageProductController) CampaignResultDefectModal(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("id")

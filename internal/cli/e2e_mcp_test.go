@@ -159,7 +159,7 @@ func TestE2EMCPTools(t *testing.T) {
 					t.Errorf("%s has no description", tool.Name)
 				}
 				if strings.Contains(tool.Name, "delete") || strings.Contains(tool.Name, "remove") {
-					t.Errorf("%s: MCP offers no deletions (FR-904)", tool.Name)
+					t.Errorf("%s: MCP offers no deletions (FR-136)", tool.Name)
 				}
 			}
 			sort.Strings(names)

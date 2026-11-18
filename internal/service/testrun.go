@@ -15,7 +15,7 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// Limits of one automated test run upload (FR-409).
+// Limits of one automated test run upload (FR-118).
 const (
 	// MaxTestRunResults caps the number of results in one upload.
 	MaxTestRunResults = 50000
@@ -73,7 +73,7 @@ type TestRunOutcome struct {
 	ResultID       string
 	PreviousStatus string
 	DefectID       string
-	// DefectIdentifier is the defect's identifier, e.g. DF-17 (FR-043).
+	// DefectIdentifier is the defect's identifier, e.g. DF-17 (FR-49).
 	DefectIdentifier string
 	Defect           string // TestRunDefectCreated, TestRunDefectReused or empty
 }
@@ -87,11 +87,11 @@ type TestRunReport struct {
 	Outcomes    []TestRunOutcome
 }
 
-// TestRunService ingests automated test results into campaigns (FR-018,
-// FR-409). It sits next to the testing and backlog services: it writes
+// TestRunService ingests automated test results into campaigns (FR-24,
+// FR-118). It sits next to the testing and backlog services: it writes
 // campaign results like a tester does, and files defects for failures
 // through the backlog service so they follow the same rules as any other
-// defect (FR-502).
+// defect (FR-121).
 type TestRunService struct {
 	// tx groups multi-step writes into one transaction (nil in unit tests).
 	tx           store.Transactor
@@ -112,7 +112,7 @@ type TestRunService struct {
 // Without an explicit campaign the product's active campaign is used; when
 // there is none, the run is evaluated and reported but nothing is written —
 // no results, events or defects — so CI keeps working between campaigns and
-// results only ever change inside an active campaign (FR-505).
+// results only ever change inside an active campaign (FR-124).
 //
 // Each result is applied in its own transaction — the defect filed for it,
 // the defect's link to the test case, the result and its event stand or fall
@@ -296,7 +296,7 @@ func (s *TestRunService) apply(ctx context.Context, user *model.User, in TestRun
 }
 
 // fileDefect creates the defect explaining an automated failure and links it
-// to the test case (FR-502, FR-023).
+// to the test case (FR-121, FR-29).
 func (s *TestRunService) fileDefect(ctx context.Context, user *model.User, in TestRunInput, report *TestRunReport,
 	campaign *model.TestingCampaign, tc *model.TestCase, g testGroup) (*model.Defect, error) {
 	envID := ""

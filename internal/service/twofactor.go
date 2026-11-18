@@ -17,7 +17,7 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// Instance settings that make TOTP mandatory (SC-107). SettingTwoFactorEnforced
+// Instance settings that make TOTP mandatory (SC-34). SettingTwoFactorEnforced
 // covers everyone; the others cover administrators and users who hold a given
 // role in at least one product (see SettingTwoFactorEnforcedRole).
 const (

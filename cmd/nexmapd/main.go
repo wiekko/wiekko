@@ -103,7 +103,7 @@ func main() {
 	st := store.New(db, dialect, keys)
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
 
-	// Mail for invitations and password resets (AC-104); nil when not
+	// Mail for invitations and password resets (AC-10); nil when not
 	// configured, and nexmap then hands out invitation links only.
 	sender, err := mail.New(cfg.Mail)
 	if err != nil {

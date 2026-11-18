@@ -149,7 +149,7 @@ type productSeed struct {
 	testCases  map[string]string // handle -> test case id
 	cons       map[string]string // title -> constraint id
 	// kanban products activate by column, so spec.active is ignored there:
-	// the item's status decides (FR-318).
+	// the item's status decides (FR-91).
 	kanban bool
 }
 
@@ -390,7 +390,7 @@ func (p *productSeed) requirement(spec reqSpec) {
 	}
 
 	// IsActive is not part of the create input — activation is a deliberate
-	// step in the UI too. Items created in a sprint are already active (FR-318).
+	// step in the UI too. Items created in a sprint are already active (FR-91).
 	if spec.active && !p.kanban {
 		active := true
 		_, err := p.s.svc.Backlog.UpdateRequirement(p.s.ctx, p.s.admin, p.id, r.ID, service.UpdateRequirementInput{
@@ -563,7 +563,7 @@ func (p *productSeed) fillerDefects(n int, statuses, envs, sprints []string) {
 			UpdatedAt:     created,
 		}
 		// Inserted directly to control created_at, so the number has to be
-		// drawn here as the service would (FR-043).
+		// drawn here as the service would (FR-49).
 		seq, err := p.s.st.Defect.NextSequenceNumber(p.s.ctx, p.id)
 		if err != nil {
 			p.s.fail(fmt.Sprintf("number filler defect %d", i+1), err)
@@ -625,7 +625,7 @@ func (p *productSeed) constraint(spec constraintSpec) {
 
 // --- Documents ---
 
-// documentSpec seeds a document (FR-044). Revisions after the first are
+// documentSpec seeds a document (FR-50). Revisions after the first are
 // written as updates, so the document arrives with a history to diff.
 type documentSpec struct {
 	title      string

@@ -124,7 +124,7 @@ type SpecificationView struct {
 	SHA256 string `json:"sha256"`
 }
 
-// Specification exports the product's specification as Markdown (FR-905):
+// Specification exports the product's specification as Markdown (FR-137):
 // the structure, constraints and requirements, and tasks if asked for. The
 // server renders it, in a stable order and without timestamps.
 func (s *Session) Specification(ctx context.Context, q SpecificationQuery) (string, *SpecificationView, error) {

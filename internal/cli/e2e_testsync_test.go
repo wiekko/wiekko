@@ -1,6 +1,6 @@
 package cli_test
 
-// `nexmap test sync` options (FR-409a) and the MCP tool, with package-style
+// `nexmap test sync` options (FR-119) and the MCP tool, with package-style
 // identifiers such as example.com/aviary/app.TestX.
 
 import (

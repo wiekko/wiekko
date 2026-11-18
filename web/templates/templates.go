@@ -151,6 +151,6 @@ type BoardCard struct {
 	Priority   int
 	MoveURL    string
 	// Locked is set when the viewer may move cards in general but not this
-	// one: it has not been activated, and only owners move those (FR-407).
+	// one: it has not been activated, and only owners move those (FR-116).
 	Locked bool
 }

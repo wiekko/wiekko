@@ -8,7 +8,7 @@ import (
 )
 
 // CampaignResultEventStore defines data access operations for the immutable
-// campaign result status change log (FR-042).
+// campaign result status change log (FR-48).
 type CampaignResultEventStore interface {
 	Create(ctx context.Context, ev *model.CampaignResultEvent) error
 	ListByResultID(ctx context.Context, resultID string) ([]*model.CampaignResultEvent, error)

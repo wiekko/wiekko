@@ -43,9 +43,9 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	reqRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "id")
 	reqParamRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "reqId")
 	conRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "id")
-	// Defect routes accept defect identifiers ("DF-17", FR-043) likewise.
+	// Defect routes accept defect identifiers ("DF-17", FR-49) likewise.
 	defRef := controller.ResolveRefs(svc.Backlog.ResolveDefectRef, "id")
-	// Document routes accept document identifiers ("DOC-3", FR-050), and
+	// Document routes accept document identifiers ("DOC-3", FR-56), and
 	// their link routes the identifiers of the linked items.
 	docRef := controller.ResolveRefs(svc.Document.ResolveDocumentRef, "id")
 	docTargetReqRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "targetId")
@@ -255,7 +255,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/campaigns/{id}/results", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListCampaignResults))
 	api.authed("PATCH /products/{productId}/campaigns/{id}/results/{resultId}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.UpdateResult)))
 
-	// Automated test runs (FR-409): CI uploads results into the active campaign.
+	// Automated test runs (FR-118): CI uploads results into the active campaign.
 	api.authed("POST /products/{productId}/test-runs", need(access.W(access.Tests)), csrf(http.HandlerFunc(testRunCtrl.Ingest)))
 
 	// Comments.
@@ -272,8 +272,8 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/attachments/{id}/download", need(access.R(access.Discussion)), http.HandlerFunc(discussionCtrl.DownloadAttachment))
 	api.authed("DELETE /products/{productId}/attachments/{id}", need(access.W(access.Discussion)), csrf(http.HandlerFunc(discussionCtrl.DeleteAttachment)))
 
-	// Documents (FR-044..FR-052): their own scope (SC-404); links need read on
-	// the scope of the linked item as well (SC-405).
+	// Documents (FR-50..FR-58): their own scope (SC-54); links need read on
+	// the scope of the linked item as well (SC-55).
 	api.authed("GET /products/{productId}/documents", need(access.R(access.Documents)), http.HandlerFunc(documentCtrl.ListDocuments))
 	api.authed("POST /products/{productId}/documents", need(access.W(access.Documents)), csrf(http.HandlerFunc(documentCtrl.CreateDocument)))
 	api.authed("GET /products/{productId}/documents/{id}", need(access.R(access.Documents)), docRef(http.HandlerFunc(documentCtrl.GetDocument)))
@@ -297,7 +297,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/constraints/{id}/documents", need(access.R(access.Backlog), access.R(access.Documents)), conRef(documentCtrl.DocumentsOf(model.DocumentLinkConstraint)))
 	api.authed("GET /products/{productId}/test-cases/{id}/documents", need(access.R(access.Tests), access.R(access.Documents)), documentCtrl.DocumentsOf(model.DocumentLinkTestCase))
 
-	// Specification export (FR-905): the structure and the backlog, as Markdown.
+	// Specification export (FR-137): the structure and the backlog, as Markdown.
 	api.authed("GET /products/{productId}/specification", need(access.R(access.Structure), access.R(access.Backlog)), http.HandlerFunc(specCtrl.Export))
 
 	// Audit trail.
@@ -308,7 +308,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 }
 
 // apiRoutes registers authenticated API routes together with the token scopes
-// they need (SC-404, SC-405). Every authenticated route declares its scopes,
+// they need (SC-54, SC-55). Every authenticated route declares its scopes,
 // so a route cannot be added without deciding what a token needs for it.
 //
 // The rule: every resource named in the path needs read, and a state-changing
@@ -327,7 +327,7 @@ func (a *apiRoutes) authed(pattern string, need []access.Need, h http.Handler) {
 }
 
 // admin registers a route that requires an administrator; a token must hold
-// every scope in need (always the admin scope, SC-406).
+// every scope in need (always the admin scope, SC-56).
 func (a *apiRoutes) admin(pattern string, need []access.Need, h http.Handler) {
 	a.needs[pattern] = need
 	a.mux.Handle(pattern, middleware.RequireAuth(middleware.RequireScopes(need...)(middleware.RequireAdmin(h))))

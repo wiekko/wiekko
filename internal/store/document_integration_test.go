@@ -10,7 +10,7 @@ import (
 )
 
 // TestDocumentStore covers documents, their revisions and links
-// (FR-044..FR-052) on every engine.
+// (FR-50..FR-58) on every engine.
 func TestDocumentStore(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
 		ctx := context.Background()

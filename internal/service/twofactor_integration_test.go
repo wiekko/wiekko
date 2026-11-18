@@ -280,7 +280,7 @@ func TestTwoFactorDisableAndReset(t *testing.T) {
 	})
 }
 
-// TestTwoFactorScopedEnforcement runs the role and product rules (SC-107)
+// TestTwoFactorScopedEnforcement runs the role and product rules (SC-34)
 // through the real stores.
 func TestTwoFactorScopedEnforcement(t *testing.T) {
 	ctx := context.Background()

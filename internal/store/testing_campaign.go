@@ -104,7 +104,7 @@ func (s *testingCampaignStore) ListByProductID(ctx context.Context, productID st
 }
 
 // GetActiveByProductID returns the product's active campaign, or nil when there
-// is none. A product may have at most one active campaign (FR-322).
+// is none. A product may have at most one active campaign (FR-95).
 func (s *testingCampaignStore) GetActiveByProductID(ctx context.Context, productID string) (*model.TestingCampaign, error) {
 	tc, err := scanTestingCampaign(s.db.QueryRowContext(ctx,
 		`SELECT `+testingCampaignColumns+`

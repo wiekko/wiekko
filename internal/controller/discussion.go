@@ -25,7 +25,7 @@ type DiscussionController struct {
 // NewDiscussion creates a DiscussionController.
 //
 // defectRef resolves defect identifiers given as the owner of comments and
-// attachments (FR-043); nil accepts IDs only.
+// attachments (FR-49); nil accepts IDs only.
 func NewDiscussion(discussion *service.DiscussionService, defectRef refResolver) *DiscussionController {
 	return &DiscussionController{discussion: discussion, defectRef: defectRef}
 }

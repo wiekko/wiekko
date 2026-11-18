@@ -33,7 +33,7 @@ type PATService struct {
 var ErrPasswordRequired = errors.New("enter your current password to confirm")
 
 // SettingPATMaxLifetimeDays is the instance setting limiting how long a token
-// may live, in days; "0" or empty means no limit (SC-409).
+// may live, in days; "0" or empty means no limit (SC-59).
 const SettingPATMaxLifetimeDays = "pat_max_lifetime_days"
 
 // CreatePATInput describes a token to create. The zero restriction fields
@@ -67,7 +67,7 @@ type CreatePATResult struct {
 // The token never receives more than the user holds: products must be ones
 // the user is a member of, and the admin scope needs an administrator. A
 // request made with a token can only create tokens within that token's own
-// restriction (SC-406).
+// restriction (SC-56).
 func (s *PATService) Create(ctx context.Context, user *model.User, in CreatePATInput) (*CreatePATResult, error) {
 	if in.Name == "" {
 		return nil, errors.New("token name is required")
@@ -177,7 +177,7 @@ func (s *PATService) checkProducts(ctx context.Context, user *model.User, in Cre
 }
 
 // checkExpiry validates the expiry against the instance's maximum token
-// lifetime (SC-409).
+// lifetime (SC-59).
 func (s *PATService) checkExpiry(ctx context.Context, expiresAt string) error {
 	now := time.Now().UTC()
 	var exp time.Time

@@ -45,14 +45,14 @@ type UpdateProductInput struct {
 	Description    *string
 	EstimationMode *string
 	WorkflowMode   *string
-	// DefectPrefix renames every defect identifier at once (FR-043); it must
+	// DefectPrefix renames every defect identifier at once (FR-49); it must
 	// not be a prefix of any of the product's categories.
 	DefectPrefix *string
-	// DocumentPrefix renames every document identifier at once (FR-050); it
+	// DocumentPrefix renames every document identifier at once (FR-56); it
 	// must differ from the defect prefix and every category prefix.
 	DocumentPrefix *string
 	// TwoFactorRequired keeps members without 2FA out of the product
-	// (SC-107). Only users with 2FA set up may turn it on.
+	// (SC-34). Only users with 2FA set up may turn it on.
 	TwoFactorRequired *bool
 }
 
@@ -60,8 +60,8 @@ type UpdateProductInput struct {
 // product require it.
 var ErrOwnTwoFactorRequired = errors.New("set up two-factor authentication on your own account before requiring it for the product")
 
-// Create creates a new product and assigns the creator as owner (FR-303).
-// Checks product_creation_enabled setting unless user is admin (FR-301, FR-302).
+// Create creates a new product and assigns the creator as owner (FR-75).
+// Checks product_creation_enabled setting unless user is admin (FR-73, FR-74).
 func (s *ProductService) Create(ctx context.Context, user *model.User, input CreateProductInput) (*model.Product, error) {
 	// A product-restricted token could not reach the product it creates.
 	if r := access.FromContext(ctx); r != nil && r.ProductsRestricted {
@@ -102,7 +102,7 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 		if err := s.products.Create(ctx, product); err != nil {
 			return fmt.Errorf("create product: %w", err)
 		}
-		// Assign creator as owner (FR-303).
+		// Assign creator as owner (FR-75).
 		if err := s.productRoles.Create(ctx, &model.ProductRole{
 			ID:        uuid.New().String(),
 			UserID:    user.ID,
@@ -131,7 +131,7 @@ func (s *ProductService) Create(ctx context.Context, user *model.User, input Cre
 func (s *ProductService) seedDefaults(ctx context.Context, productID, now string) error {
 	// Default statuses (synced: same for both entity types).
 	// New items land in "New", which is not active: an owner activates them
-	// by moving them on (kanban, FR-318). "Done" is not active either, so
+	// by moving them on (kanban, FR-91). "Done" is not active either, so
 	// only owners reopen finished work.
 	defaultStatuses := []struct {
 		Name      string
@@ -408,7 +408,7 @@ type ProductWithRole struct {
 	Product *model.Product
 	Role    string // "admin" when an admin has no explicit membership
 	// TwoFactorLocked is set when the product requires 2FA and the user has
-	// not set it up: the product is listed, but cannot be opened (SC-107).
+	// not set it up: the product is listed, but cannot be opened (SC-34).
 	TwoFactorLocked bool
 }
 
@@ -481,8 +481,8 @@ func markTwoFactorLocked(ctx context.Context, user *model.User, list []ProductWi
 }
 
 // restrictProductRoles applies a token's restriction to a product listing:
-// only the token's products are listed, with their roles capped (SC-402,
-// SC-403). An administrator's "admin" pseudo-role counts as owner.
+// only the token's products are listed, with their roles capped (SC-52,
+// SC-53). An administrator's "admin" pseudo-role counts as owner.
 func restrictProductRoles(ctx context.Context, list []ProductWithRole) []ProductWithRole {
 	r := access.FromContext(ctx)
 	if r == nil {
@@ -505,7 +505,7 @@ func restrictProductRoles(ctx context.Context, list []ProductWithRole) []Product
 	return out
 }
 
-// AddMember adds a user to a product with the given role (FR-304).
+// AddMember adds a user to a product with the given role (FR-76).
 func (s *ProductService) AddMember(ctx context.Context, user *model.User, productID, targetUserID, role string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
 		return err
@@ -667,7 +667,7 @@ func (s *ProductService) SplitStatuses(ctx context.Context, user *model.User, pr
 	return nil
 }
 
-// TransferOwnership transfers product ownership to another user (FR-306):
+// TransferOwnership transfers product ownership to another user (FR-78):
 // the new owner is promoted (or added) and the current owner becomes a
 // developer, in one transaction, so a failure can never leave the product
 // without an owner.

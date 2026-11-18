@@ -18,10 +18,10 @@ type ProductStore interface {
 	List(ctx context.Context) ([]*model.Product, error)
 	// ResetActivationToSprints sets the stored is_active of the product's
 	// requirements, tasks and defects to whether they are planned into a
-	// sprint: what activation means once a product switches to scrum (FR-318).
+	// sprint: what activation means once a product switches to scrum (FR-91).
 	ResetActivationToSprints(ctx context.Context, productID string) error
 	// ListTwoFactorRequiredForUser returns the products the user is a member
-	// of that require two-factor authentication (SC-107), ordered by name.
+	// of that require two-factor authentication (SC-34), ordered by name.
 	ListTwoFactorRequiredForUser(ctx context.Context, userID string) ([]*model.Product, error)
 }
 
@@ -141,7 +141,7 @@ func defectPrefixOrDefault(prefix string) string {
 	return prefix
 }
 
-// documentPrefixOrDefault does the same for the document prefix (FR-050).
+// documentPrefixOrDefault does the same for the document prefix (FR-56).
 func documentPrefixOrDefault(prefix string) string {
 	if prefix == "" {
 		return model.DefaultDocumentPrefix

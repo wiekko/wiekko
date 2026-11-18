@@ -1,6 +1,6 @@
 # Email decisions
 
-Decisions behind transactional email (AC-104, SC-109 – SC-111): what was chosen, and why. How to configure
+Decisions behind transactional email (AC-10, SC-36 – SC-38): what was chosen, and why. How to configure
 it is described in [Configuration](../admin/configuration.md#mail), what it guards against in
 [Security](../admin/security.md#email).
 
@@ -13,7 +13,7 @@ administrator.
 
 ## Two purposes, fixed text
 
-Email exists for invitations and password resets only (SC-111). Both messages are fixed text; the only
+Email exists for invitations and password resets only (SC-38). Both messages are fixed text; the only
 variable parts are the recipient, the installation's address, the link and its expiry, and for an
 invitation the role, which is one of a few fixed words. Product names and display names stay out of the
 email, even though a product name would help the recipient recognise an invitation: a product owner can

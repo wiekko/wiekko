@@ -13,7 +13,7 @@ import (
 	"nexmap.net/internal/mail"
 )
 
-// Mail purposes, for the log. Email is limited to these two (SC-111).
+// Mail purposes, for the log. Email is limited to these two (SC-38).
 const (
 	mailPurposeInvitation    = "invitation"
 	mailPurposePasswordReset = "password_reset"
@@ -71,7 +71,7 @@ func (m *Mailer) Enabled() bool { return m != nil && m.sender != nil }
 func (m *Mailer) link(path string) string { return m.publicURL + path }
 
 // send delivers msg now and logs the outcome, without the recipient or the
-// message (SC-303).
+// message (SC-47).
 func (m *Mailer) send(ctx context.Context, purpose string, msg mail.Message) error {
 	if !m.Enabled() {
 		return ErrMailDisabled

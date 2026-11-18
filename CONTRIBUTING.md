@@ -87,13 +87,13 @@ header from the app layout. A plain HTML form (no `hx-post`) must carry it itsel
 
 ## Specification and documentation
 
-`docs/spec/` holds the specification: what Nexmap *shall* do, with requirement identifiers (FR-…, AC-…).
-The rest of `docs/` describes how Nexmap behaves and how to use it, for administrators, users and CLI
-users; see [docs/index.md](docs/index.md).
-
-The specification is moving into Nexmap itself, as a product on cloud.nexmap.net that `.nexmap.json` binds
-this repository to; `AGENTS.md` explains how to read it with the `nexmap` CLI or its MCP server. Access to
-that product is by invitation: ask a maintainer for an account, then run `nexmap login`.
+The specification (what Nexmap *shall* do) lives in Nexmap itself, as a product on cloud.nexmap.net that
+`.nexmap.json` binds this repository to; `AGENTS.md` explains how to read it with the `nexmap` CLI or its
+MCP server. Access to that product is by invitation: ask a maintainer for an account, then run
+`nexmap login`. Identifiers in code, comments and docs (FR-…, AC-…, SC-…, UC-…) are the ones in Nexmap.
+`docs/spec/` is being retired: `requirements.md` keeps the earlier identifiers, which each item in Nexmap
+names as its legacy ID. `docs/` describes how Nexmap behaves and how to use it, for administrators, users
+and CLI users; see [docs/index.md](docs/index.md).
 
 Implementation plans live in `docs/tmp/` while their work is in progress. When a plan is done, move what
 stays true (decisions, configuration, behaviour) into the permanent docs and delete the plan. Permanent

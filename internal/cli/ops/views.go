@@ -39,7 +39,7 @@ type RequirementDetail struct {
 	Capabilities     []Ref                `json:"capabilities"`
 	TestCases        []TestCaseSummary    `json:"test_cases"`
 	Defects          []DefectSummary      `json:"defects"`
-	// Documents are the documents that define the item (FR-909); without
+	// Documents are the documents that define the item (FR-141); without
 	// the documents scope, their identifiers only.
 	Documents []Ref         `json:"documents"`
 	Comments  []CommentView `json:"comments"`

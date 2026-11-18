@@ -15,13 +15,13 @@ import (
 	productpage "nexmap.net/web/templates/pages/product"
 )
 
-// --- Document pages (FR-044..FR-052, FR-334) ---
+// --- Document pages (FR-50..FR-58, FR-108) ---
 
 // UseDocuments gives the product pages the document service.
 func (c *PageProductController) UseDocuments(docs *service.DocumentService) { c.document = docs }
 
 // canEditDocuments reports whether the user may write documents (owner or
-// admin, FR-334).
+// admin, FR-108).
 func (c *PageProductController) canEditDocuments(user *model.User, role string) bool {
 	return user.IsAdmin || role == model.RoleOwner
 }
@@ -553,7 +553,7 @@ func (c *PageProductController) DocumentHistoryTab(w http.ResponseWriter, r *htt
 }
 
 // linkedDocuments returns the documents linked to a requirement, constraint
-// or test case, for its overview (FR-909); nil on any failure.
+// or test case, for its overview (FR-141); nil on any failure.
 func (c *PageProductController) linkedDocuments(r *http.Request, user *model.User, productID, targetType, targetID string) []*model.Document {
 	if c.document == nil {
 		return nil

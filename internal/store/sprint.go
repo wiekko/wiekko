@@ -65,7 +65,7 @@ func (s *sprintStore) Update(ctx context.Context, sprint *model.Sprint) error {
 }
 
 // Delete removes a sprint. Its items go back to the backlog and, as when an
-// item is taken out of a sprint, are no longer active (FR-318): the backlog is
+// item is taken out of a sprint, are no longer active (FR-91): the backlog is
 // the product owner's again. The foreign keys would only clear sprint_id, so
 // the items are released explicitly in the same transaction.
 func (s *sprintStore) Delete(ctx context.Context, id string) error {

@@ -16,7 +16,7 @@ import (
 )
 
 // documentGroup is `nexmap doc`: documents such as protocols and schemas
-// (FR-908). Nexmap is their source: a body set from a file is an ordinary
+// (FR-140). Nexmap is their source: a body set from a file is an ordinary
 // update, and `doc get` writes a body back out.
 func documentGroup() *command {
 	return &command{name: "doc", summary: "documents: protocols, schemas and other texts that define the product",

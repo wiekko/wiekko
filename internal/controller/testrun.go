@@ -10,7 +10,7 @@ import (
 	"nexmap.net/internal/service"
 )
 
-// TestRunController handles automated test run uploads (FR-409).
+// TestRunController handles automated test run uploads (FR-118).
 type TestRunController struct {
 	runs *service.TestRunService
 }

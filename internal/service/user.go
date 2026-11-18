@@ -149,7 +149,7 @@ func (s *UserService) LookupInvitation(ctx context.Context, rawToken string) (*I
 
 // AcceptInvitation registers a user from an invitation token. A product
 // invitation also makes the new user a member of that product with the
-// invited role (FR-305).
+// invited role (FR-77).
 func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, input RegisterInput) (*model.User, error) {
 	if err := s.countRegistration(input.ClientIP); err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (s *UserService) AcceptInvitation(ctx context.Context, rawToken string, inp
 		DisplayName:  input.DisplayName,
 		PasswordHash: hash,
 		IsAdmin:      false,
-		Status:       model.UserStatusActive, // invitation accounts skip moderation (FR-204)
+		Status:       model.UserStatusActive, // invitation accounts skip moderation (FR-69)
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -460,7 +460,7 @@ func (s *UserService) RequestDeletion(ctx context.Context, id, password string) 
 		if moderation == "true" {
 			return s.users.UpdateStatus(ctx, id, model.UserStatusDeletionRequested)
 		}
-		// No moderation: delete immediately (FR-207).
+		// No moderation: delete immediately (FR-72).
 		return s.users.Delete(ctx, id)
 	})
 }

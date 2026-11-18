@@ -1,6 +1,6 @@
 package cli_test
 
-// `nexmap export` (FR-905) against the seeded Aviary product.
+// `nexmap export` (FR-137) against the seeded Aviary product.
 
 import (
 	"crypto/sha256"

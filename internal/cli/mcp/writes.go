@@ -63,7 +63,7 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 }
 
 // registerStructureWriteTools offers the structure, constraint and link
-// writes of the CLI (FR-904). Deletions are deliberately left out: an agent
+// writes of the CLI (FR-136). Deletions are deliberately left out: an agent
 // can restructure, but not remove.
 func registerStructureWriteTools(s *sdk.Server, h *handlers) {
 	component := func(v *ops.ComponentView) func(io.Writer) error {

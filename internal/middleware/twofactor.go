@@ -10,7 +10,7 @@ import (
 	"nexmap.net/internal/model"
 )
 
-// TwoFactorPolicy decides who has to use two-factor authentication (SC-107).
+// TwoFactorPolicy decides who has to use two-factor authentication (SC-34).
 type TwoFactorPolicy interface {
 	// RequiredFor reports whether an instance-level rule requires the user
 	// to set up 2FA before using Nexmap at all.
@@ -25,7 +25,7 @@ const TwoFactorSetupPath = "/user/2fa/setup"
 
 // RequireTwoFactorEnrollment keeps session users who have not set up TOTP
 // away from everything but the setup flow while an instance-level rule
-// requires 2FA of them (SC-107). Page requests are redirected to the setup
+// requires 2FA of them (SC-34). Page requests are redirected to the setup
 // page; API requests get 403 TOTP_SETUP_REQUIRED.
 //
 // Pages of a product that requires 2FA are redirected to the setup page as

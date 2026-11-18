@@ -15,7 +15,7 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// Password reset (SC-110): a link sent to the address stored on the account,
+// Password reset (SC-37): a link sent to the address stored on the account,
 // usable once, for passwordResetTTL.
 const passwordResetTTL = time.Hour
 

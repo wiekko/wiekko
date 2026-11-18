@@ -14,7 +14,7 @@ import (
 	"nexmap.net/internal/textdiff"
 )
 
-// DocumentController handles document endpoints (FR-044..FR-052).
+// DocumentController handles document endpoints (FR-50..FR-58).
 type DocumentController struct {
 	documents *service.DocumentService
 }
@@ -432,7 +432,7 @@ func (c *DocumentController) DocumentsOf(targetType string) http.Handler {
 }
 
 // linkedDocumentsJSON names the documents linked to an item, for embedding in
-// the item's own response (FR-909). A token without documents:read learns
+// the item's own response (FR-141). A token without documents:read learns
 // only their identifiers; a failed lookup leaves the field out rather than
 // failing the item.
 func linkedDocumentsJSON(r *http.Request, docs *service.DocumentService, targetType, id string) ([]map[string]any, bool) {

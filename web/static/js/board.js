@@ -7,7 +7,7 @@
     new Sortable(col, {
       group: col.dataset.group,
       // Cards without a move URL are read-only for this viewer (for example
-      // not activated for work, FR-407), so they cannot be picked up.
+      // not activated for work, FR-116), so they cannot be picked up.
       draggable: "[data-move-url]",
       animation: 150,
       ghostClass: "opacity-40",

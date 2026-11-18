@@ -1,36 +1,36 @@
 package model
 
 // Document is a long-form reference text that defines part of the product,
-// such as a protocol, a data schema or an interface contract (FR-044). It is
+// such as a protocol, a data schema or an interface contract (FR-50). It is
 // part of the product's definition, not a backlog item.
 type Document struct {
 	ID        string
 	ProductID string
-	// SequenceNumber numbers the product's documents (FR-050); with the
+	// SequenceNumber numbers the product's documents (FR-56); with the
 	// product's document prefix it forms the identifier, e.g. DOC-3.
 	SequenceNumber int
 	// Identifier is the human-readable identifier, filled in when read from
 	// the store with the product's current prefix.
 	Identifier string
 	Title      string
-	// Body is stored byte for byte (FR-046). For the markdown format it is
+	// Body is stored byte for byte (FR-52). For the markdown format it is
 	// rendered as Markdown; every other format is shown and exported verbatim.
 	Body   string
 	Format string // one of the DocumentFormat* constants
 	State  string // one of the DocumentState* constants
 	// SupersededByID names the document that replaces this one; only set
-	// while State is superseded (FR-049).
+	// while State is superseded (FR-55).
 	SupersededByID string
 	ComponentID    string // empty unless filed under a component
 	CapabilityID   string // empty unless filed under a capability
 	MilestoneID    string // empty if not linked
-	// Revision is the number of the latest revision (FR-051), starting at 1.
+	// Revision is the number of the latest revision (FR-57), starting at 1.
 	Revision  int
 	CreatedAt string // RFC 3339
 	UpdatedAt string // RFC 3339
 }
 
-// DocumentRevision is a snapshot of a document's content (FR-051).
+// DocumentRevision is a snapshot of a document's content (FR-57).
 type DocumentRevision struct {
 	ID         string
 	DocumentID string
@@ -42,7 +42,7 @@ type DocumentRevision struct {
 	CreatedAt  string // RFC 3339
 }
 
-// Document formats (FR-046).
+// Document formats (FR-52).
 const (
 	DocumentFormatMarkdown = "markdown"
 	DocumentFormatText     = "text"
@@ -55,7 +55,7 @@ const (
 )
 
 // documentFormatExt maps each format to the file extension it is exported
-// with (FR-907).
+// with (FR-139).
 var documentFormatExt = map[string]string{
 	DocumentFormatMarkdown: ".md",
 	DocumentFormatText:     ".txt",
@@ -88,13 +88,13 @@ func DocumentFileExtension(format string) string {
 	return ".txt"
 }
 
-// DocumentFileName is the name a document is exported under (FR-907), e.g.
+// DocumentFileName is the name a document is exported under (FR-139), e.g.
 // DOC-3.md. It is built from the identifier only, never from user text.
 func DocumentFileName(identifier, format string) string {
 	return identifier + DocumentFileExtension(format)
 }
 
-// Document states (FR-049). Only current documents are binding.
+// Document states (FR-55). Only current documents are binding.
 const (
 	DocumentStateDraft      = "draft"
 	DocumentStateCurrent    = "current"
@@ -113,7 +113,7 @@ func ValidDocumentState(state string) bool {
 	return false
 }
 
-// Document link targets (FR-048). Tasks are deliberately absent.
+// Document link targets (FR-54). Tasks are deliberately absent.
 const (
 	DocumentLinkRequirement = "requirement"
 	DocumentLinkConstraint  = "constraint"
@@ -140,7 +140,7 @@ type DocumentLink struct {
 	CreatedAt  string // RFC 3339
 }
 
-// DocumentRef names a document without its content (FR-909).
+// DocumentRef names a document without its content (FR-141).
 type DocumentRef struct {
 	ID         string
 	Identifier string

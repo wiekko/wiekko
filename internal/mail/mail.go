@@ -1,10 +1,10 @@
-// Package mail sends nexmap's transactional emails (AC-104): invitations and
-// password resets, nothing else (SC-111). It talks to an SMTP relay or to one
+// Package mail sends nexmap's transactional emails (AC-10): invitations and
+// password resets, nothing else (SC-38). It talks to an SMTP relay or to one
 // of a few mailer HTTP APIs, all implemented on the standard library.
 //
 // Every message goes to exactly one recipient and is plain text. The package
 // never logs and never puts a recipient, subject or body into an error, so a
-// failed delivery cannot leak personal data or a token into the log (SC-303).
+// failed delivery cannot leak personal data or a token into the log (SC-47).
 package mail
 
 import (

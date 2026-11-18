@@ -77,7 +77,7 @@ func refLines(refs []ops.Ref) []string {
 	return out
 }
 
-// documentsSection lists the documents linked to an item (FR-909).
+// documentsSection lists the documents linked to an item (FR-141).
 func documentsSection(d *doc, refs []ops.Ref) {
 	d.h(2, "Documents")
 	d.list(refLines(refs))

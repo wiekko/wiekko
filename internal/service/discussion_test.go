@@ -840,7 +840,7 @@ func TestCreateAttachmentEnforcesTheUploadPolicy(t *testing.T) {
 	})
 }
 
-// --- Token scopes (SC-405) ---
+// --- Token scopes (SC-55) ---
 
 func TestDiscussionOwnerScope(t *testing.T) {
 	ctx := access.WithRestriction(context.Background(),

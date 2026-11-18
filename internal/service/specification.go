@@ -15,7 +15,7 @@ import (
 )
 
 // SpecificationService exports a product's specification as Markdown
-// (FR-319, FR-905). Importing is deliberately not offered (FR-906).
+// (FR-92, FR-137). Importing is deliberately not offered (FR-138).
 type SpecificationService struct {
 	products     store.ProductStore
 	components   store.ComponentStore
@@ -30,15 +30,15 @@ type SpecificationService struct {
 
 // ExportOptions selects what an export contains beyond the defaults.
 type ExportOptions struct {
-	Tasks bool // include tasks (FR-905: only on request)
-	// Drafts includes draft documents besides the current ones (FR-907).
+	Tasks bool // include tasks (FR-137: only on request)
+	// Drafts includes draft documents besides the current ones (FR-139).
 	Drafts bool
 }
 
 // ExportedDocuments lists the documents an export includes, in its order:
 // the current ones, and the drafts when asked for. A token without the
 // documents scope gets none; the export then leaves them out rather than
-// failing (FR-907). Requires viewer role.
+// failing (FR-139). Requires viewer role.
 func (s *SpecificationService) ExportedDocuments(ctx context.Context, user *model.User, productID string, opts ExportOptions) ([]*model.Document, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
 		return nil, err
@@ -355,7 +355,7 @@ func buildSections(cats []*model.Category, items []itemSource) []specdoc.Section
 		if !nested {
 			out.Refines = it.parentIdentifier
 		}
-		seen[it.id] = true // parents cannot form a cycle (FR-008c); this keeps a corrupt one finite
+		seen[it.id] = true // parents cannot form a cycle (FR-12); this keeps a corrupt one finite
 		for _, c := range children[it.id] {
 			if !seen[c.id] {
 				out.Children = append(out.Children, build(c, true, seen))

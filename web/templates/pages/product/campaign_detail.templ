@@ -66,7 +66,7 @@ templ CampaignDetailPage(props CampaignDetailProps) {
 	}
 }
 
-// campaignLifecycleActions renders the draft > active > closed controls (FR-320).
+// campaignLifecycleActions renders the draft > active > closed controls (FR-93).
 templ campaignLifecycleActions(props CampaignDetailProps) {
 	switch props.Campaign.Status {
 		case model.CampaignStatusDraft:
@@ -103,7 +103,7 @@ func campaignDetailTabs(productID, campaignID string) []templates.TabDef {
 	}
 }
 
-// A closed campaign is frozen (FR-332), so it offers no edit affordance.
+// A closed campaign is frozen (FR-106), so it offers no edit affordance.
 func campaignEditHref(props CampaignDetailProps) string {
 	if !props.CanEdit || props.Campaign.Status == model.CampaignStatusClosed {
 		return ""
@@ -137,13 +137,13 @@ type CampaignMatrixRow struct {
 	Cells    []*model.CampaignResult
 }
 
-// CampaignMatrixGroup collects rows under a component or pyramid level (UC-203).
+// CampaignMatrixGroup collects rows under a component or pyramid level (UC-81).
 type CampaignMatrixGroup struct {
 	Label string
 	Rows  []CampaignMatrixRow
 }
 
-// CampaignMatrixProps holds the execution matrix (UC-201).
+// CampaignMatrixProps holds the execution matrix (UC-79).
 type CampaignMatrixProps struct {
 	ProductID  string
 	CampaignID string
@@ -226,7 +226,7 @@ templ CampaignMatrixTabContent(props CampaignMatrixProps) {
 
 // campaignMatrixCell renders one result. Every recorded result opens a panel:
 // testers get the status picker plus the change log, everyone else gets the log
-// on its own, so a closed campaign can still be read back (FR-505, FR-042).
+// on its own, so a closed campaign can still be read back (FR-124, FR-48).
 templ campaignMatrixCell(props CampaignMatrixProps, result *model.CampaignResult) {
 	if result == nil {
 		@campaignResultIcon("")
@@ -328,7 +328,7 @@ type ResultEventView struct {
 }
 
 // CampaignResultMenuProps holds one matrix cell's detail panel: the status
-// picker for testers, and the change log for everyone (UC-201, FR-042).
+// picker for testers, and the change log for everyone (UC-79, FR-48).
 type CampaignResultMenuProps struct {
 	ProductID   string
 	CampaignID  string
@@ -460,7 +460,7 @@ func campaignResultOptionClass(current bool) string {
 
 // --- Progress tab ---
 
-// CampaignProgressProps holds the progress breakdown (UC-204, UC-207).
+// CampaignProgressProps holds the progress breakdown (UC-82, UC-85).
 type CampaignProgressProps struct {
 	View CampaignView
 	// Timeline is the cumulative settled count after each recorded event,
@@ -558,7 +558,7 @@ type CampaignHistoryEntry struct {
 	IsRetest    bool
 }
 
-// CampaignHistoryProps holds the merged campaign history feed (FR-042, UC-207).
+// CampaignHistoryProps holds the merged campaign history feed (FR-48, UC-85).
 type CampaignHistoryProps struct {
 	ProductID  string
 	CampaignID string
@@ -720,7 +720,7 @@ func campaignHistoryEmptyMessage(filter string) string {
 
 // --- Close confirmation ---
 
-// CampaignCloseProps holds the close confirmation dialog (FR-332, FR-333).
+// CampaignCloseProps holds the close confirmation dialog (FR-106, FR-107).
 type CampaignCloseProps struct {
 	ProductID  string
 	CampaignID string

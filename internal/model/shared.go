@@ -26,7 +26,7 @@ type Attachment struct {
 	CreatedAt   string // RFC 3339
 }
 
-// Owner types for comments and attachments (FR-026, FR-027, FR-401).
+// Owner types for comments and attachments (FR-32, FR-33, FR-110).
 const (
 	OwnerTypeRequirement = "requirement"
 	OwnerTypeTask        = "task"
@@ -83,7 +83,7 @@ type DefectLink struct {
 	CreatedAt  string // RFC 3339
 }
 
-// Defect link target types (FR-023, FR-501).
+// Defect link target types (FR-29, FR-120).
 const (
 	DefectLinkTargetComponent   = "component"
 	DefectLinkTargetCapability  = "capability"

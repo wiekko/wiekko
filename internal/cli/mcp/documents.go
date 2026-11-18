@@ -12,7 +12,7 @@ import (
 )
 
 // registerDocumentReadTools offers the documents that define the product
-// (FR-044, FR-908): protocols, schemas and other reference texts an agent
+// (FR-50, FR-140): protocols, schemas and other reference texts an agent
 // implements against or validates code with.
 func registerDocumentReadTools(s *sdk.Server, h *handlers) {
 	readTool(s, h, "list_documents", "List documents",
@@ -54,7 +54,7 @@ func registerDocumentReadTools(s *sdk.Server, h *handlers) {
 		})
 }
 
-// registerDocumentWriteTools offers document writes (FR-904): no deletion.
+// registerDocumentWriteTools offers document writes (FR-136): no deletion.
 func registerDocumentWriteTools(s *sdk.Server, h *handlers) {
 	document := func(v *ops.DocumentDetail) func(io.Writer) error {
 		return func(w io.Writer) error { return render.Document(w, v) }
