@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "nexmap": {
+      "args": [
+        "mcp",
+        "--read-only"
+      ],
+      "command": "nexmap"
+    }
+  }
+}
