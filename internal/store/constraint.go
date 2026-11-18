@@ -92,7 +92,7 @@ func (s *constraintStore) ListByProductID(ctx context.Context, productID string,
 		query += ` AND category_id = ?`
 		args = append(args, filter.CategoryID)
 	}
-	query += ` ORDER BY priority DESC, created_at`
+	query += ` ORDER BY ` + itemOrder
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *constraintStore) ListByProductID(ctx context.Context, productID string,
 
 func (s *constraintStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Constraint, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+constraintColumns+` FROM constraints WHERE milestone_id = ? ORDER BY priority DESC, created_at`,
+		`SELECT `+constraintColumns+` FROM constraints WHERE milestone_id = ? ORDER BY `+itemOrder,
 		milestoneID)
 	if err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func (s *constraintStore) UnlinkCapability(ctx context.Context, constraintID, ca
 func (s *constraintStore) ListCapabilitiesByConstraint(ctx context.Context, constraintID string) ([]*model.ConstraintCapability, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, constraint_id, capability_id, created_at
-		 FROM constraint_capabilities WHERE constraint_id = ? ORDER BY created_at`,
+		 FROM constraint_capabilities WHERE constraint_id = ? ORDER BY created_at, id`,
 		constraintID)
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func (s *constraintStore) ListCapabilitiesByConstraint(ctx context.Context, cons
 func (s *constraintStore) ListConstraintsByCapability(ctx context.Context, capabilityID string) ([]*model.ConstraintCapability, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, constraint_id, capability_id, created_at
-		 FROM constraint_capabilities WHERE capability_id = ? ORDER BY created_at`,
+		 FROM constraint_capabilities WHERE capability_id = ? ORDER BY created_at, id`,
 		capabilityID)
 	if err != nil {
 		return nil, err

@@ -162,7 +162,7 @@ templ DefectsTableContent(props DefectsProps) {
 									}
 								}
 								@ui.TableCellMuted() {
-									{ fmt.Sprintf("%d", d.Priority) }
+									@patterns.PriorityBadge(d.Priority)
 								}
 								@ui.TableCellMuted() {
 									{ formatDate(d.CreatedAt) }

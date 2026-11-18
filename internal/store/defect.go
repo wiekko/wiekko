@@ -32,13 +32,13 @@ var DefectSortColumns = map[string]string{
 	"status":      `COALESCE(s.position, 9999)`,
 	"environment": `LOWER(COALESCE(e.name, ''))`,
 	"identifier":  `d.sequence_number`,
-	"priority":    `d.priority`,
+	"priority":    priorityRank("d.priority"),
 	"created":     `d.created_at`,
 }
 
-// defectDefaultOrder preserves the ordering this list had before it became
-// sortable, so an unsorted view looks unchanged.
-const defectDefaultOrder = `d.priority DESC, d.created_at`
+// defectDefaultOrder lists the highest priority first, then the oldest
+// defect; the identifier breaks ties within one second (DF-2).
+var defectDefaultOrder = priorityRank("d.priority") + `, d.created_at, d.sequence_number`
 
 // defectListFrom joins the tables whose values are sortable or searchable but
 // not stored on the defect itself. Both joins are outer: status and environment
@@ -195,7 +195,8 @@ func (s *defectStore) ListByProductID(ctx context.Context, productID string, fil
 func (s *defectStore) ListPageByProductID(ctx context.Context, productID string, filter DefectFilter, params ListParams) ([]*model.Defect, error) {
 	where, args := defectListWhere(productID, filter, params.Search)
 	query := `SELECT ` + defectColumnsQualified + defectListFrom + where
-	query += orderClause(params, DefectSortColumns, defectDefaultOrder, `d.id`)
+	// Ties fall back to the identifier, then the ID (DF-2).
+	query += orderClause(params, DefectSortColumns, defectDefaultOrder, `d.sequence_number, d.id`)
 
 	limit, limitArgs := limitClause(params)
 	query += limit
@@ -214,13 +215,13 @@ func (s *defectStore) CountByProductID(ctx context.Context, productID string, fi
 
 func (s *defectStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Defect, error) {
 	return s.listDefects(ctx,
-		`SELECT `+defectColumns+` FROM defects WHERE sprint_id = ? ORDER BY priority DESC, created_at`,
+		`SELECT `+defectColumns+` FROM defects WHERE sprint_id = ? ORDER BY `+itemOrder,
 		sprintID)
 }
 
 func (s *defectStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Defect, error) {
 	return s.listDefects(ctx,
-		`SELECT `+defectColumns+` FROM defects WHERE milestone_id = ? ORDER BY priority DESC, created_at`,
+		`SELECT `+defectColumns+` FROM defects WHERE milestone_id = ? ORDER BY `+itemOrder,
 		milestoneID)
 }
 
@@ -243,7 +244,7 @@ func (s *defectStore) Unassign(ctx context.Context, defectID, userID string) err
 func (s *defectStore) ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, defect_id, user_id, created_at
-		 FROM defect_assignments WHERE defect_id = ? ORDER BY created_at`,
+		 FROM defect_assignments WHERE defect_id = ? ORDER BY created_at, id`,
 		defectID)
 	if err != nil {
 		return nil, err
@@ -297,7 +298,7 @@ func (s *defectStore) GetLink(ctx context.Context, id string) (*model.DefectLink
 func (s *defectStore) ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, defect_id, target_type, target_id, created_at
-		 FROM defect_links WHERE defect_id = ? ORDER BY created_at`,
+		 FROM defect_links WHERE defect_id = ? ORDER BY created_at, id`,
 		defectID)
 	if err != nil {
 		return nil, err
@@ -318,7 +319,7 @@ func (s *defectStore) ListLinks(ctx context.Context, defectID string) ([]*model.
 func (s *defectStore) ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, defect_id, target_type, target_id, created_at
-		 FROM defect_links WHERE target_type = ? AND target_id = ? ORDER BY created_at`,
+		 FROM defect_links WHERE target_type = ? AND target_id = ? ORDER BY created_at, id`,
 		targetType, targetID)
 	if err != nil {
 		return nil, err

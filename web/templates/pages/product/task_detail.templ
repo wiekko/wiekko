@@ -107,7 +107,9 @@ templ TaskOverviewTabContent(props TaskDetailProps) {
 				if props.Product.EstimationMode != model.EstimationModeDisabled {
 					@patterns.DetailField("Estimation", formatEstimation(props.Product.EstimationMode, props.Task.Estimation))
 				}
-				@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Task.Priority))
+				@patterns.DetailFieldSlot("Priority") {
+					@patterns.PriorityBadge(props.Task.Priority)
+				}
 				@patterns.DetailField("Coarse", boolDisplay(props.Task.IsCoarse))
 				@patterns.DetailField("Active", boolDisplay(props.Task.IsActive))
 				@patterns.DetailField("Created", formatDate(props.Task.CreatedAt))

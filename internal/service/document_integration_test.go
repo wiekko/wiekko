@@ -137,13 +137,22 @@ func TestDocuments(t *testing.T) {
 				taskID = r.ID
 			}
 		}
+		// The seed links documents to some constraints; take one without any,
+		// so the check below sees only the document linked here.
 		cons, _ := svc.Constraint.ListConstraints(ctx, owner, pid, store.ConstraintFilter{})
+		var conID string
+		for _, c := range cons {
+			if got, err := docs.DocumentsFor(ctx, owner, pid, model.DocumentLinkConstraint, c.ID); err == nil && len(got) == 0 {
+				conID = c.ID
+				break
+			}
+		}
 		tcs, _ := svc.Testing.ListTestCases(ctx, owner, pid)
-		if reqID == "" || len(cons) == 0 || len(tcs) == 0 {
-			t.Fatal("seed lacks requirements, constraints or test cases")
+		if reqID == "" || conID == "" || len(tcs) == 0 {
+			t.Fatal("seed lacks requirements, unlinked constraints or test cases")
 		}
 		for _, l := range []struct{ typ, id string }{
-			{model.DocumentLinkRequirement, reqID}, {model.DocumentLinkConstraint, cons[0].ID}, {model.DocumentLinkTestCase, tcs[0].ID},
+			{model.DocumentLinkRequirement, reqID}, {model.DocumentLinkConstraint, conID}, {model.DocumentLinkTestCase, tcs[0].ID},
 		} {
 			if err := docs.LinkDocument(ctx, owner, pid, d.ID, l.typ, l.id); err != nil {
 				t.Fatalf("link %s: %v", l.typ, err)

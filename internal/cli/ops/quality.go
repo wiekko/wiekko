@@ -3,6 +3,7 @@ package ops
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -230,8 +231,17 @@ func sortDefects(list []DefectSummary) {
 		if ri != rj {
 			return ri < rj
 		}
-		return list[i].Priority > list[j].Priority
+		return priorityRank(list[i].Priority) < priorityRank(list[j].Priority)
 	})
+}
+
+// priorityRank orders priorities lowest number first; 0 means none set and
+// ranks last (DF-2), as in the server's list order.
+func priorityRank(p int) int {
+	if p > 0 {
+		return p
+	}
+	return math.MaxInt32
 }
 
 func rank(criticality string) int {

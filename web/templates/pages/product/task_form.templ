@@ -161,7 +161,7 @@ templ TaskFormBody(props TaskFormProps) {
 					Value:       props.Priority,
 					Type:        "number",
 					Placeholder: "0",
-					HelpText:    "Lower numbers indicate higher priority.",
+					HelpText:    "Lower numbers indicate higher priority: 1 is the highest, 0 means none.",
 				})
 				@ui.Checkbox("is_coarse", "is_coarse", "Needs refinement (coarse task)", props.IsCoarse, false)
 				@patterns.FormActions(taskSubmitLabel(props.IsEdit), "/products/"+props.Product.ID+"/tasks")

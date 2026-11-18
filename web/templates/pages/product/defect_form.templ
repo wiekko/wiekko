@@ -180,7 +180,7 @@ templ DefectFormBody(props DefectFormProps) {
 					Value:       props.Priority,
 					Type:        "number",
 					Placeholder: "0",
-					HelpText:    "Lower numbers indicate higher priority.",
+					HelpText:    "Lower numbers indicate higher priority: 1 is the highest, 0 means none.",
 				})
 				if props.LinkTo != "" {
 					@defectModalActions(defectSubmitLabel(props.IsEdit))

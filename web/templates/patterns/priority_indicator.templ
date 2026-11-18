@@ -7,8 +7,14 @@ import (
 
 // PriorityBadge renders a color-coded priority indicator.
 // 1=critical (red), 2=high (amber), 3=medium (yellow), 4=low (blue), 5+=info (gray).
+// 0 or less means no priority is set (DF-2) and renders a muted dash, the
+// way unset fields look elsewhere.
 templ PriorityBadge(priority int) {
-	@ui.Badge(fmt.Sprintf("P%d", priority), priorityColor(priority))
+	if priority > 0 {
+		@ui.Badge(fmt.Sprintf("P%d", priority), priorityColor(priority))
+	} else {
+		<span class="text-gray-400 dark:text-gray-500" title="No priority">—</span>
+	}
 }
 
 // CriticalityBadge renders a badge for defect criticality.

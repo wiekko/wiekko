@@ -66,7 +66,7 @@ func (s *productRoleStore) Delete(ctx context.Context, userID, productID string)
 func (s *productRoleStore) ListByProductID(ctx context.Context, productID string) ([]*model.ProductRole, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, user_id, product_id, role, created_at
-		 FROM product_roles WHERE product_id = ? ORDER BY created_at`,
+		 FROM product_roles WHERE product_id = ? ORDER BY created_at, id`,
 		productID)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (s *productRoleStore) ListByProductID(ctx context.Context, productID string
 func (s *productRoleStore) ListByUserID(ctx context.Context, userID string) ([]*model.ProductRole, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, user_id, product_id, role, created_at
-		 FROM product_roles WHERE user_id = ? ORDER BY created_at`,
+		 FROM product_roles WHERE user_id = ? ORDER BY created_at, id`,
 		userID)
 	if err != nil {
 		return nil, err

@@ -101,7 +101,7 @@ templ TasksPage(props TasksProps) {
 										@workflowStatusCell(props.Statuses, task.StatusID)
 									}
 									@ui.TableCellMuted() {
-										{ fmt.Sprintf("%d", task.Priority) }
+										@patterns.PriorityBadge(task.Priority)
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(task.CreatedAt) }

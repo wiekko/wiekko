@@ -126,7 +126,9 @@ templ DefectOverviewTabContent(props DefectOverviewProps) {
 					if props.EstimationMode != model.EstimationModeDisabled {
 						@patterns.DetailField("Estimation", formatEstimation(props.EstimationMode, props.Defect.Estimation))
 					}
-					@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Defect.Priority))
+					@patterns.DetailFieldSlot("Priority") {
+						@patterns.PriorityBadge(props.Defect.Priority)
+					}
 					@patterns.DetailField("Active", boolDisplay(props.Defect.IsActive))
 					@patterns.DetailField("Created", formatDate(props.Defect.CreatedAt))
 					@patterns.DetailField("Last Updated", formatDate(props.Defect.UpdatedAt))

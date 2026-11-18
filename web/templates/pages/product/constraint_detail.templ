@@ -92,7 +92,9 @@ templ ConstraintOverviewTabContent(props ConstraintDetailProps) {
 				} else {
 					@patterns.DetailField("Milestone", "")
 				}
-				@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Constraint.Priority))
+				@patterns.DetailFieldSlot("Priority") {
+					@patterns.PriorityBadge(props.Constraint.Priority)
+				}
 				@patterns.DetailField("Created", formatDate(props.Constraint.CreatedAt))
 				@patterns.DetailField("Last Updated", formatDate(props.Constraint.UpdatedAt))
 			}

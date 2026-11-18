@@ -170,7 +170,9 @@ templ BoardCardView(productID string, card templates.BoardCard, canMove bool) {
 						@ui.Icon("lock", "sm")
 					</span>
 				}
-				@PriorityBadge(card.Priority)
+				if card.Priority > 0 {
+					@PriorityBadge(card.Priority)
+				}
 			</div>
 		</div>
 		<p class="mt-1.5 text-sm text-gray-900 dark:text-gray-100">{ card.Title }</p>

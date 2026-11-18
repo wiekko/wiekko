@@ -118,13 +118,13 @@ func (s *requirementStore) ListByProductID(ctx context.Context, productID string
 		query += ` AND sprint_id = ?`
 		args = append(args, filter.SprintID)
 	}
-	query += ` ORDER BY priority DESC, created_at`
+	query += ` ORDER BY ` + itemOrder
 	return s.listRequirements(ctx, query, args...)
 }
 
 func (s *requirementStore) ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error) {
 	return s.listRequirements(ctx,
-		`SELECT `+requirementColumns+` FROM requirements WHERE parent_id = ? ORDER BY priority DESC, created_at`,
+		`SELECT `+requirementColumns+` FROM requirements WHERE parent_id = ? ORDER BY `+itemOrder,
 		parentID)
 }
 
@@ -136,13 +136,13 @@ func (s *requirementStore) SetParent(ctx context.Context, id, parentID, updatedA
 
 func (s *requirementStore) ListBySprintID(ctx context.Context, sprintID string) ([]*model.Requirement, error) {
 	return s.listRequirements(ctx,
-		`SELECT `+requirementColumns+` FROM requirements WHERE sprint_id = ? ORDER BY priority DESC, created_at`,
+		`SELECT `+requirementColumns+` FROM requirements WHERE sprint_id = ? ORDER BY `+itemOrder,
 		sprintID)
 }
 
 func (s *requirementStore) ListByMilestoneID(ctx context.Context, milestoneID string) ([]*model.Requirement, error) {
 	return s.listRequirements(ctx,
-		`SELECT `+requirementColumns+` FROM requirements WHERE milestone_id = ? ORDER BY priority DESC, created_at`,
+		`SELECT `+requirementColumns+` FROM requirements WHERE milestone_id = ? ORDER BY `+itemOrder,
 		milestoneID)
 }
 
@@ -165,7 +165,7 @@ func (s *requirementStore) Unassign(ctx context.Context, requirementID, userID s
 func (s *requirementStore) ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, requirement_id, user_id, created_at
-		 FROM requirement_assignments WHERE requirement_id = ? ORDER BY created_at`,
+		 FROM requirement_assignments WHERE requirement_id = ? ORDER BY created_at, id`,
 		requirementID)
 	if err != nil {
 		return nil, err

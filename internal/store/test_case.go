@@ -150,7 +150,7 @@ func (s *testCaseStore) UnlinkRequirement(ctx context.Context, testCaseID, requi
 func (s *testCaseStore) ListRequirementLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, test_case_id, requirement_id, link_type, created_at
-		 FROM test_case_requirements WHERE test_case_id = ? ORDER BY created_at`,
+		 FROM test_case_requirements WHERE test_case_id = ? ORDER BY created_at, id`,
 		testCaseID)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (s *testCaseStore) ListRequirementLinks(ctx context.Context, testCaseID str
 func (s *testCaseStore) ListTestCaseLinksByRequirement(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, test_case_id, requirement_id, link_type, created_at
-		 FROM test_case_requirements WHERE requirement_id = ? ORDER BY created_at`,
+		 FROM test_case_requirements WHERE requirement_id = ? ORDER BY created_at, id`,
 		requirementID)
 	if err != nil {
 		return nil, err

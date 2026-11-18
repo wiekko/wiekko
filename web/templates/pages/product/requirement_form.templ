@@ -187,7 +187,7 @@ templ RequirementFormBody(props RequirementFormProps) {
 					Value:       props.Priority,
 					Type:        "number",
 					Placeholder: "0",
-					HelpText:    "Lower numbers indicate higher priority.",
+					HelpText:    "Lower numbers indicate higher priority: 1 is the highest, 0 means none.",
 				})
 				@ui.Checkbox("is_coarse", "is_coarse", "Needs refinement (coarse requirement)", props.IsCoarse, false)
 				if props.LinkTo != "" {

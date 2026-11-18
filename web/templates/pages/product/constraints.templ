@@ -100,7 +100,7 @@ templ ConstraintsPage(props ConstraintsProps) {
 										@complianceBadge(c.ComplianceState)
 									}
 									@ui.TableCellMuted() {
-										{ fmt.Sprintf("%d", c.Priority) }
+										@patterns.PriorityBadge(c.Priority)
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(c.CreatedAt) }

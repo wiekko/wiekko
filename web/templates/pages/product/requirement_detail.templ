@@ -112,7 +112,9 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 				if props.Product.EstimationMode != model.EstimationModeDisabled {
 					@patterns.DetailField("Estimation", formatEstimation(props.Product.EstimationMode, props.Requirement.Estimation))
 				}
-				@patterns.DetailField("Priority", fmt.Sprintf("%d", props.Requirement.Priority))
+				@patterns.DetailFieldSlot("Priority") {
+					@patterns.PriorityBadge(props.Requirement.Priority)
+				}
 				@patterns.DetailField("Coarse", boolDisplay(props.Requirement.IsCoarse))
 				@patterns.DetailField("Active", boolDisplay(props.Requirement.IsActive))
 				@patterns.DetailField("Created", formatDate(props.Requirement.CreatedAt))

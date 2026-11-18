@@ -101,7 +101,7 @@ templ RequirementsPage(props RequirementsProps) {
 										@workflowStatusCell(props.Statuses, req.StatusID)
 									}
 									@ui.TableCellMuted() {
-										{ fmt.Sprintf("%d", req.Priority) }
+										@patterns.PriorityBadge(req.Priority)
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(req.CreatedAt) }

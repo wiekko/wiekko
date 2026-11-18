@@ -193,9 +193,10 @@ func TestDefectStoreSortOrder(t *testing.T) {
 				want:   []string{"Critical issue", "High issue", "Medium issue", "Low issue"},
 			},
 			{
+				// Default order: highest priority (lowest number) first (DF-2).
 				name:   "unknown sort key falls back to the default order",
 				params: ListParams{Sort: "; DROP TABLE defects", Dir: SortAsc},
-				want:   []string{"Low issue", "High issue", "Medium issue", "Critical issue"},
+				want:   []string{"Critical issue", "Medium issue", "High issue", "Low issue"},
 			},
 		}
 

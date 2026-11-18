@@ -144,7 +144,7 @@ func (s *capabilityStore) UnlinkRequirement(ctx context.Context, capabilityID, r
 func (s *capabilityStore) ListRequirementsByCapability(ctx context.Context, capabilityID string) ([]*model.RequirementCapability, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, requirement_id, capability_id, created_at
-		 FROM requirement_capabilities WHERE capability_id = ? ORDER BY created_at`,
+		 FROM requirement_capabilities WHERE capability_id = ? ORDER BY created_at, id`,
 		capabilityID)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (s *capabilityStore) ListRequirementsByCapability(ctx context.Context, capa
 func (s *capabilityStore) ListCapabilitiesByRequirement(ctx context.Context, requirementID string) ([]*model.RequirementCapability, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, requirement_id, capability_id, created_at
-		 FROM requirement_capabilities WHERE requirement_id = ? ORDER BY created_at`,
+		 FROM requirement_capabilities WHERE requirement_id = ? ORDER BY created_at, id`,
 		requirementID)
 	if err != nil {
 		return nil, err
