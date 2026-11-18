@@ -1321,6 +1321,7 @@ func (c *PageProductController) MilestoneDetail(w http.ResponseWriter, r *http.R
 		Milestone:      m,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
 		TabCounts:      c.milestoneTabCounts(r, user, p.ID, m.ID, p.WorkflowMode),
+		Progress:       c.milestoneProgress(r, user, p.ID, m.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -1547,7 +1548,41 @@ func (c *PageProductController) MilestoneOverviewTab(w http.ResponseWriter, r *h
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestoneOverviewTabContent(m).Render(r.Context(), w)
+	_ = productpage.MilestoneOverviewTabContent(m, c.milestoneProgress(r, user, productID, milestoneID)).Render(r.Context(), w)
+}
+
+// milestoneProgress counts the requirements, tasks and defects assigned to a
+// milestone and how many of them are in a closed status (UR-158). It is the
+// sprint summary's method: an item is done when its status is closed.
+func (c *PageProductController) milestoneProgress(r *http.Request, user *model.User, productID, milestoneID string) productpage.MilestoneProgress {
+	items, _ := c.backlog.ListRequirementsByMilestone(r.Context(), user, productID, milestoneID)
+	defects, _ := c.backlog.ListDefectsByMilestone(r.Context(), user, productID, milestoneID)
+	reqStatuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
+	defStatuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "defect")
+	return buildMilestoneProgress(items, defects, closedStatusSet(reqStatuses), closedStatusSet(defStatuses))
+}
+
+func buildMilestoneProgress(items []*model.Requirement, defects []*model.Defect, closedReq, closedDef map[string]bool) productpage.MilestoneProgress {
+	var p productpage.MilestoneProgress
+	count := func(kind *productpage.ProgressCount, closed bool) {
+		kind.Total++
+		p.Overall.Total++
+		if closed {
+			kind.Completed++
+			p.Overall.Completed++
+		}
+	}
+	for _, item := range items {
+		if item.Kind == model.RequirementKindTask {
+			count(&p.Tasks, closedReq[item.StatusID])
+		} else {
+			count(&p.Requirements, closedReq[item.StatusID])
+		}
+	}
+	for _, d := range defects {
+		count(&p.Defects, closedDef[d.StatusID])
+	}
+	return p
 }
 
 // --- Milestone link tabs (FR-19, FR-31, FR-35) ---

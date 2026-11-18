@@ -19,6 +19,7 @@ type MilestoneDetailProps struct {
 	Milestone      *model.Milestone
 	IsOwnerOrAdmin bool
 	TabCounts      map[string]int // tab ID → number of linked items (UC-88)
+	Progress       MilestoneProgress
 }
 
 templ MilestoneDetailPage(props MilestoneDetailProps) {
@@ -51,7 +52,7 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 			@ui.TabGroup(templates.WithCounts(milestoneDetailTabs(props.Product.ID, props.Milestone.ID, props.Product.WorkflowMode), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@MilestoneOverviewTabContent(props.Milestone)
+				@MilestoneOverviewTabContent(props.Milestone, props.Progress)
 			}
 			@ui.TabPanelHidden("components") {
 				@ui.LoadingSpinner("md")
@@ -86,17 +87,80 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 	}
 }
 
-templ MilestoneOverviewTabContent(m *model.Milestone) {
+// ProgressCount is how many items of one kind are done (in a closed status)
+// out of all assigned.
+type ProgressCount struct {
+	Total     int
+	Completed int
+}
+
+// Percent is the share of completed items, rounded down as on sprints.
+func (p ProgressCount) Percent() int {
+	if p.Total == 0 {
+		return 0
+	}
+	return p.Completed * 100 / p.Total
+}
+
+// MilestoneProgress holds the completion of the items assigned to a
+// milestone (UR-158), overall and per kind.
+type MilestoneProgress struct {
+	Overall      ProgressCount
+	Requirements ProgressCount
+	Tasks        ProgressCount
+	Defects      ProgressCount
+}
+
+templ MilestoneOverviewTabContent(m *model.Milestone, progress MilestoneProgress) {
+	<div class="space-y-6">
+		@ui.Card() {
+			@ui.CardBody() {
+				@patterns.DetailGrid() {
+					@patterns.DetailField("Type", milestoneTypeLabel(m.Type))
+					@patterns.DetailField("Due Date", milestoneDate(m.DueDate))
+					@patterns.DetailField("Created", formatDate(m.CreatedAt))
+					@patterns.DetailField("Last Updated", formatDate(m.UpdatedAt))
+				}
+				@patterns.DetailDescription(m.Description)
+			}
+		}
+		@milestoneProgressCard(progress)
+	</div>
+}
+
+// milestoneProgressCard shows the overall completion and one bar per kind,
+// in the colours the board uses for requirements, tasks and defects.
+templ milestoneProgressCard(progress MilestoneProgress) {
 	@ui.Card() {
 		@ui.CardBody() {
-			@patterns.DetailGrid() {
-				@patterns.DetailField("Type", milestoneTypeLabel(m.Type))
-				@patterns.DetailField("Due Date", milestoneDate(m.DueDate))
-				@patterns.DetailField("Created", formatDate(m.CreatedAt))
-				@patterns.DetailField("Last Updated", formatDate(m.UpdatedAt))
-			}
-			@patterns.DetailDescription(m.Description)
+			<div id="milestone-progress" class="space-y-6">
+				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Progress</h3>
+				if progress.Overall.Total == 0 {
+					<p class="text-sm text-gray-500 dark:text-gray-400">No requirements, tasks or defects are assigned to this milestone yet.</p>
+				} else {
+					@patterns.DetailGrid() {
+						@patterns.DetailField("Assigned", fmt.Sprintf("%d items", progress.Overall.Total))
+						@patterns.DetailField("Completed", fmt.Sprintf("%d items", progress.Overall.Completed))
+					}
+					@ui.ProgressBar(progress.Overall.Percent(), "green", "Completion")
+					<div class="space-y-4">
+						@milestoneKindProgress("requirements", "Requirements", "blue", progress.Requirements)
+						@milestoneKindProgress("tasks", "Tasks", "emerald", progress.Tasks)
+						@milestoneKindProgress("defects", "Defects", "red", progress.Defects)
+					</div>
+				}
+			</div>
 		}
+	}
+}
+
+// milestoneKindProgress renders one kind's bar; kinds with nothing assigned
+// are left out.
+templ milestoneKindProgress(id, label, color string, count ProgressCount) {
+	if count.Total > 0 {
+		<div data-progress={ id }>
+			@ui.ProgressBar(count.Percent(), color, fmt.Sprintf("%s (%d of %d)", label, count.Completed, count.Total))
+		</div>
 	}
 }
 

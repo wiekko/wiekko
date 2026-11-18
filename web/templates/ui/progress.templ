@@ -3,7 +3,7 @@ package ui
 import "fmt"
 
 // ProgressBar renders a horizontal progress indicator.
-// Color: "indigo", "green", "yellow", "red". Defaults to "indigo".
+// Color: "indigo", "green", "yellow", "red", "blue", "emerald". Defaults to "indigo".
 templ ProgressBar(percent int, color, label string) {
 	<div class="w-full">
 		if label != "" {
@@ -29,6 +29,10 @@ func progressColor(color string) string {
 		return "bg-yellow-500"
 	case "red":
 		return "bg-red-500"
+	case "blue":
+		return "bg-blue-500"
+	case "emerald":
+		return "bg-emerald-500"
 	default:
 		return "bg-indigo-600"
 	}
