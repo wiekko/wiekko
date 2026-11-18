@@ -29,6 +29,7 @@ type TaskDetailProps struct {
 	ParentIdentifier string // e.g. "FR-1" or "MT-3"
 	ParentPath       string // detail URL of the parent, whichever kind it is
 	Children         []*model.Requirement
+	Inherited        InheritedCapabilities // from the requirement it refines (UR-160)
 	CanEdit          bool
 }
 
@@ -107,6 +108,7 @@ templ TaskOverviewTabContent(props TaskDetailProps) {
 				@patterns.DetailField("Last Updated", formatDate(props.Task.UpdatedAt))
 			}
 			@patterns.DetailDescription(props.Task.Description)
+			@InheritedCapabilityList(props.Product.ID, props.Inherited)
 		}
 	}
 	if len(props.Children) > 0 {

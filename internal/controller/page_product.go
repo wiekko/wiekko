@@ -4345,6 +4345,10 @@ func (c *PageProductController) loadHostDefectsTabProps(r *http.Request, user *m
 	}
 
 	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, h.target, hostID)
+	var derived []productpage.DerivedDefect
+	if h.target == model.DefectLinkTargetComponent {
+		derived = c.componentDefectsViaCapabilities(r, user, productID, hostID, defects)
+	}
 
 	return productpage.HostDefectsTabProps{
 		BaseURL:   h.baseURL(productID, hostID),
@@ -4354,6 +4358,7 @@ func (c *PageProductController) loadHostDefectsTabProps(r *http.Request, user *m
 		CanUnlink: c.canRemoveDefectLinksForRole(user, role),
 		Defects:   defects,
 		LinkIDs:   linkIDs,
+		Derived:   derived,
 	}, nil
 }
 
@@ -5681,6 +5686,7 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
 		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkRequirement, req.ID),
+		Components:       c.requirementComponents(r, user, productID, req.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -6042,6 +6048,7 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
 		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkRequirement, req.ID),
+		Components:       c.requirementComponents(r, user, productID, req.ID),
 	}).Render(r.Context(), w)
 }
 

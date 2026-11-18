@@ -168,7 +168,10 @@ func TestStructureBacklinks(t *testing.T) {
 		refuse("component overview", compOverview, "Backlog schema")
 		defects := get(owner, compURL+"/tabs/defects")
 		expect("component defects", defects, compDefect.Title, "Unlink defect")
-		refuse("component defects", defects, capDefect.Title)
+		// The capability's defect is only derived (UR-160), not linked directly.
+		if i := strings.Index(defects, `data-derived="defects"`); i < 0 || strings.Contains(defects[:i], capDefect.Title) {
+			t.Errorf("component defects: %q should be listed via the capability only", capDefect.Title)
+		}
 		expect("component defect search", get(owner, compURL+"/defects/link-search?q=backlog"), capDefect.Title)
 		if status, body := do(owner, http.MethodPost, compURL+"/defects/link", url.Values{"defect_id": {capDefect.ID}}); status != http.StatusOK {
 			t.Fatalf("link a defect to the component: %d %s", status, body)
@@ -188,5 +191,171 @@ func TestStructureBacklinks(t *testing.T) {
 		// The capability's Defects tab still works through the shared handlers.
 		capDefects := get(owner, capURL+"/tabs/defects")
 		expect("capability defects", capDefects, capDefect.Title, capURL+"/defects/link-modal")
+	})
+}
+
+// TestDerivedLinks checks the links derived one step along the product
+// structure (UR-160): a requirement shows its components via its
+// capabilities, a task the capabilities of the requirement it refines, and a
+// component the requirements and defects of its capabilities. Derived links
+// are read-only, name what they come through, and never repeat a direct link.
+func TestDerivedLinks(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		admin, pid := e.admin, e.product.ID
+		must := func(err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		component := func(name string) *model.Component {
+			t.Helper()
+			c, err := e.svc.Component.CreateComponent(ctx, admin, service.CreateComponentInput{ProductID: pid, Name: name})
+			must(err)
+			return c
+		}
+		capability := func(name string, comp *model.Component) *model.Capability {
+			t.Helper()
+			in := service.CreateCapabilityInput{ProductID: pid, Name: name}
+			if comp != nil {
+				in.ComponentID = comp.ID
+			}
+			c, err := e.svc.Component.CreateCapability(ctx, admin, in)
+			must(err)
+			return c
+		}
+		item := func(kind, title, parentID string, caps ...*model.Capability) *model.Requirement {
+			t.Helper()
+			r, err := e.svc.Backlog.CreateRequirement(ctx, admin, service.CreateRequirementInput{ProductID: pid, Kind: kind, Title: title, ParentID: parentID})
+			must(err)
+			for _, c := range caps {
+				must(e.svc.Component.LinkRequirementToCapability(ctx, admin, pid, c.ID, r.ID))
+			}
+			return r
+		}
+		defect := func(title string, links ...[2]string) *model.Defect {
+			t.Helper()
+			d, err := e.svc.Backlog.CreateDefect(ctx, admin, service.CreateDefectInput{ProductID: pid, Title: title, Criticality: "medium"})
+			must(err)
+			for _, l := range links {
+				must(e.svc.Backlog.AddDefectLink(ctx, admin, pid, d.ID, l[0], l[1]))
+			}
+			return d
+		}
+
+		server, web := component("Server"), component("Web UI")
+		backlog, search := capability("Backlog", server), capability("Search", server)
+		board := capability("Board", web)
+		audit := capability("Audit trail", nil) // product level: no component
+		req := item(model.RequirementKindRequirement, "Record a sighting", "", backlog, search, board, audit)
+		other := item(model.RequirementKindRequirement, "Drag cards", "", board)
+		task := item(model.RequirementKindTask, "Write the handler", req.ID)
+		subtask := item(model.RequirementKindTask, "Add the route", task.ID)
+		loose := item(model.RequirementKindTask, "Tidy up", "")
+		both := defect("Crash on save",
+			[2]string{model.DefectLinkTargetComponent, server.ID}, [2]string{model.DefectLinkTargetCapability, backlog.ID})
+		twice := defect("Slow queries",
+			[2]string{model.DefectLinkTargetCapability, backlog.ID}, [2]string{model.DefectLinkTargetCapability, search.ID})
+		elsewhere := defect("Card flickers", [2]string{model.DefectLinkTargetCapability, board.ID})
+
+		cookie := func() *http.Cookie {
+			resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+			for _, c := range resp.Cookies() {
+				if c.Name == "nexmap_session" && c.Value != "" {
+					return c
+				}
+			}
+			t.Fatalf("no session cookie, status %d", resp.StatusCode)
+			return nil
+		}()
+		get := func(path string) string {
+			t.Helper()
+			req, err := http.NewRequest(http.MethodGet, e.srv.URL+path, nil)
+			must(err)
+			req.AddCookie(cookie)
+			resp, err := e.client().Do(req)
+			must(err)
+			body := readBody(t, resp)
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("GET %s: status %d", path, resp.StatusCode)
+			}
+			return body
+		}
+		// section returns the part of a page from a data-derived marker on.
+		section := func(body, marker string) string {
+			t.Helper()
+			i := strings.Index(body, `data-derived="`+marker+`"`)
+			if i < 0 {
+				t.Fatalf("no derived %s section", marker)
+			}
+			return body[i:]
+		}
+		p := "/products/" + pid
+		capHref := func(c *model.Capability) string { return `href="` + p + "/capabilities/" + c.ID + `"` }
+		compHref := func(c *model.Component) string { return `href="` + p + "/components/" + c.ID + `"` }
+
+		// A requirement shows its components, each via its capabilities;
+		// the product-level capability adds none.
+		for _, page := range []string{p + "/requirements/" + req.ID, p + "/requirements/" + req.ID + "/tabs/overview"} {
+			comps := section(get(page), "components")
+			for _, want := range []string{compHref(server), compHref(web), capHref(backlog), capHref(search), capHref(board)} {
+				if !strings.Contains(comps, want) {
+					t.Errorf("%s: components missing %s", page, want)
+				}
+			}
+			if strings.Contains(comps, capHref(audit)) {
+				t.Errorf("%s: product-level capability listed under components", page)
+			}
+			if strings.Count(comps, compHref(server)) != 1 {
+				t.Errorf("%s: Server listed %d times, want once", page, strings.Count(comps, compHref(server)))
+			}
+		}
+
+		// A task, also below another task, inherits the requirement's
+		// capabilities and their components; a top-level task has none.
+		for _, tk := range []*model.Requirement{task, subtask} {
+			page := get(p + "/tasks/" + tk.ID)
+			caps := section(page, "capabilities")
+			for _, want := range []string{capHref(backlog), capHref(audit), compHref(server), `href="` + p + "/requirements/" + req.ID + `"`} {
+				if !strings.Contains(caps, want) {
+					t.Errorf("task %s: inherited capabilities missing %s", tk.Title, want)
+				}
+			}
+		}
+		if strings.Contains(get(p+"/tasks/"+loose.ID), `data-derived="capabilities"`) {
+			t.Error("a top-level task shows inherited capabilities")
+		}
+
+		// A component shows the requirements of its capabilities, once each.
+		reqs := get(p + "/components/" + server.ID + "/tabs/requirements")
+		if !strings.Contains(reqs, req.Title) || strings.Contains(reqs, other.Title) {
+			t.Errorf("component requirements: want %q only, got %s", req.Title, reqs)
+		}
+		if strings.Count(reqs, req.Title) != 1 || !strings.Contains(reqs, capHref(backlog)) || !strings.Contains(reqs, capHref(search)) {
+			t.Errorf("component requirements: want %q once, via Backlog and Search", req.Title)
+		}
+		if strings.Contains(reqs, "Unlink") {
+			t.Error("derived requirements offer an unlink")
+		}
+
+		// A component's Defects tab lists defects of its capabilities below
+		// its own, read-only, and a direct link wins over a derived one.
+		defects := get(p + "/components/" + server.ID + "/tabs/defects")
+		derived := section(defects, "defects")
+		direct := defects[:strings.Index(defects, `data-derived="defects"`)]
+		if !strings.Contains(direct, both.Title) || strings.Contains(derived, both.Title) {
+			t.Errorf("defect linked directly and via a capability: want it under direct links only")
+		}
+		if strings.Count(derived, twice.Title) != 1 || !strings.Contains(derived, capHref(backlog)) || !strings.Contains(derived, capHref(search)) {
+			t.Errorf("defect via two capabilities: want it once, via both")
+		}
+		if strings.Contains(defects, elsewhere.Title) {
+			t.Error("defect of another component's capability listed")
+		}
+		if strings.Contains(derived, "Unlink defect") {
+			t.Error("derived defects offer an unlink")
+		}
 	})
 }

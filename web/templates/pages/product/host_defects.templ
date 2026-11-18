@@ -17,6 +17,9 @@ type HostDefectsTabProps struct {
 	CanUnlink bool
 	Defects   []*model.Defect
 	LinkIDs   map[string]string // defect ID → DefectLink ID
+	// Derived holds, for a component, the defects linked to its capabilities
+	// but not to the component itself (UR-160).
+	Derived []DerivedDefect
 }
 
 templ HostDefectsTabContent(props HostDefectsTabProps) {
@@ -105,6 +108,7 @@ templ HostDefectsTabContent(props HostDefectsTabProps) {
 				}
 			}
 		}
+		@derivedDefectsSection(props.ProductID, props.Derived)
 	</div>
 }
 

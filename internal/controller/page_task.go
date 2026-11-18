@@ -383,6 +383,7 @@ func (c *PageProductController) taskDetailProps(r *http.Request, user *model.Use
 		ParentIdentifier: parentIdentifier,
 		ParentPath:       parentPath,
 		Children:         children,
+		Inherited:        c.inheritedCapabilities(r, user, p.ID, task),
 		CanEdit:          c.canEditRequirements(user, role),
 	}
 }

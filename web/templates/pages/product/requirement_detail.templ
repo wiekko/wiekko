@@ -26,6 +26,7 @@ type RequirementDetailProps struct {
 	ParentIdentifier string // e.g. "FR-1"
 	Children         []*model.Requirement
 	Documents        []*model.Document // linked documents (FR-141)
+	Components       []DerivedComponent // via its capabilities (UR-160)
 	CanEdit          bool
 }
 
@@ -115,6 +116,7 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 			@patterns.DetailDescription(props.Requirement.Description)
 			@patterns.DetailMarkdownSection("Definition of Done", props.Requirement.DefinitionOfDone)
 			@LinkedDocuments(props.Product.ID, props.Documents)
+			@DerivedComponents(props.Product.ID, props.Components)
 		}
 	}
 	if len(props.Children) > 0 {

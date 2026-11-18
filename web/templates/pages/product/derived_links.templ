@@ -1,0 +1,216 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/ui"
+)
+
+// Derived links (UR-160) follow the product structure one step:
+// component → capability → requirement → task. They are read-only and name
+// what they come through, so they are never mistaken for a link someone
+// made; the stored link is changed on the page named in "via".
+
+// DerivedComponent is a component reached through the named capabilities.
+type DerivedComponent struct {
+	Component *model.Component
+	Via       []*model.Capability
+}
+
+// DerivedRequirement is a requirement linked to the named capabilities of a
+// component.
+type DerivedRequirement struct {
+	Requirement *model.Requirement
+	Identifier  string
+	Via         []*model.Capability
+}
+
+// DerivedDefect is a defect linked to the named capabilities of a component,
+// but not to the component itself.
+type DerivedDefect struct {
+	Defect *model.Defect
+	Via    []*model.Capability
+}
+
+// InheritedCapabilities are the capabilities of the requirement a task
+// refines, its nearest requirement ancestor.
+type InheritedCapabilities struct {
+	SourceIdentifier string
+	SourcePath       string
+	Capabilities     []*model.Capability
+	ComponentNames   map[string]string // capability ID → component name
+}
+
+templ viaCapabilities(productID string, caps []*model.Capability) {
+	<span class="text-gray-500 dark:text-gray-400">
+		via
+		for i, cap := range caps {
+			if i > 0 {
+				{ ", " }
+			}
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", productID, cap.ID)) }
+				class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+			>
+				{ cap.Name }
+			</a>
+		}
+	</span>
+}
+
+// DerivedComponents lists a requirement's components, reached through its
+// capabilities.
+templ DerivedComponents(productID string, comps []DerivedComponent) {
+	if len(comps) > 0 {
+		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700" data-derived="components">
+			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Components</h3>
+			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Derived from the linked capabilities.</p>
+			<ul class="mt-2 space-y-1">
+				for _, d := range comps {
+					<li class="flex flex-wrap items-baseline gap-x-2 text-sm">
+						@componentLink(productID, d.Component.ID, d.Component.Name)
+						@viaCapabilities(productID, d.Via)
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}
+
+// InheritedCapabilityList shows a task the capabilities and components of the
+// requirement it refines.
+templ InheritedCapabilityList(productID string, inh InheritedCapabilities) {
+	if len(inh.Capabilities) > 0 {
+		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700" data-derived="capabilities">
+			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Capabilities</h3>
+			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+				Inherited via <a href={ templ.SafeURL(inh.SourcePath) } class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">{ inh.SourceIdentifier }</a>{ "; change them there." }
+			</p>
+			<ul class="mt-2 space-y-1">
+				for _, cap := range inh.Capabilities {
+					<li class="flex flex-wrap items-baseline gap-x-2 text-sm">
+						<a
+							href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", productID, cap.ID)) }
+							class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+						>
+							{ cap.Name }
+						</a>
+						if cap.ComponentID != "" && inh.ComponentNames[cap.ID] != "" {
+							<span class="text-gray-500 dark:text-gray-400">in</span>
+							@componentLink(productID, cap.ComponentID, inh.ComponentNames[cap.ID])
+						}
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}
+
+// ComponentRequirementsTabProps holds data for a component's Requirements
+// tab: the requirements of its capabilities.
+type ComponentRequirementsTabProps struct {
+	ProductID    string
+	Requirements []DerivedRequirement
+}
+
+templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
+	<div class="space-y-4">
+		<p class="text-sm text-gray-500 dark:text-gray-400">
+			Requirements linked to this component's capabilities. Link or unlink them on the capability.
+		</p>
+		if len(props.Requirements) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("list", "No requirements", "Requirements linked to this component's capabilities will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Via
+						}
+					}
+					@ui.TableBody("") {
+						for _, d := range props.Requirements {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ d.Identifier }</span>
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(backlogChildHref(props.ProductID, d.Requirement)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ d.Requirement.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@viaCapabilities(props.ProductID, d.Via)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// derivedDefectsSection lists, below a component's own defects, those linked
+// to its capabilities.
+templ derivedDefectsSection(productID string, defects []DerivedDefect) {
+	if len(defects) > 0 {
+		<div class="space-y-2" data-derived="defects">
+			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Via capabilities</h3>
+			<p class="text-xs text-gray-500 dark:text-gray-400">Linked to this component's capabilities; unlink them there.</p>
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Criticality
+						}
+						@ui.TableHeader() {
+							Via
+						}
+					}
+					@ui.TableBody("") {
+						for _, d := range defects {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ d.Defect.Identifier }</span>
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", productID, d.Defect.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ d.Defect.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									{ d.Defect.Criticality }
+								}
+								@ui.TableCellMuted() {
+									@viaCapabilities(productID, d.Via)
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}

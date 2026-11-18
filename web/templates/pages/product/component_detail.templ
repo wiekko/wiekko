@@ -55,6 +55,9 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 			@ui.TabPanelHidden("capabilities") {
 				@ui.LoadingSpinner("md")
 			}
+			@ui.TabPanelHidden("requirements") {
+				@ui.LoadingSpinner("md")
+			}
 			@ui.TabPanelHidden("test-cases") {
 				@ui.LoadingSpinner("md")
 			}
@@ -402,6 +405,7 @@ func componentDetailTabs(productID, componentID string) []templates.TabDef {
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
 		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
+		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},

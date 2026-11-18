@@ -180,6 +180,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("POST /products/{id}/components/{componentId}/capabilities/link", pageAuthed(http.HandlerFunc(productCtrl.ComponentCapabilityLink)))
 	mux.Handle("POST /products/{id}/components/{componentId}/capabilities", pageAuthed(http.HandlerFunc(productCtrl.ComponentCapabilityCreateAndLink)))
 	mux.Handle("DELETE /products/{id}/components/{componentId}/capabilities/{capabilityId}", pageAuthed(http.HandlerFunc(productCtrl.ComponentCapabilityUnlink)))
+	mux.Handle("GET /products/{id}/components/{componentId}/tabs/requirements", pageAuthed(http.HandlerFunc(productCtrl.ComponentRequirementsTab)))
 	mux.Handle("GET /products/{id}/components/{componentId}/tabs/test-cases", pageAuthed(http.HandlerFunc(productCtrl.ComponentTestCasesTab)))
 	mux.Handle("GET /products/{id}/components/{componentId}/test-cases/link-modal", pageAuthed(http.HandlerFunc(productCtrl.ComponentTestCaseLinkModal)))
 	mux.Handle("GET /products/{id}/components/{componentId}/test-cases/link-search", pageAuthed(http.HandlerFunc(productCtrl.ComponentTestCaseLinkSearch)))
