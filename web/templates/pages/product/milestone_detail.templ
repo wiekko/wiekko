@@ -18,7 +18,7 @@ type MilestoneDetailProps struct {
 	Product        *model.Product
 	Milestone      *model.Milestone
 	IsOwnerOrAdmin bool
-	TabCounts map[string]int // tab ID → number of linked items (UC-88)
+	TabCounts      map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ MilestoneDetailPage(props MilestoneDetailProps) {
@@ -48,7 +48,7 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 				@milestoneTypeBadge(props.Milestone.Type)
 			}
 			<!-- Tabs -->
-			@ui.TabGroup(templates.WithCounts(milestoneDetailTabs(props.Product.ID, props.Milestone.ID), props.TabCounts))
+			@ui.TabGroup(templates.WithCounts(milestoneDetailTabs(props.Product.ID, props.Milestone.ID, props.Product.WorkflowMode), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
 				@MilestoneOverviewTabContent(props.Milestone)
@@ -68,8 +68,10 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 			@ui.TabPanelHidden("defects") {
 				@ui.LoadingSpinner("md")
 			}
-			@ui.TabPanelHidden("sprints") {
-				@ui.LoadingSpinner("md")
+			if props.Product.WorkflowMode == model.WorkflowModeScrum {
+				@ui.TabPanelHidden("sprints") {
+					@ui.LoadingSpinner("md")
+				}
 			}
 			@ui.TabPanelHidden("comments") {
 				@ui.LoadingSpinner("md")
@@ -977,9 +979,11 @@ templ MilestoneDeleteConfirmation(name, productID, milestoneID, csrfToken string
 	@patterns.DeleteConfirmation("milestone", name, fmt.Sprintf("/products/%s/milestones/%s", productID, milestoneID), csrfToken)
 }
 
-func milestoneDetailTabs(productID, milestoneID string) []templates.TabDef {
+// milestoneDetailTabs lists the milestone tabs. Sprints exist only in Scrum,
+// so the Sprints tab is left out for Kanban products (UR-157).
+func milestoneDetailTabs(productID, milestoneID, workflowMode string) []templates.TabDef {
 	base := fmt.Sprintf("/products/%s/milestones/%s/tabs", productID, milestoneID)
-	return []templates.TabDef{
+	tabs := []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
 		{ID: "components", Label: "Components", HxGet: base + "/components"},
 		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
@@ -991,6 +995,16 @@ func milestoneDetailTabs(productID, milestoneID string) []templates.TabDef {
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},
 	}
+	if workflowMode == model.WorkflowModeScrum {
+		return tabs
+	}
+	out := tabs[:0]
+	for _, t := range tabs {
+		if t.ID != "sprints" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func milestoneDetailSubtitle(m *model.Milestone) string {

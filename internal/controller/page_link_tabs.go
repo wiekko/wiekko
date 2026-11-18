@@ -181,21 +181,24 @@ func (c *PageProductController) defectTabCounts(r *http.Request, user *model.Use
 	})
 }
 
-func (c *PageProductController) milestoneTabCounts(r *http.Request, user *model.User, productID, id string) map[string]int {
+func (c *PageProductController) milestoneTabCounts(r *http.Request, user *model.User, productID, id, workflowMode string) map[string]int {
 	comps, compsErr := c.loadMilestoneComponentsTabProps(r, user, productID, id)
 	caps, capsErr := c.loadMilestoneCapabilitiesTabProps(r, user, productID, id)
 	reqs, reqsErr := c.loadMilestoneRequirementsTabProps(r, user, productID, id)
 	cons, consErr := c.loadMilestoneConstraintsTabProps(r, user, productID, id)
 	defs, defsErr := c.loadMilestoneDefectsTabProps(r, user, productID, id)
-	sprints, sprintsErr := c.loadMilestoneSprintsTabProps(r, user, productID, id)
-	return c.discussionCounts(r, user, productID, model.OwnerTypeMilestone, id, map[string]int{
+	counts := map[string]int{
 		"components":   countOf(comps, compsErr, func(p productpage.MilestoneComponentsTabProps) int { return len(p.Components) + len(p.Affected) }),
 		"capabilities": countOf(caps, capsErr, func(p productpage.MilestoneCapabilitiesTabProps) int { return len(p.Capabilities) + len(p.Affected) }),
 		"requirements": countOf(reqs, reqsErr, func(p productpage.MilestoneRequirementsTabProps) int { return len(p.Requirements) }),
 		"constraints":  countOf(cons, consErr, func(p productpage.MilestoneConstraintsTabProps) int { return len(p.Constraints) }),
 		"defects":      countOf(defs, defsErr, func(p productpage.MilestoneDefectsTabProps) int { return len(p.Defects) }),
-		"sprints":      countOf(sprints, sprintsErr, func(p productpage.MilestoneSprintsTabProps) int { return len(p.Sprints) }),
-	})
+	}
+	if workflowMode == model.WorkflowModeScrum { // no Sprints tab in Kanban (UR-157)
+		sprints, err := c.loadMilestoneSprintsTabProps(r, user, productID, id)
+		counts["sprints"] = countOf(sprints, err, func(p productpage.MilestoneSprintsTabProps) int { return len(p.Sprints) })
+	}
+	return c.discussionCounts(r, user, productID, model.OwnerTypeMilestone, id, counts)
 }
 
 func (c *PageProductController) documentTabCounts(r *http.Request, user *model.User, productID, id string) map[string]int {

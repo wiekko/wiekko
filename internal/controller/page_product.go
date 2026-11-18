@@ -1320,7 +1320,7 @@ func (c *PageProductController) MilestoneDetail(w http.ResponseWriter, r *http.R
 		Product:        p,
 		Milestone:      m,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
-		TabCounts:      c.milestoneTabCounts(r, user, p.ID, m.ID),
+		TabCounts:      c.milestoneTabCounts(r, user, p.ID, m.ID, p.WorkflowMode),
 	}).Render(r.Context(), w)
 }
 
