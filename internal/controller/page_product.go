@@ -1701,6 +1701,7 @@ func (c *PageProductController) loadMilestoneComponentsTabProps(r *http.Request,
 	}
 
 	items, _ := c.component.ListComponentsByMilestone(r.Context(), user, productID, milestoneID)
+	_, affected := c.milestoneAffected(r, user, productID, milestoneID)
 
 	return productpage.MilestoneComponentsTabProps{
 		ProductID:   productID,
@@ -1708,6 +1709,7 @@ func (c *PageProductController) loadMilestoneComponentsTabProps(r *http.Request,
 		CSRFToken:   csrfToken,
 		CanWrite:    c.canEditMilestoneLinks(user, role),
 		Components:  items,
+		Affected:    affected,
 	}, nil
 }
 
@@ -1850,6 +1852,7 @@ func (c *PageProductController) loadMilestoneCapabilitiesTabProps(r *http.Reques
 	}
 
 	items, _ := c.component.ListCapabilitiesByMilestone(r.Context(), user, productID, milestoneID)
+	affected, _ := c.milestoneAffected(r, user, productID, milestoneID)
 
 	return productpage.MilestoneCapabilitiesTabProps{
 		ProductID:    productID,
@@ -1857,6 +1860,7 @@ func (c *PageProductController) loadMilestoneCapabilitiesTabProps(r *http.Reques
 		CSRFToken:    csrfToken,
 		CanWrite:     c.canEditMilestoneLinks(user, role),
 		Capabilities: items,
+		Affected:     affected,
 	}, nil
 }
 

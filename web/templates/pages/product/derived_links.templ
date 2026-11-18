@@ -168,3 +168,73 @@ templ derivedDefectsSection(productID string, defects []DerivedDefect) {
 		</div>
 	}
 }
+
+// ViaRequirement names a requirement a derived item comes through.
+type ViaRequirement struct {
+	Identifier string
+	Href       string
+}
+
+// AffectedItem is a component or capability that a milestone's requirements
+// touch without it being planned for the milestone itself (UR-161).
+type AffectedItem struct {
+	Name string
+	Href string
+	Via  []ViaRequirement
+}
+
+// affectedSection lists, below what is planned for a milestone, the parts
+// of the product its requirements affect. Planning happens in the section
+// above; this one only reads.
+templ affectedSection(items []AffectedItem, noun string) {
+	if len(items) > 0 {
+		<div class="space-y-2" data-derived="affected">
+			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Affected via requirements</h3>
+			<p class="text-xs text-gray-500 dark:text-gray-400">
+				{ "Not planned for this milestone, but linked to its requirements through their capabilities. Link a " + noun + " above to plan it." }
+			</p>
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Name
+						}
+						@ui.TableHeader() {
+							Via
+						}
+					}
+					@ui.TableBody("") {
+						for _, it := range items {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(it.Href) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ it.Name }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									<span class="text-gray-500 dark:text-gray-400">
+										via
+										for i, v := range it.Via {
+											if i > 0 {
+												{ ", " }
+											}
+											<a
+												href={ templ.SafeURL(v.Href) }
+												class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+											>
+												{ v.Identifier }
+											</a>
+										}
+									</span>
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}

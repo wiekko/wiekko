@@ -459,3 +459,151 @@ func TestDiscussionTabCounts(t *testing.T) {
 		}
 	})
 }
+
+// TestMilestoneAffected checks that a milestone's Components and
+// Capabilities tabs list, below what is planned for the milestone, the parts
+// of the product its requirements affect through their capabilities. Each
+// names the requirements it comes through, is read-only, and appears once:
+// as planned if it is (UR-161).
+func TestMilestoneAffected(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		admin, pid := e.admin, e.product.ID
+		must := func(err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		m, err := e.svc.Milestone.CreateMilestone(ctx, admin, service.CreateMilestoneInput{ProductID: pid, Name: "v2"})
+		must(err)
+		component := func(name, milestoneID string) *model.Component {
+			t.Helper()
+			c, err := e.svc.Component.CreateComponent(ctx, admin, service.CreateComponentInput{ProductID: pid, Name: name, MilestoneID: milestoneID})
+			must(err)
+			return c
+		}
+		capability := func(name string, comp *model.Component, milestoneID string) *model.Capability {
+			t.Helper()
+			in := service.CreateCapabilityInput{ProductID: pid, Name: name, MilestoneID: milestoneID}
+			if comp != nil {
+				in.ComponentID = comp.ID
+			}
+			c, err := e.svc.Component.CreateCapability(ctx, admin, in)
+			must(err)
+			return c
+		}
+		requirement := func(title, milestoneID string, caps ...*model.Capability) *model.Requirement {
+			t.Helper()
+			r, err := e.svc.Backlog.CreateRequirement(ctx, admin, service.CreateRequirementInput{ProductID: pid, Title: title, MilestoneID: milestoneID})
+			must(err)
+			for _, c := range caps {
+				must(e.svc.Component.LinkRequirementToCapability(ctx, admin, pid, c.ID, r.ID))
+			}
+			return r
+		}
+
+		server, web := component("Server", m.ID), component("Web UI", "")
+		backlog := capability("Backlog", server, m.ID)
+		search := capability("Search", server, "")
+		board := capability("Board", web, "")
+		audit := capability("Audit trail", nil, "")
+		cards := capability("Cards", web, "")
+		first := requirement("Record a sighting", m.ID, backlog, board)
+		second := requirement("Find a sighting", m.ID, board, search, audit)
+		requirement("Drag cards", "", cards)
+
+		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+		var cookie *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" && c.Value != "" {
+				cookie = c
+			}
+		}
+		if cookie == nil {
+			t.Fatal("no session cookie")
+		}
+		do := func(method, path string, form url.Values) string {
+			t.Helper()
+			req, err := http.NewRequest(method, e.srv.URL+path, strings.NewReader(form.Encode()))
+			must(err)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(cookie)
+			if method != http.MethodGet {
+				req.Header.Set("X-CSRF-Token", csrfToken(t, e, cookie))
+				req.Header.Set("HX-Request", "true")
+			}
+			resp, err := e.client().Do(req)
+			must(err)
+			body := readBody(t, resp)
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("%s %s: status %d", method, path, resp.StatusCode)
+			}
+			return body
+		}
+		split := func(body string) (planned, affected string) {
+			t.Helper()
+			i := strings.Index(body, `data-derived="affected"`)
+			if i < 0 {
+				return body, ""
+			}
+			return body[:i], body[i:]
+		}
+		p := "/products/" + pid
+		base := p + "/milestones/" + m.ID
+		reqHref := func(r *model.Requirement) string { return `href="` + p + "/requirements/" + r.ID + `"` }
+		capHref := func(c *model.Capability) string { return `href="` + p + "/capabilities/" + c.ID + `"` }
+
+		// Capabilities: Backlog is planned; Board, Search and the
+		// product-level Audit trail are affected; Cards is not touched.
+		planned, affected := split(do(http.MethodGet, base+"/tabs/capabilities", nil))
+		if !strings.Contains(planned, capHref(backlog)) || strings.Contains(affected, capHref(backlog)) {
+			t.Error("planned capability: want it under planned only")
+		}
+		for _, c := range []*model.Capability{board, search, audit} {
+			if strings.Count(affected, capHref(c)) != 1 {
+				t.Errorf("affected capabilities: want %s once", c.Name)
+			}
+		}
+		if strings.Contains(affected, capHref(cards)) {
+			t.Error("a capability of a requirement outside the milestone is listed")
+		}
+		if !strings.Contains(affected, reqHref(first)) || !strings.Contains(affected, reqHref(second)) {
+			t.Error("affected capabilities do not name the requirements they come through")
+		}
+		if strings.Contains(affected, "Remove this") {
+			t.Error("affected capabilities offer an unlink")
+		}
+
+		// Components: Server is planned (and affected), Web UI only affected,
+		// named once although two requirements reach it.
+		compPlanned, compAffected := split(do(http.MethodGet, base+"/tabs/components", nil))
+		serverHref := `href="` + p + "/components/" + server.ID + `"`
+		webHref := `href="` + p + "/components/" + web.ID + `"`
+		if !strings.Contains(compPlanned, serverHref) || strings.Contains(compAffected, serverHref) {
+			t.Error("planned component: want it under planned only")
+		}
+		if strings.Count(compAffected, webHref) != 1 || !strings.Contains(compAffected, reqHref(first)) || !strings.Contains(compAffected, reqHref(second)) {
+			t.Error("affected component: want Web UI once, via both requirements")
+		}
+
+		// The counts include both sections.
+		page := do(http.MethodGet, base, nil)
+		for _, want := range []string{`id="tab-count-capabilities"`, `id="tab-count-components"`} {
+			if !strings.Contains(page, want) {
+				t.Errorf("milestone page: missing %s", want)
+			}
+		}
+		if !strings.Contains(do(http.MethodGet, base+"/tabs/capabilities", nil), `data-tab-count="4"`) {
+			t.Error("capabilities count: want 4 (1 planned, 3 affected)")
+		}
+
+		// Planning an affected capability moves it up.
+		do(http.MethodPost, base+"/capabilities/link", url.Values{"capability_id": {board.ID}})
+		after, afterAffected := split(do(http.MethodGet, base+"/tabs/capabilities", nil))
+		if !strings.Contains(after, capHref(board)) || strings.Contains(afterAffected, capHref(board)) {
+			t.Error("a capability planned for the milestone is still listed as affected")
+		}
+	})
+}

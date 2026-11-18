@@ -189,8 +189,8 @@ func (c *PageProductController) milestoneTabCounts(r *http.Request, user *model.
 	defs, defsErr := c.loadMilestoneDefectsTabProps(r, user, productID, id)
 	sprints, sprintsErr := c.loadMilestoneSprintsTabProps(r, user, productID, id)
 	return c.discussionCounts(r, user, productID, model.OwnerTypeMilestone, id, map[string]int{
-		"components":   countOf(comps, compsErr, func(p productpage.MilestoneComponentsTabProps) int { return len(p.Components) }),
-		"capabilities": countOf(caps, capsErr, func(p productpage.MilestoneCapabilitiesTabProps) int { return len(p.Capabilities) }),
+		"components":   countOf(comps, compsErr, func(p productpage.MilestoneComponentsTabProps) int { return len(p.Components) + len(p.Affected) }),
+		"capabilities": countOf(caps, capsErr, func(p productpage.MilestoneCapabilitiesTabProps) int { return len(p.Capabilities) + len(p.Affected) }),
 		"requirements": countOf(reqs, reqsErr, func(p productpage.MilestoneRequirementsTabProps) int { return len(p.Requirements) }),
 		"constraints":  countOf(cons, consErr, func(p productpage.MilestoneConstraintsTabProps) int { return len(p.Constraints) }),
 		"defects":      countOf(defs, defsErr, func(p productpage.MilestoneDefectsTabProps) int { return len(p.Defects) }),

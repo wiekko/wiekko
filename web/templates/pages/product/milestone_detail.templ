@@ -105,10 +105,11 @@ type MilestoneComponentsTabProps struct {
 	CSRFToken   string
 	CanWrite    bool
 	Components []*model.Component
+	Affected   []AffectedItem // via the milestone's requirements (UR-161)
 }
 
 templ MilestoneComponentsTabContent(props MilestoneComponentsTabProps) {
-	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Components)) }>
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Components) + len(props.Affected)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -177,6 +178,7 @@ templ MilestoneComponentsTabContent(props MilestoneComponentsTabProps) {
 				}
 			}
 		}
+		@affectedSection(props.Affected, "component")
 	</div>
 }
 
@@ -249,10 +251,11 @@ type MilestoneCapabilitiesTabProps struct {
 	CSRFToken   string
 	CanWrite    bool
 	Capabilities []*model.Capability
+	Affected   []AffectedItem // via the milestone's requirements (UR-161)
 }
 
 templ MilestoneCapabilitiesTabContent(props MilestoneCapabilitiesTabProps) {
-	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Capabilities)) }>
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Capabilities) + len(props.Affected)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -321,6 +324,7 @@ templ MilestoneCapabilitiesTabContent(props MilestoneCapabilitiesTabProps) {
 				}
 			}
 		}
+		@affectedSection(props.Affected, "capability")
 	</div>
 }
 

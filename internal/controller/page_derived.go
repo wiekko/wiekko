@@ -157,3 +157,65 @@ func (c *PageProductController) ComponentRequirementsTab(w http.ResponseWriter, 
 		Requirements: c.componentRequirements(r, user, productID, componentID),
 	}).Render(r.Context(), w)
 }
+
+// milestoneAffected returns the capabilities and components a milestone's
+// requirements are linked to, through their capabilities, but which are not
+// planned for the milestone themselves (UR-161). Each names the requirements
+// it comes through. Planned items are listed once, as planned.
+func (c *PageProductController) milestoneAffected(r *http.Request, user *model.User, productID, milestoneID string) (caps, comps []productpage.AffectedItem) {
+	reqs, _ := c.backlog.ListRequirementsByMilestone(r.Context(), user, productID, milestoneID)
+	if len(reqs) == 0 {
+		return nil, nil
+	}
+	// Name the requirements in identifier order, not backlog order.
+	sort.SliceStable(reqs, func(a, b int) bool { return reqs[a].SequenceNumber < reqs[b].SequenceNumber })
+	components, _ := c.component.ListComponents(r.Context(), user, productID)
+	byID := make(map[string]*model.Component, len(components))
+	for _, comp := range components {
+		byID[comp.ID] = comp
+	}
+	prefixes := c.buildBacklogPrefixMap(r, user, productID)
+
+	type entry struct {
+		item productpage.AffectedItem
+		seen map[string]bool // requirement IDs already named
+	}
+	add := func(list *[]*entry, index map[string]*entry, key, name, href string, via productpage.ViaRequirement, reqID string) {
+		e, ok := index[key]
+		if !ok {
+			e = &entry{item: productpage.AffectedItem{Name: name, Href: href}, seen: map[string]bool{}}
+			index[key] = e
+			*list = append(*list, e)
+		}
+		if !e.seen[reqID] {
+			e.seen[reqID] = true
+			e.item.Via = append(e.item.Via, via)
+		}
+	}
+	var capList, compList []*entry
+	capIndex, compIndex := map[string]*entry{}, map[string]*entry{}
+	for _, req := range reqs {
+		linked, _ := c.component.ListLinkedCapabilities(r.Context(), user, productID, req.ID)
+		via := productpage.ViaRequirement{
+			Identifier: model.EntityIdentifier(categoryPrefix(prefixes, req.CategoryID), req.SequenceNumber),
+			Href:       backlogItemPath(productID, req),
+		}
+		for _, capa := range linked {
+			if capa.MilestoneID != milestoneID {
+				add(&capList, capIndex, capa.ID, capa.Name, "/products/"+productID+"/capabilities/"+capa.ID, via, req.ID)
+			}
+			if comp, ok := byID[capa.ComponentID]; ok && comp.MilestoneID != milestoneID {
+				add(&compList, compIndex, comp.ID, comp.Name, "/products/"+productID+"/components/"+comp.ID, via, req.ID)
+			}
+		}
+	}
+	flatten := func(list []*entry) []productpage.AffectedItem {
+		out := make([]productpage.AffectedItem, 0, len(list))
+		for _, e := range list {
+			out = append(out, e.item)
+		}
+		sort.SliceStable(out, func(a, b int) bool { return out[a].Name < out[b].Name })
+		return out
+	}
+	return flatten(capList), flatten(compList)
+}
