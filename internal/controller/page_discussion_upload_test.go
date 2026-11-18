@@ -97,6 +97,8 @@ func newUploadController(t *testing.T, maxBytes int64) *PageProductController {
 		Comment: &testutil.MockCommentStore{},
 		Attachment: &testutil.MockAttachmentStore{
 			CreateFunc: func(_ context.Context, _ *model.Attachment) error { return nil },
+			// The tab label's count is refreshed after an upload (UC-88).
+			ListByOwnerFunc: func(_ context.Context, _, _, _ string) ([]*model.Attachment, error) { return nil, nil },
 		},
 		Audit: &testutil.MockAuditStore{
 			CreateFunc: func(_ context.Context, _ *model.AuditEntry) error { return nil },

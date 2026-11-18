@@ -19,7 +19,7 @@ type ComponentDetailProps struct {
 	Component      *model.Component
 	MilestoneName  string
 	IsOwnerOrAdmin bool
-	Documents      []*model.Document // documents that belong to the component (UR-159)
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ ComponentDetailPage(props ComponentDetailProps) {
@@ -47,10 +47,10 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 				props.Meta.CSRFToken,
 			)
 			<!-- Tabs -->
-			@ui.TabGroup(componentDetailTabs(props.Product.ID, props.Component.ID))
+			@ui.TabGroup(templates.WithCounts(componentDetailTabs(props.Product.ID, props.Component.ID), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@ComponentOverviewTabContent(props.Product.ID, props.Component, props.MilestoneName, props.Documents)
+				@ComponentOverviewTabContent(props.Product.ID, props.Component, props.MilestoneName)
 			}
 			@ui.TabPanelHidden("capabilities") {
 				@ui.LoadingSpinner("md")
@@ -62,6 +62,9 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("defects") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("documents") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("comments") {
@@ -77,7 +80,7 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 	}
 }
 
-templ ComponentOverviewTabContent(productID string, c *model.Component, milestoneName string, docs []*model.Document) {
+templ ComponentOverviewTabContent(productID string, c *model.Component, milestoneName string) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -86,7 +89,6 @@ templ ComponentOverviewTabContent(productID string, c *model.Component, mileston
 				@patterns.DetailField("Last Updated", formatDate(c.UpdatedAt))
 			}
 			@patterns.DetailDescription(c.Description)
-			@LinkedDocuments(productID, docs)
 		}
 	}
 }
@@ -101,7 +103,7 @@ type ComponentCapabilitiesTabProps struct {
 }
 
 templ ComponentCapabilitiesTabContent(props ComponentCapabilitiesTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Capabilities)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -249,7 +251,7 @@ type ComponentTestCasesTabProps struct {
 }
 
 templ ComponentTestCasesTabContent(props ComponentTestCasesTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.TestCases)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -408,6 +410,7 @@ func componentDetailTabs(productID, componentID string) []templates.TabDef {
 		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
+		{ID: "documents", Label: "Documents", HxGet: base + "/documents"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},

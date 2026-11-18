@@ -20,8 +20,8 @@ type ConstraintDetailProps struct {
 	CategoryPrefixes map[string]string // category ID → prefix
 	CategoryNames    map[string]string // category ID → name
 	MilestoneName    string
-	Documents        []*model.Document // linked documents (FR-141)
 	CanEdit          bool
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ ConstraintDetailPage(props ConstraintDetailProps) {
@@ -51,12 +51,15 @@ templ ConstraintDetailPage(props ConstraintDetailProps) {
 				@ui.Badge(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), "indigo")
 			}
 			<!-- Tabs -->
-			@ui.TabGroup(constraintDetailTabs(props.Product.ID, props.Constraint.ID))
+			@ui.TabGroup(templates.WithCounts(constraintDetailTabs(props.Product.ID, props.Constraint.ID), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
 				@ConstraintOverviewTabContent(props)
 			}
 			@ui.TabPanelHidden("capabilities") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("documents") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("comments") {
@@ -94,7 +97,6 @@ templ ConstraintOverviewTabContent(props ConstraintDetailProps) {
 				@patterns.DetailField("Last Updated", formatDate(props.Constraint.UpdatedAt))
 			}
 			@patterns.DetailDescription(props.Constraint.Description)
-			@LinkedDocuments(props.Product.ID, props.Documents)
 		}
 	}
 }
@@ -127,7 +129,7 @@ type ConstraintCapabilitiesTabProps struct {
 }
 
 templ ConstraintCapabilitiesTabContent(props ConstraintCapabilitiesTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Capabilities)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -278,6 +280,7 @@ func constraintDetailTabs(productID, constraintID string) []templates.TabDef {
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
 		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
+		{ID: "documents", Label: "Documents", HxGet: base + "/documents"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},

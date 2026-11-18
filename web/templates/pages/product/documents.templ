@@ -218,6 +218,7 @@ type DocumentDetailProps struct {
 	CapabilityName string
 	MilestoneName  string
 	CanEdit        bool
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ DocumentDetailPage(props DocumentDetailProps) {
@@ -246,7 +247,7 @@ templ DocumentDetailPage(props DocumentDetailProps) {
 			) {
 				@documentStateBadge(props.Document.State)
 			}
-			@ui.TabGroup(documentDetailTabs(props.Product.ID, props.Document.ID))
+			@ui.TabGroup(templates.WithCounts(documentDetailTabs(props.Product.ID, props.Document.ID), props.TabCounts))
 			@ui.TabPanel("overview") {
 				@DocumentOverviewTabContent(props)
 			}
@@ -360,7 +361,7 @@ type DocumentLinksTabProps struct {
 }
 
 templ DocumentLinksTabContent(props DocumentLinksTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Requirements) + len(props.Constraints) + len(props.TestCases)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end">
 				@ui.Button(ui.ButtonProps{
@@ -909,25 +910,3 @@ func documentSuccessorOptions(list []*model.Document, self *model.Document, curr
 	return opts
 }
 
-// LinkedDocuments lists the documents linked to a requirement, constraint
-// or test case (FR-141), for its overview.
-templ LinkedDocuments(productID string, docs []*model.Document) {
-	if len(docs) > 0 {
-		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
-			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Documents</h3>
-			<ul class="mt-2 space-y-1">
-				for _, d := range docs {
-					<li class="flex items-center gap-2 text-sm">
-						<a href={ templ.SafeURL(documentURL(productID, d.ID)) } class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
-							<span class="font-medium">{ d.Identifier }</span>
-							{ d.Title }
-						</a>
-						if d.State != model.DocumentStateCurrent {
-							@documentStateBadge(d.State)
-						}
-					</li>
-				}
-			</ul>
-		</div>
-	}
-}

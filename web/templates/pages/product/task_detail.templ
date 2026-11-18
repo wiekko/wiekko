@@ -29,8 +29,8 @@ type TaskDetailProps struct {
 	ParentIdentifier string // e.g. "FR-1" or "MT-3"
 	ParentPath       string // detail URL of the parent, whichever kind it is
 	Children         []*model.Requirement
-	Inherited        InheritedCapabilities // from the requirement it refines (UR-160)
 	CanEdit          bool
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ TaskDetailPage(props TaskDetailProps) {
@@ -60,10 +60,16 @@ templ TaskDetailPage(props TaskDetailProps) {
 				@ui.Badge(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), "emerald")
 			}
 			<!-- Tabs -->
-			@ui.TabGroup(taskDetailTabs(props.Product.ID, props.Task.ID))
+			@ui.TabGroup(templates.WithCounts(taskDetailTabs(props.Product.ID, props.Task.ID), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
 				@TaskOverviewTabContent(props)
+			}
+			@ui.TabPanelHidden("children") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("capabilities") {
+				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("comments") {
 				@ui.LoadingSpinner("md")
@@ -108,47 +114,6 @@ templ TaskOverviewTabContent(props TaskDetailProps) {
 				@patterns.DetailField("Last Updated", formatDate(props.Task.UpdatedAt))
 			}
 			@patterns.DetailDescription(props.Task.Description)
-			@InheritedCapabilityList(props.Product.ID, props.Inherited)
-		}
-	}
-	if len(props.Children) > 0 {
-		@ui.Card() {
-			@ui.CardBody() {
-				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Child Tasks</h3>
-				@ui.Table() {
-					@ui.TableHead() {
-						@ui.TableHeader() {
-							ID
-						}
-						@ui.TableHeader() {
-							Title
-						}
-						@ui.TableHeader() {
-							Category
-						}
-					}
-					@ui.TableBody("") {
-						for _, child := range props.Children {
-							@ui.TableRow("") {
-								@ui.TableCellMuted() {
-									{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, child.CategoryID), child.SequenceNumber) }
-								}
-								@ui.TableCell() {
-									<a
-										href={ templ.SafeURL(fmt.Sprintf("/products/%s/tasks/%s", props.Product.ID, child.ID)) }
-										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-									>
-										{ child.Title }
-									</a>
-								}
-								@ui.TableCellMuted() {
-									@ui.Badge(requirementPrefix(props.CategoryPrefixes, child.CategoryID), "emerald")
-								}
-							}
-						}
-					}
-				}
-			}
 		}
 	}
 }
@@ -172,6 +137,8 @@ func taskDetailTabs(productID, taskID string) []templates.TabDef {
 	base := fmt.Sprintf("/products/%s/tasks/%s/tabs", productID, taskID)
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "children", Label: "Children", HxGet: base + "/children"},
+		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},

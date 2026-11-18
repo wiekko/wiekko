@@ -21,8 +21,8 @@ type TestCaseDetailProps struct {
 	CapabilityName    string
 	PyramidLevelName  string
 	EnvironmentNames  []string
-	Documents         []*model.Document // linked documents (FR-141)
 	CanEdit           bool // developer, owner, or admin
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ TestCaseDetailPage(props TestCaseDetailProps) {
@@ -52,12 +52,15 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 				@executionModeBadge(props.TestCase.ExecutionMode)
 			}
 			<!-- Tabs -->
-			@ui.TabGroup(testCaseDetailTabs(props.Product.ID, props.TestCase.ID))
+			@ui.TabGroup(templates.WithCounts(testCaseDetailTabs(props.Product.ID, props.TestCase.ID), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName, props.EnvironmentNames, props.Documents)
+				@TestCaseOverviewTabContent(props.Product.ID, props.TestCase, props.ComponentName, props.CapabilityName, props.PyramidLevelName, props.EnvironmentNames)
 			}
 			@ui.TabPanelHidden("requirements") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("documents") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("campaigns") {
@@ -76,7 +79,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 	}
 }
 
-templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string, environmentNames []string, documents []*model.Document) {
+templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, componentName, capabilityName, pyramidLevelName string, environmentNames []string) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -98,7 +101,6 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 				@patterns.DetailField("Last Updated", formatDate(tc.UpdatedAt))
 			}
 			@patterns.DetailDescription(tc.Description)
-			@LinkedDocuments(productID, documents)
 		}
 	}
 }
@@ -151,7 +153,7 @@ type TestCaseRequirementsTabProps struct {
 }
 
 templ TestCaseRequirementsTabContent(props TestCaseRequirementsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Requirements)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -417,6 +419,7 @@ func testCaseDetailTabs(productID, testCaseID string) []templates.TabDef {
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
 		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
+		{ID: "documents", Label: "Documents", HxGet: base + "/documents"},
 		{ID: "campaigns", Label: "Campaigns", HxGet: base + "/campaigns"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},

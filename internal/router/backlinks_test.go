@@ -125,9 +125,11 @@ func TestStructureBacklinks(t *testing.T) {
 		compLink := `href="` + compURL + `"`
 
 		// Component names link to the component.
-		expect("capability page", get(owner, capURL), compLink, capURL+"/tabs/constraints", "Backlog schema")
-		expect("capability overview", get(owner, capURL+"/tabs/overview"), compLink, "Backlog schema")
-		refuse("capability overview", get(owner, capURL+"/tabs/overview"), "Server protocol")
+		expect("capability page", get(owner, capURL), compLink, capURL+"/tabs/constraints", capURL+"/tabs/documents")
+		expect("capability overview", get(owner, capURL+"/tabs/overview"), compLink)
+		refuse("capability overview", get(owner, capURL+"/tabs/overview"), "Backlog schema")
+		expect("capability documents", get(owner, capURL+"/tabs/documents"), "Backlog schema", `data-tab-count="1"`)
+		refuse("capability documents", get(owner, capURL+"/tabs/documents"), "Server protocol")
 		expect("product-level capability", get(owner, p+"/capabilities/"+productLevel.ID+"/tabs/overview"), "None (top-level)")
 		expect("requirement capabilities", get(owner, p+"/requirements/"+req.ID+"/tabs/capabilities"), compLink)
 		expect("defect capabilities", get(owner, p+"/defects/"+capDefect.ID+"/tabs/capabilities"), compLink)
@@ -162,10 +164,11 @@ func TestStructureBacklinks(t *testing.T) {
 		expect("constraint capabilities", get(owner, p+"/constraints/"+otherCon.ID+"/tabs/capabilities"), capURL)
 
 		// A component lists its own defects and documents.
-		expect("component page", get(owner, compURL), compURL+"/tabs/defects", "Server protocol")
-		compOverview := get(owner, compURL+"/tabs/overview")
-		expect("component overview", compOverview, "Server protocol")
-		refuse("component overview", compOverview, "Backlog schema")
+		expect("component page", get(owner, compURL), compURL+"/tabs/defects", compURL+"/tabs/documents", `id="tab-count-documents"`)
+		refuse("component overview", get(owner, compURL+"/tabs/overview"), "Server protocol")
+		compDocs := get(owner, compURL+"/tabs/documents")
+		expect("component documents", compDocs, "Server protocol")
+		refuse("component documents", compDocs, "Backlog schema")
 		defects := get(owner, compURL+"/tabs/defects")
 		expect("component defects", defects, compDefect.Title, "Unlink defect")
 		// The capability's defect is only derived (UR-160), not linked directly.
@@ -296,35 +299,44 @@ func TestDerivedLinks(t *testing.T) {
 		capHref := func(c *model.Capability) string { return `href="` + p + "/capabilities/" + c.ID + `"` }
 		compHref := func(c *model.Component) string { return `href="` + p + "/components/" + c.ID + `"` }
 
-		// A requirement shows its components, each via its capabilities;
-		// the product-level capability adds none.
-		for _, page := range []string{p + "/requirements/" + req.ID, p + "/requirements/" + req.ID + "/tabs/overview"} {
-			comps := section(get(page), "components")
-			for _, want := range []string{compHref(server), compHref(web), capHref(backlog), capHref(search), capHref(board)} {
-				if !strings.Contains(comps, want) {
-					t.Errorf("%s: components missing %s", page, want)
-				}
-			}
-			if strings.Contains(comps, capHref(audit)) {
-				t.Errorf("%s: product-level capability listed under components", page)
-			}
-			if strings.Count(comps, compHref(server)) != 1 {
-				t.Errorf("%s: Server listed %d times, want once", page, strings.Count(comps, compHref(server)))
+		// A requirement shows its components in its Capabilities tab, next to
+		// the capability each comes through; its Overview lists nothing (UC-88).
+		reqCaps := get(p + "/requirements/" + req.ID + "/tabs/capabilities")
+		for _, want := range []string{compHref(server), compHref(web), capHref(backlog), capHref(search), capHref(board), capHref(audit)} {
+			if !strings.Contains(reqCaps, want) {
+				t.Errorf("requirement capabilities missing %s", want)
 			}
 		}
+		if overview := get(p + "/requirements/" + req.ID + "/tabs/overview"); strings.Contains(overview, compHref(server)) || strings.Contains(overview, task.Title) {
+			t.Error("requirement overview still lists components or children")
+		}
+		expect := func(what, body string, want ...string) {
+			t.Helper()
+			for _, w := range want {
+				if !strings.Contains(body, w) {
+					t.Errorf("%s: missing %q", what, w)
+				}
+			}
+		}
+		expect("requirement children", get(p+"/requirements/"+req.ID+"/tabs/children"), task.Title, `data-tab-count="1"`)
+		expect("requirement page", get(p+"/requirements/"+req.ID), `id="tab-count-children"`, `id="tab-count-capabilities"`, ">4</span>")
 
 		// A task, also below another task, inherits the requirement's
-		// capabilities and their components; a top-level task has none.
+		// capabilities and their components in a read-only Capabilities tab;
+		// a top-level task has none.
 		for _, tk := range []*model.Requirement{task, subtask} {
-			page := get(p + "/tasks/" + tk.ID)
-			caps := section(page, "capabilities")
+			caps := section(get(p+"/tasks/"+tk.ID+"/tabs/capabilities"), "capabilities")
 			for _, want := range []string{capHref(backlog), capHref(audit), compHref(server), `href="` + p + "/requirements/" + req.ID + `"`} {
 				if !strings.Contains(caps, want) {
 					t.Errorf("task %s: inherited capabilities missing %s", tk.Title, want)
 				}
 			}
+			if strings.Contains(get(p+"/tasks/"+tk.ID+"/tabs/overview"), capHref(backlog)) {
+				t.Errorf("task %s: overview still lists capabilities", tk.Title)
+			}
 		}
-		if strings.Contains(get(p+"/tasks/"+loose.ID), `data-derived="capabilities"`) {
+		expect("task children", get(p+"/tasks/"+task.ID+"/tabs/children"), subtask.Title)
+		if strings.Contains(get(p+"/tasks/"+loose.ID+"/tabs/capabilities"), `data-derived="capabilities"`) {
 			t.Error("a top-level task shows inherited capabilities")
 		}
 
@@ -356,6 +368,94 @@ func TestDerivedLinks(t *testing.T) {
 		}
 		if strings.Contains(derived, "Unlink defect") {
 			t.Error("derived defects offer an unlink")
+		}
+	})
+}
+
+// TestDiscussionTabCounts checks that the Comments and Attachments tabs
+// count their items and keep the count current when one is added or
+// deleted, while History shows no count (UC-88).
+func TestDiscussionTabCounts(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		admin, pid := e.admin, e.product.ID
+		comp, err := e.svc.Component.CreateComponent(ctx, admin, service.CreateComponentInput{ProductID: pid, Name: "Server"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.svc.Discussion.CreateComment(ctx, admin, pid, model.OwnerTypeComponent, comp.ID, "First"); err != nil {
+			t.Fatal(err)
+		}
+		att, err := e.svc.Discussion.CreateAttachment(ctx, admin, pid, service.CreateAttachmentInput{
+			OwnerType: model.OwnerTypeComponent, OwnerID: comp.ID, Filename: "log.txt", ContentType: "text/plain", Content: strings.NewReader("boom"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+		var cookie *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" && c.Value != "" {
+				cookie = c
+			}
+		}
+		if cookie == nil {
+			t.Fatal("no session cookie")
+		}
+		do := func(method, path string, form url.Values) string {
+			t.Helper()
+			req, err := http.NewRequest(method, e.srv.URL+path, strings.NewReader(form.Encode()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(cookie)
+			if method != http.MethodGet {
+				req.Header.Set("X-CSRF-Token", csrfToken(t, e, cookie))
+				req.Header.Set("HX-Request", "true")
+			}
+			resp, err := e.client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := readBody(t, resp)
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("%s %s: status %d: %s", method, path, resp.StatusCode, body)
+			}
+			return body
+		}
+		base := "/products/" + pid + "/components/" + comp.ID
+
+		page := do(http.MethodGet, base, nil)
+		for _, want := range []string{`id="tab-count-comments"`, `id="tab-count-attachments"`} {
+			if !strings.Contains(page, want) {
+				t.Errorf("component page: missing %s", want)
+			}
+		}
+		if strings.Contains(page, `id="tab-count-history"`) {
+			t.Error("History tab shows a count")
+		}
+		if body := do(http.MethodGet, base+"/tabs/comments", nil); !strings.Contains(body, `data-tab-count="1"`) {
+			t.Error("comments tab: no count of 1")
+		}
+
+		added := do(http.MethodPost, base+"/comments", url.Values{"body": {"Second"}})
+		if !strings.Contains(added, `id="tab-count-src-comments" hidden data-tab-count="2" hx-swap-oob="true"`) {
+			t.Errorf("adding a comment: count not updated to 2: %s", added)
+		}
+		comments, err := e.svc.Discussion.ListComments(ctx, admin, pid, model.OwnerTypeComponent, comp.ID)
+		if err != nil || len(comments) != 2 {
+			t.Fatalf("comments: %v %v", comments, err)
+		}
+		deleted := do(http.MethodDelete, base+"/comments/"+comments[0].ID, nil)
+		if !strings.Contains(deleted, `id="tab-count-src-comments" hidden data-tab-count="1" hx-swap-oob="true"`) {
+			t.Errorf("deleting a comment: count not updated to 1: %s", deleted)
+		}
+		removed := do(http.MethodDelete, base+"/attachments/"+att.ID, nil)
+		if !strings.Contains(removed, `id="tab-count-src-attachments" hidden data-tab-count="0" hx-swap-oob="true"`) {
+			t.Errorf("deleting an attachment: count not updated to 0: %s", removed)
 		}
 	})
 }

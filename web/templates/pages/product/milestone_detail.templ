@@ -18,6 +18,7 @@ type MilestoneDetailProps struct {
 	Product        *model.Product
 	Milestone      *model.Milestone
 	IsOwnerOrAdmin bool
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ MilestoneDetailPage(props MilestoneDetailProps) {
@@ -47,7 +48,7 @@ templ MilestoneDetailPage(props MilestoneDetailProps) {
 				@milestoneTypeBadge(props.Milestone.Type)
 			}
 			<!-- Tabs -->
-			@ui.TabGroup(milestoneDetailTabs(props.Product.ID, props.Milestone.ID))
+			@ui.TabGroup(templates.WithCounts(milestoneDetailTabs(props.Product.ID, props.Milestone.ID), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
 				@MilestoneOverviewTabContent(props.Milestone)
@@ -107,7 +108,7 @@ type MilestoneComponentsTabProps struct {
 }
 
 templ MilestoneComponentsTabContent(props MilestoneComponentsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Components)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -251,7 +252,7 @@ type MilestoneCapabilitiesTabProps struct {
 }
 
 templ MilestoneCapabilitiesTabContent(props MilestoneCapabilitiesTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Capabilities)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -396,7 +397,7 @@ type MilestoneRequirementsTabProps struct {
 }
 
 templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Requirements)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -539,7 +540,7 @@ type MilestoneConstraintsTabProps struct {
 }
 
 templ MilestoneConstraintsTabContent(props MilestoneConstraintsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Constraints)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -681,7 +682,7 @@ type MilestoneDefectsTabProps struct {
 }
 
 templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Defects)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -829,7 +830,7 @@ type MilestoneSprintsTabProps struct {
 }
 
 templ MilestoneSprintsTabContent(props MilestoneSprintsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Sprints)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{

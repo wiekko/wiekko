@@ -26,6 +26,33 @@ import (
 // request body — the store rows carry no product scope of their own beyond the
 // product_id the service stamps on them.
 
+// --- Tab counts (UC-88) ---
+
+// writeTabCountMarker ends a comments or attachments tab with the number of
+// items, which the tab bar's script copies into the tab label.
+func writeTabCountMarker(w http.ResponseWriter, tabID string, n int) {
+	fmt.Fprintf(w, `<span id="tab-count-src-%s" hidden data-tab-count="%d"></span>`, tabID, n)
+}
+
+// writeTabCountOOB replaces that marker out of band: adding or deleting a
+// comment or attachment swaps a single row, not the whole tab, and the tab
+// bar's script then copies the new number into the label.
+func writeTabCountOOB(w http.ResponseWriter, tabID string, n int) {
+	fmt.Fprintf(w, `<span id="tab-count-src-%s" hidden data-tab-count="%d" hx-swap-oob="true"></span>`, tabID, n)
+}
+
+// discussionCounts adds the number of comments and attachments of an item
+// to the counts of its page's tab labels.
+func (c *PageProductController) discussionCounts(r *http.Request, user *model.User, productID, ownerType, ownerID string, counts map[string]int) map[string]int {
+	if comments, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil {
+		counts["comments"] = len(comments)
+	}
+	if attachments, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil {
+		counts["attachments"] = len(attachments)
+	}
+	return counts
+}
+
 // --- Comments ---
 
 func (c *PageProductController) commentsTab(w http.ResponseWriter, r *http.Request, ownerType, ownerID string) {
@@ -45,6 +72,7 @@ func (c *PageProductController) commentsTab(w http.ResponseWriter, r *http.Reque
 		middleware.CSRFTokenFromContext(r.Context()),
 		canComment,
 	).Render(r.Context(), w)
+	writeTabCountMarker(w, "comments", len(views))
 }
 
 func (c *PageProductController) commentCreate(w http.ResponseWriter, r *http.Request, ownerType, ownerID string) {
@@ -71,6 +99,9 @@ func (c *PageProductController) commentCreate(w http.ResponseWriter, r *http.Req
 		c.commentView(created, user, c.displayNames(r, user), productID, ownerType, ownerID, true),
 		middleware.CSRFTokenFromContext(r.Context()),
 	).Render(r.Context(), w)
+	if all, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil {
+		writeTabCountOOB(w, "comments", len(all))
+	}
 }
 
 func (c *PageProductController) commentDelete(w http.ResponseWriter, r *http.Request, ownerType, ownerID string) {
@@ -86,8 +117,11 @@ func (c *PageProductController) commentDelete(w http.ResponseWriter, r *http.Req
 	// hx-swap="outerHTML" against an empty body removes the row. If that was
 	// the last one, bring the empty state back out of band.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if remaining, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
-		_ = patterns.CommentsEmptied().Render(r.Context(), w)
+	if remaining, err := c.discussion.ListComments(r.Context(), user, productID, ownerType, ownerID); err == nil {
+		if len(remaining) == 0 {
+			_ = patterns.CommentsEmptied().Render(r.Context(), w)
+		}
+		writeTabCountOOB(w, "comments", len(remaining))
 	}
 }
 
@@ -154,6 +188,7 @@ func (c *PageProductController) attachmentsTab(w http.ResponseWriter, r *http.Re
 		canUpload,
 		c.maxUploadBytes,
 	).Render(r.Context(), w)
+	writeTabCountMarker(w, "attachments", len(views))
 }
 
 func (c *PageProductController) attachmentCreate(w http.ResponseWriter, r *http.Request, ownerType, ownerID string) {
@@ -193,6 +228,9 @@ func (c *PageProductController) attachmentCreate(w http.ResponseWriter, r *http.
 		attachmentView(created, productID, ownerType, ownerID, true),
 		middleware.CSRFTokenFromContext(r.Context()),
 	).Render(r.Context(), w)
+	if all, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil {
+		writeTabCountOOB(w, "attachments", len(all))
+	}
 }
 
 func (c *PageProductController) attachmentDelete(w http.ResponseWriter, r *http.Request, ownerType, ownerID string) {
@@ -206,8 +244,11 @@ func (c *PageProductController) attachmentDelete(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if remaining, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil && len(remaining) == 0 {
-		_ = patterns.AttachmentsEmptied().Render(r.Context(), w)
+	if remaining, err := c.discussion.ListAttachments(r.Context(), user, productID, ownerType, ownerID); err == nil {
+		if len(remaining) == 0 {
+			_ = patterns.AttachmentsEmptied().Render(r.Context(), w)
+		}
+		writeTabCountOOB(w, "attachments", len(remaining))
 	}
 }
 

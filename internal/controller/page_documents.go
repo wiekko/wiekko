@@ -107,7 +107,9 @@ func (c *PageProductController) DocumentDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.DocumentDetailPage(c.documentDetailProps(r, user, p, role, d)).Render(r.Context(), w)
+	props := c.documentDetailProps(r, user, p, role, d)
+	props.TabCounts = c.documentTabCounts(r, user, p.ID, d.ID)
+	_ = productpage.DocumentDetailPage(props).Render(r.Context(), w)
 }
 
 // DocumentOverviewTab renders GET /products/{id}/documents/{documentId}/tabs/overview.

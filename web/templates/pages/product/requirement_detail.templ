@@ -25,9 +25,8 @@ type RequirementDetailProps struct {
 	ParentName       string // display name of parent requirement
 	ParentIdentifier string // e.g. "FR-1"
 	Children         []*model.Requirement
-	Documents        []*model.Document // linked documents (FR-141)
-	Components       []DerivedComponent // via its capabilities (UR-160)
 	CanEdit          bool
+	TabCounts map[string]int // tab ID → number of linked items (UC-88)
 }
 
 templ RequirementDetailPage(props RequirementDetailProps) {
@@ -57,10 +56,13 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 				@ui.Badge(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), "blue")
 			}
 			<!-- Tabs -->
-			@ui.TabGroup(requirementDetailTabs(props.Product.ID, props.Requirement.ID))
+			@ui.TabGroup(templates.WithCounts(requirementDetailTabs(props.Product.ID, props.Requirement.ID), props.TabCounts))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
 				@RequirementOverviewTabContent(props)
+			}
+			@ui.TabPanelHidden("children") {
+				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("capabilities") {
 				@ui.LoadingSpinner("md")
@@ -69,6 +71,9 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("defects") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("documents") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("comments") {
@@ -115,48 +120,6 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 			}
 			@patterns.DetailDescription(props.Requirement.Description)
 			@patterns.DetailMarkdownSection("Definition of Done", props.Requirement.DefinitionOfDone)
-			@LinkedDocuments(props.Product.ID, props.Documents)
-			@DerivedComponents(props.Product.ID, props.Components)
-		}
-	}
-	if len(props.Children) > 0 {
-		@ui.Card() {
-			@ui.CardBody() {
-				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Children</h3>
-				@ui.Table() {
-					@ui.TableHead() {
-						@ui.TableHeader() {
-							ID
-						}
-						@ui.TableHeader() {
-							Title
-						}
-						@ui.TableHeader() {
-							Category
-						}
-					}
-					@ui.TableBody("") {
-						for _, child := range props.Children {
-							@ui.TableRow("") {
-								@ui.TableCellMuted() {
-									{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, child.CategoryID), child.SequenceNumber) }
-								}
-								@ui.TableCell() {
-									<a
-										href={ templ.SafeURL(backlogChildHref(props.Product.ID, child)) }
-										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-									>
-										{ child.Title }
-									</a>
-								}
-								@ui.TableCellMuted() {
-									@ui.Badge(requirementPrefix(props.CategoryPrefixes, child.CategoryID), backlogKindBadgeColor(child.Kind))
-								}
-							}
-						}
-					}
-				}
-			}
 		}
 	}
 }
@@ -190,7 +153,7 @@ type RequirementCapabilitiesTabProps struct {
 }
 
 templ RequirementCapabilitiesTabContent(props RequirementCapabilitiesTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Capabilities)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -339,7 +302,7 @@ type RequirementTestCasesTabProps struct {
 }
 
 templ RequirementTestCasesTabContent(props RequirementTestCasesTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.TestCases)) }>
 		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -489,7 +452,7 @@ type RequirementDefectsTabProps struct {
 }
 
 templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Defects)) }>
 		if props.CanLink {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
@@ -650,9 +613,11 @@ func requirementDetailTabs(productID, requirementID string) []templates.TabDef {
 	base := fmt.Sprintf("/products/%s/requirements/%s/tabs", productID, requirementID)
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
+		{ID: "children", Label: "Children", HxGet: base + "/children"},
 		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
+		{ID: "documents", Label: "Documents", HxGet: base + "/documents"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},

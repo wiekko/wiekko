@@ -22,6 +22,21 @@ type TabDef struct {
 	Label  string
 	HxGet  string // URL to load tab content via htmx
 	Active bool
+	// Count, when set, is shown in the label: the number of items a tab
+	// listing links holds (UC-88). The tab's content keeps it current
+	// through a data-tab-count attribute.
+	Count *int
+}
+
+// WithCounts sets the Count of each tab named in counts. Tabs not named keep
+// no count.
+func WithCounts(tabs []TabDef, counts map[string]int) []TabDef {
+	for i := range tabs {
+		if n, ok := counts[tabs[i].ID]; ok {
+			tabs[i].Count = &n
+		}
+	}
+	return tabs
 }
 
 // PageMeta holds metadata for the base layout.

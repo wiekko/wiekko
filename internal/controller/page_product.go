@@ -1320,6 +1320,7 @@ func (c *PageProductController) MilestoneDetail(w http.ResponseWriter, r *http.R
 		Product:        p,
 		Milestone:      m,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
+		TabCounts:      c.milestoneTabCounts(r, user, p.ID, m.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -2562,7 +2563,7 @@ func (c *PageProductController) ComponentDetail(w http.ResponseWriter, r *http.R
 		Component:      comp,
 		MilestoneName:  milestoneName,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
-		Documents:      c.structureDocuments(r, user, productID, store.DocumentFilter{ComponentID: comp.ID}),
+		TabCounts:      c.componentTabCounts(r, user, productID, comp.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -2794,8 +2795,7 @@ func (c *PageProductController) ComponentOverviewTab(w http.ResponseWriter, r *h
 	milestoneName := c.resolveMilestoneName(r, user, productID, comp.MilestoneID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentOverviewTabContent(productID, comp, milestoneName,
-		c.structureDocuments(r, user, productID, store.DocumentFilter{ComponentID: comp.ID})).Render(r.Context(), w)
+	_ = productpage.ComponentOverviewTabContent(productID, comp, milestoneName).Render(r.Context(), w)
 }
 
 // --- Component → Capability (FK 1:N, re-parent semantics) ---
@@ -3337,7 +3337,7 @@ func (c *PageProductController) CapabilityDetail(w http.ResponseWriter, r *http.
 		ComponentName:  componentName,
 		MilestoneName:  milestoneName,
 		IsOwnerOrAdmin: isOwnerOrAdmin,
-		Documents:      c.structureDocuments(r, user, productID, store.DocumentFilter{CapabilityID: f.ID}),
+		TabCounts:      c.capabilityTabCounts(r, user, productID, f.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -3585,8 +3585,7 @@ func (c *PageProductController) CapabilityOverviewTab(w http.ResponseWriter, r *
 	milestoneName := c.resolveMilestoneName(r, user, productID, f.MilestoneID)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CapabilityOverviewTabContent(productID, f, componentName, milestoneName,
-		c.structureDocuments(r, user, productID, store.DocumentFilter{CapabilityID: f.ID})).Render(r.Context(), w)
+	_ = productpage.CapabilityOverviewTabContent(productID, f, componentName, milestoneName).Render(r.Context(), w)
 }
 
 // --- Capability → Requirement (M:N reverse) ---
@@ -4647,7 +4646,7 @@ func (c *PageProductController) TestCaseDetail(w http.ResponseWriter, r *http.Re
 		PyramidLevelName: c.resolvePyramidLevelName(r, user, productID, tc.PyramidLevelID),
 		EnvironmentNames: c.resolveTestCaseEnvironmentNames(r, user, productID, testCaseID),
 		CanEdit:          c.canEditTestCases(user, role),
-		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkTestCase, testCaseID),
+		TabCounts:        c.testCaseTabCounts(r, user, productID, testCaseID),
 	}).Render(r.Context(), w)
 }
 
@@ -5032,7 +5031,7 @@ func (c *PageProductController) TestCaseOverviewTab(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.TestCaseOverviewTabContent(productID, tc, componentName, capabilityName,
-		pyramidLevelName, environmentNames, c.linkedDocuments(r, user, productID, model.DocumentLinkTestCase, testCaseID)).Render(r.Context(), w)
+		pyramidLevelName, environmentNames).Render(r.Context(), w)
 }
 
 // TestCaseRequirementsTab renders GET /products/{id}/test-cases/{testCaseId}/tabs/requirements.
@@ -5685,8 +5684,7 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		ParentIdentifier: parentIdentifier,
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
-		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkRequirement, req.ID),
-		Components:       c.requirementComponents(r, user, productID, req.ID),
+		TabCounts:        c.requirementTabCounts(r, user, productID, req.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -6047,8 +6045,6 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 		ParentIdentifier: parentIdentifier,
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
-		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkRequirement, req.ID),
-		Components:       c.requirementComponents(r, user, productID, req.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -7030,6 +7026,7 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 		Defect:      d,
 		Overview:    c.buildDefectOverview(r, user, p, d),
 		CanEdit:     c.canEditDefects(user, role),
+		TabCounts:   c.defectTabCounts(r, user, p.ID, d.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -8200,7 +8197,7 @@ func (c *PageProductController) ConstraintDetail(w http.ResponseWriter, r *http.
 		CategoryNames:    catNames,
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, con.MilestoneID),
 		CanEdit:          c.canEditConstraints(user, role),
-		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkConstraint, con.ID),
+		TabCounts:        c.constraintTabCounts(r, user, productID, con.ID),
 	}).Render(r.Context(), w)
 }
 
@@ -8479,7 +8476,6 @@ func (c *PageProductController) ConstraintOverviewTab(w http.ResponseWriter, r *
 		CategoryNames:    catNames,
 		MilestoneName:    c.resolveMilestoneName(r, user, productID, con.MilestoneID),
 		CanEdit:          c.canEditConstraints(user, role),
-		Documents:        c.linkedDocuments(r, user, productID, model.DocumentLinkConstraint, con.ID),
 	}).Render(r.Context(), w)
 }
 

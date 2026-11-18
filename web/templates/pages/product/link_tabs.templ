@@ -1,0 +1,152 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/ui"
+)
+
+// Tabs that list links of a detail page which used to sit on its Overview
+// (UC-88): documents, children and a task's inherited capabilities.
+
+// DocumentsTabContent lists the documents of an item. Documents are linked
+// on the document's own page, so this tab only reads.
+templ DocumentsTabContent(productID string, docs []*model.Document, noun string) {
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(docs)) }>
+		if len(docs) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("file-text", "No documents", "Documents linked to this "+noun+" will appear here. Link them on the document's page.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							State
+						}
+					}
+					@ui.TableBody("") {
+						for _, d := range docs {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ d.Identifier }</span>
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(documentURL(productID, d.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ d.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@documentStateBadge(d.State)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// ChildrenTabContent lists the requirements and tasks below a backlog item.
+templ ChildrenTabContent(productID string, children []*model.Requirement, prefixes map[string]string) {
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(children)) }>
+		if len(children) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("list", "No children", "Requirements and tasks that refine this item will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Category
+						}
+					}
+					@ui.TableBody("") {
+						for _, child := range children {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ model.EntityIdentifier(requirementPrefix(prefixes, child.CategoryID), child.SequenceNumber) }</span>
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(backlogChildHref(productID, child)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ child.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@ui.Badge(requirementPrefix(prefixes, child.CategoryID), backlogKindBadgeColor(child.Kind))
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// TaskCapabilitiesTabContent shows a task the capabilities, and their
+// components, of the requirement it refines (UR-160). Tasks cannot be
+// linked to capabilities themselves, so the tab only reads.
+templ TaskCapabilitiesTabContent(productID string, inh InheritedCapabilities) {
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(inh.Capabilities)) }>
+		if len(inh.Capabilities) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("layers", "No capabilities", "Tasks take the capabilities of the requirement they refine; that requirement has none.", "", "")
+			}
+		} else {
+			<p class="text-sm text-gray-500 dark:text-gray-400" data-derived="capabilities">
+				Inherited via <a href={ templ.SafeURL(inh.SourcePath) } class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">{ inh.SourceIdentifier }</a>{ "; change them there." }
+			</p>
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Name
+						}
+						@ui.TableHeader() {
+							Component
+						}
+					}
+					@ui.TableBody("") {
+						for _, cap := range inh.Capabilities {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", productID, cap.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ cap.Name }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@componentLink(productID, cap.ComponentID, inh.ComponentNames[cap.ID])
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}

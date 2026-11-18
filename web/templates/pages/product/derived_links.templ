@@ -59,53 +59,7 @@ templ viaCapabilities(productID string, caps []*model.Capability) {
 	</span>
 }
 
-// DerivedComponents lists a requirement's components, reached through its
-// capabilities.
-templ DerivedComponents(productID string, comps []DerivedComponent) {
-	if len(comps) > 0 {
-		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700" data-derived="components">
-			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Components</h3>
-			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Derived from the linked capabilities.</p>
-			<ul class="mt-2 space-y-1">
-				for _, d := range comps {
-					<li class="flex flex-wrap items-baseline gap-x-2 text-sm">
-						@componentLink(productID, d.Component.ID, d.Component.Name)
-						@viaCapabilities(productID, d.Via)
-					</li>
-				}
-			</ul>
-		</div>
-	}
-}
 
-// InheritedCapabilityList shows a task the capabilities and components of the
-// requirement it refines.
-templ InheritedCapabilityList(productID string, inh InheritedCapabilities) {
-	if len(inh.Capabilities) > 0 {
-		<div class="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700" data-derived="capabilities">
-			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Capabilities</h3>
-			<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-				Inherited via <a href={ templ.SafeURL(inh.SourcePath) } class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">{ inh.SourceIdentifier }</a>{ "; change them there." }
-			</p>
-			<ul class="mt-2 space-y-1">
-				for _, cap := range inh.Capabilities {
-					<li class="flex flex-wrap items-baseline gap-x-2 text-sm">
-						<a
-							href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", productID, cap.ID)) }
-							class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-						>
-							{ cap.Name }
-						</a>
-						if cap.ComponentID != "" && inh.ComponentNames[cap.ID] != "" {
-							<span class="text-gray-500 dark:text-gray-400">in</span>
-							@componentLink(productID, cap.ComponentID, inh.ComponentNames[cap.ID])
-						}
-					</li>
-				}
-			</ul>
-		</div>
-	}
-}
 
 // ComponentRequirementsTabProps holds data for a component's Requirements
 // tab: the requirements of its capabilities.
@@ -115,7 +69,7 @@ type ComponentRequirementsTabProps struct {
 }
 
 templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Requirements)) }>
 		<p class="text-sm text-gray-500 dark:text-gray-400">
 			Requirements linked to this component's capabilities. Link or unlink them on the capability.
 		</p>

@@ -47,13 +47,6 @@ func (c *PageProductController) derivedComponents(r *http.Request, user *model.U
 	return out
 }
 
-// requirementComponents returns the components a requirement reaches through
-// its capabilities.
-func (c *PageProductController) requirementComponents(r *http.Request, user *model.User, productID, requirementID string) []productpage.DerivedComponent {
-	caps, _ := c.component.ListLinkedCapabilities(r.Context(), user, productID, requirementID)
-	return c.derivedComponents(r, user, productID, caps)
-}
-
 // inheritedCapabilities returns the capabilities of the requirement a task
 // refines: its nearest requirement ancestor, as tasks may hang below tasks.
 // Tasks themselves cannot be linked to capabilities.

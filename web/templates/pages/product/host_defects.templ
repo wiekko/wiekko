@@ -23,7 +23,7 @@ type HostDefectsTabProps struct {
 }
 
 templ HostDefectsTabContent(props HostDefectsTabProps) {
-	<div class="space-y-4">
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Defects) + len(props.Derived)) }>
 		if props.CanLink {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
