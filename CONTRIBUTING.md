@@ -77,6 +77,13 @@ a server named by `NEXMAP_TEST_POSTGRES_DSN` (a `postgres://` URL whose role may
 are skipped, not failed; set `NEXMAP_TEST_POSTGRES=required` where PostgreSQL coverage must not be
 skipped silently, such as CI.
 
+Every top-level Go test is a test case in Nexmap, identified as `nexmap.net/<package>.<TestName>`, with a
+pyramid level (Unit; Integration for tests against a database; End-to-End for the CLI's `e2e_*` tests)
+and the capability it belongs to. Register new tests with, for example,
+`go test -json ./internal/service | nexmap test sync --capability Backlog --pyramid-level Unit`, and
+link a test to the requirement it verifies with `nexmap test link <identifier> --req FR-12`. Name the
+requirement in the test's comment, too.
+
 ## Web UI routes and forms
 
 Register signed-in page routes with `pageAuthed` or `pageAdmin` (uploads: `pageUpload`) in
@@ -90,10 +97,10 @@ header from the app layout. A plain HTML form (no `hx-post`) must carry it itsel
 The specification (what Nexmap *shall* do) lives in Nexmap itself, as a product on cloud.nexmap.net that
 `.nexmap.json` binds this repository to; `AGENTS.md` explains how to read it with the `nexmap` CLI or its
 MCP server. Access to that product is by invitation: ask a maintainer for an account, then run
-`nexmap login`. Identifiers in code, comments and docs (FR-…, AC-…, SC-…, UC-…) are the ones in Nexmap.
-`docs/spec/` is being retired: `requirements.md` keeps the earlier identifiers, which each item in Nexmap
-names as its legacy ID. `docs/` describes how Nexmap behaves and how to use it, for administrators, users
-and CLI users; see [docs/index.md](docs/index.md).
+`nexmap login`. Identifiers in code, comments and docs (FR-…, AC-…, SC-…, UC-…, DOC-…) are the ones in
+Nexmap. The specification used to live in `docs/spec/` with other identifiers; each item in Nexmap names
+its earlier one as its legacy ID, and git history has the old files. `docs/` describes how Nexmap behaves
+and how to use it, for administrators, users and CLI users; see [docs/index.md](docs/index.md).
 
 Implementation plans live in `docs/tmp/` while their work is in progress. When a plan is done, move what
 stays true (decisions, configuration, behaviour) into the permanent docs and delete the plan. Permanent
@@ -106,9 +113,9 @@ The user, administrator, CLI and API documentation is published at `docs.nexmap.
 tooling, so none of it is published.
 
 - **What gets published:** only the pages listed in [docs/SUMMARY.md](docs/SUMMARY.md), which is also the
-  site's navigation. Add new pages there. `docs/spec/`, `docs/decisions/` and `docs/tmp/` are left out
-  on purpose. The repository is private, so published pages must not link to it: mention such files by
-  path (`docs/spec/`, `CONTRIBUTING.md`) instead.
+  site's navigation. Add new pages there. `docs/decisions/` and `docs/tmp/` are left out on purpose.
+  The repository is private, so published pages must not link to it: mention such files by path
+  (`docs/decisions/`, `CONTRIBUTING.md`) instead.
 - **Versions:** the site serves `main` as `/latest/` (with a banner saying it may describe unreleased
   features), every release tag `v*` as `/<tag>/`, and the newest release that is not a pre-release as
   `/stable/`, where the site's root redirects. A menu in the header switches between versions. Tags from

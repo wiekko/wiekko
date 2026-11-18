@@ -6817,7 +6817,7 @@ func (c *PageProductController) loadDefectsProps(r *http.Request, user *model.Us
 //
 // The tab fragments elsewhere in this file each get their own route, but a list
 // view cannot: sort, filter and page state has to be bookmarkable
-// (docs/spec/ui-structure.md, "URL = state"), so the controls push their request URL
+// (DOC-1, "URL = state"), so the controls push their request URL
 // into the address bar. A separate fragment route would push that route's URL
 // instead, and the search box — whose URL depends on what the user has typed —
 // cannot precompute a page URL to push in its place. Serving both shapes from

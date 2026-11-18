@@ -1,6 +1,6 @@
 // Package specdoc renders a product specification as Markdown (FR-137): the
 // product structure, constraints, requirements and, on request, tasks, in
-// the style of docs/spec/requirements.md.
+// the style of Nexmap's former docs/spec/requirements.md.
 //
 // Rendering is a pure function of a Document. The caller decides what goes
 // in and in which order; Render only formats, and formats identically for
@@ -148,7 +148,7 @@ func (w *writer) capabilities(caps []Capability) {
 		case desc == "":
 			b.WriteByte('\n')
 		case !strings.Contains(desc, "\n"):
-			b.WriteString(": " + desc + "\n") // like the entries of docs/spec/requirements.md
+			b.WriteString(": " + desc + "\n") // one line per item
 		default:
 			b.WriteString("\n\n" + indent(desc, 2) + "\n")
 		}
@@ -206,8 +206,8 @@ func (w *writer) sections(title string, sections []Section) {
 }
 
 // writeItems writes items as a bullet list indented by depth*2 spaces.
-// Items with nothing but a title stay on one line, like the entries of
-// docs/spec/requirements.md; anything more follows as indented paragraphs.
+// Items with nothing but a title stay on one line, like the entries of the
+// former docs/spec/requirements.md; anything more follows as indented paragraphs.
 func writeItems(b *strings.Builder, items []Item, depth int) {
 	pad := strings.Repeat(" ", depth*2)
 	for i, it := range items {

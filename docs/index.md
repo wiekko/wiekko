@@ -35,7 +35,7 @@ Developers, CI pipelines and AI agents working with the `nexmap` command line cl
 
 The source repository holds the material for contributors that this documentation leaves out:
 
-- `docs/spec/`, the specification: what Nexmap *shall* do, with requirement identifiers. It describes
-  targets, not necessarily the current behaviour;
+- the specification: what Nexmap *shall* do, with requirement identifiers, kept in Nexmap itself
+  (`CONTRIBUTING.md` explains access). It describes targets, not necessarily the current behaviour;
 - `docs/decisions/`, the design decisions and their reasoning;
 - `CONTRIBUTING.md`: building, testing, and how this documentation is organised and published.
