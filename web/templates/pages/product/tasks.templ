@@ -95,10 +95,10 @@ templ TasksPage(props TasksProps) {
 										</a>
 									}
 									@ui.TableCellMuted() {
-										@ui.Badge(requirementPrefix(props.CategoryPrefixes, task.CategoryID), "emerald")
+										@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, task.CategoryID), model.RequirementKindTask)
 									}
 									@ui.TableCellMuted() {
-										@workflowStatusCell(props.Statuses, task.StatusID)
+										@patterns.WorkflowStatusBadge(props.Statuses, task.StatusID)
 									}
 									@ui.TableCellMuted() {
 										@patterns.PriorityBadge(task.Priority)

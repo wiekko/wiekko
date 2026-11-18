@@ -57,7 +57,7 @@ templ TaskDetailPage(props TaskDetailProps) {
 				taskDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@ui.Badge(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), "emerald")
+				@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), model.RequirementKindTask)
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(taskDetailTabs(props.Product.ID, props.Task.ID), props.TabCounts))
@@ -89,7 +89,9 @@ templ TaskOverviewTabContent(props TaskDetailProps) {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
 				@patterns.DetailField("Identifier", taskIdentifier(props))
-				@patterns.DetailField("Category", requirementCategoryName(props.CategoryNames, props.Task.CategoryID))
+				@patterns.DetailFieldSlot("Category") {
+					@patterns.CategoryField(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), requirementCategoryName(props.CategoryNames, props.Task.CategoryID), model.RequirementKindTask)
+				}
 				if props.Task.ParentID != "" && props.ParentName != "" {
 					@requirementLinkedField("Parent", props.ParentIdentifier+" — "+props.ParentName, props.ParentPath)
 				} else {
@@ -154,15 +156,6 @@ func backlogChildHref(productID string, child *model.Requirement) string {
 		return fmt.Sprintf("/products/%s/tasks/%s", productID, child.ID)
 	}
 	return fmt.Sprintf("/products/%s/requirements/%s", productID, child.ID)
-}
-
-// backlogKindBadgeColor keeps the board's colour language on detail pages:
-// blue for requirements, emerald for tasks.
-func backlogKindBadgeColor(kind string) string {
-	if kind == model.RequirementKindTask {
-		return "emerald"
-	}
-	return "blue"
 }
 
 func taskIdentifier(props TaskDetailProps) string {

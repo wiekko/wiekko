@@ -3,26 +3,7 @@ package product
 import (
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates/patterns"
-	"nexmap.net/web/templates/ui"
 )
-
-// workflowStatusCell renders the status of a requirement, defect or task from
-// the product's configured workflow. Shared by the three backlog lists so they
-// all read the same way, and so they match the fixed-lifecycle badges used by
-// sprints and campaigns.
-//
-// A status ID with no matching status is shown as the raw ID in a neutral pill:
-// the row is more useful with the unresolved value visible than with a dash
-// that hides it.
-templ workflowStatusCell(statuses map[string]*model.Status, statusID string) {
-	if statusID == "" {
-		@patterns.StatusBadge("", false, false)
-	} else if s, ok := statuses[statusID]; ok {
-		@patterns.StatusBadge(s.Name, s.IsDefault, s.IsClosed)
-	} else {
-		@ui.Badge(statusID, "gray")
-	}
-}
 
 // workflowStatusField renders the Status field of a requirement, defect or task
 // detail page, so the badge matches the one in the corresponding list.

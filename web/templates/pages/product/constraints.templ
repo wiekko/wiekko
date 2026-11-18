@@ -94,10 +94,10 @@ templ ConstraintsPage(props ConstraintsProps) {
 										</a>
 									}
 									@ui.TableCellMuted() {
-										@ui.Badge(constraintPrefix(props.CategoryPrefixes, c.CategoryID), "indigo")
+										@patterns.CategoryBadge(constraintPrefix(props.CategoryPrefixes, c.CategoryID), "constraint")
 									}
 									@ui.TableCellMuted() {
-										@complianceBadge(c.ComplianceState)
+										@patterns.ComplianceBadge(c.ComplianceState)
 									}
 									@ui.TableCellMuted() {
 										@patterns.PriorityBadge(c.Priority)
@@ -133,13 +133,3 @@ func constraintPrefix(prefixes map[string]string, categoryID string) string {
 	return "??"
 }
 
-templ complianceBadge(state string) {
-	switch state {
-		case "met":
-			@ui.Badge("Met", "green")
-		case "violated":
-			@ui.Badge("Violated", "red")
-		default:
-			@ui.Badge("Not Assessed", "gray")
-	}
-}

@@ -106,7 +106,7 @@ templ DocumentsPage(props DocumentsProps) {
 										{ documentFormatLabel(d.Format) }
 									}
 									@ui.TableCellMuted() {
-										@documentStateBadge(d.State)
+										@patterns.DocumentStateBadge(d.State)
 									}
 									@ui.TableCellMuted() {
 										{ strconv.Itoa(d.Revision) }
@@ -177,17 +177,6 @@ func documentStateLabel(state string) string {
 	}
 }
 
-templ documentStateBadge(state string) {
-	switch state {
-		case model.DocumentStateCurrent:
-			@ui.Badge("Current", "green")
-		case model.DocumentStateSuperseded:
-			@ui.Badge("Superseded", "gray")
-		default:
-			@ui.Badge("Draft", "yellow")
-	}
-}
-
 var documentFormatLabels = map[string]string{
 	model.DocumentFormatMarkdown: "Markdown",
 	model.DocumentFormatText:     "Plain text",
@@ -245,7 +234,7 @@ templ DocumentDetailPage(props DocumentDetailProps) {
 				documentDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@documentStateBadge(props.Document.State)
+				@patterns.DocumentStateBadge(props.Document.State)
 			}
 			@ui.TabGroup(templates.WithCounts(documentDetailTabs(props.Product.ID, props.Document.ID), props.TabCounts))
 			@ui.TabPanel("overview") {
@@ -268,7 +257,7 @@ templ DocumentOverviewTabContent(props DocumentDetailProps) {
 					@patterns.DetailField("Identifier", props.Document.Identifier)
 					@patterns.DetailField("Format", documentFormatLabel(props.Document.Format))
 					@patterns.DetailFieldSlot("State") {
-						@documentStateBadge(props.Document.State)
+						@patterns.DocumentStateBadge(props.Document.State)
 					}
 					@patterns.DetailField("Revision", strconv.Itoa(props.Document.Revision))
 					if props.SupersededBy != nil {

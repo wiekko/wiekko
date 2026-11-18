@@ -49,7 +49,7 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 				testCaseDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@executionModeBadge(props.TestCase.ExecutionMode)
+				@patterns.ExecutionModeBadge(props.TestCase.ExecutionMode)
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(testCaseDetailTabs(props.Product.ID, props.TestCase.ID), props.TabCounts))
@@ -83,7 +83,9 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
-				@patterns.DetailField("Execution Mode", testCaseModeDisplay(tc.ExecutionMode))
+				@patterns.DetailFieldSlot("Execution Mode") {
+					@patterns.ExecutionModeBadge(tc.ExecutionMode)
+				}
 				@patterns.DetailField("Test Identifier", testCaseIdentifierDisplay(tc.TestIdentifier))
 				if tc.ComponentID != "" {
 					@testCaseLinkedField("Component", componentName, fmt.Sprintf("/products/%s/components/%s", productID, tc.ComponentID))
@@ -95,7 +97,13 @@ templ TestCaseOverviewTabContent(productID string, tc *model.TestCase, component
 				} else {
 					@patterns.DetailField("Capability", "")
 				}
-				@patterns.DetailField("Pyramid Level", pyramidLevelName)
+				if pyramidLevelName != "" {
+					@patterns.DetailFieldSlot("Pyramid Level") {
+						@patterns.PyramidLevelBadge(pyramidLevelName)
+					}
+				} else {
+					@patterns.DetailField("Pyramid Level", "")
+				}
 				@testCaseEnvironmentsField(environmentNames)
 				@patterns.DetailField("Created", formatDate(tc.CreatedAt))
 				@patterns.DetailField("Last Updated", formatDate(tc.UpdatedAt))
@@ -150,6 +158,7 @@ type TestCaseRequirementsTabProps struct {
 	CanWrite         bool
 	Requirements     []*model.Requirement
 	CategoryPrefixes map[string]string // category ID → prefix
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ TestCaseRequirementsTabContent(props TestCaseRequirementsTabProps) {
@@ -192,6 +201,9 @@ templ TestCaseRequirementsTabContent(props TestCaseRequirementsTabProps) {
 						@ui.TableHeader() {
 							Title
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanWrite {
 							@ui.TableHeader() {
 							}
@@ -210,6 +222,9 @@ templ TestCaseRequirementsTabContent(props TestCaseRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -439,13 +454,6 @@ func testCaseDeleteURL(props TestCaseDetailProps) string {
 		return "/products/" + props.Product.ID + "/test-cases/" + props.TestCase.ID
 	}
 	return ""
-}
-
-func testCaseModeDisplay(mode string) string {
-	if mode == "automatic" {
-		return "Automatic"
-	}
-	return "Manual"
 }
 
 func testCaseIdentifierDisplay(identifier string) string {

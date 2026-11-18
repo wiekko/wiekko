@@ -48,7 +48,7 @@ templ ConstraintDetailPage(props ConstraintDetailProps) {
 				constraintDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@ui.Badge(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), "indigo")
+				@patterns.CategoryBadge(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), "constraint")
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(constraintDetailTabs(props.Product.ID, props.Constraint.ID), props.TabCounts))
@@ -80,11 +80,13 @@ templ ConstraintOverviewTabContent(props ConstraintDetailProps) {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
 				@patterns.DetailField("Identifier", model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), props.Constraint.SequenceNumber))
-				@patterns.DetailField("Category", constraintCategoryName(props.CategoryNames, props.Constraint.CategoryID))
+				@patterns.DetailFieldSlot("Category") {
+					@patterns.CategoryField(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), constraintCategoryName(props.CategoryNames, props.Constraint.CategoryID), "constraint")
+				}
 				<div>
 					<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Compliance</dt>
 					<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
-						@complianceBadge(props.Constraint.ComplianceState)
+						@patterns.ComplianceBadge(props.Constraint.ComplianceState)
 					</dd>
 				</div>
 				if props.Constraint.MilestoneID != "" && props.MilestoneName != "" {

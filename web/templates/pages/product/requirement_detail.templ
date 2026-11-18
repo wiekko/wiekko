@@ -53,7 +53,7 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 				requirementDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@ui.Badge(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), "blue")
+				@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), model.RequirementKindRequirement)
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(requirementDetailTabs(props.Product.ID, props.Requirement.ID), props.TabCounts))
@@ -94,7 +94,9 @@ templ RequirementOverviewTabContent(props RequirementDetailProps) {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
 				@patterns.DetailField("Identifier", model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), props.Requirement.SequenceNumber))
-				@patterns.DetailField("Category", requirementCategoryName(props.CategoryNames, props.Requirement.CategoryID))
+				@patterns.DetailFieldSlot("Category") {
+					@patterns.CategoryField(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), requirementCategoryName(props.CategoryNames, props.Requirement.CategoryID), model.RequirementKindRequirement)
+				}
 				if props.Requirement.ParentID != "" && props.ParentName != "" {
 					@requirementLinkedField("Parent", props.ParentIdentifier+" \u2014 "+props.ParentName, fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, props.Requirement.ParentID))
 				} else {
@@ -360,7 +362,7 @@ templ RequirementTestCasesTabContent(props RequirementTestCasesTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ tc.ExecutionMode }
+									@patterns.ExecutionModeBadge(tc.ExecutionMode)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -451,6 +453,7 @@ type RequirementDefectsTabProps struct {
 	CanUnlink     bool
 	Defects       []*model.Defect
 	LinkIDs       map[string]string // defectID → DefectLink ID
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
@@ -496,6 +499,9 @@ templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
 						@ui.TableHeader() {
 							Criticality
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanUnlink {
 							@ui.TableHeader() {
 							}
@@ -516,7 +522,10 @@ templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ d.Criticality }
+									@patterns.CriticalityBadge(d.Criticality)
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, d.StatusID)
 								}
 								if props.CanUnlink {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">

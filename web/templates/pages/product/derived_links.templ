@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 )
 
@@ -66,6 +67,7 @@ templ viaCapabilities(productID string, caps []*model.Capability) {
 type ComponentRequirementsTabProps struct {
 	ProductID    string
 	Requirements []DerivedRequirement
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
@@ -88,6 +90,9 @@ templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
 							Title
 						}
 						@ui.TableHeader() {
+							Status
+						}
+						@ui.TableHeader() {
 							Via
 						}
 					}
@@ -106,6 +111,9 @@ templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, d.Requirement.StatusID)
+								}
+								@ui.TableCellMuted() {
 									@viaCapabilities(props.ProductID, d.Via)
 								}
 							}
@@ -119,7 +127,7 @@ templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
 
 // derivedDefectsSection lists, below a component's own defects, those linked
 // to its capabilities.
-templ derivedDefectsSection(productID string, defects []DerivedDefect) {
+templ derivedDefectsSection(productID string, defects []DerivedDefect, statuses map[string]*model.Status) {
 	if len(defects) > 0 {
 		<div class="space-y-2" data-derived="defects">
 			<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Via capabilities</h3>
@@ -135,6 +143,9 @@ templ derivedDefectsSection(productID string, defects []DerivedDefect) {
 						}
 						@ui.TableHeader() {
 							Criticality
+						}
+						@ui.TableHeader() {
+							Status
 						}
 						@ui.TableHeader() {
 							Via
@@ -155,7 +166,10 @@ templ derivedDefectsSection(productID string, defects []DerivedDefect) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ d.Defect.Criticality }
+									@patterns.CriticalityBadge(d.Defect.Criticality)
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(statuses, d.Defect.StatusID)
 								}
 								@ui.TableCellMuted() {
 									@viaCapabilities(productID, d.Via)

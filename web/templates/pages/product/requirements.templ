@@ -95,10 +95,10 @@ templ RequirementsPage(props RequirementsProps) {
 										</a>
 									}
 									@ui.TableCellMuted() {
-										@ui.Badge(requirementPrefix(props.CategoryPrefixes, req.CategoryID), "blue")
+										@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, req.CategoryID), model.RequirementKindRequirement)
 									}
 									@ui.TableCellMuted() {
-										@workflowStatusCell(props.Statuses, req.StatusID)
+										@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
 									}
 									@ui.TableCellMuted() {
 										@patterns.PriorityBadge(req.Priority)

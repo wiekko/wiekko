@@ -147,10 +147,10 @@ templ DefectsTableContent(props DefectsProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									@defectCriticalityBadge(d.Criticality)
+									@patterns.CriticalityBadge(d.Criticality)
 								}
 								@ui.TableCellMuted() {
-									@workflowStatusCell(props.Statuses, d.StatusID)
+									@patterns.WorkflowStatusBadge(props.Statuses, d.StatusID)
 								}
 								if len(props.Environments) > 0 {
 									@ui.TableCellMuted() {
@@ -324,19 +324,6 @@ templ defectsFacet(props DefectsProps, name, label string, options []templates.S
 			Options: options,
 		})
 	</div>
-}
-
-templ defectCriticalityBadge(criticality string) {
-	switch criticality {
-		case "critical":
-			@ui.Badge("Critical", "red")
-		case "high":
-			@ui.Badge("High", "amber")
-		case "medium":
-			@ui.Badge("Medium", "yellow")
-		default:
-			@ui.Badge("Low", "gray")
-	}
 }
 
 // defectsCountLabel states how many defects are shown. Under an active filter

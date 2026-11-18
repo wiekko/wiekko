@@ -46,7 +46,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 				defectDeleteURL(props),
 				props.Meta.CSRFToken,
 			) {
-				@defectCriticalityBadge(props.Defect.Criticality)
+				@patterns.CriticalityBadge(props.Defect.Criticality)
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(defectDetailTabs(props.Product.ID, props.Defect.ID), props.TabCounts))
@@ -112,7 +112,9 @@ templ DefectOverviewTabContent(props DefectOverviewProps) {
 			@ui.CardBody() {
 				@patterns.DetailGrid() {
 					@patterns.DetailField("Identifier", props.Defect.Identifier)
-					@patterns.DetailField("Criticality", defectCriticalityDisplay(props.Defect.Criticality))
+					@patterns.DetailFieldSlot("Criticality") {
+						@patterns.CriticalityBadge(props.Defect.Criticality)
+					}
 					@workflowStatusField(props.Status)
 					if props.Defect.MilestoneID != "" && props.MilestoneName != "" {
 						@defectLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.ProductID, props.Defect.MilestoneID))
@@ -574,7 +576,7 @@ templ DefectTestCasesTabContent(props DefectTestCasesTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ tc.ExecutionMode }
+									@patterns.ExecutionModeBadge(tc.ExecutionMode)
 								}
 								if props.CanUnlink {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -666,6 +668,7 @@ type DefectRequirementsTabProps struct {
 	Requirements     []*model.Requirement
 	CategoryPrefixes map[string]string // categoryID → prefix
 	LinkIDs          map[string]string // requirementID → DefectLink ID
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ DefectRequirementsTabContent(props DefectRequirementsTabProps) {
@@ -698,6 +701,9 @@ templ DefectRequirementsTabContent(props DefectRequirementsTabProps) {
 						@ui.TableHeader() {
 							Title
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanUnlink {
 							@ui.TableHeader() {
 							}
@@ -716,6 +722,9 @@ templ DefectRequirementsTabContent(props DefectRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
 								}
 								if props.CanUnlink {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -847,15 +856,3 @@ func defectDeleteURL(props DefectDetailProps) string {
 	return ""
 }
 
-func defectCriticalityDisplay(criticality string) string {
-	switch criticality {
-	case "critical":
-		return "Critical"
-	case "high":
-		return "High"
-	case "medium":
-		return "Medium"
-	default:
-		return "Low"
-	}
-}

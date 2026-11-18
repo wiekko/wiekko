@@ -64,7 +64,7 @@ func (c *PageProductController) backlogChildrenTab(w http.ResponseWriter, r *htt
 	}
 	children, _ := c.backlog.ListChildRequirements(r.Context(), user, productID, itemID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ChildrenTabContent(productID, children, c.buildBacklogPrefixMap(r, user, productID)).Render(r.Context(), w)
+	_ = productpage.ChildrenTabContent(productID, children, c.buildBacklogPrefixMap(r, user, productID), c.buildStatusMap(r, user, productID, "requirement")).Render(r.Context(), w)
 }
 
 // RequirementChildrenTab renders GET /products/{id}/requirements/{requirementId}/tabs/children.

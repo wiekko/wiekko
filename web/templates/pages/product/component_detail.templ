@@ -307,7 +307,7 @@ templ ComponentTestCasesTabContent(props ComponentTestCasesTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ tc.ExecutionMode }
+									@patterns.ExecutionModeBadge(tc.ExecutionMode)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">

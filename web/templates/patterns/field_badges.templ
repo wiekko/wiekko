@@ -1,0 +1,128 @@
+package patterns
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/ui"
+)
+
+// Fields with a fixed set of values are shown as the same badge wherever
+// they appear: list pages, tabs on detail pages and detail fields (UC-89).
+// Priority (PriorityBadge) and workflow status (StatusBadge) live beside
+// these in their own files.
+
+// CriticalityBadge renders a defect's criticality.
+// Values: "critical", "high", "medium", "low".
+templ CriticalityBadge(criticality string) {
+	@ui.Badge(CriticalityLabel(criticality), criticalityColor(criticality))
+}
+
+// CriticalityLabel names a criticality; unknown values read as Low, the
+// default a defect gets.
+func CriticalityLabel(criticality string) string {
+	switch criticality {
+	case "critical":
+		return "Critical"
+	case "high":
+		return "High"
+	case "medium":
+		return "Medium"
+	default:
+		return "Low"
+	}
+}
+
+func criticalityColor(criticality string) string {
+	switch criticality {
+	case "critical":
+		return "red"
+	case "high":
+		return "amber"
+	case "medium":
+		return "yellow"
+	default:
+		return "gray"
+	}
+}
+
+// CategoryBadge renders a category by its prefix, in the colour of the item
+// kind it belongs to: blue for requirements, emerald for tasks (as on the
+// board) and indigo for constraints.
+templ CategoryBadge(prefix, kind string) {
+	@ui.Badge(prefix, CategoryColor(kind))
+}
+
+// CategoryField renders a category on a detail page: its badge, followed by
+// its name.
+templ CategoryField(prefix, name, kind string) {
+	<span class="inline-flex items-center gap-2">
+		@CategoryBadge(prefix, kind)
+		<span>{ name }</span>
+	</span>
+}
+
+// CategoryColor is the badge colour for a kind's categories.
+func CategoryColor(kind string) string {
+	switch kind {
+	case model.RequirementKindTask:
+		return "emerald"
+	case "constraint":
+		return "indigo"
+	default:
+		return "blue"
+	}
+}
+
+// ComplianceBadge renders a constraint's compliance state.
+templ ComplianceBadge(state string) {
+	switch state {
+		case "met":
+			@ui.Badge("Met", "green")
+		case "violated":
+			@ui.Badge("Violated", "red")
+		default:
+			@ui.Badge("Not Assessed", "gray")
+	}
+}
+
+// ExecutionModeBadge renders whether a test case runs automatically.
+templ ExecutionModeBadge(mode string) {
+	if mode == "automatic" {
+		@ui.Badge("Automatic", "blue")
+	} else {
+		@ui.Badge("Manual", "gray")
+	}
+}
+
+// PyramidLevelBadge renders a test case's pyramid level by name.
+templ PyramidLevelBadge(name string) {
+	@ui.Badge(name, "indigo")
+}
+
+// DocumentStateBadge renders a document's state.
+templ DocumentStateBadge(state string) {
+	switch state {
+		case model.DocumentStateCurrent:
+			@ui.Badge("Current", "green")
+		case model.DocumentStateSuperseded:
+			@ui.Badge("Superseded", "gray")
+		default:
+			@ui.Badge("Draft", "yellow")
+	}
+}
+
+// WorkflowStatusBadge renders the status of a requirement, task or defect
+// from the product's configured workflow; statuses maps status IDs of both
+// workflows to their status (UC-90).
+//
+// A status ID with no matching status is shown as the raw ID in a neutral
+// pill: the row is more useful with the unresolved value visible than with a
+// dash that hides it.
+templ WorkflowStatusBadge(statuses map[string]*model.Status, statusID string) {
+	if statusID == "" {
+		@StatusBadge("", false, false)
+	} else if s, ok := statuses[statusID]; ok {
+		@StatusBadge(s.Name, s.IsDefault, s.IsClosed)
+	} else {
+		@ui.Badge(statusID, "gray")
+	}
+}

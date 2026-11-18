@@ -17,18 +17,6 @@ templ PriorityBadge(priority int) {
 	}
 }
 
-// CriticalityBadge renders a badge for defect criticality.
-// Values: "critical", "high", "medium", "low".
-templ CriticalityBadge(criticality string) {
-	@ui.Badge(criticality, criticalityColor(criticality))
-}
-
-// CategoryBadge renders a badge for requirement category.
-// Values: "architecture", "security", "functionality", "ux".
-templ CategoryBadge(category string) {
-	@ui.Badge(category, categoryColor(category))
-}
-
 // RoleBadge renders a badge for a user's product role.
 templ RoleBadge(role string) {
 	@ui.Badge(role, roleColor(role))
@@ -44,36 +32,6 @@ func priorityColor(p int) string {
 		return "yellow"
 	case 4:
 		return "blue"
-	default:
-		return "gray"
-	}
-}
-
-func criticalityColor(c string) string {
-	switch c {
-	case "critical":
-		return "red"
-	case "high":
-		return "amber"
-	case "medium":
-		return "yellow"
-	case "low":
-		return "blue"
-	default:
-		return "gray"
-	}
-}
-
-func categoryColor(c string) string {
-	switch c {
-	case "architecture":
-		return "indigo"
-	case "security":
-		return "red"
-	case "functionality":
-		return "blue"
-	case "ux":
-		return "green"
 	default:
 		return "gray"
 	}

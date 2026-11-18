@@ -127,16 +127,16 @@ templ TestCasesPage(props TestCasesProps) {
 									@ui.TableCellMuted() {
 										if tc.PyramidLevelID != "" {
 											if name, ok := props.PyramidLevels[tc.PyramidLevelID]; ok {
-												@ui.Badge(name, "indigo")
+												@patterns.PyramidLevelBadge(name)
 											} else {
-												@ui.Badge(tc.PyramidLevelID, "indigo")
+												@patterns.PyramidLevelBadge(tc.PyramidLevelID)
 											}
 										} else {
 											@testCaseCellEmpty()
 										}
 									}
 									@ui.TableCellMuted() {
-										@executionModeBadge(tc.ExecutionMode)
+										@patterns.ExecutionModeBadge(tc.ExecutionMode)
 									}
 									@ui.TableCellMuted() {
 										{ formatDate(tc.CreatedAt) }
@@ -165,10 +165,3 @@ templ testCaseCellEmpty() {
 	<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
 }
 
-templ executionModeBadge(mode string) {
-	if mode == "automatic" {
-		@ui.Badge("Automatic", "blue")
-	} else {
-		@ui.Badge("Manual", "gray")
-	}
-}

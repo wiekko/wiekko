@@ -470,6 +470,7 @@ type MilestoneRequirementsTabProps struct {
 	CanWrite         bool
 	Requirements     []*model.Requirement
 	CategoryPrefixes map[string]string
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 // TabID is the tab the props render: "requirements" or "tasks".
@@ -536,6 +537,9 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 						@ui.TableHeader() {
 							Title
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanWrite {
 							@ui.TableHeader() {
 							}
@@ -554,6 +558,9 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -790,6 +797,7 @@ type MilestoneDefectsTabProps struct {
 	CSRFToken   string
 	CanWrite    bool
 	Defects []*model.Defect
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
@@ -825,6 +833,9 @@ templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
 						@ui.TableHeader() {
 							Criticality
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanWrite {
 							@ui.TableHeader() {
 							}
@@ -845,7 +856,10 @@ templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ d.Criticality }
+									@patterns.CriticalityBadge(d.Criticality)
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, d.StatusID)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">

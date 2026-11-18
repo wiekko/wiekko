@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 )
 
@@ -20,6 +21,7 @@ type HostDefectsTabProps struct {
 	// Derived holds, for a component, the defects linked to its capabilities
 	// but not to the component itself (UR-160).
 	Derived []DerivedDefect
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ HostDefectsTabContent(props HostDefectsTabProps) {
@@ -65,6 +67,9 @@ templ HostDefectsTabContent(props HostDefectsTabProps) {
 						@ui.TableHeader() {
 							Criticality
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanUnlink {
 							@ui.TableHeader() {
 							}
@@ -85,7 +90,10 @@ templ HostDefectsTabContent(props HostDefectsTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ d.Criticality }
+									@patterns.CriticalityBadge(d.Criticality)
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, d.StatusID)
 								}
 								if props.CanUnlink {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -108,7 +116,7 @@ templ HostDefectsTabContent(props HostDefectsTabProps) {
 				}
 			}
 		}
-		@derivedDefectsSection(props.ProductID, props.Derived)
+		@derivedDefectsSection(props.ProductID, props.Derived, props.Statuses)
 	</div>
 }
 

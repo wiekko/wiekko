@@ -122,7 +122,7 @@ func TestMilestoneOverviewShowsProgress(t *testing.T) {
 			for _, want := range []string{
 				`id="milestone-progress"`,
 				"5 items", "2 items", // assigned, completed
-				"40%",                       // 2 of 5, rounded down as on sprints
+				"40%", // 2 of 5, rounded down as on sprints
 				"Requirements (1 of 3)", "33%", "bg-blue-500",
 				"Tasks (1 of 1)", "100%", "bg-emerald-500",
 				"Defects (0 of 1)", "bg-red-500",

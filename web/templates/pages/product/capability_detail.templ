@@ -107,6 +107,7 @@ type CapabilityRequirementsTabProps struct {
 	CanWrite         bool
 	Requirements     []*model.Requirement
 	CategoryPrefixes map[string]string
+	Statuses map[string]*model.Status // status ID → status, for the Status column (UC-90)
 }
 
 templ CapabilityRequirementsTabContent(props CapabilityRequirementsTabProps) {
@@ -149,6 +150,9 @@ templ CapabilityRequirementsTabContent(props CapabilityRequirementsTabProps) {
 						@ui.TableHeader() {
 							Title
 						}
+						@ui.TableHeader() {
+							Status
+						}
 						if props.CanWrite {
 							@ui.TableHeader() {
 							}
@@ -167,6 +171,9 @@ templ CapabilityRequirementsTabContent(props CapabilityRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -312,7 +319,7 @@ templ CapabilityTestCasesTabContent(props CapabilityTestCasesTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ tc.ExecutionMode }
+									@patterns.ExecutionModeBadge(tc.ExecutionMode)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -456,7 +463,7 @@ templ CapabilityConstraintsTabContent(props CapabilityConstraintsTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									@complianceBadge(c.ComplianceState)
+									@patterns.ComplianceBadge(c.ComplianceState)
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">

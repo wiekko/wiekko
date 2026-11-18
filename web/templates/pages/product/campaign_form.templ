@@ -244,7 +244,7 @@ templ campaignScopeMeta(opt CampaignTestCaseOption) {
 		if opt.PyramidName != "" {
 			@ui.Badge(opt.PyramidName, "indigo")
 		}
-		@executionModeBadge(opt.TestCase.ExecutionMode)
+		@patterns.ExecutionModeBadge(opt.TestCase.ExecutionMode)
 	</div>
 }
 

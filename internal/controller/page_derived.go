@@ -155,6 +155,7 @@ func (c *PageProductController) ComponentRequirementsTab(w http.ResponseWriter, 
 	_ = productpage.ComponentRequirementsTabContent(productpage.ComponentRequirementsTabProps{
 		ProductID:    productID,
 		Requirements: c.componentRequirements(r, user, productID, componentID),
+		Statuses:     c.buildStatusMap(r, user, productID, "requirement"),
 	}).Render(r.Context(), w)
 }
 

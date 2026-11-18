@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 )
 
@@ -47,7 +48,7 @@ templ DocumentsTabContent(productID string, docs []*model.Document, noun string)
 									</a>
 								}
 								@ui.TableCellMuted() {
-									@documentStateBadge(d.State)
+									@patterns.DocumentStateBadge(d.State)
 								}
 							}
 						}
@@ -59,7 +60,7 @@ templ DocumentsTabContent(productID string, docs []*model.Document, noun string)
 }
 
 // ChildrenTabContent lists the requirements and tasks below a backlog item.
-templ ChildrenTabContent(productID string, children []*model.Requirement, prefixes map[string]string) {
+templ ChildrenTabContent(productID string, children []*model.Requirement, prefixes map[string]string, statuses map[string]*model.Status) {
 	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(children)) }>
 		if len(children) == 0 {
 			@ui.Card() {
@@ -78,6 +79,9 @@ templ ChildrenTabContent(productID string, children []*model.Requirement, prefix
 						@ui.TableHeader() {
 							Category
 						}
+						@ui.TableHeader() {
+							Status
+						}
 					}
 					@ui.TableBody("") {
 						for _, child := range children {
@@ -94,7 +98,10 @@ templ ChildrenTabContent(productID string, children []*model.Requirement, prefix
 									</a>
 								}
 								@ui.TableCellMuted() {
-									@ui.Badge(requirementPrefix(prefixes, child.CategoryID), backlogKindBadgeColor(child.Kind))
+									@patterns.CategoryBadge(requirementPrefix(prefixes, child.CategoryID), child.Kind)
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(statuses, child.StatusID)
 								}
 							}
 						}

@@ -2115,6 +2115,7 @@ func (c *PageProductController) loadMilestoneBacklogTabProps(r *http.Request, us
 	}
 
 	return productpage.MilestoneRequirementsTabProps{
+		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
 		ProductID:        productID,
 		MilestoneID:      milestoneID,
 		Kind:             kind,
@@ -2409,6 +2410,7 @@ func (c *PageProductController) loadMilestoneDefectsTabProps(r *http.Request, us
 	items, _ := c.backlog.ListDefectsByMilestone(r.Context(), user, productID, milestoneID)
 
 	return productpage.MilestoneDefectsTabProps{
+		Statuses:    c.buildStatusMap(r, user, productID, "defect"),
 		ProductID:   productID,
 		MilestoneID: milestoneID,
 		CSRFToken:   csrfToken,
@@ -3944,6 +3946,7 @@ func (c *PageProductController) loadCapabilityRequirementsTabProps(r *http.Reque
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	return productpage.CapabilityRequirementsTabProps{
+		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
 		ProductID:        productID,
 		CapabilityID:     capabilityID,
 		CSRFToken:        csrfToken,
@@ -4454,6 +4457,7 @@ func (c *PageProductController) loadHostDefectsTabProps(r *http.Request, user *m
 	}
 
 	return productpage.HostDefectsTabProps{
+		Statuses:  c.buildStatusMap(r, user, productID, "defect"),
 		BaseURL:   h.baseURL(productID, hostID),
 		ProductID: productID,
 		Noun:      h.noun,
@@ -5389,6 +5393,7 @@ func (c *PageProductController) loadTestCaseRequirementsTabProps(r *http.Request
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	return productpage.TestCaseRequirementsTabProps{
+		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
 		ProductID:        productID,
 		TestCaseID:       testCaseID,
 		CSRFToken:        csrfToken,
@@ -6883,6 +6888,7 @@ func (c *PageProductController) loadRequirementDefectsTabProps(r *http.Request, 
 	defects, linkIDs, _ := c.backlog.ListLinkedDefects(r.Context(), user, productID, model.DefectLinkTargetRequirement, requirementID)
 
 	return productpage.RequirementDefectsTabProps{
+		Statuses:      c.buildStatusMap(r, user, productID, "defect"),
 		ProductID:     productID,
 		RequirementID: requirementID,
 		CSRFToken:     csrfToken,
@@ -8186,6 +8192,7 @@ func (c *PageProductController) loadDefectRequirementsTabProps(r *http.Request, 
 	}
 
 	return productpage.DefectRequirementsTabProps{
+		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
 		ProductID:        productID,
 		DefectID:         defectID,
 		CSRFToken:        csrfToken,
