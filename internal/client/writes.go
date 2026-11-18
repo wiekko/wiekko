@@ -37,6 +37,8 @@ func (c *Client) CreateRequirement(ctx context.Context, productID string, in Req
 type RequirementPatch struct {
 	StatusID *string `json:"status_id,omitempty"`
 	IsActive *bool   `json:"is_active,omitempty"`
+	// ParentID moves the item; a pointer to "" moves it to the top level.
+	ParentID *string `json:"parent_id,omitempty"`
 }
 
 // UpdateRequirement patches a requirement or task by identifier or ID.

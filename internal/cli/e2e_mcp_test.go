@@ -116,7 +116,7 @@ var readTools = []string{
 	"list_documents", "get_document", "document_revisions", "document_diff",
 }
 
-var writeTools = []string{"add_comment", "create_backlog_item", "create_defect", "set_defect_status", "set_requirement_status",
+var writeTools = []string{"add_comment", "create_backlog_item", "update_backlog_item", "create_defect", "set_defect_status", "set_requirement_status",
 	"create_component", "update_component", "create_capability", "update_capability", "link_capability", "unlink_capability",
 	"link_test_case", "unlink_test_case", "create_constraint", "update_constraint", "sync_test_cases",
 	"create_document", "update_document", "link_document", "unlink_document", "restore_document"}

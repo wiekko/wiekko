@@ -120,6 +120,39 @@ func requirementCreateCommand(group, fixedKind string) *command {
 	}
 }
 
+func requirementUpdateCommand(group, fixedKind string) *command {
+	var parent string
+	var set flagsSet
+	name := group + " update"
+	return &command{
+		name:    name,
+		args:    "<FR-12|ID>",
+		summary: "change an item, e.g. move it below another one (owner role)",
+		flags: func(fs *flag.FlagSet) {
+			set.bind(fs)
+			fs.StringVar(&parent, "parent", "", `new parent, e.g. FR-3; "" moves the item to the top level`)
+		},
+		run: func(ctx context.Context, a *app, args []string) error {
+			if len(args) != 1 {
+				return usageErr(fmt.Errorf("usage: nexmap %s <FR-12|ID> --parent <FR-3|\"\">", name))
+			}
+			in := ops.BacklogItemChange{Ref: args[0], Parent: set.optional("parent", parent), Kind: fixedKind}
+			if in.Parent == nil {
+				return usageErr(errors.New("nothing to change: give --parent"))
+			}
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			d, err := s.UpdateBacklogItem(ctx, in)
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Requirement(w, d) })
+		},
+	}
+}
+
 func defectStatusCommand() *command {
 	return &command{
 		name:    "defect status",

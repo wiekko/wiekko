@@ -127,7 +127,10 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 	var req struct {
 		// IfUpdatedAt is the updated_at the client edited: a change made
 		// meanwhile turns the update into 409 CONFLICT.
-		IfUpdatedAt      string  `json:"if_updated_at"`
+		IfUpdatedAt string `json:"if_updated_at"`
+		// ParentID moves the item below another one, "" to the top level
+		// (FR-152); the service applies the same checks as on create.
+		ParentID         *string `json:"parent_id"`
 		CategoryID       *string `json:"category_id"`
 		Title            *string `json:"title"`
 		Description      *string `json:"description"`
@@ -146,6 +149,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 
 	item, err := c.backlog.UpdateRequirement(r.Context(), user, productID, id, service.UpdateRequirementInput{
 		IfUpdatedAt:      req.IfUpdatedAt,
+		ParentID:         req.ParentID,
 		CategoryID:       req.CategoryID,
 		Title:            req.Title,
 		Description:      req.Description,

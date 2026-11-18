@@ -52,7 +52,7 @@ agent is told. In short:
   and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
   existing ones instead of duplicating them.
 - **Write:** set the status of requirements, tasks and defects, add comments, report defects, create
-  tasks, create and update constraints (including whether they are met), change the product structure,
+  tasks and move items below others, create and update constraints (including whether they are met), change the product structure,
   write documents and restore their earlier revisions, link requirements, constraints and test cases to
   capabilities and documents, and test cases to requirements, each
   only as far as the user's role allows (see below). The MCP server offers none of the CLI's deletions.

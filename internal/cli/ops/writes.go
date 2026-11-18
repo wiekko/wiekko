@@ -103,6 +103,45 @@ func (s *Session) requirement(ctx context.Context, ref, kind string) (*client.Re
 	return r, nil
 }
 
+// BacklogItemChange changes a requirement or task; nil fields stay as they are.
+type BacklogItemChange struct {
+	Ref    string  `json:"ref" jsonschema:"the item: identifier (FR-12) or ID"`
+	Parent *string `json:"parent,omitempty" jsonschema:"identifier of the new parent requirement or task, e.g. FR-3; empty moves the item to the top level"`
+	// Kind restricts the change to requirements or tasks (the CLI's
+	// "task update"); not part of a schema.
+	Kind string `json:"-"`
+}
+
+// UpdateBacklogItem changes a requirement or task (owner role). The server
+// checks the new parent as it does on create: same product, no cycle, and a
+// requirement never below a task (FR-152).
+func (s *Session) UpdateBacklogItem(ctx context.Context, in BacklogItemChange) (*RequirementDetail, error) {
+	if strings.TrimSpace(in.Ref) == "" {
+		return nil, errors.New("an item reference is required")
+	}
+	if in.Parent == nil {
+		return nil, errors.New("nothing to change: give a parent")
+	}
+	r, err := s.requirement(ctx, in.Ref, in.Kind)
+	if err != nil {
+		return nil, err
+	}
+	var patch client.RequirementPatch
+	parentID := ""
+	if ref := strings.TrimSpace(*in.Parent); ref != "" {
+		p, err := s.requirement(ctx, ref, "")
+		if err != nil {
+			return nil, err
+		}
+		parentID = p.ID
+	}
+	patch.ParentID = &parentID
+	if _, err := s.C.UpdateRequirement(ctx, s.ProductID, r.ID, patch); err != nil {
+		return nil, err
+	}
+	return s.ShowRequirement(ctx, r.ID)
+}
+
 // NewBacklogItem creates a requirement or task.
 type NewBacklogItem struct {
 	Kind             string `json:"kind,omitempty" jsonschema:"task (default) or requirement"`

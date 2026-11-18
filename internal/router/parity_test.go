@@ -66,6 +66,46 @@ func TestAPIParityEndpoints(t *testing.T) {
 			t.Errorf("requirement statuses changed by the split: %d -> %d", len(reqStatuses), len(after))
 		}
 
+		// An item moves below another one and back to the top level, with the
+		// web UI's checks (FR-152, AC-86).
+		newItem := func(kind, title string) *model.Requirement {
+			t.Helper()
+			r, err := e.svc.Backlog.CreateRequirement(ctx, admin, service.CreateRequirementInput{ProductID: pid, Kind: kind, Title: title})
+			must(err)
+			return r
+		}
+		upper := newItem(model.RequirementKindRequirement, "Upper")
+		lower := newItem(model.RequirementKindRequirement, "Lower")
+		task := newItem(model.RequirementKindTask, "Some task")
+		move := func(item *model.Requirement, parentID string) (int, string) {
+			t.Helper()
+			return call(http.MethodPatch, "/requirements/"+item.ID, `{"parent_id":"`+parentID+`"}`)
+		}
+		if status, body := move(lower, upper.ID); status != http.StatusOK || !strings.Contains(body, `"parent_id":"`+upper.ID+`"`) {
+			t.Fatalf("move below: %d %s", status, body)
+		}
+		for _, bad := range []struct {
+			what       string
+			item       *model.Requirement
+			parentID   string
+			wantStatus int
+		}{
+			{"own parent", upper, upper.ID, http.StatusBadRequest},
+			{"cycle", upper, lower.ID, http.StatusBadRequest},
+			{"requirement below a task", lower, task.ID, http.StatusBadRequest},
+			{"unknown parent", lower, "no-such-item", http.StatusNotFound},
+		} {
+			if status, body := move(bad.item, bad.parentID); status != bad.wantStatus {
+				t.Errorf("%s: %d %s, want %d", bad.what, status, body, bad.wantStatus)
+			}
+		}
+		if status, body := move(task, lower.ID); status != http.StatusOK {
+			t.Errorf("task below a requirement: %d %s", status, body)
+		}
+		if status, body := move(lower, ""); status != http.StatusOK || !strings.Contains(body, `"parent_id":""`) {
+			t.Errorf("move to the top level: %d %s", status, body)
+		}
+
 		// A draft campaign's scope can be edited (FR-94).
 		tc1, err := e.svc.Testing.CreateTestCase(ctx, admin, service.CreateTestCaseInput{ProductID: pid, Title: "one", ExecutionMode: "manual"})
 		must(err)

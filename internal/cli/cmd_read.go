@@ -130,7 +130,8 @@ func requirementGroup(name, summary, fixedKind string) *command {
 		},
 	}
 	return &command{name: name, summary: summary, subs: []*command{list, show,
-		requirementStatusCommand(name, fixedKind), requirementCreateCommand(name, fixedKind)}}
+		requirementStatusCommand(name, fixedKind), requirementCreateCommand(name, fixedKind),
+		requirementUpdateCommand(name, fixedKind)}}
 }
 
 func constraintGroup() *command {

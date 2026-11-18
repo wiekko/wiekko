@@ -121,6 +121,11 @@ whatever is current.
     - Closed campaigns keep everything.
   - Kept results then have `test_case_id` `null`, or `environment_id` empty, but keep their title,
     environment name and history.
+- `PATCH /api/v1/products/{p}/requirements/{id}` (owner) with `{"parent_id": …}` moves a requirement
+  or task below another item, given by ID; `""` moves it to the top level. The checks are those of the
+  web UI: the parent belongs to the same product, the move creates no cycle, and a requirement's parent
+  is a requirement (tasks may hang below either). A refused move answers `400 REQUEST_FAILED`, an
+  unknown parent `404 NOT_FOUND`.
 - `DELETE /api/v1/products/{p}/requirements/{id}` deletes a requirement or task. With
   `?children=keep`, the default, the items below it move up one level, to its parent or to the top
   level; with `?children=delete`, they are deleted too.

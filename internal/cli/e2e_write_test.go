@@ -133,6 +133,51 @@ func TestE2ECreateTask(t *testing.T) {
 	}
 }
 
+// TestE2EMoveBacklogItem moves items below others and back to the top level
+// (FR-152).
+func TestE2EMoveBacklogItem(t *testing.T) {
+	e := newAviary(t)
+	reqs := decode[[]ops.RequirementSummary](t, e.mustRun("", "req", "list", "-o", "json").stdout)
+	parent := findRequirement(t, reqs, "Record a sighting")
+	item := decode[ops.RequirementDetail](t, e.mustAs("root", "", "req", "create", "--kind", "requirement", "--title", "Moved around", "-o", "json").stdout)
+	task := decode[ops.RequirementDetail](t, e.mustAs("root", "", "task", "create", "--title", "Some task", "-o", "json").stdout)
+
+	wantForbidden(t, "developer", e.as("cy", "", "req", "update", item.Identifier, "--parent", parent.Identifier))
+
+	d := decode[ops.RequirementDetail](t, e.mustAs("root", "", "req", "update", item.Identifier, "--parent", parent.Identifier, "-o", "json").stdout)
+	if d.Parent == nil || d.Parent.ID != parent.ID {
+		t.Fatalf("parent = %+v, want %s", d.Parent, parent.Identifier)
+	}
+	d = decode[ops.RequirementDetail](t, e.mustAs("root", "", "task", "update", task.Identifier, "--parent", item.Identifier, "-o", "json").stdout)
+	if d.Parent == nil || d.Parent.ID != item.ID {
+		t.Errorf("task parent = %+v, want %s", d.Parent, item.Identifier)
+	}
+
+	// The server's checks come through; a refused move changes nothing.
+	for _, bad := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"req", "update", parent.Identifier, "--parent", item.Identifier}, cli.ExitAPI},       // cycle
+		{[]string{"req", "update", item.Identifier, "--parent", task.Identifier}, cli.ExitAPI},         // requirement below a task
+		{[]string{"req", "update", item.Identifier, "--parent", "FR-9999"}, cli.ExitNotFound},          // unknown parent
+		{[]string{"task", "update", item.Identifier, "--parent", parent.Identifier}, cli.ExitNotFound}, // not a task
+		{[]string{"req", "update", item.Identifier}, cli.ExitUsage},                                    // nothing to change
+	} {
+		if r := e.as("root", "", bad.args...); r.code != bad.code {
+			t.Errorf("%v: exit %d, want %d\nstderr: %s", bad.args, r.code, bad.code, r.stderr)
+		}
+	}
+	if p := decode[ops.RequirementDetail](t, e.mustRun("", "req", "show", parent.Identifier, "-o", "json").stdout); p.Parent != nil {
+		t.Errorf("refused cycle moved %s below %s", parent.Identifier, p.Parent.Identifier)
+	}
+
+	d = decode[ops.RequirementDetail](t, e.mustAs("root", "", "req", "update", item.Identifier, "--parent", "", "-o", "json").stdout)
+	if d.Parent != nil {
+		t.Errorf("after moving to the top level: parent = %+v", d.Parent)
+	}
+}
+
 func TestE2EDefectWrites(t *testing.T) {
 	e := newAviary(t)
 	reqs := decode[[]ops.RequirementSummary](t, e.mustRun("", "req", "list", "-o", "json").stdout)
@@ -231,6 +276,7 @@ func TestE2EMCPWrites(t *testing.T) {
 	reqs := decode[[]ops.RequirementSummary](t, e.mustRun("", "req", "list", "-o", "json").stdout)
 	item := findRequirement(t, reqs, "Record a sighting")
 
+	rootToken := e.env[cliconfig.EnvToken]
 	e.env[cliconfig.EnvToken] = e.tokens["cy"]
 	s := e.startMCP("mcp")
 	_, got := mustTool(t, s, "set_requirement_status", map[string]any{"ref": item.Identifier, "status": "In Review"})
@@ -251,6 +297,29 @@ func TestE2EMCPWrites(t *testing.T) {
 	if !res.IsError || !strings.Contains(toolText(res), "role") {
 		t.Errorf("create_backlog_item as developer: isError=%v, %q", res.IsError, toolText(res))
 	}
+	res = callTool(t, s, "update_backlog_item", map[string]any{"ref": item.Identifier, "parent": ""})
+	if !res.IsError || !strings.Contains(toolText(res), "role") {
+		t.Errorf("update_backlog_item as developer: isError=%v, %q", res.IsError, toolText(res))
+	}
+
+	// An owner moves items below others and back (FR-152); the server's
+	// checks reach the model as tool errors.
+	e.env[cliconfig.EnvToken] = rootToken
+	owner := e.startMCP("mcp")
+	_, created := mustTool(t, owner, "create_backlog_item", map[string]any{"title": "Moved by an agent"})
+	task := created.(map[string]any)["identifier"].(string)
+	_, moved := mustTool(t, owner, "update_backlog_item", map[string]any{"ref": task, "parent": item.Identifier})
+	if p, _ := moved.(map[string]any)["parent"].(map[string]any); p["identifier"] != item.Identifier {
+		t.Errorf("update_backlog_item parent: %v", moved)
+	}
+	if res := callTool(t, owner, "update_backlog_item", map[string]any{"ref": item.Identifier, "parent": task}); !res.IsError {
+		t.Errorf("requirement moved below a task: %q", toolText(res))
+	}
+	_, top := mustTool(t, owner, "update_backlog_item", map[string]any{"ref": task, "parent": ""})
+	if _, has := top.(map[string]any)["parent"]; has {
+		t.Errorf("after moving to the top level: %v", top)
+	}
+	e.env[cliconfig.EnvToken] = e.tokens["cy"]
 
 	// --read-only does not offer write tools at all.
 	ro := e.startMCP("mcp", "--read-only")
