@@ -19,6 +19,7 @@ type ComponentDetailProps struct {
 	Component      *model.Component
 	MilestoneName  string
 	IsOwnerOrAdmin bool
+	Documents      []*model.Document // documents that belong to the component (UR-159)
 }
 
 templ ComponentDetailPage(props ComponentDetailProps) {
@@ -49,12 +50,15 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 			@ui.TabGroup(componentDetailTabs(props.Product.ID, props.Component.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@ComponentOverviewTabContent(props.Component, props.MilestoneName)
+				@ComponentOverviewTabContent(props.Product.ID, props.Component, props.MilestoneName, props.Documents)
 			}
 			@ui.TabPanelHidden("capabilities") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("test-cases") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("defects") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("comments") {
@@ -70,7 +74,7 @@ templ ComponentDetailPage(props ComponentDetailProps) {
 	}
 }
 
-templ ComponentOverviewTabContent(c *model.Component, milestoneName string) {
+templ ComponentOverviewTabContent(productID string, c *model.Component, milestoneName string, docs []*model.Document) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
@@ -79,6 +83,7 @@ templ ComponentOverviewTabContent(c *model.Component, milestoneName string) {
 				@patterns.DetailField("Last Updated", formatDate(c.UpdatedAt))
 			}
 			@patterns.DetailDescription(c.Description)
+			@LinkedDocuments(productID, docs)
 		}
 	}
 }
@@ -398,6 +403,7 @@ func componentDetailTabs(productID, componentID string) []templates.TabDef {
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
 		{ID: "capabilities", Label: "Capabilities", HxGet: base + "/capabilities"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
+		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},
@@ -416,6 +422,21 @@ func componentDeleteURL(props ComponentDetailProps) string {
 		return "/products/" + props.Product.ID + "/components/" + props.Component.ID
 	}
 	return ""
+}
+
+// componentLink links a component by name wherever another page names it
+// (UR-159); an empty name, e.g. a product-level capability, shows a dash.
+templ componentLink(productID, componentID, name string) {
+	if componentID != "" && name != "" {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", productID, componentID)) }
+			class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+		>
+			{ name }
+		</a>
+	} else {
+		<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+	}
 }
 
 func componentMilestoneDisplay(name string) string {

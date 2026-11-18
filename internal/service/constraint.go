@@ -266,6 +266,32 @@ func (s *ConstraintService) UnlinkCapability(ctx context.Context, user *model.Us
 	return s.constraints.UnlinkCapability(ctx, constraintID, capabilityID)
 }
 
+// ListCapabilityConstraints returns the constraints linked to a capability,
+// the reverse of ListConstraintCapabilities (UR-159). Requires viewer role.
+func (s *ConstraintService) ListCapabilityConstraints(ctx context.Context, user *model.User, productID, capabilityID string) ([]*model.Constraint, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, err
+	}
+	if err := s.owns.require(ctx, productID, ref{kindCapability, capabilityID}); err != nil {
+		return nil, err
+	}
+	links, err := s.constraints.ListConstraintsByCapability(ctx, capabilityID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.Constraint, 0, len(links))
+	for _, l := range links {
+		c, err := s.constraints.GetByID(ctx, l.ConstraintID)
+		if err != nil {
+			return nil, err
+		}
+		if c.ProductID == productID {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 // ListConstraintCapabilities returns capability links for a constraint. Requires viewer role.
 func (s *ConstraintService) ListConstraintCapabilities(ctx context.Context, user *model.User, productID, constraintID string) ([]*model.ConstraintCapability, error) {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {

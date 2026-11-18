@@ -20,6 +20,7 @@ type CapabilityDetailProps struct {
 	ComponentName  string
 	MilestoneName  string
 	IsOwnerOrAdmin bool
+	Documents      []*model.Document // documents that belong to the capability (UR-159)
 }
 
 templ CapabilityDetailPage(props CapabilityDetailProps) {
@@ -50,7 +51,7 @@ templ CapabilityDetailPage(props CapabilityDetailProps) {
 			@ui.TabGroup(capabilityDetailTabs(props.Product.ID, props.Capability.ID))
 			<!-- Tab panels -->
 			@ui.TabPanel("overview") {
-				@CapabilityOverviewTabContent(props.Product.ID, props.Capability, props.ComponentName, props.MilestoneName)
+				@CapabilityOverviewTabContent(props.Product.ID, props.Capability, props.ComponentName, props.MilestoneName, props.Documents)
 			}
 			@ui.TabPanelHidden("requirements") {
 				@ui.LoadingSpinner("md")
@@ -59,6 +60,9 @@ templ CapabilityDetailPage(props CapabilityDetailProps) {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("defects") {
+				@ui.LoadingSpinner("md")
+			}
+			@ui.TabPanelHidden("constraints") {
 				@ui.LoadingSpinner("md")
 			}
 			@ui.TabPanelHidden("comments") {
@@ -74,16 +78,21 @@ templ CapabilityDetailPage(props CapabilityDetailProps) {
 	}
 }
 
-templ CapabilityOverviewTabContent(productID string, f *model.Capability, componentName, milestoneName string) {
+templ CapabilityOverviewTabContent(productID string, f *model.Capability, componentName, milestoneName string, docs []*model.Document) {
 	@ui.Card() {
 		@ui.CardBody() {
 			@patterns.DetailGrid() {
-				@patterns.DetailField("Component", capabilityComponentDisplay(componentName))
+				if f.ComponentID != "" && componentName != "" {
+					@constraintLinkedField("Component", componentName, fmt.Sprintf("/products/%s/components/%s", productID, f.ComponentID))
+				} else {
+					@patterns.DetailField("Component", "None (top-level)")
+				}
 				@patterns.DetailField("Milestone", componentMilestoneDisplay(milestoneName))
 				@patterns.DetailField("Created", formatDate(f.CreatedAt))
 				@patterns.DetailField("Last Updated", formatDate(f.UpdatedAt))
 			}
 			@patterns.DetailDescription(f.Description)
+			@LinkedDocuments(productID, docs)
 		}
 	}
 }
@@ -381,46 +390,36 @@ templ CapabilityTestCaseLinkResults(productID, capabilityID string, candidates [
 	}
 }
 
-// CapabilityDefectsTabProps holds data for the capability defects tab.
-type CapabilityDefectsTabProps struct {
-	ProductID    string
-	CapabilityID string
-	CSRFToken    string
-	CanLink      bool
-	CanUnlink    bool
-	Defects      []*model.Defect
-	LinkIDs      map[string]string
+// CapabilityConstraintsTabProps holds data for the capability constraints
+// tab, the reverse side of a constraint's Capabilities tab (UR-159).
+type CapabilityConstraintsTabProps struct {
+	ProductID        string
+	CapabilityID     string
+	CSRFToken        string
+	CanWrite         bool
+	Constraints      []*model.Constraint
+	CategoryPrefixes map[string]string
 }
 
-templ CapabilityDefectsTabContent(props CapabilityDefectsTabProps) {
+templ CapabilityConstraintsTabContent(props CapabilityConstraintsTabProps) {
 	<div class="space-y-4">
-		if props.CanLink {
+		if props.CanWrite {
 			<div class="flex items-center justify-end gap-2">
 				@ui.Button(ui.ButtonProps{
 					Label:    "Link existing",
 					Variant:  "secondary",
 					Size:     "sm",
-					HxGet:    fmt.Sprintf("/products/%s/capabilities/%s/defects/link-modal", props.ProductID, props.CapabilityID),
+					HxGet:    fmt.Sprintf("/products/%s/capabilities/%s/constraints/link-modal", props.ProductID, props.CapabilityID),
 					HxTarget: "#modal",
 					HxSwap:   "innerHTML",
 				}) {
 					@ui.Icon("link", "sm")
 				}
-				@ui.Button(ui.ButtonProps{
-					Label:    "Create new",
-					Variant:  "primary",
-					Size:     "sm",
-					HxGet:    fmt.Sprintf("/products/%s/capabilities/%s/defects/create-modal", props.ProductID, props.CapabilityID),
-					HxTarget: "#modal",
-					HxSwap:   "innerHTML",
-				}) {
-					@ui.Icon("plus", "sm")
-				}
 			</div>
 		}
-		if len(props.Defects) == 0 {
+		if len(props.Constraints) == 0 {
 			@ui.Card() {
-				@ui.EmptyState("bug", "No defects", "Defects linked to this capability will appear here.", "", "")
+				@ui.EmptyState("shield-check", "No constraints", "Constraints linked to this capability will appear here.", "", "")
 			}
 		} else {
 			@ui.Card() {
@@ -433,40 +432,40 @@ templ CapabilityDefectsTabContent(props CapabilityDefectsTabProps) {
 							Title
 						}
 						@ui.TableHeader() {
-							Criticality
+							Compliance
 						}
-						if props.CanUnlink {
+						if props.CanWrite {
 							@ui.TableHeader() {
 							}
 						}
 					}
 					@ui.TableBody("") {
-						for _, d := range props.Defects {
+						for _, c := range props.Constraints {
 							@ui.TableRow("") {
 								@ui.TableCellMuted() {
-									<span class="whitespace-nowrap">{ d.Identifier }</span>
+									<span class="whitespace-nowrap">{ model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, c.CategoryID), c.SequenceNumber) }</span>
 								}
 								@ui.TableCell() {
 									<a
-										href={ templ.SafeURL(fmt.Sprintf("/products/%s/defects/%s", props.ProductID, d.ID)) }
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/constraints/%s", props.ProductID, c.ID)) }
 										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
 									>
-										{ d.Title }
+										{ c.Title }
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ d.Criticality }
+									@complianceBadge(c.ComplianceState)
 								}
-								if props.CanUnlink {
+								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
 										<button
 											type="button"
-											aria-label="Unlink defect"
+											aria-label="Unlink constraint"
 											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
-											hx-delete={ fmt.Sprintf("/products/%s/capabilities/%s/defects/%s", props.ProductID, props.CapabilityID, props.LinkIDs[d.ID]) }
-											hx-target="#tab-panel-defects"
+											hx-delete={ fmt.Sprintf("/products/%s/capabilities/%s/constraints/%s", props.ProductID, props.CapabilityID, c.ID) }
+											hx-target="#tab-panel-constraints"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this defect from the capability?"
+											hx-confirm="Unlink this constraint from the capability?"
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -481,8 +480,8 @@ templ CapabilityDefectsTabContent(props CapabilityDefectsTabProps) {
 	</div>
 }
 
-templ CapabilityDefectLinkModal(productID, capabilityID string) {
-	@ui.Modal("defect-link-modal", "Link existing defect", "md") {
+templ CapabilityConstraintLinkModal(productID, capabilityID string) {
+	@ui.Modal("constraint-link-modal", "Link existing constraint", "md") {
 		<div class="space-y-4">
 			<div class="relative">
 				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
@@ -491,38 +490,38 @@ templ CapabilityDefectLinkModal(productID, capabilityID string) {
 				<input
 					type="search"
 					name="q"
-					placeholder="Search defects..."
+					placeholder="Search constraints..."
 					autofocus
 					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
-					hx-get={ fmt.Sprintf("/products/%s/capabilities/%s/defects/link-search", productID, capabilityID) }
-					hx-target="#defect-link-results"
+					hx-get={ fmt.Sprintf("/products/%s/capabilities/%s/constraints/link-search", productID, capabilityID) }
+					hx-target="#constraint-link-results"
 					hx-swap="innerHTML"
 					hx-trigger="keyup changed delay:300ms, search, load"
 				/>
 			</div>
-			<div id="defect-link-results" class="min-h-[6rem]">
+			<div id="constraint-link-results" class="min-h-[6rem]">
 				@ui.LoadingSpinner("sm")
 			</div>
 		</div>
 	}
 }
 
-templ CapabilityDefectLinkResults(productID, capabilityID string, candidates []*model.Defect) {
+templ CapabilityConstraintLinkResults(productID, capabilityID string, candidates []*model.Constraint, prefixes map[string]string) {
 	if len(candidates) == 0 {
-		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching defects.</p>
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching constraints.</p>
 	} else {
 		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
-			for _, d := range candidates {
+			for _, c := range candidates {
 				<li class="flex items-center justify-between gap-4 py-3">
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ d.Title }</p>
-						<p class="text-xs text-gray-500 dark:text-gray-400">{ d.Identifier } · { d.Criticality }</p>
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{ c.Title }</p>
+						<p class="text-xs text-gray-500 dark:text-gray-400">{ model.EntityIdentifier(constraintPrefix(prefixes, c.CategoryID), c.SequenceNumber) }</p>
 					</div>
 					<button
 						type="button"
 						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-						hx-post={ fmt.Sprintf("/products/%s/capabilities/%s/defects/link", productID, capabilityID) }
-						hx-vals={ fmt.Sprintf(`{"defect_id":"%s"}`, d.ID) }
+						hx-post={ fmt.Sprintf("/products/%s/capabilities/%s/constraints/link", productID, capabilityID) }
+						hx-vals={ fmt.Sprintf(`{"constraint_id":"%s"}`, c.ID) }
 						hx-target="#modal"
 						hx-swap="innerHTML"
 					>
@@ -565,6 +564,7 @@ func capabilityDetailTabs(productID, capabilityID string) []templates.TabDef {
 		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
 		{ID: "test-cases", Label: "Test Cases", HxGet: base + "/test-cases"},
 		{ID: "defects", Label: "Defects", HxGet: base + "/defects"},
+		{ID: "constraints", Label: "Constraints", HxGet: base + "/constraints"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},
 		{ID: "attachments", Label: "Attachments", HxGet: base + "/attachments"},
 		{ID: "history", Label: "History", HxGet: base + "/history"},
@@ -592,9 +592,3 @@ func capabilityDeleteURL(props CapabilityDetailProps) string {
 	return ""
 }
 
-func capabilityComponentDisplay(name string) string {
-	if name == "" {
-		return "None (top-level)"
-	}
-	return name
-}

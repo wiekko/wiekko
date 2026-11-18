@@ -565,6 +565,19 @@ func (c *PageProductController) linkedDocuments(r *http.Request, user *model.Use
 	return docs
 }
 
+// structureDocuments returns the documents that belong to a component or
+// capability (filter.ComponentID or CapabilityID), for its overview (UR-159).
+func (c *PageProductController) structureDocuments(r *http.Request, user *model.User, productID string, filter store.DocumentFilter) []*model.Document {
+	if c.document == nil {
+		return nil
+	}
+	docs, err := c.document.ListDocuments(r.Context(), user, productID, filter, store.ListParams{})
+	if err != nil {
+		return nil
+	}
+	return docs
+}
+
 // Comments and attachments.
 
 func (c *PageProductController) DocumentCommentsTab(w http.ResponseWriter, r *http.Request) {

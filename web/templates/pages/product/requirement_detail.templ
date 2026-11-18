@@ -244,7 +244,7 @@ templ RequirementCapabilitiesTabContent(props RequirementCapabilitiesTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ requirementCapabilityComponentName(props.ComponentName, cap.ID) }
+									@componentLink(props.ProductID, cap.ComponentID, props.ComponentName[cap.ID])
 								}
 								if props.CanWrite {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -325,16 +325,6 @@ templ RequirementCapabilityLinkResults(productID, requirementID string, candidat
 			}
 		</ul>
 	}
-}
-
-func requirementCapabilityComponentName(names map[string]string, capabilityID string) string {
-	if names == nil {
-		return "—"
-	}
-	if n, ok := names[capabilityID]; ok && n != "" {
-		return n
-	}
-	return "—"
 }
 
 // RequirementTestCasesTabProps holds data for the requirement test-cases tab.

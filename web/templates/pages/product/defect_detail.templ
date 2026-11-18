@@ -412,7 +412,7 @@ templ DefectCapabilitiesTabContent(props DefectCapabilitiesTabProps) {
 									</a>
 								}
 								@ui.TableCellMuted() {
-									{ defectCapabilityComponentName(props.ComponentName, cap.ID) }
+									@componentLink(props.ProductID, cap.ComponentID, props.ComponentName[cap.ID])
 								}
 								if props.CanUnlink {
 									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -792,13 +792,6 @@ templ DefectRequirementLinkResults(productID, defectID string, candidates []*mod
 			}
 		</ul>
 	}
-}
-
-func defectCapabilityComponentName(names map[string]string, capabilityID string) string {
-	if name, ok := names[capabilityID]; ok {
-		return name
-	}
-	return "—"
 }
 
 func defectCategoryPrefix(prefixes map[string]string, categoryID string) string {
