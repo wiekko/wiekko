@@ -14,8 +14,9 @@ import (
 // Documents (FR-50..FR-58): protocols, schemas and other texts that define
 // the product. Their bodies are user input of any format, so they reach the
 // page only two ways: Markdown through templates.RenderMarkdown, which escapes
-// raw HTML and drops unsafe links, and every other format as text that templ
-// escapes. Nothing here passes a body to templ.Raw by any other route.
+// raw HTML and drops unsafe links, and every other format through
+// templates.HighlightCode, which escapes it. Nothing here passes a body to
+// templ.Raw by any other route.
 
 // DocumentsProps holds data for the document list page.
 type DocumentsProps struct {
@@ -295,7 +296,8 @@ templ DocumentOverviewTabContent(props DocumentDetailProps) {
 }
 
 // DocumentBody shows a body by its format: Markdown rendered safely,
-// everything else verbatim and escaped.
+// everything else as an escaped code block, highlighted where the format has
+// a highlighter (UR-151).
 templ DocumentBody(format, body string) {
 	if body == "" {
 		<p class="text-sm text-gray-500 dark:text-gray-400">This document has no content yet.</p>
@@ -304,7 +306,9 @@ templ DocumentBody(format, body string) {
 			@templ.Raw(templates.RenderMarkdown(body))
 		</div>
 	} else {
-		<pre class="overflow-x-auto rounded-md bg-gray-50 p-4 text-xs leading-relaxed text-gray-900 dark:bg-gray-950 dark:text-gray-100"><code class="font-mono">{ body }</code></pre>
+		<div class="prose prose-sm dark:prose-invert max-w-none">
+			@templ.Raw(templates.HighlightCode(format, body))
+		</div>
 	}
 }
 

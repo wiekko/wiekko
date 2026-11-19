@@ -6,17 +6,20 @@ toolchain go1.26.11
 
 require (
 	github.com/a-h/templ v0.3.1100
+	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/kaugesaar/lucide-go v0.42.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/yuin/goldmark v1.8.7
+	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
 	golang.org/x/term v0.47.0
 	modernc.org/sqlite v1.62.0
 	rsc.io/qr v0.2.0
 )
 
 require (
+	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

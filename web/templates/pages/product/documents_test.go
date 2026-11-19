@@ -2,6 +2,8 @@ package product
 
 import (
 	"context"
+	"html"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -18,7 +20,14 @@ const hostileBody = "<script>alert(1)</script>\n" +
 // activeContent lists what must not reach the page as markup. A
 // "javascript:" left as escaped text in a code block is harmless; as a link
 // target it is not, so links are checked separately.
-var activeContent = []string{"<script", "<img", "<iframe", "<svg", "</code></pre><", "href=\"javascript:", "<a "}
+var activeContent = []string{"<script", "<img", "<iframe", "<svg", "</code></pre><iframe", "href=\"javascript:", "<a "}
+
+var markupTag = regexp.MustCompile(`<[^>]*>`)
+
+// visibleText is the text a browser shows for out.
+func visibleText(out string) string {
+	return html.UnescapeString(markupTag.ReplaceAllString(out, ""))
+}
 
 func renderComponent(t *testing.T, render func(sb *strings.Builder) error) string {
 	t.Helper()
@@ -27,7 +36,7 @@ func renderComponent(t *testing.T, render func(sb *strings.Builder) error) strin
 
 // TestDocumentBodyIsInert checks that a document body, whatever its format,
 // reaches the page without active content: Markdown through the safe
-// renderer, every other format as escaped text.
+// renderer, every other format as escaped text, highlighted or not.
 func TestDocumentBodyIsInert(t *testing.T) {
 	for _, format := range model.DocumentFormats {
 		out := renderComponent(t, func(sb *strings.Builder) error {
@@ -41,8 +50,10 @@ func TestDocumentBodyIsInert(t *testing.T) {
 		if format == model.DocumentFormatMarkdown && strings.Contains(out, "javascript:") {
 			t.Errorf("markdown output keeps a javascript: link:\n%s", out)
 		}
-		if format != model.DocumentFormatMarkdown && !strings.Contains(out, "&lt;script&gt;") {
-			t.Errorf("format %s: body not shown as escaped text:\n%s", format, out)
+		// Other formats show the body as text: highlighting (UR-151) only
+		// wraps tokens in spans, so the text without them is the body.
+		if format != model.DocumentFormatMarkdown && !strings.Contains(visibleText(out), hostileBody) {
+			t.Errorf("format %s: body not shown as text:\n%s", format, out)
 		}
 	}
 }

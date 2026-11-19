@@ -77,3 +77,94 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background-color: rgb(255 255 255 / 0.1);
 }
+
+/* Markdown content (UR-143, UR-151) ------------------------------------- */
+
+/* Code blocks follow the theme instead of the typography plugin's dark
+   default, the same as other code on the page. */
+.prose {
+  --tw-prose-pre-bg: var(--color-gray-50);
+  --tw-prose-pre-code: var(--color-gray-900);
+}
+
+.dark .prose {
+  --tw-prose-pre-bg: var(--color-gray-950);
+  --tw-prose-pre-code: var(--color-gray-100);
+}
+
+.prose pre {
+  border: 1px solid var(--color-gray-200);
+}
+
+.dark .prose pre {
+  border-color: var(--color-gray-700);
+}
+
+/* Wide tables scroll inside their own box on narrow screens (UC-60). */
+.prose .md-table {
+  overflow-x: auto;
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+.prose .md-table > table {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Task lists: the checkbox takes the place of the bullet. */
+.prose li:has(> input[type="checkbox"]) {
+  list-style: none;
+}
+
+.prose li > input[type="checkbox"] {
+  margin: 0 0.5em 0 -1.5em;
+  vertical-align: middle;
+  accent-color: var(--color-indigo-600);
+}
+
+/* Syntax highlighting: chroma token classes, Tailwind palettes (DOC-2). */
+.chroma .err { color: var(--color-red-700); }
+.chroma .k, .chroma .kc, .chroma .kd, .chroma .kn, .chroma .kp, .chroma .kr,
+.chroma .ow, .chroma .nt { color: var(--color-indigo-700); }
+.chroma .kt, .chroma .nc, .chroma .nn, .chroma .ne { color: var(--color-violet-700); }
+.chroma .s, .chroma .sa, .chroma .sb, .chroma .sc, .chroma .dl, .chroma .sd,
+.chroma .s2, .chroma .se, .chroma .sh, .chroma .si, .chroma .sx, .chroma .sr,
+.chroma .s1, .chroma .ss, .chroma .ls { color: var(--color-emerald-700); }
+.chroma .m, .chroma .mb, .chroma .mf, .chroma .mh, .chroma .mi, .chroma .il,
+.chroma .mo { color: var(--color-amber-700); }
+.chroma .nf, .chroma .fm, .chroma .nb, .chroma .bp, .chroma .na,
+.chroma .nd { color: var(--color-sky-700); }
+.chroma .nv, .chroma .vc, .chroma .vg, .chroma .vi, .chroma .vm,
+.chroma .no { color: var(--color-rose-700); }
+.chroma .c, .chroma .ch, .chroma .cm, .chroma .c1, .chroma .cs,
+.chroma .cpf { color: var(--color-gray-500); font-style: italic; }
+.chroma .cp { color: var(--color-amber-700); }
+.chroma .o { color: var(--color-gray-600); }
+.chroma .gd { color: var(--color-red-700); }
+.chroma .gi { color: var(--color-emerald-700); }
+.chroma .ge { font-style: italic; }
+.chroma .gs, .chroma .gh, .chroma .gu { font-weight: 600; }
+
+.dark .chroma .err { color: var(--color-red-400); }
+.dark .chroma .k, .dark .chroma .kc, .dark .chroma .kd, .dark .chroma .kn,
+.dark .chroma .kp, .dark .chroma .kr, .dark .chroma .ow,
+.dark .chroma .nt { color: var(--color-indigo-300); }
+.dark .chroma .kt, .dark .chroma .nc, .dark .chroma .nn,
+.dark .chroma .ne { color: var(--color-violet-300); }
+.dark .chroma .s, .dark .chroma .sa, .dark .chroma .sb, .dark .chroma .sc,
+.dark .chroma .dl, .dark .chroma .sd, .dark .chroma .s2, .dark .chroma .se,
+.dark .chroma .sh, .dark .chroma .si, .dark .chroma .sx, .dark .chroma .sr,
+.dark .chroma .s1, .dark .chroma .ss, .dark .chroma .ls { color: var(--color-emerald-300); }
+.dark .chroma .m, .dark .chroma .mb, .dark .chroma .mf, .dark .chroma .mh,
+.dark .chroma .mi, .dark .chroma .il, .dark .chroma .mo,
+.dark .chroma .cp { color: var(--color-amber-300); }
+.dark .chroma .nf, .dark .chroma .fm, .dark .chroma .nb, .dark .chroma .bp,
+.dark .chroma .na, .dark .chroma .nd { color: var(--color-sky-300); }
+.dark .chroma .nv, .dark .chroma .vc, .dark .chroma .vg, .dark .chroma .vi,
+.dark .chroma .vm, .dark .chroma .no { color: var(--color-rose-300); }
+.dark .chroma .c, .dark .chroma .ch, .dark .chroma .cm, .dark .chroma .c1,
+.dark .chroma .cs, .dark .chroma .cpf { color: var(--color-gray-400); }
+.dark .chroma .o { color: var(--color-gray-400); }
+.dark .chroma .gd { color: var(--color-red-400); }
+.dark .chroma .gi { color: var(--color-emerald-300); }
