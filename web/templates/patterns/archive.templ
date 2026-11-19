@@ -20,6 +20,57 @@ type ArchiveProps struct {
 	HasChildren bool
 	// CanArchive is set for product owners.
 	CanArchive bool
+	// MayHaveChildren is set in a table row of a requirement or task, where
+	// whether items are below it is not known; the confirmation then mentions
+	// them in general terms.
+	MayHaveChildren bool
+}
+
+const rowArchiveButtonClass = "inline-flex items-center justify-center rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+
+// ArchiveRowAction is the quick action of a table row (UR-166) that archives
+// a closed item or brings an archived one back, with the same confirmation
+// as ArchiveControls. An open item cannot be archived; its button is shown
+// disabled so the actions of all rows line up. After the change the list
+// reloads with its state, so the item leaves or stays by the archived facet.
+templ ArchiveRowAction(props ArchiveProps) {
+	if props.Archived {
+		<button
+			type="button"
+			class={ rowArchiveButtonClass }
+			aria-label="Unarchive"
+			title="Unarchive"
+			hx-post={ props.ItemURL + "/unarchive" }
+			hx-vals={ `{"return":"list"}` }
+			hx-swap="none"
+			{ ui.Confirm(ui.ConfirmNeutral, "Unarchive "+props.Kind, "Unarchive", unarchiveMessage(props))... }
+		>
+			@ui.Icon("archive-restore", "sm")
+		</button>
+	} else if props.Closed {
+		<button
+			type="button"
+			class={ rowArchiveButtonClass }
+			aria-label="Archive"
+			title="Archive"
+			hx-post={ props.ItemURL + "/archive" }
+			hx-vals={ `{"return":"list"}` }
+			hx-swap="none"
+			{ ui.Confirm(ui.ConfirmNeutral, "Archive "+props.Kind, "Archive", archiveMessage(props))... }
+		>
+			@ui.Icon("archive", "sm")
+		</button>
+	} else {
+		<button
+			type="button"
+			class="inline-flex cursor-not-allowed items-center justify-center rounded p-1.5 text-gray-300 dark:text-gray-600"
+			aria-label="Archive"
+			title={ "Only closed " + props.Kind + "s can be archived" }
+			disabled
+		>
+			@ui.Icon("archive", "sm")
+		</button>
+	}
 }
 
 // ArchiveControls renders, in a detail page header, the Archived badge of an
@@ -59,6 +110,8 @@ func archiveMessage(props ArchiveProps) string {
 	msg := "Archive " + props.Kind + " " + props.Name + "?"
 	if props.HasChildren {
 		msg += " All items below it are archived too; they must all be closed."
+	} else if props.MayHaveChildren {
+		msg += " Any items below it are archived too; they must all be closed."
 	}
 	return msg + " Archived items are hidden from lists, the board and sprint planning, but stay linked to everything else. You can unarchive it at any time."
 }
@@ -67,6 +120,8 @@ func unarchiveMessage(props ArchiveProps) string {
 	msg := "Unarchive " + props.Kind + " " + props.Name + "?"
 	if props.HasChildren {
 		msg += " The items below it are unarchived too."
+	} else if props.MayHaveChildren {
+		msg += " Any items below it are unarchived too."
 	}
 	return msg + " It shows up in lists and on the board again."
 }

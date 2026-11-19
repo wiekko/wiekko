@@ -142,3 +142,95 @@ func TestArchivePages(t *testing.T) {
 		}
 	})
 }
+
+// TestArchiveRowActions drives the archive quick action of the table rows
+// (UR-166): closed items offer Archive, archived ones Unarchive, open ones a
+// disabled button, and a change made from the list reloads the list instead
+// of opening the item.
+func TestArchiveRowActions(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		pid := e.product.ID
+		must := func(err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		closedStatus := func(et string) string {
+			list, err := e.svc.Milestone.ListStatuses(ctx, e.admin, pid, et)
+			must(err)
+			for _, s := range list {
+				if s.IsClosed {
+					return s.ID
+				}
+			}
+			t.Fatalf("no closed %s status", et)
+			return ""
+		}
+		done, err := e.svc.Backlog.CreateRequirement(ctx, e.admin, service.CreateRequirementInput{
+			ProductID: pid, Title: "Finished feature", StatusID: closedStatus("requirement"),
+		})
+		must(err)
+		open, err := e.svc.Backlog.CreateRequirement(ctx, e.admin, service.CreateRequirementInput{ProductID: pid, Title: "Open feature"})
+		must(err)
+		def, err := e.svc.Backlog.CreateDefect(ctx, e.admin, service.CreateDefectInput{
+			ProductID: pid, Title: "Fixed crash", StatusID: closedStatus("defect"),
+		})
+		must(err)
+
+		get := adminPageGetter(t, e)
+		reqs := "/products/" + pid + "/requirements"
+		body := get(reqs, nil)
+		if !strings.Contains(body, reqs+"/"+done.ID+"/archive") {
+			t.Error("a closed requirement's row offers no Archive action")
+		}
+		if strings.Contains(body, reqs+"/"+open.ID+"/archive") || !strings.Contains(body, "Only closed requirements can be archived") {
+			t.Error("an open requirement's row does not show a disabled Archive action")
+		}
+		defs := "/products/" + pid + "/defects"
+		if body := get(defs, nil); !strings.Contains(body, defs+"/"+def.ID+"/archive") {
+			t.Error("a closed defect's row offers no Archive action")
+		}
+
+		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+		var cookie *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" && c.Value != "" {
+				cookie = c
+			}
+		}
+		if cookie == nil {
+			t.Fatal("no session cookie")
+		}
+		quick := func(path string) {
+			t.Helper()
+			r, err := http.NewRequest(http.MethodPost, e.srv.URL+path, strings.NewReader("return=list"))
+			must(err)
+			r.AddCookie(cookie)
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			r.Header.Set("X-CSRF-Token", csrfToken(t, e, cookie))
+			r.Header.Set("HX-Request", "true")
+			resp, err := e.client().Do(r)
+			must(err)
+			body := readBody(t, resp)
+			if resp.StatusCode != http.StatusOK || resp.Header.Get("HX-Refresh") != "true" || resp.Header.Get("HX-Redirect") != "" {
+				t.Fatalf("POST %s from the list: %d %q, refresh %q", path, resp.StatusCode, body, resp.Header.Get("HX-Refresh"))
+			}
+		}
+
+		quick(reqs + "/" + done.ID + "/archive")
+		quick(defs + "/" + def.ID + "/archive")
+		if body := get(reqs+"?archived=include", nil); !strings.Contains(body, reqs+"/"+done.ID+"/unarchive") {
+			t.Error("an archived requirement's row offers no Unarchive action")
+		}
+		if body := get(defs+"?archived=only", nil); !strings.Contains(body, defs+"/"+def.ID+"/unarchive") {
+			t.Error("an archived defect's row offers no Unarchive action")
+		}
+		quick(reqs + "/" + done.ID + "/unarchive")
+		if body := get(reqs, nil); !strings.Contains(body, "Finished feature") {
+			t.Error("the requirement unarchived from its row is still hidden")
+		}
+	})
+}

@@ -8819,8 +8819,10 @@ func archivedParam(f, defaultFilter store.ArchivedFilter) string {
 
 // ArchiveItem returns the handler of POST …/{collection}/{item}/archive and
 // …/unarchive (FR-155), for collection requirements, tasks or defects, whose
-// item ID is the path value param. On success the page reloads; a refusal is
-// shown as the toast htmx-errors.js makes of a plain-text body.
+// item ID is the path value param. On success the item's page loads, or, for
+// the quick action of a table row (UR-166, return=list), the list reloads
+// with its state; a refusal is shown as the toast htmx-errors.js makes of a
+// plain-text body.
 func (c *PageProductController) ArchiveItem(param, collection string, archived bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.UserFromContext(r.Context())
@@ -8847,7 +8849,11 @@ func (c *PageProductController) ArchiveItem(param, collection string, archived b
 			http.Error(w, errorText(err), status)
 			return
 		}
-		w.Header().Set("HX-Redirect", "/products/"+productID+"/"+collection+"/"+itemID)
+		if r.FormValue("return") == "list" {
+			w.Header().Set("HX-Refresh", "true")
+		} else {
+			w.Header().Set("HX-Redirect", "/products/"+productID+"/"+collection+"/"+itemID)
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 }

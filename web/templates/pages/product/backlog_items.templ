@@ -151,10 +151,11 @@ templ BacklogItemsTableContent(props BacklogItemsProps) {
 								}
 								if props.CanEdit {
 									@ui.TableCell() {
-										@patterns.RowActions(
+										@patterns.RowActionsWith(
 											fmt.Sprintf("%s/%s/edit?return=list", backlogItemsURL(props), item.ID),
 											fmt.Sprintf("%s/%s", backlogItemsURL(props), item.ID),
 											props.Meta.CSRFToken,
+											patterns.ArchiveRowAction(backlogItemArchiveProps(props, item)),
 										)
 									}
 								}
@@ -278,4 +279,18 @@ func requirementPrefix(prefixes map[string]string, categoryID string) string {
 		}
 	}
 	return "??"
+}
+
+// backlogItemArchiveProps describes a row's archive quick action (UR-166).
+func backlogItemArchiveProps(props BacklogItemsProps, item *model.Requirement) patterns.ArchiveProps {
+	status := props.Statuses[item.StatusID]
+	return patterns.ArchiveProps{
+		ItemURL:         fmt.Sprintf("%s/%s", backlogItemsURL(props), item.ID),
+		Kind:            props.Kind,
+		Name:            ui.ItemName(model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, item.CategoryID), item.SequenceNumber), item.Title),
+		Archived:        item.Archived(),
+		Closed:          status != nil && status.IsClosed,
+		CanArchive:      props.CanEdit,
+		MayHaveChildren: true,
+	}
 }

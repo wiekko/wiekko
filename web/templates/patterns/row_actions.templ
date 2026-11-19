@@ -8,6 +8,12 @@ import "nexmap.net/web/templates/ui"
 // deleteURL is the DELETE endpoint; /delete/confirm is appended for the modal.
 // Pass "" for either URL to hide that action.
 templ RowActions(editHref, deleteURL, csrfToken string) {
+	@RowActionsWith(editHref, deleteURL, csrfToken, nil)
+}
+
+// RowActionsWith is RowActions with one more action, e.g. ArchiveRowAction,
+// between Edit and Delete; extra may be nil.
+templ RowActionsWith(editHref, deleteURL, csrfToken string, extra templ.Component) {
 	<div class="flex items-center justify-end gap-1" onclick="event.stopPropagation()">
 		if editHref != "" {
 			<a
@@ -18,6 +24,9 @@ templ RowActions(editHref, deleteURL, csrfToken string) {
 			>
 				@ui.Icon("pencil", "sm")
 			</a>
+		}
+		if extra != nil {
+			@extra
 		}
 		if deleteURL != "" {
 			<button

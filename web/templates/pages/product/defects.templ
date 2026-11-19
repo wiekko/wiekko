@@ -169,10 +169,11 @@ templ DefectsTableContent(props DefectsProps) {
 								}
 								if props.CanEdit {
 									@ui.TableCell() {
-										@patterns.RowActions(
+										@patterns.RowActionsWith(
 											fmt.Sprintf("/products/%s/defects/%s/edit?return=list", props.Product.ID, d.ID),
 											fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID),
 											props.Meta.CSRFToken,
+											patterns.ArchiveRowAction(defectArchiveRowProps(props, d)),
 										)
 									}
 								}
@@ -244,4 +245,17 @@ func defectSprintOptions(props DefectsProps) []templates.SelectOption {
 		options = append(options, templates.SelectOption{Value: s.ID, Label: s.Name})
 	}
 	return options
+}
+
+// defectArchiveRowProps describes a row's archive quick action (UR-166).
+func defectArchiveRowProps(props DefectsProps, d *model.Defect) patterns.ArchiveProps {
+	status := props.Statuses[d.StatusID]
+	return patterns.ArchiveProps{
+		ItemURL:    fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, d.ID),
+		Kind:       "defect",
+		Name:       ui.ItemName(d.Identifier, d.Title),
+		Archived:   d.Archived(),
+		Closed:     status != nil && status.IsClosed,
+		CanArchive: props.CanEdit,
+	}
 }
