@@ -43,6 +43,13 @@ func TestE2EStructureWrites(t *testing.T) {
 	if len(capa.Requirements) != 1 || capa.Requirements[0].Identifier != fr {
 		t.Fatalf("linked requirements = %+v", capa.Requirements)
 	}
+	// DF-1: capability show lists linked constraints, in JSON and markdown.
+	if len(capa.Constraints) != 1 || capa.Constraints[0].Identifier != ac || capa.Constraints[0].Compliance == "" {
+		t.Fatalf("linked constraints = %+v", capa.Constraints)
+	}
+	if md := e.mustRun("", "capability", "show", "Crash reporting", "-o", "md").stdout; !strings.Contains(md, "## Constraints") || !strings.Contains(md, ac) {
+		t.Errorf("capability markdown lacks the linked constraint %s:\n%s", ac, md)
+	}
 	con := decode[ops.ConstraintDetail](t, e.mustRun("", "constraint", "show", ac, "-o", "json").stdout)
 	if !hasRef(con.Capabilities, "Crash reporting") {
 		t.Fatalf("%s not linked to the capability: %+v", ac, con.Capabilities)
@@ -125,6 +132,12 @@ func TestE2EMCPStructureWrites(t *testing.T) {
 	_, got = mustTool(t, s, "link_capability", map[string]any{"capability": "Crash reports", "items": []string{ident}})
 	if got.(map[string]any)["name"] != "Crash reports" {
 		t.Fatalf("link_capability = %v", got)
+	}
+	// DF-1: get_capability lists the linked constraint.
+	_, got = mustTool(t, s, "get_capability", map[string]any{"ref": "Crash reports"})
+	linked, _ := got.(map[string]any)["constraints"].([]any)
+	if len(linked) != 1 || linked[0].(map[string]any)["identifier"] != ident {
+		t.Fatalf("get_capability constraints = %v", got.(map[string]any)["constraints"])
 	}
 	con := decode[ops.ConstraintDetail](t, e.mustRun("", "constraint", "show", ident, "-o", "json").stdout)
 	if !hasRef(con.Capabilities, "Crash reports") {

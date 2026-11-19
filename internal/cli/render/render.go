@@ -392,6 +392,8 @@ func Capability(w io.Writer, c *ops.CapabilityDetail) error {
 	d.section(2, "Description", c.Description)
 	d.h(2, "Requirements")
 	d.table(requirementHeaders, requirementRows(c.Requirements))
+	d.h(2, "Constraints")
+	d.table(constraintHeaders, constraintRows(c.Constraints))
 	d.h(2, "Test cases")
 	d.table(testCaseHeaders, testCaseRows(c.TestCases))
 	d.h(2, "Defects")

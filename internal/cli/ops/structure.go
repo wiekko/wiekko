@@ -37,7 +37,8 @@ func (s *Session) Structure(ctx context.Context) (*Structure, error) {
 }
 
 // ShowCapability returns a capability by name (case-insensitive), ID or ID
-// prefix, with the requirements, test cases and defects traced to it.
+// prefix, with the requirements, constraints (DF-1), test cases and defects
+// traced to it.
 func (s *Session) ShowCapability(ctx context.Context, ref string) (*CapabilityDetail, error) {
 	c, err := s.findCapability(ctx, ref)
 	if err != nil {
@@ -72,6 +73,18 @@ func (s *Session) ShowCapability(ctx context.Context, ref string) (*CapabilityDe
 			return nil, err
 		}
 		d.Requirements = append(d.Requirements, sum)
+	}
+	cons, err := s.C.CapabilityConstraints(ctx, s.ProductID, c.ID)
+	if err != nil {
+		return nil, err
+	}
+	d.Constraints = make([]ConstraintSummary, 0, len(cons))
+	for _, con := range cons {
+		sum, err := s.constraintSummary(ctx, con)
+		if err != nil {
+			return nil, err
+		}
+		d.Constraints = append(d.Constraints, sum)
 	}
 	tcs, err := s.C.CapabilityTestCases(ctx, s.ProductID, c.ID)
 	if err != nil {

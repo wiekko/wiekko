@@ -224,7 +224,7 @@ func registerReadTools(s *sdk.Server, h *handlers) {
 		})
 
 	readTool(s, h, "get_capability", "Show a capability",
-		"One capability by name or ID: its component, linked requirements, test cases and defects.",
+		"One capability by name or ID: its component, linked requirements, constraints, test cases and defects.",
 		func(ctx context.Context, sess *ops.Session, in RefInput) (*ops.CapabilityDetail, func(io.Writer) error, error) {
 			if err := required(in.Ref); err != nil {
 				return nil, nil, err

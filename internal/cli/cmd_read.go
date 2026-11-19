@@ -214,7 +214,7 @@ func capabilityGroup() *command {
 	show := &command{
 		name:    "capability show",
 		args:    "<name|ID>",
-		summary: "show a capability with its requirements, test cases and defects",
+		summary: "show a capability with its requirements, constraints, test cases and defects",
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) == 0 {
 				return usageErr(errors.New("usage: nexmap capability show <name|ID>"))

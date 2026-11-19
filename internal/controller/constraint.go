@@ -174,6 +174,27 @@ func (c *ConstraintController) ListConstraintCapabilities(w http.ResponseWriter,
 	httputil.JSON(w, http.StatusOK, result)
 }
 
+// ListCapabilityConstraints handles GET /products/{productId}/capabilities/{id}/constraints,
+// the reverse of ListConstraintCapabilities (DF-1).
+func (c *ConstraintController) ListCapabilityConstraints(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("productId")
+	id := r.PathValue("id")
+
+	items, err := c.constraint.ListCapabilityConstraints(r.Context(), user, productID, id)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	prefixes := c.prefixes(r, user, productID)
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		result = append(result, constraintToJSON(item, prefixes))
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
 // LinkConstraintCapability handles POST /products/{productId}/constraints/{id}/capabilities.
 func (c *ConstraintController) LinkConstraintCapability(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())

@@ -142,6 +142,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("DELETE /products/{productId}/capabilities/{id}/requirements/{reqId}", need(access.W(access.Structure), access.R(access.Backlog)), reqParamRef(csrf(http.HandlerFunc(componentCtrl.UnlinkCapabilityRequirement))))
 	api.authed("GET /products/{productId}/capabilities/{id}/test-cases", need(access.R(access.Structure), access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListCapabilityTestCases))
 	api.authed("GET /products/{productId}/capabilities/{id}/defects", need(access.R(access.Structure), access.R(access.Defects)), backlogCtrl.LinkedDefects(model.DefectLinkTargetCapability))
+	api.authed("GET /products/{productId}/capabilities/{id}/constraints", need(access.R(access.Structure), access.R(access.Backlog)), http.HandlerFunc(constraintCtrl.ListCapabilityConstraints))
 
 	// Requirement-capability links.
 	api.authed("GET /products/{productId}/requirements/{id}/capabilities", need(access.R(access.Backlog), access.R(access.Structure)), reqRef(http.HandlerFunc(componentCtrl.ListRequirementCapabilities)))

@@ -173,6 +173,7 @@ type CapabilityDetail struct {
 	CapabilityView
 	Component    string               `json:"component,omitempty"`
 	Requirements []RequirementSummary `json:"requirements"`
+	Constraints  []ConstraintSummary  `json:"constraints"`
 	TestCases    []TestCaseSummary    `json:"test_cases"`
 	Defects      []DefectSummary      `json:"defects"`
 	Comments     []CommentView        `json:"comments"`

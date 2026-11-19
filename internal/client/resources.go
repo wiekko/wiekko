@@ -386,6 +386,11 @@ func (c *Client) CapabilityDefects(ctx context.Context, productID, id string) ([
 	return getList[Defect](ctx, c, productPath(productID, "capabilities", id, "defects"))
 }
 
+// CapabilityConstraints lists the constraints linked to a capability.
+func (c *Client) CapabilityConstraints(ctx context.Context, productID, id string) ([]Constraint, error) {
+	return getList[Constraint](ctx, c, productPath(productID, "capabilities", id, "constraints"))
+}
+
 // Categories lists the categories of one entity type (requirement, task, constraint).
 func (c *Client) Categories(ctx context.Context, productID, entityType string) ([]Category, error) {
 	return getList[Category](ctx, c, withQuery(productPath(productID, "categories"), url.Values{"entity_type": {entityType}}))
