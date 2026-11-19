@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"net/http"
+	"net/url"
 )
 
 // Write calls. POST requests are never retried (see isIdempotent), so a
@@ -158,4 +159,19 @@ type TestCaseCreate struct {
 // CreateTestCase creates a test case (developer role).
 func (c *Client) CreateTestCase(ctx context.Context, productID string, in TestCaseCreate) (*TestCase, error) {
 	return send[TestCase](ctx, c, http.MethodPost, productPath(productID, "test-cases"), in)
+}
+
+// DeleteRequirement deletes a requirement or task. children is "keep" (the
+// server's default: children move to the item's parent) or "delete".
+func (c *Client) DeleteRequirement(ctx context.Context, productID, ref, children string) error {
+	path := productPath(productID, "requirements", ref)
+	if children != "" {
+		path = withQuery(path, url.Values{"children": {children}})
+	}
+	return c.Do(ctx, http.MethodDelete, path, nil, nil)
+}
+
+// DeleteDefect deletes a defect.
+func (c *Client) DeleteDefect(ctx context.Context, productID, ref string) error {
+	return c.Do(ctx, http.MethodDelete, productPath(productID, "defects", ref), nil, nil)
 }

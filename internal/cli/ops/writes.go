@@ -393,3 +393,41 @@ func (s *Session) commentOwner(ctx context.Context, typ, ref string) (string, Re
 	}
 	return "", Ref{}, fmt.Errorf("cannot comment on %q; types: %s", typ, strings.Join(commentTypes, ", "))
 }
+
+// Children policies for DeleteBacklogItem, as the API takes them.
+const (
+	KeepChildren   = "keep"
+	DeleteChildren = "delete"
+)
+
+// DeleteBacklogItem deletes a requirement or task (owner role, FR-153).
+// children says what happens to its children: KeepChildren moves them to the
+// item's parent (or the top level), DeleteChildren deletes them too. Not
+// offered via MCP.
+func (s *Session) DeleteBacklogItem(ctx context.Context, ref, kind, children string) (*Ref, string, error) {
+	switch children {
+	case "", KeepChildren, DeleteChildren:
+	default:
+		return nil, "", fmt.Errorf("children must be %s or %s, not %q", KeepChildren, DeleteChildren, children)
+	}
+	r, err := s.requirement(ctx, ref, kind)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := s.C.DeleteRequirement(ctx, s.ProductID, r.ID, children); err != nil {
+		return nil, "", err
+	}
+	return &Ref{ID: r.ID, Identifier: r.Identifier, Title: r.Title}, r.Kind, nil
+}
+
+// DeleteDefect deletes a defect (FR-153). Not offered via MCP.
+func (s *Session) DeleteDefect(ctx context.Context, ref string) (*Ref, error) {
+	d, err := s.findDefect(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.C.DeleteDefect(ctx, s.ProductID, d.ID); err != nil {
+		return nil, err
+	}
+	return &Ref{ID: d.ID, Identifier: d.Identifier, Title: d.Title}, nil
+}

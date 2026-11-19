@@ -265,3 +265,75 @@ func (f *repeatedFlag) Set(v string) error {
 	*f = append(*f, v)
 	return nil
 }
+
+// requirementDeleteCommand deletes a requirement or task (FR-153). Like every
+// deletion it needs --yes; the MCP server offers no counterpart.
+func requirementDeleteCommand(group, fixedKind string) *command {
+	var yes bool
+	var children string
+	name := group + " delete"
+	what := "a requirement or task"
+	if fixedKind != "" {
+		what = "a " + fixedKind
+	}
+	return &command{
+		name:    name,
+		args:    "<FR-12|ID>",
+		summary: "delete " + what + " (owner role)",
+		flags: func(fs *flag.FlagSet) {
+			fs.BoolVar(&yes, "yes", false, "confirm the deletion")
+			fs.StringVar(&children, "children", ops.KeepChildren,
+				"keep: move the children to the item's parent; delete: delete them too")
+		},
+		run: func(ctx context.Context, a *app, args []string) error {
+			ref, err := oneArg(name, "<identifier|ID> --yes [--children keep|delete]", args)
+			if err != nil {
+				return err
+			}
+			if children != ops.KeepChildren && children != ops.DeleteChildren {
+				return usageErr(fmt.Errorf("--children must be %s or %s, not %q", ops.KeepChildren, ops.DeleteChildren, children))
+			}
+			if err := confirmDelete(what, yes); err != nil {
+				return err
+			}
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			r, kind, err := s.DeleteBacklogItem(ctx, ref, fixedKind, children)
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return emitDeleted(a, strings.TrimSpace(kind+" "+r.Identifier), r)
+		},
+	}
+}
+
+// defectDeleteCommand deletes a defect (FR-153); needs --yes.
+func defectDeleteCommand() *command {
+	var yes bool
+	return &command{
+		name:    "defect delete",
+		args:    "<DF-17|ID>",
+		summary: "delete a defect (owner role)",
+		flags:   func(fs *flag.FlagSet) { fs.BoolVar(&yes, "yes", false, "confirm the deletion") },
+		run: func(ctx context.Context, a *app, args []string) error {
+			ref, err := oneArg("defect delete", "<identifier|ID> --yes", args)
+			if err != nil {
+				return err
+			}
+			if err := confirmDelete("a defect", yes); err != nil {
+				return err
+			}
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			r, err := s.DeleteDefect(ctx, ref)
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return emitDeleted(a, strings.TrimSpace("defect "+r.Identifier), r)
+		},
+	}
+}

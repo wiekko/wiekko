@@ -82,8 +82,11 @@ into a sprint). An item's `active` field says whether it is.
 | `nexmap doc create --title … --format json --body-file F` / `doc update DOC-3 --body-file F` | Write a definition; every content change is a new revision | owner |
 | `nexmap doc link DOC-3 FR-12 SC-2 <test identifier>` / `doc unlink …` / `doc restore DOC-3 2` | Trace a document; bring back an earlier revision | owner |
 
-`component delete`, `capability delete` and `doc delete` exist too and need `--yes`; never
-delete unless the user asked for exactly that.
+`req delete FR-12` (`--children keep|delete`, default keep: children move to the
+item's parent), `task delete`, `defect delete`, `component delete`,
+`capability delete` and `doc delete` exist too (owner role) and need `--yes`;
+the MCP server has no delete tools. Never delete unless the user asked for
+exactly that.
 
 Only change what the task at hand calls for, and tell the user what you
 changed.

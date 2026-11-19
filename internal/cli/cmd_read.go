@@ -131,7 +131,7 @@ func requirementGroup(name, summary, fixedKind string) *command {
 	}
 	return &command{name: name, summary: summary, subs: []*command{list, show,
 		requirementStatusCommand(name, fixedKind), requirementCreateCommand(name, fixedKind),
-		requirementUpdateCommand(name, fixedKind)}}
+		requirementUpdateCommand(name, fixedKind), requirementDeleteCommand(name, fixedKind)}}
 }
 
 func constraintGroup() *command {
@@ -284,7 +284,7 @@ func defectGroup() *command {
 		},
 	}
 	return &command{name: "defect", summary: "defects (bugs and issues)", subs: []*command{list, show,
-		defectStatusCommand(), defectCreateCommand()}}
+		defectStatusCommand(), defectCreateCommand(), defectDeleteCommand()}}
 }
 
 func testGroup() *command {

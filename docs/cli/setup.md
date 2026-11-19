@@ -152,12 +152,12 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `version` | Client version and, if a server is configured, the server version |
 | `update` | Install the latest or a given release, see [Updating](#updating) |
 | `context` | Product briefing: structure, constraints, work in progress, defects, testing status |
-| `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create`, `update` (e.g. `--parent FR-3`) |
+| `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create`, `update` (e.g. `--parent FR-3`), `delete` |
 | `constraint` | `list`, `show`, `create`, `update` (e.g. `--compliance met`) |
 | `doc` | Documents: `list`, `show`, `create`, `update`, `delete`, `link`/`unlink`, `revisions`, `diff`, `restore`, `get` |
 | `component` | Product structure: `list`, `create`, `update`, `delete` |
 | `capability` | `list`, `show`, `create`, `update`, `delete`, and `link`/`unlink` requirements and constraints |
-| `defect` | `list`, `show`, `status`, `create` |
+| `defect` | `list`, `show`, `status`, `create`, `delete` |
 | `test` | Test cases: `list`, `show`, `sync`, and `link`/`unlink` them to a requirement, capability or component |
 | `campaign` | `status` of the active testing campaign |
 | `comment` | `add` a comment to any commentable item |
@@ -171,6 +171,11 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 Requirements, tasks, constraints, documents and defects are referenced by their identifier (`FR-12`, `MT-3`,
 `AC-42`, `DOC-3`, `DF-17`), test cases by their short ID (the first 8 characters of the ID, shown in lists) or
 their test identifier, and capabilities by name.
+
+Deletions cannot be undone, so every `delete` command needs `--yes` and refuses without it. `req delete`
+and `task delete` take `--children keep|delete`: `keep`, the default, moves the item's children to its
+parent (or the top level), `delete` deletes them too. Deleting requirements, tasks and defects needs the
+owner role; the MCP server offers no deletions, so agents delete through the CLI or the API.
 
 ## Changing the structure
 
