@@ -27,6 +27,8 @@ type RequirementCreate struct {
 	Description      string `json:"description,omitempty"`
 	DefinitionOfDone string `json:"definition_of_done,omitempty"`
 	StatusID         string `json:"status_id,omitempty"`
+	// Priority orders items, lowest number first; 0 means none (FR-149).
+	Priority int `json:"priority,omitempty"`
 	// CapabilityIDs links a new requirement to capabilities (FR-156).
 	CapabilityIDs []string `json:"capability_ids,omitempty"`
 }
@@ -45,6 +47,8 @@ type RequirementPatch struct {
 	// Archived archives or unarchives the item with its subtree (FR-155,
 	// owner role).
 	Archived *bool `json:"archived,omitempty"`
+	// Priority changes the item's priority (FR-149, owner role).
+	Priority *int `json:"priority,omitempty"`
 }
 
 // UpdateRequirement patches a requirement or task by identifier or ID.
@@ -60,6 +64,7 @@ type DefectCreate struct {
 	Criticality   string `json:"criticality,omitempty"`
 	StatusID      string `json:"status_id,omitempty"`
 	EnvironmentID string `json:"environment_id,omitempty"`
+	Priority      int    `json:"priority,omitempty"`
 }
 
 // CreateDefect creates a defect (tester role).
@@ -72,6 +77,8 @@ type DefectPatch struct {
 	StatusID *string `json:"status_id,omitempty"`
 	// Archived archives or unarchives the defect (FR-155, owner role).
 	Archived *bool `json:"archived,omitempty"`
+	// Priority changes the defect's priority (FR-149, owner role).
+	Priority *int `json:"priority,omitempty"`
 }
 
 // UpdateDefect patches a defect. Developers may change its status.

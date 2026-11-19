@@ -23,7 +23,7 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 		})
 
 	writeTool(s, h, "create_backlog_item", "Create a task or requirement",
-		"Create a task (default) or requirement, e.g. to split a requirement into tasks via parent. "+
+		"Create a task (default) or requirement, e.g. to split a requirement into tasks via parent, optionally with a priority (1 is the highest). "+
 			"Requires the product owner role. Returns the new item with its identifier.",
 		false,
 		func(ctx context.Context, sess *ops.Session, in ops.NewBacklogItem) (*ops.RequirementDetail, func(io.Writer) error, error) {
@@ -32,7 +32,7 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 		})
 
 	writeTool(s, h, "update_backlog_item", "Update a task or requirement",
-		"Move a requirement or task below another item (parent), or to the top level with an empty parent; omitted fields stay. "+
+		"Move a requirement or task below another item (parent), or to the top level with an empty parent, or change its priority; omitted fields stay. "+
 			"A requirement's parent must be a requirement, and a move may not create a cycle. "+
 			"Requires the product owner role. Returns the updated item.",
 		true,
@@ -43,7 +43,7 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 
 	writeTool(s, h, "create_defect", "Report a defect",
 		"Report a bug found while working, optionally linked to the test case that reveals it, the requirement it violates "+
-			"and the components and capabilities it affects. "+
+			"and the components and capabilities it affects, optionally with a priority (1 is the highest). "+
 			"Check list_defects first to avoid duplicates. Requires the tester role. Returns the new defect.",
 		false,
 		func(ctx context.Context, sess *ops.Session, in ops.NewDefect) (*ops.DefectDetail, func(io.Writer) error, error) {

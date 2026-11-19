@@ -107,6 +107,8 @@ func (s *Session) requirement(ctx context.Context, ref, kind string) (*client.Re
 type BacklogItemChange struct {
 	Ref    string  `json:"ref" jsonschema:"the item: identifier (FR-12) or ID"`
 	Parent *string `json:"parent,omitempty" jsonschema:"identifier of the new parent requirement or task, e.g. FR-3; empty moves the item to the top level"`
+	// Priority changes the item's priority (FR-149).
+	Priority *int `json:"priority,omitempty" jsonschema:"new priority: 1 is the highest, higher numbers come later, 0 removes the priority"`
 	// Kind restricts the change to requirements or tasks (the CLI's
 	// "task update"); not part of a schema.
 	Kind string `json:"-"`
@@ -119,23 +121,28 @@ func (s *Session) UpdateBacklogItem(ctx context.Context, in BacklogItemChange) (
 	if strings.TrimSpace(in.Ref) == "" {
 		return nil, errors.New("an item reference is required")
 	}
-	if in.Parent == nil {
-		return nil, errors.New("nothing to change: give a parent")
+	if in.Parent == nil && in.Priority == nil {
+		return nil, errors.New("nothing to change: give a parent or a priority")
+	}
+	if err := checkPriority(in.Priority); err != nil {
+		return nil, err
 	}
 	r, err := s.requirement(ctx, in.Ref, in.Kind)
 	if err != nil {
 		return nil, err
 	}
-	var patch client.RequirementPatch
-	parentID := ""
-	if ref := strings.TrimSpace(*in.Parent); ref != "" {
-		p, err := s.requirement(ctx, ref, "")
-		if err != nil {
-			return nil, err
+	patch := client.RequirementPatch{Priority: in.Priority}
+	if in.Parent != nil {
+		parentID := ""
+		if ref := strings.TrimSpace(*in.Parent); ref != "" {
+			p, err := s.requirement(ctx, ref, "")
+			if err != nil {
+				return nil, err
+			}
+			parentID = p.ID
 		}
-		parentID = p.ID
+		patch.ParentID = &parentID
 	}
-	patch.ParentID = &parentID
 	if _, err := s.C.UpdateRequirement(ctx, s.ProductID, r.ID, patch); err != nil {
 		return nil, err
 	}
@@ -151,6 +158,7 @@ type NewBacklogItem struct {
 	Status           string `json:"status,omitempty" jsonschema:"initial status name; omit for the default"`
 	Description      string `json:"description,omitempty" jsonschema:"Markdown description"`
 	DefinitionOfDone string `json:"definition_of_done,omitempty" jsonschema:"Markdown definition of done"`
+	Priority         int    `json:"priority,omitempty" jsonschema:"priority: 1 is the highest, higher numbers come later; omit or 0 for none"`
 	// Capabilities links a new requirement to capabilities (FR-156).
 	Capabilities []string `json:"capabilities,omitempty" jsonschema:"names or IDs of the capabilities a requirement belongs to; not for tasks, which reach capabilities through their parent"`
 }
@@ -168,9 +176,13 @@ func (s *Session) CreateBacklogItem(ctx context.Context, in NewBacklogItem) (*Re
 	if strings.TrimSpace(in.Title) == "" {
 		return nil, errors.New("a title is required")
 	}
+	if err := checkPriority(&in.Priority); err != nil {
+		return nil, err
+	}
 	body := client.RequirementCreate{
 		Kind: kind, Title: strings.TrimSpace(in.Title),
 		Description: in.Description, DefinitionOfDone: in.DefinitionOfDone,
+		Priority: in.Priority,
 	}
 	var err error
 	if in.Category != "" {
@@ -214,6 +226,7 @@ type NewDefect struct {
 	Status      string `json:"status,omitempty" jsonschema:"initial status name; omit for the default"`
 	TestCase    string `json:"test_case,omitempty" jsonschema:"test case that reveals the defect: test identifier, short ID or ID"`
 	Requirement string `json:"requirement,omitempty" jsonschema:"requirement or task the defect violates, e.g. FR-12"`
+	Priority    int    `json:"priority,omitempty" jsonschema:"priority: 1 is the highest, higher numbers come later; omit or 0 for none"`
 	// Components and Capabilities are where the defect shows (FR-147).
 	Components   []string `json:"components,omitempty" jsonschema:"components (name or ID) the defect affects"`
 	Capabilities []string `json:"capabilities,omitempty" jsonschema:"capabilities (name or ID) the defect affects"`
@@ -227,7 +240,10 @@ func (s *Session) CreateDefect(ctx context.Context, in NewDefect) (*DefectDetail
 	if strings.TrimSpace(in.Title) == "" {
 		return nil, errors.New("a title is required")
 	}
-	body := client.DefectCreate{Title: strings.TrimSpace(in.Title), Description: in.Description}
+	if err := checkPriority(&in.Priority); err != nil {
+		return nil, err
+	}
+	body := client.DefectCreate{Title: strings.TrimSpace(in.Title), Description: in.Description, Priority: in.Priority}
 	if c := strings.ToLower(strings.TrimSpace(in.Criticality)); c != "" {
 		if !contains(criticalities, c) {
 			return nil, fmt.Errorf("criticality must be one of %s, not %q", strings.Join(criticalities, ", "), in.Criticality)
@@ -260,6 +276,42 @@ func (s *Session) CreateDefect(ctx context.Context, in NewDefect) (*DefectDetail
 		if err := s.C.AddDefectLink(ctx, s.ProductID, d.ID, l.Type, l.ID); err != nil {
 			return nil, fmt.Errorf("defect %s was created, but linking it to %s failed: %w", d.Identifier, l.Label, err)
 		}
+	}
+	return s.ShowDefect(ctx, d.ID)
+}
+
+// checkPriority rejects negative priorities; 0 means none, 1 is the highest
+// (FR-149).
+func checkPriority(p *int) error {
+	if p != nil && *p < 0 {
+		return fmt.Errorf("priority must be 0 (none) or a positive number, not %d", *p)
+	}
+	return nil
+}
+
+// DefectChange changes a defect; nil fields stay as they are.
+type DefectChange struct {
+	Ref      string `json:"ref" jsonschema:"the defect, e.g. DF-17"`
+	Priority *int   `json:"priority,omitempty" jsonschema:"new priority: 1 is the highest, higher numbers come later, 0 removes the priority"`
+}
+
+// UpdateDefect changes a defect (owner role, FR-149).
+func (s *Session) UpdateDefect(ctx context.Context, in DefectChange) (*DefectDetail, error) {
+	if strings.TrimSpace(in.Ref) == "" {
+		return nil, errors.New("a defect reference is required")
+	}
+	if in.Priority == nil {
+		return nil, errors.New("nothing to change: give a priority")
+	}
+	if err := checkPriority(in.Priority); err != nil {
+		return nil, err
+	}
+	d, err := s.findDefect(ctx, in.Ref)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.C.UpdateDefect(ctx, s.ProductID, d.ID, client.DefectPatch{Priority: in.Priority}); err != nil {
+		return nil, err
 	}
 	return s.ShowDefect(ctx, d.ID)
 }

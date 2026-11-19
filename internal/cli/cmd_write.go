@@ -87,6 +87,7 @@ func requirementCreateCommand(group, fixedKind string) *command {
 			fs.StringVar(&in.Category, "category", "", "category prefix or name (default: the product's default)")
 			fs.StringVar(&in.Parent, "parent", "", "identifier of the requirement this item refines, e.g. FR-12")
 			fs.StringVar(&in.Status, "status", "", "initial status name")
+			fs.IntVar(&in.Priority, "priority", 0, priorityUsage)
 			if fixedKind != "task" {
 				fs.Var((*repeatedFlag)(&in.Capabilities), "capability", "capability the requirement belongs to, by name; repeat for several (requirements only)")
 			}
@@ -123,25 +124,40 @@ func requirementCreateCommand(group, fixedKind string) *command {
 	}
 }
 
+// priorityUsage describes --priority, which orders items lowest number
+// first (FR-149).
+const priorityUsage = "priority: 1 is the highest, higher numbers come later, 0 for none"
+
+// optionalPriority returns &value if --priority was given, nil otherwise.
+func (f *flagsSet) optionalPriority(value int) *int {
+	if !f.has("priority") {
+		return nil
+	}
+	return &value
+}
+
 func requirementUpdateCommand(group, fixedKind string) *command {
 	var parent string
+	var priority int
 	var set flagsSet
 	name := group + " update"
 	return &command{
 		name:    name,
 		args:    "<FR-12|ID>",
-		summary: "change an item, e.g. move it below another one (owner role)",
+		summary: "change an item's parent or priority (owner role)",
 		flags: func(fs *flag.FlagSet) {
 			set.bind(fs)
 			fs.StringVar(&parent, "parent", "", `new parent, e.g. FR-3; "" moves the item to the top level`)
+			fs.IntVar(&priority, "priority", 0, priorityUsage)
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 1 {
-				return usageErr(fmt.Errorf("usage: nexmap %s <FR-12|ID> --parent <FR-3|\"\">", name))
+				return usageErr(fmt.Errorf("usage: nexmap %s <FR-12|ID> [--parent <FR-3|\"\">] [--priority N]", name))
 			}
-			in := ops.BacklogItemChange{Ref: args[0], Parent: set.optional("parent", parent), Kind: fixedKind}
-			if in.Parent == nil {
-				return usageErr(errors.New("nothing to change: give --parent"))
+			in := ops.BacklogItemChange{Ref: args[0], Parent: set.optional("parent", parent),
+				Priority: set.optionalPriority(priority), Kind: fixedKind}
+			if in.Parent == nil && in.Priority == nil {
+				return usageErr(errors.New("nothing to change: give --parent or --priority"))
 			}
 			s, err := a.session()
 			if err != nil {
@@ -188,6 +204,7 @@ func defectCreateCommand() *command {
 		flags: func(fs *flag.FlagSet) {
 			fs.StringVar(&in.Title, "title", "", "title (required)")
 			fs.StringVar(&in.Criticality, "criticality", "", "critical, high, medium (default) or low")
+			fs.IntVar(&in.Priority, "priority", 0, priorityUsage)
 			fs.StringVar(&in.Status, "status", "", "initial status name")
 			fs.StringVar(&in.TestCase, "test", "", "test case revealing the defect: test identifier, short ID or ID")
 			fs.StringVar(&in.Requirement, "req", "", "requirement or task the defect violates, e.g. FR-12")
@@ -211,6 +228,40 @@ func defectCreateCommand() *command {
 				return err
 			}
 			d, err := s.CreateDefect(ctx, in)
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Defect(w, d) })
+		},
+	}
+}
+
+// defectUpdateCommand changes a defect's priority (FR-149).
+func defectUpdateCommand() *command {
+	var priority int
+	var set flagsSet
+	return &command{
+		name:    "defect update",
+		args:    "<DF-17>",
+		summary: "change a defect's priority (owner role)",
+		flags: func(fs *flag.FlagSet) {
+			set.bind(fs)
+			fs.IntVar(&priority, "priority", 0, priorityUsage)
+		},
+		run: func(ctx context.Context, a *app, args []string) error {
+			ref, err := oneArg("defect update", "<DF-17>", args)
+			if err != nil {
+				return err
+			}
+			in := ops.DefectChange{Ref: ref, Priority: set.optionalPriority(priority)}
+			if in.Priority == nil {
+				return usageErr(errors.New("nothing to change: give --priority"))
+			}
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			d, err := s.UpdateDefect(ctx, in)
 			if err != nil {
 				return usageIfInput(err)
 			}
