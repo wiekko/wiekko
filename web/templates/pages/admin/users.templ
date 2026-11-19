@@ -3,18 +3,22 @@ package admin
 import (
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 	"nexmap.net/internal/model"
 )
 
 // UsersProps holds the data for the users list page.
 type UsersProps struct {
-	Meta         templates.PageMeta
-	DisplayName  string
-	IsAdmin      bool
-	Users        []*model.User
-	StatusFilter string
+	Meta        templates.PageMeta
+	DisplayName string
+	IsAdmin     bool
+	Users       []*model.User
+	patterns.TableView
 }
+
+// UsersTableID is the element the users table controls swap.
+const UsersTableID = "users-table"
 
 templ UsersPage(props UsersProps) {
 	@layout.AppLayout(layout.AppLayoutProps{
@@ -24,47 +28,54 @@ templ UsersPage(props UsersProps) {
 		ActiveSection: "admin-users",
 	}) {
 		<div class="space-y-6">
-			<div>
-				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Users</h1>
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage user accounts.</p>
+			@patterns.TableHeader("Users", "users-count", props.CountLabel())
+			<div id={ UsersTableID }>
+				@UsersTableContent(props)
 			</div>
-			<!-- Status filter tabs -->
-			<div class="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-				@statusTab("All", "", props.StatusFilter)
-				@statusTab("Active", "active", props.StatusFilter)
-				@statusTab("Pending", "pending_approval", props.StatusFilter)
-				@statusTab("Locked", "locked", props.StatusFilter)
-			</div>
-			<!-- Users table -->
-			if len(props.Users) == 0 {
-				@ui.EmptyState("users", "No users found", "No users match the selected filter.", "", "")
-			} else {
-				@ui.Table() {
-					@ui.TableHead() {
-						@ui.TableHeader() {
-							Username
-						}
-						@ui.TableHeader() {
-							Email
-						}
-						@ui.TableHeader() {
-							Display Name
-						}
-						@ui.TableHeader() {
-							Status
-						}
-						@ui.TableHeader() {
-							Created
-						}
-					}
-					@ui.TableBody("") {
-						for _, u := range props.Users {
-							@userRow(u)
-						}
-					}
+		</div>
+	}
+}
+
+// UsersTableContent renders the users table with its controls (UR-145). The
+// status facet keeps the status parameter of the tabs it replaces, so their
+// links still work.
+templ UsersTableContent(props UsersProps) {
+	{{ target := "#" + UsersTableID }}
+	@patterns.TableFrame(props.Frame(usersControls(), "users-count", len(props.Users), ui.EmptyState("users", "No users", "No user accounts exist yet.", "", ""))) {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.SortHeader("Username", "username", props.State, target)
+				@ui.SortHeader("Email", "email", props.State, target)
+				@ui.SortHeader("Display Name", "display_name", props.State, target)
+				@ui.SortHeader("Status", "status", props.State, target)
+				@ui.SortHeader("Created", "created", props.State, target)
+			}
+			@ui.TableBody("") {
+				for _, u := range props.Users {
+					@userRow(u)
 				}
 			}
-		</div>
+		}
+	}
+}
+
+func usersControls() patterns.TableControlsProps {
+	return patterns.TableControlsProps{
+		Key:    "user",
+		Target: "#" + UsersTableID,
+		Noun:   "users",
+		Facets: []patterns.TableFacet{
+			{Name: "status", Label: "Status", Options: patterns.FacetOptions("All statuses", "",
+				templates.SelectOption{Value: model.UserStatusActive, Label: "Active"},
+				templates.SelectOption{Value: model.UserStatusPendingApproval, Label: "Pending"},
+				templates.SelectOption{Value: model.UserStatusLocked, Label: "Locked"},
+				templates.SelectOption{Value: model.UserStatusDeletionRequested, Label: "Deletion requested"},
+			)},
+			{Name: "role", Label: "Role", Options: patterns.FacetOptions("All users", "",
+				templates.SelectOption{Value: "admin", Label: "Administrators"},
+				templates.SelectOption{Value: "user", Label: "Other users"},
+			)},
+		},
 	}
 }
 
@@ -93,16 +104,6 @@ templ userRow(u *model.User) {
 	</tr>
 }
 
-templ statusTab(label, value, current string) {
-	<a
-		href={ templ.SafeURL(statusTabHref(value)) }
-		class={ "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-			statusTabClass(value, current) }
-	>
-		{ label }
-	</a>
-}
-
 templ userStatusBadge(status string) {
 	switch status {
 		case "active":
@@ -120,20 +121,6 @@ templ userStatusBadge(status string) {
 
 script navigateTo(url string) {
 	window.location.href = url;
-}
-
-func statusTabHref(value string) string {
-	if value == "" {
-		return "/admin/users"
-	}
-	return "/admin/users?status=" + value
-}
-
-func statusTabClass(value, current string) string {
-	if value == current {
-		return "border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
-	}
-	return "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
 }
 
 func formatDate(rfc3339 string) string {

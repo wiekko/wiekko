@@ -894,36 +894,6 @@ func (c *PageProductController) UpdateProduct(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// Team renders GET /products/{id}/team.
-func (c *PageProductController) Team(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
-	members := c.buildTeamMembers(r, user, productID)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TeamPage(productpage.TeamProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Team",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:    user.DisplayName,
-		IsAdmin:        user.IsAdmin,
-		Product:        p,
-		Members:        members,
-		IsOwnerOrAdmin: isOwnerOrAdmin,
-		MailEnabled:    c.invitation.MailEnabled(),
-	}).Render(r.Context(), w)
-}
-
 // AddMember handles POST /products/{id}/team/members.
 func (c *PageProductController) AddMember(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -942,12 +912,20 @@ func (c *PageProductController) AddMember(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_, role2, _ := c.loadProductWithRole(r, user, productID)
-	isOwnerOrAdmin := user.IsAdmin || role2 == model.RoleOwner
-	members := c.buildTeamMembers(r, user, productID)
+	// The form swaps the whole table, back to its default view, so the new
+	// member shows up whatever the table was filtered to (UR-145).
+	props, err := c.loadTeamProps(r, user, productID)
+	if err != nil {
+		http.Error(w, errorText(err), http.StatusUnprocessableEntity)
+		return
+	}
+	props.Fragment = true
 
+	// The address bar has to describe the view too, which is now the
+	// default one.
+	w.Header().Set("HX-Push-Url", "/products/"+productID+"/team")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MemberTableBody(members, productID, isOwnerOrAdmin).Render(r.Context(), w)
+	_ = productpage.TeamTableContent(props).Render(r.Context(), w)
 	_ = productpage.AddMemberFormOOB(productID, "").Render(r.Context(), w)
 }
 
@@ -1248,46 +1226,6 @@ func (c *PageProductController) buildTeamMembers(r *http.Request, user *model.Us
 }
 
 // --- Milestones ---
-
-// Milestones renders GET /products/{id}/milestones.
-func (c *PageProductController) Milestones(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	milestones, err := c.milestone.ListMilestones(r.Context(), user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
-		return
-	}
-
-	view := r.URL.Query().Get("view")
-	if view != "timeline" {
-		view = "table"
-	}
-
-	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.MilestonesPage(productpage.MilestonesProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Milestones",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:    user.DisplayName,
-		IsAdmin:        user.IsAdmin,
-		Product:        p,
-		Milestones:     milestones,
-		IsOwnerOrAdmin: isOwnerOrAdmin,
-		View:           view,
-	}).Render(r.Context(), w)
-}
 
 // MilestoneDetail renders GET /products/{id}/milestones/{milestoneId}.
 func (c *PageProductController) MilestoneDetail(w http.ResponseWriter, r *http.Request) {
@@ -2600,42 +2538,6 @@ func milestoneEditDate(rfc3339 string) string {
 
 // --- Components ---
 
-// Components renders GET /products/{id}/components.
-func (c *PageProductController) Components(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	components, err := c.component.ListComponents(r.Context(), user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
-		return
-	}
-
-	milestoneMap := c.buildMilestoneMap(r, user, productID)
-	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ComponentsPage(productpage.ComponentsProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Components",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:    user.DisplayName,
-		IsAdmin:        user.IsAdmin,
-		Product:        p,
-		Components:     components,
-		Milestones:     milestoneMap,
-		IsOwnerOrAdmin: isOwnerOrAdmin,
-	}).Render(r.Context(), w)
-}
-
 // ComponentDetail renders GET /products/{id}/components/{componentId}.
 func (c *PageProductController) ComponentDetail(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -3369,44 +3271,6 @@ func (c *PageProductController) ComponentHistoryTab(w http.ResponseWriter, r *ht
 }
 
 // --- Capabilities ---
-
-// Capabilities renders GET /products/{id}/capabilities.
-func (c *PageProductController) Capabilities(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	funcs, err := c.component.ListCapabilities(r.Context(), user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
-		return
-	}
-
-	componentMap := c.buildComponentMap(r, user, productID)
-	milestoneMap := c.buildMilestoneMap(r, user, productID)
-	isOwnerOrAdmin := user.IsAdmin || role == model.RoleOwner
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CapabilitiesPage(productpage.CapabilitiesProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Capabilities",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:    user.DisplayName,
-		IsAdmin:        user.IsAdmin,
-		Product:        p,
-		Capabilities:   funcs,
-		Components:     componentMap,
-		Milestones:     milestoneMap,
-		IsOwnerOrAdmin: isOwnerOrAdmin,
-	}).Render(r.Context(), w)
-}
 
 // CapabilityDetail renders GET /products/{id}/capabilities/{capabilityId}.
 func (c *PageProductController) CapabilityDetail(w http.ResponseWriter, r *http.Request) {
@@ -8384,36 +8248,6 @@ func (c *PageProductController) DefectHistoryTab(w http.ResponseWriter, r *http.
 // canEditConstraints returns true if the user can create/edit/delete constraints (owner or admin).
 func (c *PageProductController) canEditConstraints(user *model.User, role string) bool {
 	return user.IsAdmin || role == model.RoleOwner
-}
-
-// Constraints renders GET /products/{id}/constraints.
-func (c *PageProductController) Constraints(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	constraints, _ := c.constraint.ListConstraints(r.Context(), user, productID, store.ConstraintFilter{})
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.ConstraintsPage(productpage.ConstraintsProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Constraints",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:      user.DisplayName,
-		IsAdmin:          user.IsAdmin,
-		Product:          p,
-		Constraints:      constraints,
-		CategoryPrefixes: prefixes,
-		CanEdit:          c.canEditConstraints(user, role),
-	}).Render(r.Context(), w)
 }
 
 // ConstraintDetail renders GET /products/{id}/constraints/{constraintId}.

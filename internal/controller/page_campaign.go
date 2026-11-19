@@ -16,44 +16,6 @@ import (
 
 // --- Campaign list ---
 
-// Campaigns renders GET /products/{id}/campaigns.
-func (c *PageProductController) Campaigns(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	campaigns, err := c.testing.ListCampaigns(r.Context(), user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
-		return
-	}
-	// One grouped query for the whole product rather than one per campaign.
-	counts, _ := c.testing.ListCampaignProgress(r.Context(), user, productID)
-
-	views := make([]productpage.CampaignView, 0, len(campaigns))
-	for _, campaign := range campaigns {
-		views = append(views, campaignView(campaign, counts[campaign.ID]))
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.CampaignsPage(productpage.CampaignsProps{
-		Meta: templates.PageMeta{
-			Title:     "Campaigns",
-			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
-		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Product:     p,
-		Campaigns:   views,
-		CanEdit:     c.canEditCampaigns(user, role),
-	}).Render(r.Context(), w)
-}
-
 // campaignView derives the progress summary shown on lists and headers.
 func campaignView(campaign *model.TestingCampaign, counts map[string]int) productpage.CampaignView {
 	if counts == nil {

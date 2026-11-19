@@ -272,8 +272,8 @@ func FacetOptions(all, none string, values ...templates.SelectOption) []template
 	return options
 }
 
-// FacetNone mirrors store.FilterNone; templates do not import the store.
-const FacetNone = "none"
+// FacetNone is the facet value for rows without a value (ui.FilterNone).
+const FacetNone = ui.FilterNone
 
 // ArchivedFacetOptions are the choices of the archived facet (FR-155); hiding
 // archived items is the default.
@@ -292,4 +292,84 @@ func singular(noun string) string {
 		return noun[:len(noun)-1]
 	}
 	return noun
+}
+
+// TableFrameProps configures a TableFrame.
+type TableFrameProps struct {
+	Controls TableControlsProps
+	// CountID names the count in the page's TableHeader, which a swap
+	// (Fragment) updates out of band.
+	CountID  string
+	Fragment bool
+	// Rows is the number of rows on this page, Total those matching the
+	// search and facets, ProductTotal all of them; TotalPages sizes the
+	// pagination.
+	Rows         int
+	Total        int
+	ProductTotal int
+	TotalPages   int
+	// Empty is the onboarding state of a table without any rows (UC-78).
+	Empty templ.Component
+}
+
+// TableFrame renders everything of a table view but the table itself, which
+// it takes as children: the search box and facets, the header count of a
+// swap, the empty states telling "nothing yet" from "nothing matches" and the
+// pagination (UC-72 to UC-78). It is what a table view's htmx request
+// returns.
+templ TableFrame(props TableFrameProps) {
+	if props.Fragment {
+		@TableCount(props.CountID, TableCountLabel(props.Controls.State, props.Total, props.ProductTotal))
+	}
+	<div class="space-y-4">
+		// A search box and filters over nothing at all are noise.
+		if props.ProductTotal > 0 {
+			@TableControls(props.Controls)
+		}
+		@ui.Card() {
+			if props.Rows == 0 && (props.ProductTotal == 0 || !props.Controls.State.Filtered()) {
+				@props.Empty
+			} else if props.Rows == 0 {
+				@TableNoMatches(props.Controls.State, props.Controls.Target, props.Controls.Noun)
+			} else {
+				{ children... }
+				@ui.Pagination(props.Controls.State, props.TotalPages, props.Controls.Target)
+			}
+		}
+	</div>
+}
+
+// TableView is the table state the props of every table view page carry.
+type TableView struct {
+	// State is the sort/search/filter/page state, and the source of every
+	// URL the table's controls link to.
+	State ui.ListState
+	// Total counts the rows matching the search and facets, ProductTotal all
+	// rows; an empty page tells "nothing yet" from "nothing matches" by them.
+	Total        int
+	ProductTotal int
+	TotalPages   int
+	// Fragment is set when the table is rendered for an htmx swap, which
+	// then also updates the count in the page header.
+	Fragment bool
+}
+
+// Frame builds the TableFrameProps of a page showing rows rows.
+func (v TableView) Frame(controls TableControlsProps, countID string, rows int, empty templ.Component) TableFrameProps {
+	controls.State = v.State
+	return TableFrameProps{
+		Controls:     controls,
+		CountID:      countID,
+		Fragment:     v.Fragment,
+		Rows:         rows,
+		Total:        v.Total,
+		ProductTotal: v.ProductTotal,
+		TotalPages:   v.TotalPages,
+		Empty:        empty,
+	}
+}
+
+// CountLabel is the count shown in the page header.
+func (v TableView) CountLabel() string {
+	return TableCountLabel(v.State, v.Total, v.ProductTotal)
 }

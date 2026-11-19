@@ -25,7 +25,12 @@ type SprintsProps struct {
 	Product        *model.Product
 	Sprints        []SprintRow
 	IsOwnerOrAdmin bool
+	patterns.TableView
+	MilestoneOptions []*model.Milestone
 }
+
+// SprintsTableID is the element the sprints table controls swap.
+const SprintsTableID = "sprints-table"
 
 templ SprintsPage(props SprintsProps) {
 	@layout.AppLayout(layout.AppLayoutProps{
@@ -43,42 +48,65 @@ templ SprintsPage(props SprintsProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Sprints"},
 			})
-			if len(props.Sprints) == 0 {
+			if props.ProductTotal == 0 {
 				@patterns.ListPageHeader("Sprints", "", "", -1)
 				@ui.Card() {
-					if props.IsOwnerOrAdmin {
-						@ui.EmptyState("clock", "No sprints yet", "Create your first sprint to start planning iterations.", "New Sprint", "/products/"+props.Product.ID+"/sprints/new")
-					} else {
-						@ui.EmptyState("clock", "No sprints yet", "No sprints have been scheduled for this product.", "", "")
-					}
+					@sprintsEmpty(props)
 				}
 			} else {
-				@patterns.ListPageHeader("Sprints", sprintsCreateHref(props), "New Sprint", len(props.Sprints))
-				@sprintsTable(props)
+				@patterns.TableHeader("Sprints", "sprints-count", props.CountLabel()) {
+					if href := sprintsCreateHref(props); href != "" {
+						@ui.LinkButton(href, "New Sprint", "primary", "md") {
+							@ui.Icon("plus", "sm")
+						}
+					}
+				}
+				<div id={ SprintsTableID }>
+					@SprintsTableContent(props)
+				</div>
 			}
 		</div>
 	}
 }
 
-templ sprintsTable(props SprintsProps) {
-	@ui.Card() {
+templ sprintsEmpty(props SprintsProps) {
+	if props.IsOwnerOrAdmin {
+		@ui.EmptyState("clock", "No sprints yet", "Create your first sprint to start planning iterations.", "New Sprint", "/products/"+props.Product.ID+"/sprints/new")
+	} else {
+		@ui.EmptyState("clock", "No sprints yet", "No sprints have been scheduled for this product.", "", "")
+	}
+}
+
+func sprintsControls(props SprintsProps) patterns.TableControlsProps {
+	facets := []patterns.TableFacet{
+		{Name: "status", Label: "Status", Options: patterns.FacetOptions("All statuses", "",
+			templates.SelectOption{Value: model.SprintStatusPlanned, Label: "Planned"},
+			templates.SelectOption{Value: model.SprintStatusActive, Label: "Active"},
+			templates.SelectOption{Value: model.SprintStatusCompleted, Label: "Completed"},
+		)},
+	}
+	if len(props.MilestoneOptions) > 0 {
+		facets = append(facets, milestoneFacet(props.MilestoneOptions))
+	}
+	return patterns.TableControlsProps{
+		Key:    "sprint",
+		Target: "#" + SprintsTableID,
+		Noun:   "sprints",
+		Facets: facets,
+	}
+}
+
+// SprintsTableContent renders the sprints table with its controls (UR-145).
+templ SprintsTableContent(props SprintsProps) {
+	{{ target := "#" + SprintsTableID }}
+	@patterns.TableFrame(props.Frame(sprintsControls(props), "sprints-count", len(props.Sprints), sprintsEmpty(props))) {
 		@ui.Table() {
 			@ui.TableHead() {
-				@ui.TableHeader() {
-					Name
-				}
-				@ui.TableHeader() {
-					Status
-				}
-				@ui.TableHeader() {
-					Dates
-				}
-				@ui.TableHeader() {
-					Milestone
-				}
-				@ui.TableHeader() {
-					Items
-				}
+				@ui.SortHeader("Name", "name", props.State, target)
+				@ui.SortHeader("Status", "status", props.State, target)
+				@ui.SortHeader("Dates", "dates", props.State, target)
+				@ui.SortHeader("Milestone", "milestone", props.State, target)
+				@ui.SortHeader("Items", "items", props.State, target)
 				if props.IsOwnerOrAdmin {
 					@ui.TableHeader() {
 						<span class="sr-only">Actions</span>

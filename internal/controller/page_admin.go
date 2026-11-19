@@ -10,7 +10,6 @@ import (
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
 	"nexmap.net/web/templates"
 	admin "nexmap.net/web/templates/pages/admin"
 )
@@ -28,30 +27,6 @@ type PageAdminController struct {
 // NewPageAdmin creates a PageAdminController.
 func NewPageAdmin(user *service.UserService, setting *service.SettingService, invitation *service.InvitationService, twoFactor *service.TwoFactorService, audit *service.AuditService, product *service.ProductService) *PageAdminController {
 	return &PageAdminController{user: user, setting: setting, invitation: invitation, twoFactor: twoFactor, audit: audit, product: product}
-}
-
-// ListUsers renders GET /admin/users.
-func (c *PageAdminController) ListUsers(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-
-	statusFilter := r.URL.Query().Get("status")
-	users, err := c.user.List(r.Context(), store.UserFilter{Status: statusFilter})
-	if err != nil {
-		users = nil
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = admin.UsersPage(admin.UsersProps{
-		Meta: templates.PageMeta{
-			Title:     "Users",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:  user.DisplayName,
-		IsAdmin:      user.IsAdmin,
-		Users:        users,
-		StatusFilter: statusFilter,
-	}).Render(r.Context(), w)
 }
 
 // GetUser renders GET /admin/users/{id}.
@@ -238,29 +213,6 @@ func (c *PageAdminController) UpdateSetting(w http.ResponseWriter, r *http.Reque
 		label, description := settingMeta(key)
 		_ = admin.SettingNumber(admin.NumberSetting(key, label, description, value)).Render(r.Context(), w)
 	}
-}
-
-// Invitations renders GET /admin/invitations.
-func (c *PageAdminController) Invitations(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-
-	invitations, err := c.invitation.List(r.Context())
-	if err != nil {
-		invitations = nil
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = admin.InvitationsPage(admin.InvitationsProps{
-		Meta: templates.PageMeta{
-			Title:     "Invitations",
-			CSRFToken: csrfToken,
-		},
-		DisplayName: user.DisplayName,
-		IsAdmin:     user.IsAdmin,
-		Invitations: invitations,
-		MailEnabled: c.invitation.MailEnabled(),
-	}).Render(r.Context(), w)
 }
 
 // CreateInvitation handles POST /admin/invitations.

@@ -14,6 +14,11 @@ const (
 	ParamPage   = "page"
 )
 
+// FilterNone is the facet value that selects rows where an optional
+// reference — a milestone, a component, a sprint — is not set. It mirrors
+// store.FilterNone, which the template packages must not import.
+const FilterNone = "none"
+
 // ListState is the complete URL-visible state of a table view: how it is
 // sorted, what it is filtered to, and which page is showing. Every control on
 // the table derives its href from this one value, which is what keeps the

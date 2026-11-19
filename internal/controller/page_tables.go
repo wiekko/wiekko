@@ -34,9 +34,9 @@ func tableSwap(r *http.Request, tableID string) bool {
 // Nothing here can fail: a stale bookmark or a hand-edited URL renders the
 // default view, so unknown sort keys and bad pages are corrected, not
 // rejected.
-func listQuery(q url.Values, sortColumns map[string]string) (sortKey, dir, search string, page int) {
+func listQuery(q url.Values, sortable func(key string) bool) (sortKey, dir, search string, page int) {
 	sortKey = q.Get(ui.ParamSort)
-	if _, ok := sortColumns[sortKey]; !ok {
+	if !sortable(sortKey) {
 		sortKey = ""
 	}
 	dir = ui.SortAsc
@@ -48,6 +48,14 @@ func listQuery(q url.Values, sortColumns map[string]string) (sortKey, dir, searc
 		page = 1
 	}
 	return sortKey, dir, strings.TrimSpace(q.Get(ui.ParamSearch)), page
+}
+
+// sortColumn reports whether a sort key is one of a store's sort columns.
+func sortColumn(columns map[string]string) func(string) bool {
+	return func(key string) bool {
+		_, ok := columns[key]
+		return ok
+	}
 }
 
 // listParams is the store query for one page of a table view.
@@ -100,7 +108,7 @@ func parseBacklogListState(r *http.Request, baseURL, kind string) (store.Require
 		SprintID:    q.Get(backlogFilterSprint),
 		Archived:    archived,
 	}
-	sortKey, dir, search, page := listQuery(q, store.RequirementSortColumns)
+	sortKey, dir, search, page := listQuery(q, sortColumn(store.RequirementSortColumns))
 	state := ui.ListState{
 		BaseURL: baseURL,
 		Sort:    sortKey,
@@ -236,7 +244,7 @@ func parseTestCaseListState(r *http.Request, baseURL string) (store.TestCaseFilt
 		PyramidLevelID: q.Get(testCaseFilterPyramidLevel),
 		ExecutionMode:  q.Get(testCaseFilterMode),
 	}
-	sortKey, dir, search, page := listQuery(q, store.TestCaseSortColumns)
+	sortKey, dir, search, page := listQuery(q, sortColumn(store.TestCaseSortColumns))
 	state := ui.ListState{
 		BaseURL: baseURL,
 		Sort:    sortKey,

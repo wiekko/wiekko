@@ -1,8 +1,6 @@
 package product
 
 import (
-	"fmt"
-
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
@@ -39,6 +37,7 @@ type TeamProps struct {
 	IsOwnerOrAdmin bool
 	// MailEnabled offers sending invitations by email.
 	MailEnabled bool
+	patterns.TableView
 }
 
 templ TeamPage(props TeamProps) {
@@ -57,35 +56,59 @@ templ TeamPage(props TeamProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Team"},
 			})
-			<div>
-				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Team</h1>
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d members", len(props.Members)) }</p>
-			</div>
+			@patterns.TableHeader("Team", "team-count", props.CountLabel())
 			if props.IsOwnerOrAdmin {
 				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 					@AddMemberForm(props.Product.ID, "")
 					@InviteForm(props.Product.ID, "", props.MailEnabled)
 				</div>
 			}
-			@ui.Card() {
-				@ui.CardBody() {
-					<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-						<thead>
-							<tr>
-								<th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">User</th>
-								<th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Role</th>
-								if props.IsOwnerOrAdmin {
-									<th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
-								}
-							</tr>
-						</thead>
-						<tbody id="member-table-body" class="divide-y divide-gray-200 dark:divide-gray-700">
-							@MemberTableBody(props.Members, props.Product.ID, props.IsOwnerOrAdmin)
-						</tbody>
-					</table>
+			<div id={ TeamTableID }>
+				@TeamTableContent(props)
+			</div>
+		</div>
+	}
+}
+
+// TeamTableID is the element the team table controls, and adding a member,
+// swap.
+const TeamTableID = "team-table"
+
+// TeamTableContent renders the members table with its controls (UR-145). A
+// product always has its owner, so the table is never empty but for a filter.
+templ TeamTableContent(props TeamProps) {
+	{{ target := "#" + TeamTableID }}
+	@patterns.TableFrame(props.Frame(teamControls(), "team-count", len(props.Members), ui.EmptyState("users", "No members", "This product has no members.", "", ""))) {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.SortHeader("User", "user", props.State, target)
+				@ui.SortHeader("Role", "role", props.State, target)
+				if props.IsOwnerOrAdmin {
+					@ui.TableHeader() {
+						<span class="sr-only">Actions</span>
+					}
 				}
 			}
-		</div>
+			<tbody id="member-table-body" class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+				@MemberTableBody(props.Members, props.Product.ID, props.IsOwnerOrAdmin)
+			</tbody>
+		}
+	}
+}
+
+func teamControls() patterns.TableControlsProps {
+	return patterns.TableControlsProps{
+		Key:    "member",
+		Target: "#" + TeamTableID,
+		Noun:   "members",
+		Facets: []patterns.TableFacet{
+			{Name: "role", Label: "Role", Options: patterns.FacetOptions("All roles", "",
+				templates.SelectOption{Value: model.RoleOwner, Label: "Owner"},
+				templates.SelectOption{Value: model.RoleDeveloper, Label: "Developer"},
+				templates.SelectOption{Value: model.RoleTester, Label: "Tester"},
+				templates.SelectOption{Value: model.RoleViewer, Label: "Viewer"},
+			)},
+		},
 	}
 }
 
@@ -103,7 +126,7 @@ templ AddMemberForm(productID string, errMsg string) {
 					id="add-member-submit-form"
 					class="space-y-4"
 					hx-post={ "/products/" + productID + "/team/members" }
-					hx-target="#member-table-body"
+					hx-target="#team-table"
 					hx-swap="innerHTML"
 				>
 					<input type="hidden" id="selected-user-id" name="user_id" value=""/>
@@ -173,7 +196,7 @@ templ AddMemberFormOOB(productID string, errMsg string) {
 					id="add-member-submit-form"
 					class="space-y-4"
 					hx-post={ "/products/" + productID + "/team/members" }
-					hx-target="#member-table-body"
+					hx-target="#team-table"
 					hx-swap="innerHTML"
 				>
 					<input type="hidden" id="selected-user-id" name="user_id" value=""/>

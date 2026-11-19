@@ -10,6 +10,9 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
+// ConstraintsTableID is the element the constraints table controls swap.
+const ConstraintsTableID = "constraints-table"
+
 // ConstraintsProps holds data for the constraints list page.
 type ConstraintsProps struct {
 	Meta             templates.PageMeta
@@ -19,6 +22,8 @@ type ConstraintsProps struct {
 	Constraints      []*model.Constraint
 	CategoryPrefixes map[string]string // category ID → prefix
 	CanEdit          bool              // owner or admin
+	patterns.TableView
+	CategoryOptions []*model.Category
 }
 
 templ ConstraintsPage(props ConstraintsProps) {
@@ -37,90 +42,113 @@ templ ConstraintsPage(props ConstraintsProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Constraints"},
 			})
-			if len(props.Constraints) == 0 {
+			if props.ProductTotal == 0 {
 				@patterns.ListPageHeader("Constraints", "", "", -1)
 				@ui.Card() {
-					if props.CanEdit {
-						@ui.EmptyState("shield-check", "No constraints yet", "Create your first constraint to define rules and boundaries.", "New Constraint", "/products/"+props.Product.ID+"/constraints/new")
-					} else {
-						@ui.EmptyState("shield-check", "No constraints yet", "No constraints have been defined for this product.", "", "")
-					}
+					@constraintsEmpty(props)
 				}
 			} else {
-				if props.CanEdit {
-					@patterns.ListPageHeader("Constraints", "/products/"+props.Product.ID+"/constraints/new", "New Constraint", len(props.Constraints))
-				} else {
-					@patterns.ListPageHeader("Constraints", "", "", len(props.Constraints))
-				}
-				@ui.Card() {
-					@ui.Table() {
-						@ui.TableHead() {
-							@ui.TableHeader() {
-								ID
-							}
-							@ui.TableHeader() {
-								Title
-							}
-							@ui.TableHeader() {
-								Category
-							}
-							@ui.TableHeader() {
-								Compliance
-							}
-							@ui.TableHeader() {
-								Priority
-							}
-							@ui.TableHeader() {
-								Created
-							}
-							if props.CanEdit {
-								@ui.TableHeader() {
-									<span class="sr-only">Actions</span>
-								}
-							}
+				@patterns.TableHeader("Constraints", "constraints-count", props.CountLabel()) {
+					if props.CanEdit {
+						@ui.LinkButton("/products/"+props.Product.ID+"/constraints/new", "New Constraint", "primary", "md") {
+							@ui.Icon("plus", "sm")
 						}
-						@ui.TableBody("") {
-							for _, c := range props.Constraints {
-								@ui.TableRow("") {
-									@ui.TableCellMuted() {
-										{ model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, c.CategoryID), c.SequenceNumber) }
-									}
-									@ui.TableCell() {
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/constraints/%s", props.Product.ID, c.ID)) }
-											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-										>
-											{ c.Title }
-										</a>
-									}
-									@ui.TableCellMuted() {
-										@patterns.CategoryBadge(constraintPrefix(props.CategoryPrefixes, c.CategoryID), "constraint")
-									}
-									@ui.TableCellMuted() {
-										@patterns.ComplianceBadge(c.ComplianceState)
-									}
-									@ui.TableCellMuted() {
-										@patterns.PriorityBadge(c.Priority)
-									}
-									@ui.TableCellMuted() {
-										{ formatDate(c.CreatedAt) }
-									}
-									if props.CanEdit {
-										@ui.TableCell() {
-											@patterns.RowActions(
-												fmt.Sprintf("/products/%s/constraints/%s/edit?return=list", props.Product.ID, c.ID),
-												fmt.Sprintf("/products/%s/constraints/%s", props.Product.ID, c.ID),
-												props.Meta.CSRFToken,
-											)
-										}
-									}
-								}
+					}
+				}
+				<div id={ ConstraintsTableID }>
+					@ConstraintsTableContent(props)
+				</div>
+			}
+		</div>
+	}
+}
+
+// ConstraintsTableContent renders the constraints table with its controls
+// (UR-145); it is what the table's htmx requests return.
+templ ConstraintsTableContent(props ConstraintsProps) {
+	{{ target := "#" + ConstraintsTableID }}
+	@patterns.TableFrame(props.Frame(constraintsControls(props), "constraints-count", len(props.Constraints), constraintsEmpty(props))) {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.SortHeader("ID", "identifier", props.State, target)
+				@ui.SortHeader("Title", "title", props.State, target)
+				@ui.SortHeader("Category", "category", props.State, target)
+				@ui.SortHeader("Compliance", "compliance", props.State, target)
+				@ui.SortHeader("Priority", "priority", props.State, target)
+				@ui.SortHeader("Created", "created", props.State, target)
+				if props.CanEdit {
+					@ui.TableHeader() {
+						<span class="sr-only">Actions</span>
+					}
+				}
+			}
+			@ui.TableBody("") {
+				for _, c := range props.Constraints {
+					@ui.TableRow("") {
+						@ui.TableCellMuted() {
+							{ model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, c.CategoryID), c.SequenceNumber) }
+						}
+						@ui.TableCell() {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/products/%s/constraints/%s", props.Product.ID, c.ID)) }
+								class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+							>
+								{ c.Title }
+							</a>
+						}
+						@ui.TableCellMuted() {
+							@patterns.CategoryBadge(constraintPrefix(props.CategoryPrefixes, c.CategoryID), "constraint")
+						}
+						@ui.TableCellMuted() {
+							@patterns.ComplianceBadge(c.ComplianceState)
+						}
+						@ui.TableCellMuted() {
+							@patterns.PriorityBadge(c.Priority)
+						}
+						@ui.TableCellMuted() {
+							{ formatDate(c.CreatedAt) }
+						}
+						if props.CanEdit {
+							@ui.TableCell() {
+								@patterns.RowActions(
+									fmt.Sprintf("/products/%s/constraints/%s/edit?return=list", props.Product.ID, c.ID),
+									fmt.Sprintf("/products/%s/constraints/%s", props.Product.ID, c.ID),
+									props.Meta.CSRFToken,
+								)
 							}
 						}
 					}
 				}
 			}
-		</div>
+		}
+	}
+}
+
+templ constraintsEmpty(props ConstraintsProps) {
+	if props.CanEdit {
+		@ui.EmptyState("shield-check", "No constraints yet", "Create your first constraint to define rules and boundaries.", "New Constraint", "/products/"+props.Product.ID+"/constraints/new")
+	} else {
+		@ui.EmptyState("shield-check", "No constraints yet", "No constraints have been defined for this product.", "", "")
+	}
+}
+
+func constraintsControls(props ConstraintsProps) patterns.TableControlsProps {
+	categories := make([]templates.SelectOption, 0, len(props.CategoryOptions))
+	for _, c := range props.CategoryOptions {
+		categories = append(categories, templates.SelectOption{Value: c.ID, Label: c.Prefix + " — " + c.Name})
+	}
+	return patterns.TableControlsProps{
+		Key:    "constraint",
+		Target: "#" + ConstraintsTableID,
+		Noun:   "constraints",
+		Facets: []patterns.TableFacet{
+			{Name: "category_id", Label: "Category", Options: patterns.FacetOptions("All categories", "", categories...)},
+			{Name: "compliance", Label: "Compliance", Options: patterns.FacetOptions("All states", "",
+				templates.SelectOption{Value: model.ComplianceViolated, Label: "Violated"},
+				templates.SelectOption{Value: model.ComplianceNotAssessed, Label: "Not assessed"},
+				templates.SelectOption{Value: model.ComplianceMet, Label: "Met"},
+			)},
+		},
 	}
 }
 
@@ -132,4 +160,3 @@ func constraintPrefix(prefixes map[string]string, categoryID string) string {
 	}
 	return "??"
 }
-

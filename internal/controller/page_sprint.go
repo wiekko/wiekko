@@ -18,47 +18,6 @@ import (
 // bounces kanban-mode products to /board, mirroring page_board.go's redirect in
 // the other direction, so a product only ever has one live workflow surface.
 
-// Sprints renders GET /products/{id}/sprints.
-func (c *PageProductController) Sprints(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, ok := c.loadScrumProduct(w, r, user, productID)
-	if !ok {
-		return
-	}
-
-	sprints, err := c.milestone.ListSprints(r.Context(), user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
-		return
-	}
-
-	milestoneNames := c.buildMilestoneNameMap(r, user, productID)
-	rows := make([]productpage.SprintRow, 0, len(sprints))
-	for _, sp := range sprints {
-		rows = append(rows, productpage.SprintRow{
-			Sprint:        sp,
-			MilestoneName: milestoneNames[sp.MilestoneID],
-			ItemCount:     c.countSprintItems(r, user, productID, sp.ID),
-		})
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.SprintsPage(productpage.SprintsProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Sprints",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:    user.DisplayName,
-		IsAdmin:        user.IsAdmin,
-		Product:        p,
-		Sprints:        rows,
-		IsOwnerOrAdmin: isOwnerOrAdmin(user, role),
-	}).Render(r.Context(), w)
-}
-
 // SprintDetail renders GET /products/{id}/sprints/{sprintId}.
 func (c *PageProductController) SprintDetail(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())

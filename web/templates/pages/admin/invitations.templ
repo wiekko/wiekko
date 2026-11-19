@@ -16,6 +16,7 @@ type InvitationsProps struct {
 	Invitations []*model.Invitation
 	// MailEnabled offers sending invitations by email.
 	MailEnabled bool
+	patterns.TableView
 }
 
 templ InvitationsPage(props InvitationsProps) {
@@ -26,10 +27,7 @@ templ InvitationsPage(props InvitationsProps) {
 		ActiveSection: "admin-invitations",
 	}) {
 		<div class="space-y-6">
-			<div>
-				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Invitations</h1>
-				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Invite users to join the instance.</p>
-			</div>
+			@patterns.TableHeader("Invitations", "invitations-count", props.CountLabel())
 			<!-- Create invitation -->
 			@ui.Card() {
 				@ui.CardHeader("New Invitation") {
@@ -59,35 +57,51 @@ templ InvitationsPage(props InvitationsProps) {
 					<div id="invite-result" class="mt-3"></div>
 				}
 			}
-			<!-- Invitations table -->
-			if len(props.Invitations) == 0 {
-				@ui.EmptyState("mail", "No invitations", "Send an invitation to get started.", "", "")
-			} else {
-				@ui.Table() {
-					@ui.TableHead() {
-						@ui.TableHeader() {
-							Email
-						}
-						@ui.TableHeader() {
-							Status
-						}
-						@ui.TableHeader() {
-							Expires
-						}
-						@ui.TableHeader() {
-							Created
-						}
-						@ui.TableHeader() {
-						}
-					}
-					@ui.TableBody("") {
-						for _, inv := range props.Invitations {
-							@invitationRow(inv)
-						}
-					}
+			<div id={ InvitationsTableID }>
+				@InvitationsTableContent(props)
+			</div>
+		</div>
+	}
+}
+
+// InvitationsTableID is the element the invitations table controls swap.
+const InvitationsTableID = "invitations-table"
+
+// InvitationsTableContent renders the invitations table with its controls
+// (UR-145).
+templ InvitationsTableContent(props InvitationsProps) {
+	{{ target := "#" + InvitationsTableID }}
+	@patterns.TableFrame(props.Frame(invitationsControls(), "invitations-count", len(props.Invitations), ui.EmptyState("mail", "No invitations", "Send an invitation to get started.", "", ""))) {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.SortHeader("Email", "email", props.State, target)
+				@ui.SortHeader("Status", "status", props.State, target)
+				@ui.SortHeader("Expires", "expires", props.State, target)
+				@ui.SortHeader("Created", "created", props.State, target)
+				@ui.TableHeader() {
+					<span class="sr-only">Actions</span>
 				}
 			}
-		</div>
+			@ui.TableBody("") {
+				for _, inv := range props.Invitations {
+					@invitationRow(inv)
+				}
+			}
+		}
+	}
+}
+
+func invitationsControls() patterns.TableControlsProps {
+	return patterns.TableControlsProps{
+		Key:    "invitation",
+		Target: "#" + InvitationsTableID,
+		Noun:   "invitations",
+		Facets: []patterns.TableFacet{
+			{Name: "status", Label: "Status", Options: patterns.FacetOptions("All statuses", "",
+				templates.SelectOption{Value: "pending", Label: "Pending"},
+				templates.SelectOption{Value: "accepted", Label: "Accepted"},
+			)},
+		},
 	}
 }
 

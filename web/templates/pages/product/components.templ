@@ -10,6 +10,9 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
+// ComponentsTableID is the element the components table controls swap.
+const ComponentsTableID = "components-table"
+
 // ComponentsProps holds data for the components list page.
 type ComponentsProps struct {
 	Meta           templates.PageMeta
@@ -19,6 +22,8 @@ type ComponentsProps struct {
 	Components     []*model.Component
 	Milestones     map[string]string // milestone ID → name
 	IsOwnerOrAdmin bool
+	patterns.TableView
+	MilestoneOptions []*model.Milestone
 }
 
 templ ComponentsPage(props ComponentsProps) {
@@ -37,85 +42,112 @@ templ ComponentsPage(props ComponentsProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Components"},
 			})
-			if len(props.Components) == 0 {
+			if props.ProductTotal == 0 {
 				@patterns.ListPageHeader("Components", "", "", -1)
 				@ui.Card() {
-					if props.IsOwnerOrAdmin {
-						@ui.EmptyState("component", "No components yet", "Create your first component to organise your product structure.", "New Component", "/products/"+props.Product.ID+"/components/new")
-					} else {
-						@ui.EmptyState("component", "No components yet", "No components have been created for this product.", "", "")
-					}
+					@componentsEmpty(props)
 				}
 			} else {
-				<div class="flex items-center justify-between">
-					<div>
-						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Components</h1>
-						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d items", len(props.Components)) }</p>
-					</div>
+				@patterns.TableHeader("Components", "components-count", props.CountLabel()) {
 					if props.IsOwnerOrAdmin {
 						@ui.LinkButton("/products/"+props.Product.ID+"/components/new", "New Component", "primary", "md") {
 							@ui.Icon("plus", "sm")
 						}
 					}
+				}
+				<div id={ ComponentsTableID }>
+					@ComponentsTableContent(props)
 				</div>
-				@ui.Card() {
-					@ui.Table() {
-						@ui.TableHead() {
-							@ui.TableHeader() {
-								Name
-							}
-							@ui.TableHeader() {
-								Milestone
-							}
-							@ui.TableHeader() {
-								Created
-							}
-							if props.IsOwnerOrAdmin {
-								@ui.TableHeader() {
-									<span class="sr-only">Actions</span>
+			}
+		</div>
+	}
+}
+
+// ComponentsTableContent renders the components table with its controls
+// (UR-145).
+templ ComponentsTableContent(props ComponentsProps) {
+	{{ target := "#" + ComponentsTableID }}
+	@patterns.TableFrame(props.Frame(componentsControls(props), "components-count", len(props.Components), componentsEmpty(props))) {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.SortHeader("Name", "name", props.State, target)
+				@ui.SortHeader("Milestone", "milestone", props.State, target)
+				@ui.SortHeader("Created", "created", props.State, target)
+				if props.IsOwnerOrAdmin {
+					@ui.TableHeader() {
+						<span class="sr-only">Actions</span>
+					}
+				}
+			}
+			@ui.TableBody("") {
+				for _, comp := range props.Components {
+					@ui.TableRow("") {
+						@ui.TableCell() {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", props.Product.ID, comp.ID)) }
+								class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+							>
+								{ comp.Name }
+							</a>
+						}
+						@ui.TableCellMuted() {
+							if comp.MilestoneID != "" {
+								if name, ok := props.Milestones[comp.MilestoneID]; ok {
+									{ name }
+								} else {
+									{ comp.MilestoneID }
 								}
+							} else {
+								<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
 							}
 						}
-						@ui.TableBody("") {
-							for _, comp := range props.Components {
-								@ui.TableRow("") {
-									@ui.TableCell() {
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", props.Product.ID, comp.ID)) }
-											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-										>
-											{ comp.Name }
-										</a>
-									}
-									@ui.TableCellMuted() {
-										if comp.MilestoneID != "" {
-											if name, ok := props.Milestones[comp.MilestoneID]; ok {
-												{ name }
-											} else {
-												{ comp.MilestoneID }
-											}
-										} else {
-											<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
-										}
-									}
-									@ui.TableCellMuted() {
-										{ formatDate(comp.CreatedAt) }
-									}
-									if props.IsOwnerOrAdmin {
-										@ui.TableCell() {
-											@patterns.RowActions(
-												fmt.Sprintf("/products/%s/components/%s/edit?return=list", props.Product.ID, comp.ID),
-												fmt.Sprintf("/products/%s/components/%s", props.Product.ID, comp.ID),
-												props.Meta.CSRFToken,
-											)
-										}
-									}
-								}
+						@ui.TableCellMuted() {
+							{ formatDate(comp.CreatedAt) }
+						}
+						if props.IsOwnerOrAdmin {
+							@ui.TableCell() {
+								@patterns.RowActions(
+									fmt.Sprintf("/products/%s/components/%s/edit?return=list", props.Product.ID, comp.ID),
+									fmt.Sprintf("/products/%s/components/%s", props.Product.ID, comp.ID),
+									props.Meta.CSRFToken,
+								)
 							}
 						}
 					}
 				}
 			}
-		</div>
+		}
 	}
+}
+
+templ componentsEmpty(props ComponentsProps) {
+	if props.IsOwnerOrAdmin {
+		@ui.EmptyState("component", "No components yet", "Create your first component to organise your product structure.", "New Component", "/products/"+props.Product.ID+"/components/new")
+	} else {
+		@ui.EmptyState("component", "No components yet", "No components have been created for this product.", "", "")
+	}
+}
+
+func componentsControls(props ComponentsProps) patterns.TableControlsProps {
+	var facets []patterns.TableFacet
+	if len(props.MilestoneOptions) > 0 {
+		facets = append(facets, milestoneFacet(props.MilestoneOptions))
+	}
+	return patterns.TableControlsProps{
+		Key:    "component",
+		Target: "#" + ComponentsTableID,
+		Noun:   "components",
+		Facets: facets,
+	}
+}
+
+// milestoneFacet is the milestone facet of the tables that link milestones,
+// with a choice for rows without one.
+func milestoneFacet(milestones []*model.Milestone) patterns.TableFacet {
+	values := make([]templates.SelectOption, 0, len(milestones))
+	for _, m := range milestones {
+		values = append(values, templates.SelectOption{Value: m.ID, Label: m.Name})
+	}
+	return patterns.TableFacet{Name: "milestone_id", Label: "Milestone",
+		Options: patterns.FacetOptions("All milestones", "No milestone", values...)}
 }

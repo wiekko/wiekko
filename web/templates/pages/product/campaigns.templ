@@ -28,7 +28,11 @@ type CampaignsProps struct {
 	Product     *model.Product
 	Campaigns   []CampaignView
 	CanEdit     bool // owner or admin
+	patterns.TableView
 }
+
+// CampaignsTableID is the element the campaigns table controls swap.
+const CampaignsTableID = "campaigns-table"
 
 templ CampaignsPage(props CampaignsProps) {
 	@layout.AppLayout(layout.AppLayoutProps{
@@ -46,89 +50,114 @@ templ CampaignsPage(props CampaignsProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Campaigns"},
 			})
-			if len(props.Campaigns) == 0 {
+			if props.ProductTotal == 0 {
 				@patterns.ListPageHeader("Campaigns", "", "", -1)
 				@ui.Card() {
-					if props.CanEdit {
-						@ui.EmptyState("flag", "No campaigns yet", "Schedule a testing campaign to track test execution across environments.", "New Campaign", "/products/"+props.Product.ID+"/campaigns/new")
-					} else {
-						@ui.EmptyState("flag", "No campaigns yet", "No testing campaigns have been scheduled for this product.", "", "")
-					}
+					@campaignsEmpty(props)
 				}
 			} else {
-				if props.CanEdit {
-					@patterns.ListPageHeader("Campaigns", "/products/"+props.Product.ID+"/campaigns/new", "New Campaign", len(props.Campaigns))
-				} else {
-					@patterns.ListPageHeader("Campaigns", "", "", len(props.Campaigns))
-				}
-				@ui.Card() {
-					@ui.Table() {
-						@ui.TableHead() {
-							@ui.TableHeader() {
-								Name
-							}
-							@ui.TableHeader() {
-								Status
-							}
-							@ui.TableHeader() {
-								Outcome
-							}
-							@ui.TableHeader() {
-								Progress
-							}
-							@ui.TableHeader() {
-								Planned
-							}
-							if props.CanEdit {
-								@ui.TableHeader() {
-									<span class="sr-only">Actions</span>
-								}
-							}
+				@patterns.TableHeader("Campaigns", "campaigns-count", props.CountLabel()) {
+					if props.CanEdit {
+						@ui.LinkButton("/products/"+props.Product.ID+"/campaigns/new", "New Campaign", "primary", "md") {
+							@ui.Icon("plus", "sm")
 						}
-						@ui.TableBody("") {
-							for _, view := range props.Campaigns {
-								@ui.TableRow("") {
-									@ui.TableCell() {
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, view.Campaign.ID)) }
-											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-										>
-											{ view.Campaign.Name }
-										</a>
-									}
-									@ui.TableCellMuted() {
-										@campaignStatusBadge(view.Campaign.Status)
-									}
-									@ui.TableCellMuted() {
-										@campaignVerdictBadge(view.Verdict, view.Campaign.Status)
-									}
-									@ui.TableCellMuted() {
-										<div class="w-40">
-											@ui.ProgressBar(view.Percent, campaignProgressColor(view.Verdict), "")
-											<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-												{ fmt.Sprintf("%d of %d tested", view.Settled, view.Total) }
-											</p>
-										</div>
-									}
-									@ui.TableCellMuted() {
-										{ campaignScheduleDisplay(view.Campaign) }
-									}
-									if props.CanEdit {
-										@ui.TableCell() {
-											@patterns.RowActions(
-												fmt.Sprintf("/products/%s/campaigns/%s/edit?return=list", props.Product.ID, view.Campaign.ID),
-												fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, view.Campaign.ID),
-												props.Meta.CSRFToken,
-											)
-										}
-									}
-								}
+					}
+				}
+				<div id={ CampaignsTableID }>
+					@CampaignsTableContent(props)
+				</div>
+			}
+		</div>
+	}
+}
+
+templ campaignsEmpty(props CampaignsProps) {
+	if props.CanEdit {
+		@ui.EmptyState("flag", "No campaigns yet", "Schedule a testing campaign to track test execution across environments.", "New Campaign", "/products/"+props.Product.ID+"/campaigns/new")
+	} else {
+		@ui.EmptyState("flag", "No campaigns yet", "No testing campaigns have been scheduled for this product.", "", "")
+	}
+}
+
+func campaignsControls() patterns.TableControlsProps {
+	return patterns.TableControlsProps{
+		Key:    "campaign",
+		Target: "#" + CampaignsTableID,
+		Noun:   "campaigns",
+		Facets: []patterns.TableFacet{
+			{Name: "status", Label: "Status", Options: patterns.FacetOptions("All statuses", "",
+				templates.SelectOption{Value: model.CampaignStatusDraft, Label: "Draft"},
+				templates.SelectOption{Value: model.CampaignStatusActive, Label: "Active"},
+				templates.SelectOption{Value: model.CampaignStatusClosed, Label: "Closed"},
+			)},
+			{Name: "outcome", Label: "Outcome", Options: patterns.FacetOptions("All outcomes", "",
+				templates.SelectOption{Value: model.CampaignVerdictIncomplete, Label: "In progress or incomplete"},
+				templates.SelectOption{Value: model.CampaignVerdictFailed, Label: "Failed"},
+				templates.SelectOption{Value: model.CampaignVerdictPassed, Label: "Passed"},
+			)},
+		},
+	}
+}
+
+// CampaignsTableContent renders the campaigns table with its controls
+// (UR-145).
+templ CampaignsTableContent(props CampaignsProps) {
+	{{ target := "#" + CampaignsTableID }}
+	@patterns.TableFrame(props.Frame(campaignsControls(), "campaigns-count", len(props.Campaigns), campaignsEmpty(props))) {
+		@ui.Table() {
+			@ui.TableHead() {
+				@ui.SortHeader("Name", "name", props.State, target)
+				@ui.SortHeader("Status", "status", props.State, target)
+				@ui.SortHeader("Outcome", "outcome", props.State, target)
+				@ui.SortHeader("Progress", "progress", props.State, target)
+				@ui.SortHeader("Planned", "planned", props.State, target)
+				if props.CanEdit {
+					@ui.TableHeader() {
+						<span class="sr-only">Actions</span>
+					}
+				}
+			}
+			@ui.TableBody("") {
+				for _, view := range props.Campaigns {
+					@ui.TableRow("") {
+						@ui.TableCell() {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, view.Campaign.ID)) }
+								class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+							>
+								{ view.Campaign.Name }
+							</a>
+						}
+						@ui.TableCellMuted() {
+							@campaignStatusBadge(view.Campaign.Status)
+						}
+						@ui.TableCellMuted() {
+							@campaignVerdictBadge(view.Verdict, view.Campaign.Status)
+						}
+						@ui.TableCellMuted() {
+							<div class="w-40">
+								@ui.ProgressBar(view.Percent, campaignProgressColor(view.Verdict), "")
+								<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+									{ fmt.Sprintf("%d of %d tested", view.Settled, view.Total) }
+								</p>
+							</div>
+						}
+						@ui.TableCellMuted() {
+							{ campaignScheduleDisplay(view.Campaign) }
+						}
+						if props.CanEdit {
+							@ui.TableCell() {
+								@patterns.RowActions(
+									fmt.Sprintf("/products/%s/campaigns/%s/edit?return=list", props.Product.ID, view.Campaign.ID),
+									fmt.Sprintf("/products/%s/campaigns/%s", props.Product.ID, view.Campaign.ID),
+									props.Meta.CSRFToken,
+								)
 							}
 						}
 					}
 				}
 			}
-		</div>
+		}
 	}
 }
 
