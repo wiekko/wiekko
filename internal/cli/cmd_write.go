@@ -337,3 +337,75 @@ func defectDeleteCommand() *command {
 		},
 	}
 }
+
+// archiveVerb names the archive or unarchive command.
+func archiveVerb(archived bool) string {
+	if archived {
+		return "archive"
+	}
+	return "unarchive"
+}
+
+// oneRef reads the single item reference of a command.
+func oneRef(name string, args []string) (string, error) {
+	if len(args) != 1 {
+		return "", usageErr(fmt.Errorf("usage: nexmap %s <item>", name))
+	}
+	return args[0], nil
+}
+
+func requirementArchiveCommand(group, fixedKind string, archived bool) *command {
+	name := group + " " + archiveVerb(archived)
+	summary := "archive a closed item with all items below it, hiding it from default lists (owner role)"
+	if !archived {
+		summary = "bring an archived item and the items below it back (owner role)"
+	}
+	return &command{
+		name:    name,
+		args:    "<FR-12|ID>",
+		summary: summary,
+		run: func(ctx context.Context, a *app, args []string) error {
+			ref, err := oneRef(name, args)
+			if err != nil {
+				return err
+			}
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			d, err := s.SetRequirementArchived(ctx, ops.ArchiveChange{Ref: ref, Archived: archived, Kind: fixedKind})
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Requirement(w, d) })
+		},
+	}
+}
+
+func defectArchiveCommand(archived bool) *command {
+	name := "defect " + archiveVerb(archived)
+	summary := "archive a closed defect, hiding it from default lists (owner role)"
+	if !archived {
+		summary = "bring an archived defect back (owner role)"
+	}
+	return &command{
+		name:    name,
+		args:    "<DF-17|ID>",
+		summary: summary,
+		run: func(ctx context.Context, a *app, args []string) error {
+			ref, err := oneRef(name, args)
+			if err != nil {
+				return err
+			}
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			d, err := s.SetDefectArchived(ctx, ops.ArchiveChange{Ref: ref, Archived: archived})
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Defect(w, d) })
+		},
+	}
+}

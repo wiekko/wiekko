@@ -54,6 +54,7 @@ templ RequirementDetailPage(props RequirementDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, props.Requirement.CategoryID), model.RequirementKindRequirement)
+				@patterns.ArchiveControls(requirementArchiveProps(props))
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(requirementDetailTabs(props.Product.ID, props.Requirement.ID), props.TabCounts))
@@ -520,6 +521,11 @@ templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
 									>
 										{ d.Title }
 									</a>
+									if d.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.CriticalityBadge(d.Criticality)
@@ -663,4 +669,19 @@ func boolDisplay(v bool) string {
 		return "Yes"
 	}
 	return "No"
+}
+
+// requirementArchiveProps describes the requirement's archived state for its
+// page header (FR-155).
+func requirementArchiveProps(props RequirementDetailProps) patterns.ArchiveProps {
+	r := props.Requirement
+	return patterns.ArchiveProps{
+		ItemURL:     fmt.Sprintf("/products/%s/requirements/%s", props.Product.ID, r.ID),
+		Kind:        "requirement",
+		Name:        ui.ItemName(model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, r.CategoryID), r.SequenceNumber), r.Title),
+		Archived:    r.Archived(),
+		Closed:      props.Status != nil && props.Status.IsClosed,
+		HasChildren: len(props.Children) > 0,
+		CanArchive:  props.CanEdit,
+	}
 }

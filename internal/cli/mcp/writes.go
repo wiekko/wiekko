@@ -59,6 +59,25 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 			return v, func(w io.Writer) error { return render.Defect(w, v) }, err
 		})
 
+	writeTool(s, h, "set_archived", "Archive or unarchive an item",
+		"Archive a requirement, task or defect in a closed status, hiding it from default lists, the board and sprint planning, "+
+			"or bring it back with archived false. A requirement or task is archived together with all items below it, which must be closed too. "+
+			"Archived items stay part of the product state; list tools show them with archived include or only. "+
+			"Requires the product owner role. Returns the updated item.",
+		true,
+		func(ctx context.Context, sess *ops.Session, in ops.ArchiveChange) (*ops.ArchiveResult, func(io.Writer) error, error) {
+			v, err := sess.SetArchived(ctx, in)
+			if err != nil {
+				return nil, nil, err
+			}
+			return v, func(w io.Writer) error {
+				if v.Defect != nil {
+					return render.Defect(w, v.Defect)
+				}
+				return render.Requirement(w, v.Requirement)
+			}, nil
+		})
+
 	writeTool(s, h, "add_comment", "Add a comment",
 		"Add a Markdown comment to a requirement, task, constraint, defect, test case, capability or component, "+
 			"e.g. to record a decision or a question. Requires the developer role (tester for defects and test cases).",

@@ -88,6 +88,11 @@ templ HostDefectsTabContent(props HostDefectsTabProps) {
 									>
 										{ d.Title }
 									</a>
+									if d.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.CriticalityBadge(d.Criticality)

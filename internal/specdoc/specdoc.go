@@ -63,7 +63,10 @@ type Item struct {
 	Capabilities []string
 	// Documents are the identifiers of the documents linked to the item.
 	Documents []string
-	Children  []Item
+	// Archived marks a closed item that was archived (FR-155); it stays part
+	// of the specification.
+	Archived bool
+	Children []Item
 }
 
 // DocumentEntry lists one document of the specification (FR-139).
@@ -214,7 +217,11 @@ func writeItems(b *strings.Builder, items []Item, depth int) {
 		if i > 0 && (hasBody(items[i-1]) || hasBody(it)) {
 			b.WriteByte('\n')
 		}
-		b.WriteString(pad + "* **" + it.Identifier + "**: " + oneLine(it.Title) + "\n")
+		title := oneLine(it.Title)
+		if it.Archived {
+			title += " *(archived)*"
+		}
+		b.WriteString(pad + "* **" + it.Identifier + "**: " + title + "\n")
 		var parts []string
 		if desc := normalize(it.Description); desc != "" {
 			parts = append(parts, desc)

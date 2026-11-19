@@ -126,3 +126,11 @@ templ WorkflowStatusBadge(statuses map[string]*model.Status, statusID string) {
 		@ui.Badge(statusID, "gray")
 	}
 }
+
+// ArchivedBadge marks an archived requirement, task or defect (FR-155)
+// wherever it is listed; it renders nothing for an item that is not archived.
+templ ArchivedBadge(archived bool) {
+	if archived {
+		@ui.Badge("Archived", "gray")
+	}
+}

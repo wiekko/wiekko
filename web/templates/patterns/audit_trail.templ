@@ -64,6 +64,10 @@ func auditActionIcon(action string) string {
 		return "plus"
 	case "delete":
 		return "trash"
+	case "archive":
+		return "archive"
+	case "unarchive":
+		return "archive-restore"
 	default:
 		return "edit"
 	}
@@ -86,6 +90,10 @@ func auditDescription(entry templates.AuditEntryView) string {
 		return "Created this item"
 	case "delete":
 		return "Deleted this item"
+	case "archive":
+		return "Archived this item"
+	case "unarchive":
+		return "Unarchived this item"
 	case "link":
 		return "Linked a " + strings.ReplaceAll(entry.FieldName, "_", " ")
 	case "unlink":

@@ -1,0 +1,72 @@
+package patterns
+
+import "nexmap.net/web/templates/ui"
+
+// ArchiveProps describes the archived state of a requirement, task or defect
+// on its detail page (FR-155).
+type ArchiveProps struct {
+	// ItemURL is the item's page; the actions post to ItemURL/archive and
+	// ItemURL/unarchive.
+	ItemURL string
+	// Kind names the item in the confirmation: requirement, task or defect.
+	Kind string
+	// Name identifies the item in the confirmation (see ui.ItemName).
+	Name string
+	// Archived tells the item's state; Closed whether its status is closed.
+	Archived bool
+	Closed   bool
+	// HasChildren mentions the items below a requirement or task, which are
+	// archived and unarchived with it.
+	HasChildren bool
+	// CanArchive is set for product owners.
+	CanArchive bool
+}
+
+// ArchiveControls renders, in a detail page header, the Archived badge of an
+// archived item and, for product owners, the button that archives a closed
+// item or brings an archived one back. Archiving can be undone, so the
+// confirmation uses the neutral style (UC-91).
+templ ArchiveControls(props ArchiveProps) {
+	if props.Archived {
+		@ArchivedBadge(true)
+	}
+	if props.CanArchive && props.Archived {
+		<button
+			type="button"
+			class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
+			hx-post={ props.ItemURL + "/unarchive" }
+			hx-swap="none"
+			{ ui.Confirm(ui.ConfirmNeutral, "Unarchive "+props.Kind, "Unarchive", unarchiveMessage(props))... }
+		>
+			@ui.Icon("archive-restore", "sm")
+			Unarchive
+		</button>
+	} else if props.CanArchive && props.Closed {
+		<button
+			type="button"
+			class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600 dark:hover:bg-gray-700"
+			hx-post={ props.ItemURL + "/archive" }
+			hx-swap="none"
+			{ ui.Confirm(ui.ConfirmNeutral, "Archive "+props.Kind, "Archive", archiveMessage(props))... }
+		>
+			@ui.Icon("archive", "sm")
+			Archive
+		</button>
+	}
+}
+
+func archiveMessage(props ArchiveProps) string {
+	msg := "Archive " + props.Kind + " " + props.Name + "?"
+	if props.HasChildren {
+		msg += " All items below it are archived too; they must all be closed."
+	}
+	return msg + " Archived items are hidden from lists, the board and sprint planning, but stay linked to everything else. You can unarchive it at any time."
+}
+
+func unarchiveMessage(props ArchiveProps) string {
+	msg := "Unarchive " + props.Kind + " " + props.Name + "?"
+	if props.HasChildren {
+		msg += " The items below it are unarchived too."
+	}
+	return msg + " It shows up in lists and on the board again."
+}

@@ -19,6 +19,7 @@ type DefectQuery struct {
 	Criticality string `json:"criticality,omitempty" jsonschema:"critical, high, medium or low"`
 	Status      string `json:"status,omitempty" jsonschema:"status name (case-insensitive)"`
 	Search      string `json:"search,omitempty" jsonschema:"case-insensitive text in title"`
+	Archived    string `json:"archived,omitempty" jsonschema:"include or only to list archived defects too or only them; by default they are left out"`
 	Limit       int    `json:"limit,omitempty" jsonschema:"return at most this many items; 0 for all"`
 }
 
@@ -29,6 +30,9 @@ func (s *Session) ListDefects(ctx context.Context, q DefectQuery) ([]DefectSumma
 			return nil, fmt.Errorf("unknown criticality %q (want critical, high, medium or low)", q.Criticality)
 		}
 	}
+	if err := checkArchived(q.Archived); err != nil {
+		return nil, err
+	}
 	var statusID string
 	if q.Status != "" {
 		var err error
@@ -36,7 +40,7 @@ func (s *Session) ListDefects(ctx context.Context, q DefectQuery) ([]DefectSumma
 			return nil, err
 		}
 	}
-	items, err := s.C.Defects(ctx, s.ProductID)
+	items, err := s.C.Defects(ctx, s.ProductID, q.Archived)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +143,7 @@ func (s *Session) findDefect(ctx context.Context, ref string) (*client.Defect, e
 		}
 		return nil, &NotFoundError{Kind: "defect", Ref: ref}
 	}
-	list, err := s.C.Defects(ctx, s.ProductID)
+	list, err := s.C.Defects(ctx, s.ProductID, client.ArchivedInclude)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +161,7 @@ func (s *Session) findDefect(ctx context.Context, ref string) (*client.Defect, e
 // callers fall back to the ID.
 func (s *Session) defectIdentifiers(ctx context.Context) map[string]string {
 	m := map[string]string{}
-	list, err := s.C.Defects(ctx, s.ProductID)
+	list, err := s.C.Defects(ctx, s.ProductID, client.ArchivedInclude)
 	if err != nil {
 		return m
 	}
@@ -207,7 +211,7 @@ func (s *Session) defectSummaries(ctx context.Context, items []client.Defect) ([
 	for _, d := range items {
 		sum := DefectSummary{
 			ID: d.ID, Identifier: d.Identifier, Title: d.Title, Criticality: d.Criticality,
-			Priority: d.Priority, Active: d.IsActive,
+			Priority: d.Priority, Active: d.IsActive, Archived: d.Archived,
 		}
 		if st, ok := statuses[d.StatusID]; ok {
 			sum.Status, sum.StatusClosed = st.Name, st.IsClosed

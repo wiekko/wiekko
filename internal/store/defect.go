@@ -16,6 +16,9 @@ type DefectFilter struct {
 	SprintID      string // empty = all
 	EnvironmentID string // empty = all
 	MilestoneID   string // empty = all
+	// Archived selects archived defects (FR-155); the zero value includes
+	// them, so only the views that hide archived defects have to say so.
+	Archived ArchivedFilter
 }
 
 // DefectSortColumns maps the sort keys the UI and API may ask for onto SQL
@@ -72,6 +75,9 @@ type DefectStore interface {
 	GetLink(ctx context.Context, id string) (*model.DefectLink, error)
 	ListLinks(ctx context.Context, defectID string) ([]*model.DefectLink, error)
 	ListLinksByTarget(ctx context.Context, targetType, targetID string) ([]*model.DefectLink, error)
+	// SetArchivedAt archives the defect at archivedAt, or unarchives it when
+	// archivedAt is empty (FR-155).
+	SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error
 }
 
 type defectStore struct {
@@ -142,6 +148,12 @@ func (s *defectStore) Update(ctx context.Context, d *model.Defect) error {
 	return err
 }
 
+func (s *defectStore) SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error {
+	return requireChanged(s.db.ExecContext(ctx,
+		`UPDATE defects SET archived_at = ?, updated_at = ? WHERE id = ?`,
+		nullableText(archivedAt), updatedAt, id))
+}
+
 func (s *defectStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM defects WHERE id = ?`, id)
 	return err
@@ -173,6 +185,7 @@ func defectListWhere(productID string, filter DefectFilter, search string) (stri
 		where += ` AND d.milestone_id = ?`
 		args = append(args, filter.MilestoneID)
 	}
+	where += filter.Archived.where("d.archived_at")
 	// The global search deliberately spans only the columns a substring match
 	// is meaningful for, the identifier (DF-17) among them. Priority is numeric, so "1" would match 10 and 21;
 	// created_at is RFC 3339 while the column renders as "12 Jul", so matching
@@ -363,22 +376,22 @@ var defectColumns = `id, product_id, sequence_number,
 	(SELECT dp.defect_prefix FROM products dp WHERE dp.id = defects.product_id),
 	title, description, criticality,
 	status_id, milestone_id, sprint_id, environment_id, estimation, priority, ` + activeColumn("defects") + `,
-	created_at, updated_at`
+	archived_at, created_at, updated_at`
 
 // defectColumnsQualified is defectColumns for the joined list query, where bare
 // column names would be ambiguous. Both feed the same scanDefect, so the column
 // order has to stay identical.
 var defectColumnsQualified = `d.id, d.product_id, d.sequence_number, p.defect_prefix, d.title, d.description, d.criticality,
 	d.status_id, d.milestone_id, d.sprint_id, d.environment_id, d.estimation, d.priority, ` + activeColumn("d") + `,
-	d.created_at, d.updated_at`
+	d.archived_at, d.created_at, d.updated_at`
 
 func scanDefect(sc scanner) (*model.Defect, error) {
 	var d model.Defect
-	var statusID, milestoneID, sprintID, environmentID, estimation sql.NullString
+	var statusID, milestoneID, sprintID, environmentID, estimation, archivedAt sql.NullString
 	var prefix string
 	err := sc.Scan(&d.ID, &d.ProductID, &d.SequenceNumber, &prefix, &d.Title, &d.Description, &d.Criticality,
 		&statusID, &milestoneID, &sprintID, &environmentID, &estimation, &d.Priority,
-		&d.IsActive, &d.CreatedAt, &d.UpdatedAt)
+		&d.IsActive, &archivedAt, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -387,6 +400,7 @@ func scanDefect(sc scanner) (*model.Defect, error) {
 	d.SprintID = sprintID.String
 	d.EnvironmentID = environmentID.String
 	d.Estimation = estimation.String
+	d.ArchivedAt = archivedAt.String
 	d.Identifier = model.EntityIdentifier(prefix, d.SequenceNumber)
 	return &d, nil
 }

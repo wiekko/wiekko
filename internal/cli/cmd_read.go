@@ -86,6 +86,7 @@ func requirementGroup(name, summary, fixedKind string) *command {
 			fs.BoolVar(&q.Open, "open", false, "only items whose status is not closed")
 			fs.BoolVar(&q.Active, "active", false, "only items activated for work")
 			fs.BoolVar(&q.Coarse, "coarse", false, "only items that need refinement")
+			fs.StringVar(&q.Archived, "archived", "", "include or only: list archived items too, or only them (default: leave them out)")
 			fs.IntVar(&q.Limit, "limit", 0, "show at most N items")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
@@ -131,7 +132,9 @@ func requirementGroup(name, summary, fixedKind string) *command {
 	}
 	return &command{name: name, summary: summary, subs: []*command{list, show,
 		requirementStatusCommand(name, fixedKind), requirementCreateCommand(name, fixedKind),
-		requirementUpdateCommand(name, fixedKind), requirementDeleteCommand(name, fixedKind)}}
+		requirementUpdateCommand(name, fixedKind),
+		requirementArchiveCommand(name, fixedKind, true), requirementArchiveCommand(name, fixedKind, false),
+		requirementDeleteCommand(name, fixedKind)}}
 }
 
 func constraintGroup() *command {
@@ -246,6 +249,7 @@ func defectGroup() *command {
 			fs.StringVar(&q.Criticality, "criticality", "", "critical, high, medium or low")
 			fs.StringVar(&q.Status, "status", "", "status name")
 			fs.StringVar(&q.Search, "search", "", "text in title")
+			fs.StringVar(&q.Archived, "archived", "", "include or only: list archived defects too, or only them (default: leave them out)")
 			fs.IntVar(&q.Limit, "limit", 0, "show at most N items")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
@@ -284,7 +288,8 @@ func defectGroup() *command {
 		},
 	}
 	return &command{name: "defect", summary: "defects (bugs and issues)", subs: []*command{list, show,
-		defectStatusCommand(), defectCreateCommand(), defectDeleteCommand()}}
+		defectStatusCommand(), defectCreateCommand(),
+		defectArchiveCommand(true), defectArchiveCommand(false), defectDeleteCommand()}}
 }
 
 func testGroup() *command {

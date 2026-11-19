@@ -58,6 +58,7 @@ templ TaskDetailPage(props TaskDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), model.RequirementKindTask)
+				@patterns.ArchiveControls(taskArchiveProps(props))
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(taskDetailTabs(props.Product.ID, props.Task.ID), props.TabCounts))
@@ -174,4 +175,18 @@ func taskDeleteURL(props TaskDetailProps) string {
 		return "/products/" + props.Product.ID + "/tasks/" + props.Task.ID
 	}
 	return ""
+}
+
+// taskArchiveProps describes the task's archived state for its page header
+// (FR-155).
+func taskArchiveProps(props TaskDetailProps) patterns.ArchiveProps {
+	return patterns.ArchiveProps{
+		ItemURL:     fmt.Sprintf("/products/%s/tasks/%s", props.Product.ID, props.Task.ID),
+		Kind:        "task",
+		Name:        ui.ItemName(taskIdentifier(props), props.Task.Title),
+		Archived:    props.Task.Archived(),
+		Closed:      props.Status != nil && props.Status.IsClosed,
+		HasChildren: len(props.Children) > 0,
+		CanArchive:  props.CanEdit,
+	}
 }

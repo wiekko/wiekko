@@ -20,6 +20,10 @@ type TasksProps struct {
 	CategoryPrefixes map[string]string // category ID → prefix
 	Statuses         map[string]*model.Status // status ID → status
 	CanEdit          bool                     // owner or admin
+	// ShowArchived is set when the list includes archived tasks (FR-155);
+	// ProductTotal counts them all, archived or not.
+	ShowArchived bool
+	ProductTotal int
 }
 
 templ TasksPage(props TasksProps) {
@@ -38,7 +42,14 @@ templ TasksPage(props TasksProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Tasks"},
 			})
-			if len(props.Tasks) == 0 {
+			if len(props.Tasks) == 0 && props.ProductTotal > 0 {
+				@patterns.ListPageHeader("Tasks", "", "", 0) {
+					@patterns.ArchivedToggle("/products/"+props.Product.ID+"/tasks", props.ShowArchived)
+				}
+				@ui.Card() {
+					@patterns.AllArchivedState("tasks", "/products/"+props.Product.ID+"/tasks")
+				}
+			} else if len(props.Tasks) == 0 {
 				@patterns.ListPageHeader("Tasks", "", "", -1)
 				@ui.Card() {
 					if props.CanEdit {
@@ -49,9 +60,13 @@ templ TasksPage(props TasksProps) {
 				}
 			} else {
 				if props.CanEdit {
-					@patterns.ListPageHeader("Tasks", "/products/"+props.Product.ID+"/tasks/new", "New Task", len(props.Tasks))
+					@patterns.ListPageHeader("Tasks", "/products/"+props.Product.ID+"/tasks/new", "New Task", len(props.Tasks)) {
+						@patterns.ArchivedToggle("/products/"+props.Product.ID+"/tasks", props.ShowArchived)
+					}
 				} else {
-					@patterns.ListPageHeader("Tasks", "", "", len(props.Tasks))
+					@patterns.ListPageHeader("Tasks", "", "", len(props.Tasks)) {
+						@patterns.ArchivedToggle("/products/"+props.Product.ID+"/tasks", props.ShowArchived)
+					}
 				}
 				@ui.Card() {
 					@ui.Table() {
@@ -93,6 +108,11 @@ templ TasksPage(props TasksProps) {
 										>
 											{ task.Title }
 										</a>
+										if task.Archived() {
+											<span class="ml-2 align-middle">
+												@patterns.ArchivedBadge(true)
+											</span>
+										}
 									}
 									@ui.TableCellMuted() {
 										@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, task.CategoryID), model.RequirementKindTask)

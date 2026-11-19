@@ -41,12 +41,13 @@ func (c *PageProductController) Board(w http.ResponseWriter, r *http.Request) {
 	}
 	// Requirements and tasks share the requirement status set, so they share
 	// the board columns too; an empty kind filter returns both.
-	backlogItems, err := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{})
+	// Archived items are done with (FR-155); the board leaves them out.
+	backlogItems, err := c.backlog.ListRequirements(r.Context(), user, productID, store.RequirementFilter{Archived: store.ArchivedExclude})
 	if err != nil {
 		http.Error(w, "failed to load requirements", http.StatusInternalServerError)
 		return
 	}
-	defects, err := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
+	defects, err := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{Archived: store.ArchivedExclude})
 	if err != nil {
 		http.Error(w, "failed to load defects", http.StatusInternalServerError)
 		return
@@ -87,7 +88,7 @@ func (c *PageProductController) DefectsBoard(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "failed to load statuses", http.StatusInternalServerError)
 		return
 	}
-	defects, err := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{})
+	defects, err := c.backlog.ListDefects(r.Context(), user, productID, store.DefectFilter{Archived: store.ArchivedExclude})
 	if err != nil {
 		http.Error(w, "failed to load defects", http.StatusInternalServerError)
 		return

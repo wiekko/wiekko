@@ -29,6 +29,8 @@ type Requirement struct {
 	Priority         int    `json:"priority"`
 	IsCoarse         bool   `json:"is_coarse"`
 	IsActive         bool   `json:"is_active"`
+	Archived         bool   `json:"archived"`
+	ArchivedAt       string `json:"archived_at"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
 	// Documents names the linked documents (FR-141); only in single-item
@@ -42,7 +44,16 @@ type RequirementFilter struct {
 	CategoryID string
 	StatusID   string
 	SprintID   string
+	// Archived is ArchivedInclude, ArchivedOnly or "" (the server leaves
+	// archived items out, FR-155).
+	Archived string
 }
+
+// Values of the archived list parameter (FR-155).
+const (
+	ArchivedInclude = "include"
+	ArchivedOnly    = "only"
+)
 
 // Constraint is an ongoing rule that is met or violated.
 type Constraint struct {
@@ -116,6 +127,8 @@ type Defect struct {
 	Estimation     string `json:"estimation"`
 	Priority       int    `json:"priority"`
 	IsActive       bool   `json:"is_active"`
+	Archived       bool   `json:"archived"`
+	ArchivedAt     string `json:"archived_at"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
 }
@@ -285,7 +298,7 @@ func getOne[T any](ctx context.Context, c *Client, path string) (*T, error) {
 
 // Requirements lists requirements and tasks.
 func (c *Client) Requirements(ctx context.Context, productID string, f RequirementFilter) ([]Requirement, error) {
-	q := url.Values{"kind": {f.Kind}, "category_id": {f.CategoryID}, "status_id": {f.StatusID}, "sprint_id": {f.SprintID}}
+	q := url.Values{"kind": {f.Kind}, "category_id": {f.CategoryID}, "status_id": {f.StatusID}, "sprint_id": {f.SprintID}, "archived": {f.Archived}}
 	return getList[Requirement](ctx, c, withQuery(productPath(productID, "requirements"), q))
 }
 
@@ -334,9 +347,10 @@ func (c *Client) ConstraintCapabilityLinks(ctx context.Context, productID, ref s
 	return getList[CapabilityLink](ctx, c, productPath(productID, "constraints", ref, "capabilities"))
 }
 
-// Defects lists defects.
-func (c *Client) Defects(ctx context.Context, productID string) ([]Defect, error) {
-	return getList[Defect](ctx, c, productPath(productID, "defects"))
+// Defects lists defects. archived is ArchivedInclude, ArchivedOnly or ""
+// (the server leaves archived defects out, FR-155).
+func (c *Client) Defects(ctx context.Context, productID, archived string) ([]Defect, error) {
+	return getList[Defect](ctx, c, withQuery(productPath(productID, "defects"), url.Values{"archived": {archived}}))
 }
 
 // Defect returns a defect by ID.

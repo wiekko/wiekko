@@ -43,6 +43,9 @@ func appliedVersions(t *testing.T, db *sql.DB) []int64 {
 	return vs
 }
 
+// latestVersions are the versions of all embedded migrations.
+var latestVersions = []int64{1, 2, 3, 4}
+
 func wantVersions(t *testing.T, db *sql.DB, want ...int64) {
 	t.Helper()
 	got := appliedVersions(t, db)
@@ -73,7 +76,7 @@ func TestMigrateFreshAndIdempotent(t *testing.T) {
 		if err := database.Migrate(db, driver, nil); err != nil {
 			t.Fatalf("migrate: %v", err)
 		}
-		wantVersions(t, db, 1, 2, 3)
+		wantVersions(t, db, latestVersions...)
 
 		var name string
 		if err := db.QueryRow(`SELECT name FROM schema_migrations WHERE version = 3`).Scan(&name); err != nil || name != "products" {
@@ -84,7 +87,7 @@ func TestMigrateFreshAndIdempotent(t *testing.T) {
 		if err := database.Migrate(db, driver, nil); err != nil {
 			t.Fatalf("second migrate: %v", err)
 		}
-		wantVersions(t, db, 1, 2, 3)
+		wantVersions(t, db, latestVersions...)
 	})
 }
 
@@ -194,7 +197,7 @@ func TestMigrateConcurrent(t *testing.T) {
 				t.Errorf("concurrent migrate: %v", err)
 			}
 		}
-		wantVersions(t, db, 1, 2, 3)
+		wantVersions(t, db, latestVersions...)
 	})
 }
 
@@ -215,8 +218,13 @@ var gooseSchema = map[string]string{
 func TestMigrateAdoptsGooseHistory(t *testing.T) {
 	eachEmpty(t, func(t *testing.T, driver string, db *sql.DB) {
 		// A database goose migrated to version 3: the schema is there, the
-		// history is in goose_db_version only.
-		if err := database.Migrate(db, driver, nil); err != nil {
+		// history is in goose_db_version only. Goose never ran a later
+		// migration, so the schema is that of version 3.
+		upTo3, err := database.MigrationsUpTo(driver, 3)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := database.MigrateFS(db, driver, upTo3, nil); err != nil {
 			t.Fatalf("migrate: %v", err)
 		}
 		if _, err := db.Exec(`DROP TABLE schema_migrations`); err != nil {
@@ -241,7 +249,7 @@ func TestMigrateAdoptsGooseHistory(t *testing.T) {
 		if err := database.Migrate(db, driver, nil); err != nil {
 			t.Fatalf("migrate goose database: %v", err)
 		}
-		wantVersions(t, db, 1, 2, 3)
+		wantVersions(t, db, latestVersions...)
 		if tableExists(db, "goose_db_version") {
 			t.Fatal("goose_db_version was not dropped")
 		}

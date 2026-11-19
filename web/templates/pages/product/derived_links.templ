@@ -109,6 +109,11 @@ templ ComponentRequirementsTabContent(props ComponentRequirementsTabProps) {
 									>
 										{ d.Requirement.Title }
 									</a>
+									if d.Requirement.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.WorkflowStatusBadge(props.Statuses, d.Requirement.StatusID)
@@ -164,6 +169,11 @@ templ derivedDefectsSection(productID string, defects []DerivedDefect, statuses 
 									>
 										{ d.Defect.Title }
 									</a>
+									if d.Defect.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.CriticalityBadge(d.Defect.Criticality)

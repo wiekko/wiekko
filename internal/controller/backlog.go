@@ -32,11 +32,16 @@ func (c *BacklogController) ListRequirements(w http.ResponseWriter, r *http.Requ
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
+	archived, ok := parseArchivedParam(w, r)
+	if !ok {
+		return
+	}
 	filter := store.RequirementFilter{
 		Kind:       r.URL.Query().Get("kind"),
 		CategoryID: r.URL.Query().Get("category_id"),
 		StatusID:   r.URL.Query().Get("status_id"),
 		SprintID:   r.URL.Query().Get("sprint_id"),
+		Archived:   archived,
 	}
 
 	items, err := c.backlog.ListRequirements(r.Context(), user, productID, filter)
@@ -145,6 +150,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 		Priority         *int    `json:"priority"`
 		IsCoarse         *bool   `json:"is_coarse"`
 		IsActive         *bool   `json:"is_active"`
+		Archived         *bool   `json:"archived"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -164,6 +170,7 @@ func (c *BacklogController) UpdateRequirement(w http.ResponseWriter, r *http.Req
 		Priority:         req.Priority,
 		IsCoarse:         req.IsCoarse,
 		IsActive:         req.IsActive,
+		Archived:         req.Archived,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -295,10 +302,15 @@ func (c *BacklogController) ListDefects(w http.ResponseWriter, r *http.Request) 
 	user := middleware.UserFromContext(r.Context())
 	productID := r.PathValue("productId")
 
+	archived, ok := parseArchivedParam(w, r)
+	if !ok {
+		return
+	}
 	filter := store.DefectFilter{
 		Criticality: r.URL.Query().Get("criticality"),
 		StatusID:    r.URL.Query().Get("status_id"),
 		SprintID:    r.URL.Query().Get("sprint_id"),
+		Archived:    archived,
 	}
 
 	items, err := c.backlog.ListDefects(r.Context(), user, productID, filter)
@@ -389,6 +401,7 @@ func (c *BacklogController) UpdateDefect(w http.ResponseWriter, r *http.Request)
 		Estimation    *string `json:"estimation"`
 		Priority      *int    `json:"priority"`
 		IsActive      *bool   `json:"is_active"`
+		Archived      *bool   `json:"archived"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -406,6 +419,7 @@ func (c *BacklogController) UpdateDefect(w http.ResponseWriter, r *http.Request)
 		Estimation:    req.Estimation,
 		Priority:      req.Priority,
 		IsActive:      req.IsActive,
+		Archived:      req.Archived,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -575,6 +589,8 @@ func requirementToJSON(r *model.Requirement, prefixes map[string]string) map[str
 		"priority":           r.Priority,
 		"is_coarse":          r.IsCoarse,
 		"is_active":          r.IsActive,
+		"archived":           r.Archived(),
+		"archived_at":        r.ArchivedAt,
 		"created_at":         r.CreatedAt,
 		"updated_at":         r.UpdatedAt,
 	}
@@ -596,6 +612,8 @@ func defectToJSON(d *model.Defect) map[string]any {
 		"estimation":      d.Estimation,
 		"priority":        d.Priority,
 		"is_active":       d.IsActive,
+		"archived":        d.Archived(),
+		"archived_at":     d.ArchivedAt,
 		"created_at":      d.CreatedAt,
 		"updated_at":      d.UpdatedAt,
 	}
@@ -618,4 +636,14 @@ func defectLinkToJSON(l *model.DefectLink) map[string]any {
 		"target_id":   l.TargetID,
 		"created_at":  l.CreatedAt,
 	}
+}
+
+// parseArchivedParam reads the archived query parameter of the list endpoints
+// (FR-155): archived items are left out unless it is "include" or "only".
+func parseArchivedParam(w http.ResponseWriter, r *http.Request) (store.ArchivedFilter, bool) {
+	archived, ok := store.ParseArchivedFilter(r.URL.Query().Get("archived"), store.ArchivedExclude)
+	if !ok {
+		httputil.Error(w, http.StatusBadRequest, "INVALID_ARCHIVED", "archived must be include, exclude or only")
+	}
+	return archived, ok
 }

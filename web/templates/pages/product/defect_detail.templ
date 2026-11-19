@@ -47,6 +47,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@patterns.CriticalityBadge(props.Defect.Criticality)
+				@patterns.ArchiveControls(defectArchiveProps(props))
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(defectDetailTabs(props.Product.ID, props.Defect.ID), props.TabCounts))
@@ -722,6 +723,11 @@ templ DefectRequirementsTabContent(props DefectRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+									if req.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
@@ -856,3 +862,16 @@ func defectDeleteURL(props DefectDetailProps) string {
 	return ""
 }
 
+
+// defectArchiveProps describes the defect's archived state for its page
+// header (FR-155).
+func defectArchiveProps(props DefectDetailProps) patterns.ArchiveProps {
+	return patterns.ArchiveProps{
+		ItemURL:    fmt.Sprintf("/products/%s/defects/%s", props.Product.ID, props.Defect.ID),
+		Kind:       "defect",
+		Name:       ui.ItemName(props.Defect.Identifier, props.Defect.Title),
+		Archived:   props.Defect.Archived(),
+		Closed:     props.Overview.Status != nil && props.Overview.Status.IsClosed,
+		CanArchive: props.CanEdit,
+	}
+}

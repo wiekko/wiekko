@@ -152,12 +152,12 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `version` | Client version and, if a server is configured, the server version |
 | `update` | Install the latest or a given release, see [Updating](#updating) |
 | `context` | Product briefing: structure, constraints, work in progress, defects, testing status |
-| `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create`, `update` (e.g. `--parent FR-3`), `delete` |
+| `req`, `task` | Requirements and tasks: `list`, `show`, `status`, `create`, `update` (e.g. `--parent FR-3`), `archive`/`unarchive`, `delete` |
 | `constraint` | `list`, `show`, `create`, `update` (e.g. `--compliance met`) |
 | `doc` | Documents: `list`, `show`, `create`, `update`, `delete`, `link`/`unlink`, `revisions`, `diff`, `restore`, `get` |
 | `component` | Product structure: `list`, `create`, `update`, `delete` |
 | `capability` | `list`, `show`, `create`, `update`, `delete`, and `link`/`unlink` requirements and constraints |
-| `defect` | `list`, `show`, `status`, `create`, `delete` |
+| `defect` | `list`, `show`, `status`, `create`, `archive`/`unarchive`, `delete` |
 | `test` | Test cases: `list`, `show`, `sync`, and `link`/`unlink` them to a requirement, capability or component |
 | `campaign` | `status` of the active testing campaign |
 | `comment` | `add` a comment to any commentable item |

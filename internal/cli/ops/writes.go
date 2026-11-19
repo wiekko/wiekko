@@ -431,3 +431,83 @@ func (s *Session) DeleteDefect(ctx context.Context, ref string) (*Ref, error) {
 	}
 	return &Ref{ID: d.ID, Identifier: d.Identifier, Title: d.Title}, nil
 }
+
+// ArchiveChange archives or unarchives a requirement, task or defect (FR-155).
+type ArchiveChange struct {
+	Ref      string `json:"ref" jsonschema:"the item: identifier (FR-12, DF-17) or ID"`
+	Archived bool   `json:"archived" jsonschema:"true archives the item, false brings it back"`
+	// Kind restricts the change to requirements or tasks (the CLI's
+	// "task archive"); not part of the MCP schema.
+	Kind string `json:"-"`
+}
+
+// ArchiveResult is the item an ArchiveChange was applied to: a requirement or
+// task, or a defect.
+type ArchiveResult struct {
+	Requirement *RequirementDetail `json:"requirement,omitempty"`
+	Defect      *DefectDetail      `json:"defect,omitempty"`
+}
+
+// checkArchived validates the archived list option.
+func checkArchived(v string) error {
+	switch v {
+	case "", client.ArchivedInclude, client.ArchivedOnly:
+		return nil
+	}
+	return fmt.Errorf("unknown archived option %q (want include or only)", v)
+}
+
+// SetRequirementArchived archives a closed requirement or task together with
+// the items below it, or brings it back (product owner role).
+func (s *Session) SetRequirementArchived(ctx context.Context, in ArchiveChange) (*RequirementDetail, error) {
+	if strings.TrimSpace(in.Ref) == "" {
+		return nil, errors.New("an item reference is required")
+	}
+	r, err := s.requirement(ctx, in.Ref, in.Kind)
+	if err != nil {
+		return nil, err
+	}
+	archived := in.Archived
+	if _, err := s.C.UpdateRequirement(ctx, s.ProductID, r.ID, client.RequirementPatch{Archived: &archived}); err != nil {
+		return nil, err
+	}
+	return s.ShowRequirement(ctx, r.ID)
+}
+
+// SetDefectArchived archives a closed defect, or brings it back (product
+// owner role).
+func (s *Session) SetDefectArchived(ctx context.Context, in ArchiveChange) (*DefectDetail, error) {
+	if strings.TrimSpace(in.Ref) == "" {
+		return nil, errors.New("a defect reference is required")
+	}
+	d, err := s.findDefect(ctx, in.Ref)
+	if err != nil {
+		return nil, err
+	}
+	archived := in.Archived
+	if _, err := s.C.UpdateDefect(ctx, s.ProductID, d.ID, client.DefectPatch{Archived: &archived}); err != nil {
+		return nil, err
+	}
+	return s.ShowDefect(ctx, d.ID)
+}
+
+// SetArchived archives or unarchives whatever Ref names: a requirement or
+// task, else a defect.
+func (s *Session) SetArchived(ctx context.Context, in ArchiveChange) (*ArchiveResult, error) {
+	r, err := s.SetRequirementArchived(ctx, in)
+	if err == nil {
+		return &ArchiveResult{Requirement: r}, nil
+	}
+	var nf *NotFoundError
+	if !errors.As(err, &nf) {
+		return nil, err
+	}
+	d, err := s.SetDefectArchived(ctx, in)
+	if err != nil {
+		if errors.As(err, &nf) {
+			return nil, &NotFoundError{Kind: "requirement, task or defect", Ref: in.Ref}
+		}
+		return nil, err
+	}
+	return &ArchiveResult{Defect: d}, nil
+}

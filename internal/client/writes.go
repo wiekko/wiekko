@@ -42,6 +42,9 @@ type RequirementPatch struct {
 	IsActive *bool   `json:"is_active,omitempty"`
 	// ParentID moves the item; a pointer to "" moves it to the top level.
 	ParentID *string `json:"parent_id,omitempty"`
+	// Archived archives or unarchives the item with its subtree (FR-155,
+	// owner role).
+	Archived *bool `json:"archived,omitempty"`
 }
 
 // UpdateRequirement patches a requirement or task by identifier or ID.
@@ -67,6 +70,8 @@ func (c *Client) CreateDefect(ctx context.Context, productID string, in DefectCr
 // DefectPatch is a partial update; nil fields are left unchanged.
 type DefectPatch struct {
 	StatusID *string `json:"status_id,omitempty"`
+	// Archived archives or unarchives the defect (FR-155, owner role).
+	Archived *bool `json:"archived,omitempty"`
 }
 
 // UpdateDefect patches a defect. Developers may change its status.

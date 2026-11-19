@@ -28,14 +28,16 @@ templ DetailDescription(description string) {
 templ DetailPageHeader(breadcrumbs []templates.BreadcrumbItem, title, subtitle, editHref, deleteURL, csrfToken string) {
 	<div class="space-y-4">
 		@ui.Breadcrumb(breadcrumbs)
-		<div class="flex items-start justify-between">
-			<div>
+		// The actions wrap rather than overflow: with badges, Archive, Edit and
+		// Delete they are wider than a phone screen (UC-60).
+		<div class="flex items-start justify-between gap-4">
+			<div class="min-w-0">
 				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{ title }</h1>
 				if subtitle != "" {
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ subtitle }</p>
 				}
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex flex-wrap items-center justify-end gap-2">
 				{ children... }
 				if editHref != "" {
 					@ui.LinkButton(editHref, "Edit", "secondary", "md") {

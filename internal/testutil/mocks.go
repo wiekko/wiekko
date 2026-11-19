@@ -595,6 +595,7 @@ type MockRequirementStore struct {
 	ListByProductIDFunc    func(ctx context.Context, productID string, filter store.RequirementFilter) ([]*model.Requirement, error)
 	ListByParentIDFunc     func(ctx context.Context, parentID string) ([]*model.Requirement, error)
 	SetParentFunc          func(ctx context.Context, id, parentID, updatedAt string) error
+	SetArchivedAtFunc      func(ctx context.Context, id, archivedAt, updatedAt string) error
 	ListBySprintIDFunc     func(ctx context.Context, sprintID string) ([]*model.Requirement, error)
 	ListByMilestoneIDFunc  func(ctx context.Context, milestoneID string) ([]*model.Requirement, error)
 	NextSequenceNumberFunc func(ctx context.Context, productID string) (int, error)
@@ -611,6 +612,12 @@ func (m *MockRequirementStore) Create(ctx context.Context, r *model.Requirement)
 func (m *MockRequirementStore) SetParent(ctx context.Context, id, parentID, updatedAt string) error {
 	if m.SetParentFunc != nil {
 		return m.SetParentFunc(ctx, id, parentID, updatedAt)
+	}
+	return nil
+}
+func (m *MockRequirementStore) SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error {
+	if m.SetArchivedAtFunc != nil {
+		return m.SetArchivedAtFunc(ctx, id, archivedAt, updatedAt)
 	}
 	return nil
 }
@@ -680,6 +687,7 @@ type MockDefectStore struct {
 	NextSequenceNumberFunc  func(ctx context.Context, productID string) (int, error)
 	UpdateFunc              func(ctx context.Context, d *model.Defect) error
 	DeleteFunc              func(ctx context.Context, id string) error
+	SetArchivedAtFunc       func(ctx context.Context, id, archivedAt, updatedAt string) error
 	ListByProductIDFunc     func(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error)
 	ListPageByProductIDFunc func(ctx context.Context, productID string, filter store.DefectFilter, params store.ListParams) ([]*model.Defect, error)
 	CountByProductIDFunc    func(ctx context.Context, productID string, filter store.DefectFilter, search string) (int, error)
@@ -724,6 +732,12 @@ func (m *MockDefectStore) Update(ctx context.Context, d *model.Defect) error {
 }
 func (m *MockDefectStore) Delete(ctx context.Context, id string) error {
 	return m.DeleteFunc(ctx, id)
+}
+func (m *MockDefectStore) SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error {
+	if m.SetArchivedAtFunc != nil {
+		return m.SetArchivedAtFunc(ctx, id, archivedAt, updatedAt)
+	}
+	return nil
 }
 func (m *MockDefectStore) ListByProductID(ctx context.Context, productID string, filter store.DefectFilter) ([]*model.Defect, error) {
 	return m.ListByProductIDFunc(ctx, productID, filter)

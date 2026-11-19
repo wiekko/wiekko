@@ -26,7 +26,7 @@ reads are available as tools: `get_context`, `get_requirement`,
 `document_revisions` and `document_diff`. Unless the server runs with
 `--read-only`, the writes below are tools too: `set_requirement_status`,
 `set_defect_status`, `create_backlog_item`, `update_backlog_item` (e.g. a new
-parent), `create_defect` and `add_comment`.
+parent), `set_archived`, `create_defect` and `add_comment`.
 Prefer the tools over the CLI.
 
 ### Identifiers
@@ -44,7 +44,7 @@ Prefer the tools over the CLI.
 
 | Command | Purpose |
 | --- | --- |
-| `nexmap req list [--open] [--active] [--kind task] [--status NAME] [--search TEXT]` | Backlog items |
+| `nexmap req list [--open] [--active] [--kind task] [--status NAME] [--search TEXT] [--archived include\|only]` | Backlog items; archived ones only on request |
 | `nexmap req show <FR-12>` | One requirement or task |
 | `nexmap constraint list [--compliance violated]` / `constraint show <AC-42>` | Rules the code must follow |
 | `nexmap doc list [--state current]` / `doc show <DOC-3>` / `doc diff <DOC-3>` | Protocols, schemas and other definitions; what changed in one |
@@ -68,6 +68,7 @@ into a sprint). An item's `active` field says whether it is.
 | --- | --- | --- |
 | `nexmap req status FR-12 "In Progress"` | Move an item through the workflow when you start or finish it | developer, on active items only |
 | `nexmap defect status DF-17 Done` | Same for a defect you fixed | developer, on active defects only |
+| `nexmap req archive FR-12` / `req unarchive` / `defect archive DF-17` | Hide a closed item (with all items below it) from default lists, the board and sprint planning; reopening brings it back | owner |
 | `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; works for `DF-17` too; `--type test_case` etc. for test cases and capabilities) | developer (tester on defects and test cases) |
 | `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
 | `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |

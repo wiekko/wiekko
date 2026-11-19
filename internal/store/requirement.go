@@ -15,6 +15,9 @@ type RequirementFilter struct {
 	CategoryID string // empty = all categories
 	StatusID   string // empty = all statuses
 	SprintID   string // empty = all sprints
+	// Archived selects archived items (FR-155); the zero value includes
+	// them, so only the views that hide archived items have to say so.
+	Archived ArchivedFilter
 }
 
 // RequirementStore defines data access operations for requirements.
@@ -37,6 +40,9 @@ type RequirementStore interface {
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, requirementID, userID string) error
 	ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error)
+	// SetArchivedAt archives the item at archivedAt, or unarchives it when
+	// archivedAt is empty (FR-155).
+	SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error
 }
 
 type requirementStore struct {
@@ -94,6 +100,12 @@ func (s *requirementStore) Update(ctx context.Context, r *model.Requirement) err
 	return err
 }
 
+func (s *requirementStore) SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error {
+	return requireChanged(s.db.ExecContext(ctx,
+		`UPDATE requirements SET archived_at = ?, updated_at = ? WHERE id = ?`,
+		nullableText(archivedAt), updatedAt, id))
+}
+
 func (s *requirementStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM requirements WHERE id = ?`, id)
 	return err
@@ -118,6 +130,7 @@ func (s *requirementStore) ListByProductID(ctx context.Context, productID string
 		query += ` AND sprint_id = ?`
 		args = append(args, filter.SprintID)
 	}
+	query += filter.Archived.where("archived_at")
 	query += ` ORDER BY ` + itemOrder
 	return s.listRequirements(ctx, query, args...)
 }
@@ -227,15 +240,15 @@ func (s *requirementStore) CountByCategoryID(ctx context.Context, categoryID str
 // it reports the activation of the item's column rather than the stored flag.
 var requirementColumns = `id, product_id, kind, parent_id, category_id, sequence_number, title, description,
 	definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
-	is_coarse, ` + activeColumn("requirements") + `, created_at, updated_at`
+	is_coarse, ` + activeColumn("requirements") + `, archived_at, created_at, updated_at`
 
 func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement
-	var parentID, statusID, milestoneID, sprintID, estimation sql.NullString
+	var parentID, statusID, milestoneID, sprintID, estimation, archivedAt sql.NullString
 	err := sc.Scan(&r.ID, &r.ProductID, &r.Kind, &parentID, &r.CategoryID, &r.SequenceNumber,
 		&r.Title, &r.Description, &r.DefinitionOfDone,
 		&statusID, &milestoneID, &sprintID, &estimation, &r.Priority,
-		&r.IsCoarse, &r.IsActive, &r.CreatedAt, &r.UpdatedAt)
+		&r.IsCoarse, &r.IsActive, &archivedAt, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -244,5 +257,6 @@ func scanRequirement(sc scanner) (*model.Requirement, error) {
 	r.MilestoneID = milestoneID.String
 	r.SprintID = sprintID.String
 	r.Estimation = estimation.String
+	r.ArchivedAt = archivedAt.String
 	return &r, nil
 }

@@ -96,6 +96,11 @@ templ ChildrenTabContent(productID string, children []*model.Requirement, prefix
 									>
 										{ child.Title }
 									</a>
+									if child.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.CategoryBadge(requirementPrefix(prefixes, child.CategoryID), child.Kind)

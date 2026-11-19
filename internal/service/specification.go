@@ -151,7 +151,7 @@ func (s *SpecificationService) Export(ctx context.Context, user *model.User, pro
 	var reqItems, taskItems []itemSource
 	for _, r := range reqs {
 		it := itemSource{id: r.ID, parentID: r.ParentID, categoryID: r.CategoryID, seq: r.SequenceNumber,
-			title: r.Title, description: r.Description, capabilities: reqCaps[r.ID]}
+			title: r.Title, description: r.Description, capabilities: reqCaps[r.ID], archived: r.Archived()}
 		if r.Kind == model.RequirementKindTask {
 			taskItems = append(taskItems, it)
 			continue
@@ -297,6 +297,7 @@ type itemSource struct {
 	capabilities             []string
 	documents                []string // identifiers of linked documents
 	parentIdentifier         string   // set by withParents
+	archived                 bool     // FR-155
 }
 
 // withParents records each item's parent identifier.
@@ -350,7 +351,7 @@ func buildSections(cats []*model.Category, items []itemSource) []specdoc.Section
 		out := specdoc.Item{
 			Identifier: model.EntityIdentifier(cmp.Or(prefix, "?"), it.seq), Title: it.title,
 			Description: it.description, DefinitionOfDone: it.definitionOfDone, Capabilities: it.capabilities,
-			Documents: it.documents,
+			Documents: it.documents, Archived: it.archived,
 		}
 		if !nested {
 			out.Refines = it.parentIdentifier

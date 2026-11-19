@@ -66,3 +66,18 @@ func TestNormalizeAndIndent(t *testing.T) {
 		t.Errorf("oneLine = %q", got)
 	}
 }
+
+// An archived item stays in the specification, marked (FR-155).
+func TestRenderMarksArchivedItems(t *testing.T) {
+	d := Document{Product: "P", Requirements: []Section{{Category: "Functionality", Items: []Item{
+		{Identifier: "FR-1", Title: "Kept", Archived: true},
+		{Identifier: "FR-2", Title: "Current"},
+	}}}}
+	got := Render(d)
+	if !strings.Contains(got, "* **FR-1**: Kept *(archived)*\n") {
+		t.Errorf("archived item not marked:\n%s", got)
+	}
+	if strings.Contains(got, "Current *(archived)*") {
+		t.Errorf("current item marked archived:\n%s", got)
+	}
+}

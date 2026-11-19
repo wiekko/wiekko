@@ -23,8 +23,10 @@ type RequirementSummary struct {
 	Priority     int    `json:"priority"`
 	Active       bool   `json:"active"`
 	Coarse       bool   `json:"coarse"`
-	Sprint       string `json:"sprint,omitempty"`
-	Estimation   string `json:"estimation,omitempty"`
+	// Archived items are closed and hidden from default lists (FR-155).
+	Archived   bool   `json:"archived,omitempty"`
+	Sprint     string `json:"sprint,omitempty"`
+	Estimation string `json:"estimation,omitempty"`
 }
 
 // RequirementDetail is everything an agent needs to work on one item.
@@ -75,7 +77,9 @@ type DefectSummary struct {
 	StatusClosed bool   `json:"status_closed"`
 	Priority     int    `json:"priority"`
 	Active       bool   `json:"active"`
-	Environment  string `json:"environment,omitempty"`
+	// Archived defects are closed and hidden from default lists (FR-155).
+	Archived    bool   `json:"archived,omitempty"`
+	Environment string `json:"environment,omitempty"`
 }
 
 // DefectDetail adds description, links, assignees and discussion.

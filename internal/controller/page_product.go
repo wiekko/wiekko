@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -5718,7 +5719,9 @@ func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
+	archived := listArchivedFilter(r)
+	requirements := filterArchived(all, archived)
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -5734,6 +5737,8 @@ func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Requ
 		CategoryPrefixes: prefixes,
 		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
 		CanEdit:          c.canEditRequirements(user, role),
+		ShowArchived:     archived != store.ArchivedExclude,
+		ProductTotal:     len(all),
 	}).Render(r.Context(), w)
 }
 
@@ -7150,6 +7155,9 @@ const (
 	defectFilterCriticality = "criticality"
 	defectFilterEnvironment = "environment_id"
 	defectFilterSprint      = "sprint_id"
+	// defectFilterArchived shows archived defects (FR-155): empty hides
+	// them, "include" shows them too, "only" shows nothing else.
+	defectFilterArchived = "archived"
 )
 
 // parseDefectListState reads sort, search, facet and page state out of the
@@ -7163,11 +7171,13 @@ const (
 func parseDefectListState(r *http.Request, baseURL string) (store.DefectFilter, store.ListParams, ui.ListState) {
 	q := r.URL.Query()
 
+	archived, _ := store.ParseArchivedFilter(q.Get(defectFilterArchived), store.ArchivedExclude)
 	filter := store.DefectFilter{
 		Criticality:   q.Get(defectFilterCriticality),
 		StatusID:      q.Get(defectFilterStatus),
 		SprintID:      q.Get(defectFilterSprint),
 		EnvironmentID: q.Get(defectFilterEnvironment),
+		Archived:      archived,
 	}
 
 	sortKey := q.Get(ui.ParamSort)
@@ -7197,6 +7207,7 @@ func parseDefectListState(r *http.Request, baseURL string) (store.DefectFilter, 
 			defectFilterStatus:      filter.StatusID,
 			defectFilterSprint:      filter.SprintID,
 			defectFilterEnvironment: filter.EnvironmentID,
+			defectFilterArchived:    archivedParam(archived, store.ArchivedExclude),
 		},
 	}
 
@@ -7243,8 +7254,9 @@ func (c *PageProductController) loadDefectsProps(r *http.Request, user *model.Us
 	// The unfiltered count separates "this product has no defects yet" from
 	// "nothing matches these filters" — the first invites you to create one,
 	// the second would be wrong to.
+	// Hidden archived defects count as existing ones (FR-155).
 	productTotal := total
-	if state.Filtered() {
+	if state.Filtered() || filter.Archived != store.ArchivedInclude {
 		productTotal, _ = c.backlog.CountDefects(r.Context(), user, productID)
 	}
 
@@ -9022,4 +9034,74 @@ func (c *PageProductController) ConstraintHistoryTab(w http.ResponseWriter, r *h
 	entries := c.buildAuditViews(r, user, productID, "constraint", constraintID)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = productpage.ConstraintHistoryTabContent(entries).Render(r.Context(), w)
+}
+
+// archivedParam is the URL value of an archived filter (FR-155); the default
+// of the view is left out of the URL.
+func archivedParam(f, defaultFilter store.ArchivedFilter) string {
+	if f == defaultFilter {
+		return ""
+	}
+	if f == store.ArchivedInclude {
+		return "include"
+	}
+	return string(f)
+}
+
+// listArchivedFilter reads the archived state of the requirements and tasks
+// lists from the URL (FR-155); they hide archived items by default.
+func listArchivedFilter(r *http.Request) store.ArchivedFilter {
+	f, _ := store.ParseArchivedFilter(r.URL.Query().Get("archived"), store.ArchivedExclude)
+	return f
+}
+
+// filterArchived keeps the items f selects. The lists filter in memory, as
+// they list every item anyway; it moves into the query once they paginate
+// (UR-144).
+func filterArchived(items []*model.Requirement, f store.ArchivedFilter) []*model.Requirement {
+	if f == store.ArchivedInclude {
+		return items
+	}
+	out := make([]*model.Requirement, 0, len(items))
+	for _, it := range items {
+		if it.Archived() == (f == store.ArchivedOnly) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// ArchiveItem returns the handler of POST …/{collection}/{item}/archive and
+// …/unarchive (FR-155), for collection requirements, tasks or defects, whose
+// item ID is the path value param. On success the page reloads; a refusal is
+// shown as the toast htmx-errors.js makes of a plain-text body.
+func (c *PageProductController) ArchiveItem(param, collection string, archived bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.UserFromContext(r.Context())
+		productID := r.PathValue("id")
+		itemID := r.PathValue(param)
+
+		var err error
+		if collection == "defects" {
+			_, err = c.backlog.UpdateDefect(r.Context(), user, productID, itemID, service.UpdateDefectInput{Archived: &archived})
+		} else {
+			if collection == "tasks" {
+				if _, err = c.loadTask(r, user, productID, itemID); err != nil {
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}
+			_, err = c.backlog.UpdateRequirement(r.Context(), user, productID, itemID, service.UpdateRequirementInput{Archived: &archived})
+		}
+		if err != nil {
+			status := http.StatusUnprocessableEntity
+			if errors.Is(err, service.ErrForbidden) {
+				status = http.StatusForbidden
+			}
+			http.Error(w, errorText(err), status)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/products/"+productID+"/"+collection+"/"+itemID)
+		w.WriteHeader(http.StatusOK)
+	})
 }

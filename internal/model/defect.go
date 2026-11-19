@@ -21,10 +21,16 @@ type Defect struct {
 	EnvironmentID string
 	Estimation    string // interpreted per product's estimation mode
 	Priority      int
-	IsActive      bool   // activated for work
-	CreatedAt     string // RFC 3339
-	UpdatedAt     string // RFC 3339
+	IsActive      bool // activated for work
+	// ArchivedAt is when the defect was archived (FR-155), RFC 3339; empty if
+	// it is not. An archived defect is always in a closed status.
+	ArchivedAt string
+	CreatedAt  string // RFC 3339
+	UpdatedAt  string // RFC 3339
 }
+
+// Archived reports whether the defect has been archived (FR-155).
+func (d *Defect) Archived() bool { return d.ArchivedAt != "" }
 
 // Defect criticality constants.
 const (

@@ -19,8 +19,9 @@ func parseState(t *testing.T, query string) (store.DefectFilter, store.ListParam
 func TestParseDefectListStateDefaults(t *testing.T) {
 	filter, params, state := parseState(t, "")
 
-	if filter != (store.DefectFilter{}) {
-		t.Errorf("expected an empty filter, got %+v", filter)
+	// Archived defects are hidden by default (FR-155); nothing else filters.
+	if filter != (store.DefectFilter{Archived: store.ArchivedExclude}) {
+		t.Errorf("expected only archived defects filtered out, got %+v", filter)
 	}
 	if params.Sort != "" {
 		t.Errorf("sort = %q, want the entity default", params.Sort)
@@ -48,6 +49,7 @@ func TestParseDefectListStateReadsFacets(t *testing.T) {
 		StatusID:      "s1",
 		SprintID:      "sp1",
 		EnvironmentID: "e1",
+		Archived:      store.ArchivedExclude,
 	}
 	if filter != want {
 		t.Errorf("filter = %+v, want %+v", filter, want)
@@ -194,5 +196,30 @@ func TestParseDefectListStateRoundTripsThroughURLs(t *testing.T) {
 	}
 	if next.Page != 2 {
 		t.Errorf("page did not survive the round trip: %d", next.Page)
+	}
+}
+
+// The archived facet (FR-155) reaches the filter and the view state; its
+// default, hiding archived defects, stays out of the URL.
+func TestParseDefectListStateArchivedFacet(t *testing.T) {
+	for query, want := range map[string]struct {
+		filter store.ArchivedFilter
+		facet  string
+	}{
+		"":                  {store.ArchivedExclude, ""},
+		"?archived=include": {store.ArchivedInclude, "include"},
+		"?archived=only":    {store.ArchivedOnly, "only"},
+		"?archived=bogus":   {store.ArchivedExclude, ""},
+	} {
+		filter, _, state := parseState(t, query)
+		if filter.Archived != want.filter {
+			t.Errorf("%q: filter.Archived = %q, want %q", query, filter.Archived, want.filter)
+		}
+		if state.Filters["archived"] != want.facet {
+			t.Errorf("%q: facet = %q, want %q", query, state.Filters["archived"], want.facet)
+		}
+		if state.Filtered() != (want.facet != "") {
+			t.Errorf("%q: Filtered() = %v", query, state.Filtered())
+		}
 	}
 }

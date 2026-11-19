@@ -30,6 +30,9 @@ type MilestoneService struct {
 	audit    store.AuditStore
 	authz    *Authorizer
 	owns     *ownership
+	// archive unarchives the items of a status that stops being closed or
+	// is deleted (FR-155); nil in unit tests that do not care.
+	archive *archiver
 }
 
 // --- Milestone ---
@@ -601,6 +604,10 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 
 	// Capture old name before mutation for sibling lookup.
 	oldName := status.Name
+	// A status that stops being closed reopens its items, which must not
+	// stay archived (FR-155).
+	reopening := *status
+	reopening.IsClosed = status.IsClosed && input.IsClosed != nil && !*input.IsClosed
 
 	if input.Name != nil {
 		status.Name = *input.Name
@@ -629,6 +636,9 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 		}); err != nil {
 			return err
 		}
+		if err := s.archive.reopened(ctx, user, &reopening, now); err != nil {
+			return err
+		}
 		if !s.statusSync(ctx, productID) {
 			return nil
 		}
@@ -638,6 +648,11 @@ func (s *MilestoneService) UpdateStatus(ctx context.Context, user *model.User, p
 			// Nothing to mirror to: the sets already differ.
 			slog.WarnContext(ctx, "status sync: sibling not found for update", "name", oldName, "entityType", otherType, "error", err)
 			return nil
+		}
+		siblingReopening := *sibling
+		siblingReopening.IsClosed = sibling.IsClosed && !status.IsClosed
+		if err := s.archive.reopened(ctx, user, &siblingReopening, now); err != nil {
+			return err
 		}
 		sibling.Name = status.Name
 		sibling.Position = status.Position
@@ -676,6 +691,10 @@ func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, p
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		// The status's items lose it and so are open now (FR-155).
+		if err := s.archive.reopened(ctx, user, status, now); err != nil {
+			return err
+		}
 		if err := s.statuses.Delete(ctx, id); err != nil {
 			return fmt.Errorf("delete status: %w", err)
 		}
@@ -693,6 +712,9 @@ func (s *MilestoneService) DeleteStatus(ctx context.Context, user *model.User, p
 		if err != nil {
 			slog.WarnContext(ctx, "status sync: sibling not found for delete", "name", status.Name, "entityType", otherType, "error", err)
 			return nil
+		}
+		if err := s.archive.reopened(ctx, user, sibling, now); err != nil {
+			return err
 		}
 		if err := s.statuses.Delete(ctx, sibling.ID); err != nil {
 			return fmt.Errorf("status sync: delete %s status: %w", otherType, err)

@@ -137,7 +137,7 @@ func requirementRows(items []ops.RequirementSummary) [][]string {
 	rows := make([][]string, 0, len(items))
 	for _, r := range items {
 		rows = append(rows, []string{dash(r.Identifier), r.Kind, r.Title, dash(r.Status), strconv.Itoa(r.Priority),
-			flags("active", r.Active, "coarse", r.Coarse, "closed", r.StatusClosed)})
+			flags("active", r.Active, "coarse", r.Coarse, "closed", r.StatusClosed, "archived", r.Archived)})
 	}
 	return rows
 }
@@ -155,7 +155,7 @@ func Requirement(w io.Writer, r *ops.RequirementDetail) error {
 	d.kv("Category", r.Category)
 	d.kv("Status", r.Status)
 	d.kv("Priority", strconv.Itoa(r.Priority))
-	d.kv("Flags", flags("active", r.Active, "coarse (needs refinement)", r.Coarse, "closed", r.StatusClosed))
+	d.kv("Flags", flags("active", r.Active, "coarse (needs refinement)", r.Coarse, "closed", r.StatusClosed, "archived", r.Archived))
 	d.kv("Estimation", r.Estimation)
 	d.kv("Sprint", r.Sprint)
 	d.kv("Milestone", r.Milestone)
@@ -239,7 +239,7 @@ func defectRows(items []ops.DefectSummary) [][]string {
 	rows := make([][]string, 0, len(items))
 	for _, x := range items {
 		rows = append(rows, []string{x.Identifier, x.Title, x.Criticality, dash(x.Status), strconv.Itoa(x.Priority),
-			flags("active", x.Active, "closed", x.StatusClosed)})
+			flags("active", x.Active, "closed", x.StatusClosed, "archived", x.Archived)})
 	}
 	return rows
 }
@@ -256,7 +256,7 @@ func Defect(w io.Writer, x *ops.DefectDetail) error {
 	d.kv("Criticality", x.Criticality)
 	d.kv("Status", x.Status)
 	d.kv("Priority", strconv.Itoa(x.Priority))
-	d.kv("Flags", flags("active", x.Active, "closed", x.StatusClosed))
+	d.kv("Flags", flags("active", x.Active, "closed", x.StatusClosed, "archived", x.Archived))
 	d.kv("Environment", x.Environment)
 	d.kv("Sprint", x.Sprint)
 	d.kv("Milestone", x.Milestone)

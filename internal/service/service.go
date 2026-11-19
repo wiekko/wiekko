@@ -194,6 +194,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			audit:         st.Audit,
 			authz:         authz,
 			owns:          owns,
+			archive:       backlogSvc.archiver(),
 		},
 		Category: &CategoryService{
 			tx:           st.Tx,

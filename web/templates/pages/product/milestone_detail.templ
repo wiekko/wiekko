@@ -558,6 +558,11 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+									if req.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)
@@ -854,6 +859,11 @@ templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
 									>
 										{ d.Title }
 									</a>
+									if d.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.CriticalityBadge(d.Criticality)

@@ -5,7 +5,8 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
-// ListPageHeader renders a page title with a count and create button.
+// ListPageHeader renders a page title with a count and create button. Any
+// children are further controls, placed before the create button.
 templ ListPageHeader(title, createHref, createLabel string, count int) {
 	<div class="flex items-center justify-between">
 		<div>
@@ -14,10 +15,34 @@ templ ListPageHeader(title, createHref, createLabel string, count int) {
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%d items", count) }</p>
 			}
 		</div>
-		if createHref != "" {
-			@ui.LinkButton(createHref, createLabel, "primary", "md") {
-				@ui.Icon("plus", "sm")
+		<div class="flex items-center gap-3">
+			{ children... }
+			if createHref != "" {
+				@ui.LinkButton(createHref, createLabel, "primary", "md") {
+					@ui.Icon("plus", "sm")
+				}
 			}
-		}
+		</div>
 	</div>
+}
+
+// ArchivedToggle switches a list between hiding archived items, its default,
+// and showing them (FR-155). baseURL is the list without the archived
+// parameter; showing tells which state the list is in.
+templ ArchivedToggle(baseURL string, showing bool) {
+	if showing {
+		@ui.LinkButton(baseURL, "Hide archived", "secondary", "md") {
+			@ui.Icon("archive-x", "sm")
+		}
+	} else {
+		@ui.LinkButton(baseURL+"?archived=include", "Show archived", "secondary", "md") {
+			@ui.Icon("archive", "sm")
+		}
+	}
+}
+
+// AllArchivedState is the empty state of a list whose items are all archived
+// and hidden (FR-155); what names the items, e.g. "requirements".
+templ AllArchivedState(what, baseURL string) {
+	@ui.EmptyState("archive", "All "+what+" are archived", "Archived "+what+" are hidden from this list.", "Show archived", baseURL+"?archived=include")
 }

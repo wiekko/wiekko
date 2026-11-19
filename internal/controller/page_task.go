@@ -34,7 +34,9 @@ func (c *PageProductController) Tasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, _ := c.backlog.ListRequirements(r.Context(), user, productID, tasksOnly)
+	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, tasksOnly)
+	archived := listArchivedFilter(r)
+	tasks := filterArchived(all, archived)
 	prefixes := c.buildCategoryPrefixMap(r, user, productID, model.RequirementKindTask)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -50,6 +52,8 @@ func (c *PageProductController) Tasks(w http.ResponseWriter, r *http.Request) {
 		CategoryPrefixes: prefixes,
 		Statuses:         c.buildStatusMap(r, user, productID, model.RequirementKindRequirement),
 		CanEdit:          c.canEditRequirements(user, role),
+		ShowArchived:     archived != store.ArchivedExclude,
+		ProductTotal:     len(all),
 	}).Render(r.Context(), w)
 }
 

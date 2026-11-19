@@ -80,6 +80,10 @@ type UpdateRequirementInput struct {
 	Priority         *int
 	IsCoarse         *bool
 	IsActive         *bool
+	// Archived archives (true) or unarchives (false) the item with its
+	// subtree (FR-155). Owner only; archiving needs the item and all items
+	// below it in a closed status.
+	Archived *bool
 }
 
 // CreateRequirement creates a new requirement. Requires owner role.
@@ -153,6 +157,10 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		r.SequenceNumber = seq
 		if err := s.requirements.Create(ctx, r); err != nil {
 			return fmt.Errorf("create %s: %w", input.Kind, err)
+		}
+		// A new item is not archived, so neither may its ancestors be (FR-155).
+		if err := s.archiver().unarchiveAncestors(ctx, user, r.ParentID, now); err != nil {
+			return err
 		}
 		for _, capID := range capabilityIDs {
 			if err := s.capabilities.LinkRequirement(ctx, &model.RequirementCapability{
@@ -230,7 +238,12 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 			}
 		}
 
+		if err := checkArchiveChange(isDeveloper, r.Archived(), input.Archived); err != nil {
+			return err
+		}
+
 		now := time.Now().UTC().Format(time.RFC3339)
+		previousParentID := r.ParentID
 		if input.StatusID != nil {
 			r.StatusID = *input.StatusID
 		}
@@ -293,10 +306,13 @@ func (s *BacklogService) UpdateRequirement(ctx context.Context, user *model.User
 			if err := s.requirements.Update(ctx, r); err != nil {
 				return fmt.Errorf("update %s: %w", r.Kind, err)
 			}
-			return s.audit.Create(ctx, &model.AuditEntry{
+			if err := s.audit.Create(ctx, &model.AuditEntry{
 				ID: uuid.New().String(), ProductID: r.ProductID, EntityType: r.Kind, EntityID: r.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
-			})
+			}); err != nil {
+				return err
+			}
+			return s.applyRequirementArchive(ctx, user, r, input.Archived, r.ParentID != previousParentID, now)
 		}); err != nil {
 			return err
 		}
@@ -663,6 +679,9 @@ type UpdateDefectInput struct {
 	Estimation    *string
 	Priority      *int
 	IsActive      *bool
+	// Archived archives (true) or unarchives (false) the defect (FR-155).
+	// Owner only; archiving needs a closed status.
+	Archived *bool
 }
 
 // CreateDefect creates a new defect. Requires tester role.
@@ -774,6 +793,10 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 			}
 		}
 
+		if err := checkArchiveChange(isDeveloper, d.Archived(), input.Archived); err != nil {
+			return err
+		}
+
 		now := time.Now().UTC().Format(time.RFC3339)
 		previousStatusID := d.StatusID
 		if input.StatusID != nil {
@@ -833,10 +856,13 @@ func (s *BacklogService) UpdateDefect(ctx context.Context, user *model.User, pro
 					return err
 				}
 			}
-			return s.audit.Create(ctx, &model.AuditEntry{
+			if err := s.audit.Create(ctx, &model.AuditEntry{
 				ID: uuid.New().String(), ProductID: d.ProductID, EntityType: "defect", EntityID: d.ID,
 				UserID: user.ID, Action: "update", CreatedAt: now,
-			})
+			}); err != nil {
+				return err
+			}
+			return s.applyDefectArchive(ctx, user, d, input.Archived, now)
 		})
 		if err != nil {
 			return err

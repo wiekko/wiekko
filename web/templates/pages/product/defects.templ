@@ -99,7 +99,22 @@ templ DefectsTableContent(props DefectsProps) {
 	<div class="space-y-4">
 		@defectsControls(props)
 		@ui.Card() {
-			if len(props.Defects) == 0 {
+			if len(props.Defects) == 0 && !props.State.Filtered() {
+				@ui.EmptyState("archive", "All defects are archived",
+					"Archived defects are hidden from this list.", "", "")
+				<div class="pb-6 text-center">
+					<a
+						href={ templ.SafeURL(props.State.FilterURL("archived", "include")) }
+						hx-get={ props.State.FilterURL("archived", "include") }
+						hx-target={ defectsTableTarget }
+						hx-swap="innerHTML"
+						hx-push-url="true"
+						class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+					>
+						Show archived defects
+					</a>
+				</div>
+			} else if len(props.Defects) == 0 {
 				@ui.EmptyState("search", "No matching defects",
 					"No defect matches the current search and filters.", "", "")
 				<div class="pb-6 text-center">
@@ -145,6 +160,11 @@ templ DefectsTableContent(props DefectsProps) {
 									>
 										{ d.Title }
 									</a>
+									if d.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.CriticalityBadge(d.Criticality)
@@ -250,6 +270,7 @@ templ defectsControls(props DefectsProps) {
 			if len(props.SprintOptions) > 0 {
 				@defectsFacet(props, "sprint_id", "Sprint", defectSprintOptions(props))
 			}
+			@defectsFacet(props, "archived", "Archived", ArchivedOptions())
 		</div>
 		// The sort order rides along as hidden fields. htmx sends only the
 		// inputs it is told to include, so without these a filter change would
@@ -356,6 +377,16 @@ func defectStatusOptions(props DefectsProps) []templates.SelectOption {
 		options = append(options, templates.SelectOption{Value: s.ID, Label: s.Name})
 	}
 	return options
+}
+
+// ArchivedOptions are the choices of the archived facet (FR-155); hiding
+// archived items is the default.
+func ArchivedOptions() []templates.SelectOption {
+	return []templates.SelectOption{
+		{Value: "", Label: "Hide archived"},
+		{Value: "include", Label: "Show archived"},
+		{Value: "only", Label: "Archived only"},
+	}
 }
 
 func defectCriticalityOptions() []templates.SelectOption {

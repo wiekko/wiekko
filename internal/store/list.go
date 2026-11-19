@@ -71,3 +71,47 @@ func searchPattern(search string) string {
 	)
 	return "%" + r.Replace(strings.ToLower(strings.TrimSpace(search))) + "%"
 }
+
+// ArchivedFilter selects backlog items by their archived state (FR-155).
+type ArchivedFilter string
+
+const (
+	// ArchivedInclude lists archived and unarchived items alike. It is the
+	// zero value: traceability views keep showing archived items, so only
+	// the views that hide them have to ask for it.
+	ArchivedInclude ArchivedFilter = ""
+	// ArchivedExclude leaves archived items out.
+	ArchivedExclude ArchivedFilter = "exclude"
+	// ArchivedOnly lists archived items only.
+	ArchivedOnly ArchivedFilter = "only"
+)
+
+// ParseArchivedFilter reads the archived query parameter of list endpoints and
+// pages. The default (empty) is defaultFilter; "include", "exclude" and "only"
+// select the mode, and "1"/"true" are read as include, the way the web UI's
+// "show archived" toggle sends it.
+func ParseArchivedFilter(v string, defaultFilter ArchivedFilter) (ArchivedFilter, bool) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "":
+		return defaultFilter, true
+	case "include", "1", "true", "yes":
+		return ArchivedInclude, true
+	case "exclude", "0", "false", "no":
+		return ArchivedExclude, true
+	case "only":
+		return ArchivedOnly, true
+	}
+	return defaultFilter, false
+}
+
+// where returns the condition on column (the archived_at column, qualified as
+// the query needs) that f adds to a WHERE clause; "" for ArchivedInclude.
+func (f ArchivedFilter) where(column string) string {
+	switch f {
+	case ArchivedExclude:
+		return ` AND ` + column + ` IS NULL`
+	case ArchivedOnly:
+		return ` AND ` + column + ` IS NOT NULL`
+	}
+	return ""
+}

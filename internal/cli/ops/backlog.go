@@ -21,12 +21,17 @@ type RequirementQuery struct {
 	Open     bool   `json:"open,omitempty" jsonschema:"only items whose status is not a closed one"`
 	Active   bool   `json:"active,omitempty" jsonschema:"only items activated for work"`
 	Coarse   bool   `json:"coarse,omitempty" jsonschema:"only items marked as needing refinement"`
+	Archived string `json:"archived,omitempty" jsonschema:"include or only to list archived items too or only them; by default they are left out"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"return at most this many items; 0 for all"`
 }
 
 // ListRequirements lists requirements and tasks.
 func (s *Session) ListRequirements(ctx context.Context, q RequirementQuery) ([]RequirementSummary, error) {
 	f := client.RequirementFilter{Kind: q.Kind}
+	if err := checkArchived(q.Archived); err != nil {
+		return nil, err
+	}
+	f.Archived = q.Archived
 	if q.Kind != "" && q.Kind != "requirement" && q.Kind != "task" {
 		return nil, fmt.Errorf("unknown kind %q (want requirement or task)", q.Kind)
 	}
@@ -191,6 +196,7 @@ func (s *Session) requirementSummary(ctx context.Context, r client.Requirement) 
 		Category:   cats[r.CategoryID].Name,
 		Priority:   r.Priority,
 		Active:     r.IsActive,
+		Archived:   r.Archived,
 		Coarse:     r.IsCoarse,
 		Estimation: r.Estimation,
 	}

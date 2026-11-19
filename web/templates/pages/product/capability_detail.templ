@@ -171,6 +171,11 @@ templ CapabilityRequirementsTabContent(props CapabilityRequirementsTabProps) {
 									>
 										{ req.Title }
 									</a>
+									if req.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
 								}
 								@ui.TableCellMuted() {
 									@patterns.WorkflowStatusBadge(props.Statuses, req.StatusID)

@@ -46,6 +46,21 @@ for it.
 Moving a defect into a closed status (such as *Done*) puts every failed result it explains back to
 *re-test* in its testing campaign; see [Testing](testing.md#the-defect-loop).
 
+## Archiving
+
+Finished work piles up: the lists and the board's last column grow with every closed item. Rather than
+deleting closed items, which would tear them out of the test cases, campaigns and milestones they belong
+to, product owners **archive** them with the *Archive* button on the item's page.
+
+- Only items in a closed status can be archived. A requirement or task is archived together with all
+  items below it, so those must be closed too.
+- Archived items are hidden from the requirements, tasks and defects lists (switch on *Show archived* to
+  see them), from the board and from the items offered when planning a sprint.
+- Pages that trace the product state, such as capabilities, components, milestones, sprints and
+  campaigns, and the specification export keep showing archived items, marked *Archived*.
+- *Unarchive* brings an item back, with the items below it. Moving an archived item to an open status
+  does the same, and so does making its status an open one or deleting it.
+
 ## Working with lists
 
 All lists work the same way:

@@ -20,6 +20,10 @@ type RequirementsProps struct {
 	CategoryPrefixes map[string]string // category ID → prefix
 	Statuses         map[string]*model.Status // status ID → status
 	CanEdit          bool                     // owner or admin
+	// ShowArchived is set when the list includes archived requirements
+	// (FR-155); ProductTotal counts them all, archived or not.
+	ShowArchived bool
+	ProductTotal int
 }
 
 templ RequirementsPage(props RequirementsProps) {
@@ -38,7 +42,14 @@ templ RequirementsPage(props RequirementsProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Requirements"},
 			})
-			if len(props.Requirements) == 0 {
+			if len(props.Requirements) == 0 && props.ProductTotal > 0 {
+				@patterns.ListPageHeader("Requirements", "", "", 0) {
+					@patterns.ArchivedToggle("/products/"+props.Product.ID+"/requirements", props.ShowArchived)
+				}
+				@ui.Card() {
+					@patterns.AllArchivedState("requirements", "/products/"+props.Product.ID+"/requirements")
+				}
+			} else if len(props.Requirements) == 0 {
 				@patterns.ListPageHeader("Requirements", "", "", -1)
 				@ui.Card() {
 					if props.CanEdit {
@@ -49,9 +60,13 @@ templ RequirementsPage(props RequirementsProps) {
 				}
 			} else {
 				if props.CanEdit {
-					@patterns.ListPageHeader("Requirements", "/products/"+props.Product.ID+"/requirements/new", "New Requirement", len(props.Requirements))
+					@patterns.ListPageHeader("Requirements", "/products/"+props.Product.ID+"/requirements/new", "New Requirement", len(props.Requirements)) {
+						@patterns.ArchivedToggle("/products/"+props.Product.ID+"/requirements", props.ShowArchived)
+					}
 				} else {
-					@patterns.ListPageHeader("Requirements", "", "", len(props.Requirements))
+					@patterns.ListPageHeader("Requirements", "", "", len(props.Requirements)) {
+						@patterns.ArchivedToggle("/products/"+props.Product.ID+"/requirements", props.ShowArchived)
+					}
 				}
 				@ui.Card() {
 					@ui.Table() {
@@ -93,6 +108,11 @@ templ RequirementsPage(props RequirementsProps) {
 										>
 											{ req.Title }
 										</a>
+										if req.Archived() {
+											<span class="ml-2 align-middle">
+												@patterns.ArchivedBadge(true)
+											</span>
+										}
 									}
 									@ui.TableCellMuted() {
 										@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, req.CategoryID), model.RequirementKindRequirement)

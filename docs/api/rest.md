@@ -129,6 +129,13 @@ whatever is current.
 - `DELETE /api/v1/products/{p}/requirements/{id}` deletes a requirement or task. With
   `?children=keep`, the default, the items below it move up one level, to its parent or to the top
   level; with `?children=delete`, they are deleted too.
+- `PATCH …/requirements/{id}` and `PATCH …/defects/{id}` (owner) with `{"archived": true}` archive a
+  closed item, `{"archived": false}` brings it back. A requirement or task is archived together with every
+  item below it, which must all be closed. Moving an archived item to an open status unarchives it, its
+  subtree and its archived ancestors. Items carry `archived` and `archived_at`.
+- `GET …/requirements` and `GET …/defects` leave archived items out; `?archived=include` lists them
+  too, `?archived=only` lists only them. Every other read, such as the linked items of a capability, a
+  milestone or a test case, includes them.
 
 ### Documents
 
