@@ -153,10 +153,13 @@ func (s *constraintStore) CountByCategoryID(ctx context.Context, categoryID stri
 	return count, err
 }
 
+// LinkCapability is idempotent: linking a pair that is already linked keeps
+// the existing link and succeeds (DF-3).
 func (s *constraintStore) LinkCapability(ctx context.Context, link *model.ConstraintCapability) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO constraint_capabilities (id, constraint_id, capability_id, created_at)
-		 VALUES (?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT (constraint_id, capability_id) DO NOTHING`,
 		link.ID, link.ConstraintID, link.CapabilityID, link.CreatedAt,
 	)
 	return err

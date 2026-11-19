@@ -50,6 +50,14 @@ func TestE2EStructureWrites(t *testing.T) {
 	if md := e.mustRun("", "capability", "show", "Crash reporting", "-o", "md").stdout; !strings.Contains(md, "## Constraints") || !strings.Contains(md, ac) {
 		t.Errorf("capability markdown lacks the linked constraint %s:\n%s", ac, md)
 	}
+	// DF-3: linking again is idempotent; an already linked item does not
+	// abort the others in the same call.
+	fr2 := reqs[len(reqs)-1].Identifier
+	capa = decode[ops.CapabilityDetail](t, e.mustRun("", "capability", "link", "Crash reporting", fr, ac, fr2, "-o", "json").stdout)
+	if len(capa.Requirements) != 2 || len(capa.Constraints) != 1 {
+		t.Fatalf("after relinking: requirements %+v, constraints %+v", capa.Requirements, capa.Constraints)
+	}
+	e.mustRun("", "capability", "unlink", "Crash reporting", fr2)
 	con := decode[ops.ConstraintDetail](t, e.mustRun("", "constraint", "show", ac, "-o", "json").stdout)
 	if !hasRef(con.Capabilities, "Crash reporting") {
 		t.Fatalf("%s not linked to the capability: %+v", ac, con.Capabilities)

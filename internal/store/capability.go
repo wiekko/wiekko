@@ -125,10 +125,13 @@ func (s *capabilityStore) ListByComponentID(ctx context.Context, componentID str
 	return caps, rows.Err()
 }
 
+// LinkRequirement is idempotent: linking a pair that is already linked keeps
+// the existing link and succeeds (DF-3).
 func (s *capabilityStore) LinkRequirement(ctx context.Context, link *model.RequirementCapability) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO requirement_capabilities (id, requirement_id, capability_id, created_at)
-		 VALUES (?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT (requirement_id, capability_id) DO NOTHING`,
 		link.ID, link.RequirementID, link.CapabilityID, link.CreatedAt,
 	)
 	return err
