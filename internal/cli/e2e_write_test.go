@@ -133,6 +133,39 @@ func TestE2ECreateTask(t *testing.T) {
 	}
 }
 
+// TestE2ECreateRequirementWithCapabilities links a new requirement to
+// capabilities as it is created (FR-156); tasks reach capabilities through
+// their parent and take none.
+func TestE2ECreateRequirementWithCapabilities(t *testing.T) {
+	e := newAviary(t)
+	e.mustRun("", "capability", "create", "--name", "Crash reports", "-o", "json")
+	e.mustRun("", "capability", "create", "--name", "Usage reports", "-o", "json")
+
+	d := decode[ops.RequirementDetail](t, e.mustRun("", "req", "create", "--kind", "requirement", "--title", "Report crashes",
+		"--capability", "Crash reports", "--capability", "usage reports", "-o", "json").stdout)
+	got := map[string]bool{}
+	for _, c := range d.Capabilities {
+		got[c.Title] = true
+	}
+	if len(d.Capabilities) != 2 || !got["Crash reports"] || !got["Usage reports"] {
+		t.Errorf("capabilities = %+v, want Crash reports and Usage reports", d.Capabilities)
+	}
+
+	before := len(decode[[]ops.RequirementSummary](t, e.mustRun("", "req", "list", "-o", "json").stdout))
+	for _, bad := range [][]string{
+		{"req", "create", "--kind", "requirement", "--title", "x", "--capability", "No such capability"},
+		{"req", "create", "--kind", "task", "--title", "x", "--capability", "Crash reports"},
+		{"task", "create", "--title", "x", "--capability", "Crash reports"},
+	} {
+		if r := e.as("root", "", bad...); r.code == cli.ExitOK {
+			t.Errorf("%v succeeded", bad)
+		}
+	}
+	if after := len(decode[[]ops.RequirementSummary](t, e.mustRun("", "req", "list", "-o", "json").stdout)); after != before {
+		t.Errorf("failed creates changed the backlog: %d → %d items", before, after)
+	}
+}
+
 // TestE2EMoveBacklogItem moves items below others and back to the top level
 // (FR-152).
 func TestE2EMoveBacklogItem(t *testing.T) {

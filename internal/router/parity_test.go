@@ -11,6 +11,7 @@ import (
 	"nexmap.net/internal/database/dbtest"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
+	"nexmap.net/internal/store"
 )
 
 // TestAPIParityEndpoints covers the REST endpoints added so that everything
@@ -104,6 +105,50 @@ func TestAPIParityEndpoints(t *testing.T) {
 		}
 		if status, body := move(lower, ""); status != http.StatusOK || !strings.Contains(body, `"parent_id":""`) {
 			t.Errorf("move to the top level: %d %s", status, body)
+		}
+
+		// A new requirement is linked to capabilities as it is created, as in
+		// the New Requirement form (FR-156, AC-86).
+		comp, err := e.svc.Component.CreateComponent(ctx, admin, service.CreateComponentInput{ProductID: pid, Name: "Server"})
+		must(err)
+		capA, err := e.svc.Component.CreateCapability(ctx, admin, service.CreateCapabilityInput{ProductID: pid, ComponentID: comp.ID, Name: "Backlog"})
+		must(err)
+		capB, err := e.svc.Component.CreateCapability(ctx, admin, service.CreateCapabilityInput{ProductID: pid, Name: "Reporting"})
+		must(err)
+		status, body = call(http.MethodPost, "/requirements", `{"title":"Linked on create","capability_ids":["`+capA.ID+`","`+capB.ID+`","`+capA.ID+`"]}`)
+		if status != http.StatusCreated {
+			t.Fatalf("create with capabilities: %d %s", status, body)
+		}
+		created, err := e.svc.Backlog.ListRequirements(ctx, admin, pid, store.RequirementFilter{})
+		must(err)
+		var linked *model.Requirement
+		for _, r := range created {
+			if r.Title == "Linked on create" {
+				linked = r
+			}
+		}
+		if linked == nil {
+			t.Fatal("created requirement not found")
+		}
+		caps, err := e.svc.Component.ListLinkedCapabilities(ctx, admin, pid, linked.ID)
+		must(err)
+		if len(caps) != 2 {
+			t.Errorf("linked capabilities: got %d, want 2", len(caps))
+		}
+		before := len(created)
+		for _, bad := range []struct {
+			what, body string
+			wantStatus int
+		}{
+			{"unknown capability", `{"title":"Nope","capability_ids":["no-such-capability"]}`, http.StatusNotFound},
+			{"task with capabilities", `{"kind":"task","title":"Nope","capability_ids":["` + capA.ID + `"]}`, http.StatusBadRequest},
+		} {
+			if status, body := call(http.MethodPost, "/requirements", bad.body); status != bad.wantStatus {
+				t.Errorf("%s: %d %s, want %d", bad.what, status, body, bad.wantStatus)
+			}
+		}
+		if after, _ := e.svc.Backlog.ListRequirements(ctx, admin, pid, store.RequirementFilter{}); len(after) != before {
+			t.Errorf("a refused create left an item behind: %d -> %d", before, len(after))
 		}
 
 		// A draft campaign's scope can be edited (FR-94).

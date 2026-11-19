@@ -151,6 +151,8 @@ type NewBacklogItem struct {
 	Status           string `json:"status,omitempty" jsonschema:"initial status name; omit for the default"`
 	Description      string `json:"description,omitempty" jsonschema:"Markdown description"`
 	DefinitionOfDone string `json:"definition_of_done,omitempty" jsonschema:"Markdown definition of done"`
+	// Capabilities links a new requirement to capabilities (FR-156).
+	Capabilities []string `json:"capabilities,omitempty" jsonschema:"names or IDs of the capabilities a requirement belongs to; not for tasks, which reach capabilities through their parent"`
 }
 
 // CreateBacklogItem creates a requirement or task (owner role, FR-81 and
@@ -185,6 +187,16 @@ func (s *Session) CreateBacklogItem(ctx context.Context, in NewBacklogItem) (*Re
 			return nil, err
 		}
 		body.ParentID = p.ID
+	}
+	if len(in.Capabilities) > 0 && kind != "requirement" {
+		return nil, errors.New("only requirements are linked to capabilities; a task reaches them through its parent")
+	}
+	for _, ref := range in.Capabilities {
+		c, err := s.findCapability(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		body.CapabilityIDs = append(body.CapabilityIDs, c.ID)
 	}
 	r, err := s.C.CreateRequirement(ctx, s.ProductID, body)
 	if err != nil {

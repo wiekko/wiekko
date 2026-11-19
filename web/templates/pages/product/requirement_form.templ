@@ -41,6 +41,30 @@ type RequirementFormProps struct {
 	Estimation       string
 	Priority         string
 	IsCoarse         bool
+	// CapabilityGroups are the product's capabilities, grouped by component,
+	// for linking a new requirement (FR-156). Empty on edit: the links of an
+	// existing requirement are changed on its Capabilities tab.
+	CapabilityGroups []RequirementCapabilityGroup
+	// CapabilityChips are the capabilities selected (kept on validation error).
+	CapabilityChips []CapabilityChip
+	// CapabilitySuggestedFrom names the parent whose capabilities the chips
+	// were suggested from, while the user has not changed them.
+	CapabilitySuggestedFrom string
+}
+
+// RequirementCapabilityGroup is one heading of the capability dropdown: a
+// component, "No component", or the parent the capabilities are suggested
+// from.
+type RequirementCapabilityGroup struct {
+	Label        string
+	Capabilities []*model.Capability
+}
+
+// CapabilityChip is one selected capability in the Capabilities field.
+type CapabilityChip struct {
+	ID        string
+	Name      string
+	Component string
 }
 
 templ RequirementFormPage(props RequirementFormProps) {
@@ -134,6 +158,9 @@ templ RequirementFormBody(props RequirementFormProps) {
 					Options:  parentSelectOptions(props.Requirements, props.CategoryPrefixes, requirementSelfID(props)),
 					HelpText: "Optional. Make this a child of another requirement.",
 				})
+				if len(props.CapabilityGroups) > 0 {
+					@requirementCapabilityField(props)
+				}
 				@ui.TextArea(ui.TextAreaProps{
 					ID:          "description",
 					Name:        "description",
@@ -323,4 +350,190 @@ func sprintSelectOptions(sprints []*model.Sprint) []templates.SelectOption {
 		opts = append(opts, templates.SelectOption{Value: s.ID, Label: s.Name})
 	}
 	return opts
+}
+
+// requirementCapabilityField sorts a new requirement into the product
+// structure while it is created (FR-156). Requirements link to capabilities
+// only; components and constraints are reached through them (SP-148).
+//
+// The field stays one line high until used: selected capabilities are chips,
+// and "Add capability…" opens a dropdown of the others, grouped by component
+// and filtered on the server as the user types. Picking a parent suggests the
+// parent's capabilities as long as the user has not chosen any of their own.
+// Without JavaScript the field falls back to a list of checkboxes.
+templ requirementCapabilityField(props RequirementFormProps) {
+	<div id="capability-field" data-capability-field class="min-w-0">
+		<label for="capability-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Capabilities</label>
+		<div class="relative mt-1">
+			<div class="flex min-h-[2.5rem] flex-wrap items-center gap-1.5 rounded-md px-2 py-1 shadow-sm ring-1 ring-inset ring-gray-300 focus-within:ring-2 focus-within:ring-indigo-500 dark:bg-gray-900 dark:ring-gray-700">
+				<div
+					id="capability-chips"
+					class="contents"
+					hx-get={ requirementCapabilityURL(props.Product.ID, "capability-chips") }
+					hx-trigger="change from:#parent_id"
+					hx-include="#parent_id, #capability-chips"
+					hx-swap="innerHTML"
+				>
+					@capabilityChipList(props.CapabilityChips, props.CapabilitySuggestedFrom != "")
+				</div>
+				<input
+					type="text"
+					id="capability-search"
+					name="capability_q"
+					autocomplete="off"
+					role="combobox"
+					aria-expanded="false"
+					aria-controls="capability-options"
+					aria-autocomplete="list"
+					aria-describedby="capability-hint"
+					placeholder="Add capability…"
+					class="min-w-[10rem] flex-1 border-0 bg-transparent px-1 py-1 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500"
+					hx-get={ requirementCapabilityURL(props.Product.ID, "capability-options") }
+					hx-trigger="focus, input changed delay:150ms, capability-refresh"
+					hx-target="#capability-options"
+					hx-include="#parent_id, #capability-chips"
+					hx-swap="innerHTML"
+				/>
+			</div>
+			<div
+				id="capability-options"
+				role="listbox"
+				aria-label="Capabilities"
+				hidden
+				class="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black/5 dark:bg-gray-800 dark:ring-gray-700"
+			></div>
+		</div>
+		@capabilityHint(props.CapabilitySuggestedFrom, false)
+		<template id="capability-chip-template">
+			@capabilityChip(CapabilityChip{})
+		</template>
+		<noscript>
+			@capabilityCheckboxes(props.CapabilityGroups, props.CapabilityChips)
+		</noscript>
+		<script src="/static/js/capability-field.js" defer></script>
+	</div>
+}
+
+// RequirementCapabilityChips is the response to a parent change: the chips
+// to show and, out of band, the hint saying where they came from.
+templ RequirementCapabilityChips(chips []CapabilityChip, suggestedFrom string) {
+	@capabilityChipList(chips, suggestedFrom != "")
+	@capabilityHint(suggestedFrom, true)
+}
+
+// capabilityChipList renders the chips. suggested marks them as an untouched
+// suggestion, which a later parent change may replace.
+templ capabilityChipList(chips []CapabilityChip, suggested bool) {
+	if suggested {
+		<input type="hidden" name="capability_suggested" value="1"/>
+	}
+	for _, chip := range chips {
+		@capabilityChip(chip)
+	}
+}
+
+templ capabilityChip(chip CapabilityChip) {
+	<span data-capability-chip class="inline-flex max-w-full items-center gap-0.5 rounded-full bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-400/20">
+		<input type="hidden" name="capability_ids" value={ chip.ID }/>
+		<span data-chip-name class="truncate" title={ chip.Component }>{ chip.Name }</span>
+		<button
+			type="button"
+			data-capability-remove
+			aria-label={ "Remove " + chip.Name }
+			class="rounded-full p-0.5 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-800 dark:hover:text-indigo-100"
+		>
+			@ui.Icon("x", "sm")
+		</button>
+	</span>
+}
+
+// capabilityHint is the field's help text; while the chips are a suggestion
+// it says where they came from.
+templ capabilityHint(suggestedFrom string, oob bool) {
+	<p
+		id="capability-hint"
+		data-default={ capabilityHintDefault }
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="mt-1 text-sm text-gray-500 dark:text-gray-400"
+	>
+		if suggestedFrom != "" {
+			{ "Suggested from " + suggestedFrom + "; remove any that don't apply." }
+		} else {
+			{ capabilityHintDefault }
+		}
+	</p>
+}
+
+const capabilityHintDefault = "Optional. Components and constraints follow from the capabilities."
+
+// RequirementCapabilityOptions is the dropdown: capabilities not yet selected,
+// under their headings. empty is shown when nothing is left to offer.
+templ RequirementCapabilityOptions(groups []RequirementCapabilityGroup, empty string) {
+	if len(groups) == 0 {
+		<p class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">{ empty }</p>
+	}
+	for _, g := range groups {
+		<div role="group" aria-label={ g.Label }>
+			<p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{ g.Label }</p>
+			for _, capab := range g.Capabilities {
+				<div
+					role="option"
+					id={ "capability-option-" + capab.ID }
+					aria-selected="false"
+					data-capability-option
+					data-capability-id={ capab.ID }
+					data-name={ capab.Name }
+					data-component={ g.Label }
+					class="cursor-pointer px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700"
+				>
+					<span class="block text-sm text-gray-900 dark:text-gray-100">{ capab.Name }</span>
+					if capab.Description != "" {
+						<span class="block truncate text-xs text-gray-500 dark:text-gray-400">{ firstLine(capab.Description) }</span>
+					}
+				</div>
+			}
+		</div>
+	}
+}
+
+// capabilityCheckboxes is the field without JavaScript: every capability as
+// a checkbox, folded away until opened.
+templ capabilityCheckboxes(groups []RequirementCapabilityGroup, selected []CapabilityChip) {
+	<details class="mt-2 rounded-md border border-gray-200 dark:border-gray-700">
+		<summary class="cursor-pointer px-3 py-2 text-sm text-gray-700 dark:text-gray-300">Choose capabilities</summary>
+		for _, g := range groups {
+			<p class="bg-gray-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">{ g.Label }</p>
+			for _, capab := range g.Capabilities {
+				<label class="flex items-center gap-3 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+					<input type="checkbox" name="capability_ids" value={ capab.ID } checked?={ chipSelected(selected, capab.ID) } class="h-4 w-4 rounded border-gray-300 text-indigo-600 dark:border-gray-600 dark:bg-gray-800"/>
+					{ capab.Name }
+				</label>
+			}
+		}
+	</details>
+}
+
+func requirementCapabilityURL(productID, endpoint string) string {
+	return "/products/" + productID + "/requirements/new/" + endpoint
+}
+
+func chipSelected(chips []CapabilityChip, id string) bool {
+	for _, c := range chips {
+		if c.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// firstLine shortens a Markdown description to its first non-empty line.
+func firstLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			return line
+		}
+	}
+	return ""
 }

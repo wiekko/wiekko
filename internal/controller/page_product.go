@@ -5839,7 +5839,192 @@ func (c *PageProductController) RequirementCreateForm(w http.ResponseWriter, r *
 		CategoryID:       "",
 		StatusID:         defaultStatusID(statuses),
 		Priority:         "0",
+		CapabilityGroups: c.requirementCapabilityGroups(r, user, productID),
 	}).Render(r.Context(), w)
+}
+
+// requirementCapabilityGroups lists the product's capabilities grouped by
+// component, components in name order and capabilities without one last,
+// for the Capabilities field of the New Requirement form (FR-156).
+func (c *PageProductController) requirementCapabilityGroups(r *http.Request, user *model.User, productID string) []productpage.RequirementCapabilityGroup {
+	caps, _ := c.component.ListCapabilities(r.Context(), user, productID)
+	if len(caps) == 0 {
+		return nil
+	}
+	comps, _ := c.component.ListComponents(r.Context(), user, productID)
+	sort.SliceStable(comps, func(i, j int) bool { return strings.ToLower(comps[i].Name) < strings.ToLower(comps[j].Name) })
+	byComponent := make(map[string][]*model.Capability, len(comps))
+	for _, capab := range caps {
+		byComponent[capab.ComponentID] = append(byComponent[capab.ComponentID], capab)
+	}
+	byName := func(list []*model.Capability) {
+		sort.SliceStable(list, func(i, j int) bool { return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name) })
+	}
+	groups := make([]productpage.RequirementCapabilityGroup, 0, len(comps)+1)
+	for _, comp := range comps {
+		if list := byComponent[comp.ID]; len(list) > 0 {
+			byName(list)
+			groups = append(groups, productpage.RequirementCapabilityGroup{Label: comp.Name, Capabilities: list})
+			delete(byComponent, comp.ID)
+		}
+	}
+	// Capabilities without a component, and any whose component was not
+	// listed, go last.
+	var rest []*model.Capability
+	for _, list := range byComponent {
+		rest = append(rest, list...)
+	}
+	if len(rest) > 0 {
+		byName(rest)
+		groups = append(groups, productpage.RequirementCapabilityGroup{Label: "No component", Capabilities: rest})
+	}
+	return groups
+}
+
+// capabilityChips turns capability IDs into chips, in the given order,
+// dropping IDs that name no capability of the product.
+func capabilityChips(groups []productpage.RequirementCapabilityGroup, ids []string) []productpage.CapabilityChip {
+	known := make(map[string]productpage.CapabilityChip)
+	for _, g := range groups {
+		for _, capab := range g.Capabilities {
+			known[capab.ID] = productpage.CapabilityChip{ID: capab.ID, Name: capab.Name, Component: g.Label}
+		}
+	}
+	chips := make([]productpage.CapabilityChip, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if chip, ok := known[id]; ok && !seen[id] {
+			seen[id] = true
+			chips = append(chips, chip)
+		}
+	}
+	return chips
+}
+
+// parentCapabilities returns the capabilities of a would-be parent and its
+// identifier, for suggesting them on a new child (FR-156). Nothing for no
+// parent or one that is not a requirement of the product.
+func (c *PageProductController) parentCapabilities(r *http.Request, user *model.User, productID, parentID string) ([]*model.Capability, string) {
+	if parentID == "" {
+		return nil, ""
+	}
+	parent, err := c.backlog.GetRequirement(r.Context(), user, productID, parentID)
+	if err != nil || parent.Kind != model.RequirementKindRequirement {
+		return nil, ""
+	}
+	caps, _ := c.component.ListLinkedCapabilities(r.Context(), user, productID, parent.ID)
+	// By name, like the component groups: link order is no order a reader
+	// can see.
+	sort.SliceStable(caps, func(i, j int) bool { return strings.ToLower(caps[i].Name) < strings.ToLower(caps[j].Name) })
+	prefixes := c.buildCategoryPrefixMap(r, user, productID, model.RequirementKindRequirement)
+	return caps, model.EntityIdentifier(categoryPrefixOr(prefixes, parent.CategoryID), parent.SequenceNumber)
+}
+
+func categoryPrefixOr(prefixes map[string]string, categoryID string) string {
+	if p, ok := prefixes[categoryID]; ok {
+		return p
+	}
+	return "??"
+}
+
+// requireRequirementEditor loads the product for a fragment of the New
+// Requirement form; the form is for owners, and so are its fragments.
+func (c *PageProductController) requireRequirementEditor(w http.ResponseWriter, r *http.Request) (*model.User, string, bool) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	_, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.NotFound(w, r)
+		return nil, "", false
+	}
+	if !c.canEditRequirements(user, role) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, "", false
+	}
+	return user, productID, true
+}
+
+// RequirementCapabilityOptions renders GET
+// /products/{id}/requirements/new/capability-options: the capabilities not
+// yet selected that match capability_q, under their component, with the
+// parent's capabilities first (FR-156).
+func (c *PageProductController) RequirementCapabilityOptions(w http.ResponseWriter, r *http.Request) {
+	user, productID, ok := c.requireRequirementEditor(w, r)
+	if !ok {
+		return
+	}
+	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("capability_q")))
+	selected := make(map[string]bool)
+	for _, id := range r.URL.Query()["capability_ids"] {
+		selected[id] = true
+	}
+	offered := func(capab *model.Capability, label string) bool {
+		if selected[capab.ID] {
+			return false
+		}
+		return q == "" || strings.Contains(strings.ToLower(capab.Name), q) || strings.Contains(strings.ToLower(label), q)
+	}
+
+	var groups []productpage.RequirementCapabilityGroup
+	fromParent := make(map[string]bool)
+	if caps, ident := c.parentCapabilities(r, user, productID, r.URL.Query().Get("parent_id")); len(caps) > 0 {
+		var list []*model.Capability
+		for _, capab := range caps {
+			fromParent[capab.ID] = true
+			if offered(capab, "") {
+				list = append(list, capab)
+			}
+		}
+		if len(list) > 0 {
+			groups = append(groups, productpage.RequirementCapabilityGroup{Label: "From " + ident, Capabilities: list})
+		}
+	}
+	for _, g := range c.requirementCapabilityGroups(r, user, productID) {
+		var list []*model.Capability
+		for _, capab := range g.Capabilities {
+			if !fromParent[capab.ID] && offered(capab, g.Label) {
+				list = append(list, capab)
+			}
+		}
+		if len(list) > 0 {
+			groups = append(groups, productpage.RequirementCapabilityGroup{Label: g.Label, Capabilities: list})
+		}
+	}
+	empty := "No capabilities match."
+	if q == "" {
+		empty = "All capabilities are selected."
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilityOptions(groups, empty).Render(r.Context(), w)
+}
+
+// RequirementCapabilityChips renders GET
+// /products/{id}/requirements/new/capability-chips after the parent changed.
+// A selection the user made stays as it is; otherwise the chips become the
+// new parent's capabilities, as a suggestion (FR-156).
+func (c *PageProductController) RequirementCapabilityChips(w http.ResponseWriter, r *http.Request) {
+	user, productID, ok := c.requireRequirementEditor(w, r)
+	if !ok {
+		return
+	}
+	groups := c.requirementCapabilityGroups(r, user, productID)
+	ids := r.URL.Query()["capability_ids"]
+	suggested := r.URL.Query().Get("capability_suggested") != ""
+
+	var chips []productpage.CapabilityChip
+	from := ""
+	if len(ids) > 0 && !suggested {
+		chips = capabilityChips(groups, ids)
+	} else if caps, ident := c.parentCapabilities(r, user, productID, r.URL.Query().Get("parent_id")); len(caps) > 0 {
+		capIDs := make([]string, 0, len(caps))
+		for _, capab := range caps {
+			capIDs = append(capIDs, capab.ID)
+		}
+		chips = capabilityChips(groups, capIDs)
+		from = ident
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = productpage.RequirementCapabilityChips(chips, from).Render(r.Context(), w)
 }
 
 // RequirementCreate handles POST /products/{id}/requirements.
@@ -5866,6 +6051,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 	priorityStr := r.FormValue("priority")
 	priority, _ := strconv.Atoi(priorityStr)
 	isCoarse := r.FormValue("is_coarse") == "on"
+	capabilityIDs := r.Form["capability_ids"]
 
 	_, createErr := c.backlog.CreateRequirement(r.Context(), user, service.CreateRequirementInput{
 		ProductID:        productID,
@@ -5880,6 +6066,7 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 		Estimation:       estimation,
 		Priority:         priority,
 		IsCoarse:         isCoarse,
+		CapabilityIDs:    capabilityIDs,
 	})
 	if createErr != nil {
 		statuses, _ := c.milestone.ListStatuses(r.Context(), user, productID, "requirement")
@@ -5888,6 +6075,13 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 		requirements, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
 		categories, _ := c.category.ListCategories(r.Context(), user, productID, "requirement")
 		prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
+		capGroups := c.requirementCapabilityGroups(r, user, productID)
+		// Chips still untouched since the parent suggested them stay marked,
+		// so changing the parent again still replaces them.
+		suggestedFrom := ""
+		if r.FormValue("capability_suggested") != "" && len(capabilityIDs) > 0 {
+			_, suggestedFrom = c.parentCapabilities(r, user, productID, parentID)
+		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = productpage.RequirementFormPage(productpage.RequirementFormProps{
@@ -5895,27 +6089,30 @@ func (c *PageProductController) RequirementCreate(w http.ResponseWriter, r *http
 				Title:     p.Name + " - New Requirement",
 				CSRFToken: csrfToken,
 			},
-			DisplayName:      user.DisplayName,
-			IsAdmin:          user.IsAdmin,
-			Product:          p,
-			Requirements:     requirements,
-			Categories:       categories,
-			CategoryPrefixes: prefixes,
-			Statuses:         statuses,
-			Milestones:       milestones,
-			Sprints:          sprints,
-			Error:            errorText(createErr),
-			Title:            title,
-			Description:      description,
-			DefinitionOfDone: definitionOfDone,
-			CategoryID:       categoryID,
-			ParentID:         parentID,
-			StatusID:         statusID,
-			MilestoneID:      milestoneID,
-			SprintID:         sprintID,
-			Estimation:       estimation,
-			Priority:         priorityStr,
-			IsCoarse:         isCoarse,
+			DisplayName:             user.DisplayName,
+			IsAdmin:                 user.IsAdmin,
+			Product:                 p,
+			Requirements:            requirements,
+			Categories:              categories,
+			CategoryPrefixes:        prefixes,
+			Statuses:                statuses,
+			Milestones:              milestones,
+			Sprints:                 sprints,
+			Error:                   errorText(createErr),
+			Title:                   title,
+			Description:             description,
+			DefinitionOfDone:        definitionOfDone,
+			CategoryID:              categoryID,
+			ParentID:                parentID,
+			StatusID:                statusID,
+			MilestoneID:             milestoneID,
+			SprintID:                sprintID,
+			Estimation:              estimation,
+			Priority:                priorityStr,
+			IsCoarse:                isCoarse,
+			CapabilityGroups:        capGroups,
+			CapabilityChips:         capabilityChips(capGroups, capabilityIDs),
+			CapabilitySuggestedFrom: suggestedFrom,
 		}).Render(r.Context(), w)
 		return
 	}

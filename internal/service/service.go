@@ -98,6 +98,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		defects:      st.Defect,
 		categories:   st.Category,
 		statuses:     st.Status,
+		capabilities: st.Capability,
 		products:     st.Product,
 		comments:     discussionSvc,
 		retester:     testingSvc,

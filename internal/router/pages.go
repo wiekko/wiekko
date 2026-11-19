@@ -307,6 +307,8 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	// Requirement pages.
 	mux.Handle("GET /products/{id}/requirements", pageAuthed(http.HandlerFunc(productCtrl.Requirements)))
 	mux.Handle("GET /products/{id}/requirements/new", pageAuthed(http.HandlerFunc(productCtrl.RequirementCreateForm)))
+	mux.Handle("GET /products/{id}/requirements/new/capability-options", pageAuthed(http.HandlerFunc(productCtrl.RequirementCapabilityOptions)))
+	mux.Handle("GET /products/{id}/requirements/new/capability-chips", pageAuthed(http.HandlerFunc(productCtrl.RequirementCapabilityChips)))
 	mux.Handle("POST /products/{id}/requirements", pageAuthed(http.HandlerFunc(productCtrl.RequirementCreate)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementDetail)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/edit", pageAuthed(http.HandlerFunc(productCtrl.RequirementEditForm)))

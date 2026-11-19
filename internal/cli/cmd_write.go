@@ -87,6 +87,9 @@ func requirementCreateCommand(group, fixedKind string) *command {
 			fs.StringVar(&in.Category, "category", "", "category prefix or name (default: the product's default)")
 			fs.StringVar(&in.Parent, "parent", "", "identifier of the requirement this item refines, e.g. FR-12")
 			fs.StringVar(&in.Status, "status", "", "initial status name")
+			if fixedKind != "task" {
+				fs.Var((*repeatedFlag)(&in.Capabilities), "capability", "capability the requirement belongs to, by name; repeat for several (requirements only)")
+			}
 			desc.bind(fs, "body", "Markdown description")
 			dod.bind(fs, "dod", "Markdown definition of done")
 		},
@@ -250,4 +253,15 @@ func commentGroup() *command {
 		},
 	}
 	return &command{name: "comment", summary: "comments on any item", subs: []*command{add}}
+}
+
+// repeatedFlag collects every occurrence of a flag, e.g. --capability A
+// --capability B.
+type repeatedFlag []string
+
+func (f *repeatedFlag) String() string { return strings.Join(*f, ", ") }
+
+func (f *repeatedFlag) Set(v string) error {
+	*f = append(*f, v)
+	return nil
 }

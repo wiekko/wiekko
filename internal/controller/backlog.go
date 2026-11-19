@@ -71,6 +71,8 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 		Estimation       string `json:"estimation"`
 		Priority         int    `json:"priority"`
 		IsCoarse         bool   `json:"is_coarse"`
+		// CapabilityIDs links a new requirement to capabilities (FR-156).
+		CapabilityIDs []string `json:"capability_ids"`
 	}
 	if !httputil.DecodeJSON(w, r, &req) {
 		return
@@ -90,6 +92,7 @@ func (c *BacklogController) CreateRequirement(w http.ResponseWriter, r *http.Req
 		Estimation:       req.Estimation,
 		Priority:         req.Priority,
 		IsCoarse:         req.IsCoarse,
+		CapabilityIDs:    req.CapabilityIDs,
 	})
 	if err != nil {
 		writeServiceError(w, err)

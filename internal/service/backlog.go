@@ -27,6 +27,9 @@ type BacklogService struct {
 	defects      store.DefectStore
 	categories   store.CategoryStore
 	statuses     store.StatusStore
+	// capabilities records the capabilities a new requirement is linked to
+	// (FR-156).
+	capabilities store.CapabilityStore
 	// products tells kanban from scrum products, which activate items
 	// differently (FR-91). nil is treated as scrum.
 	products store.ProductStore
@@ -54,6 +57,10 @@ type CreateRequirementInput struct {
 	Estimation       string
 	Priority         int
 	IsCoarse         bool
+	// CapabilityIDs links a new requirement to these capabilities in the
+	// same transaction (FR-156). Tasks are not linked to capabilities: they
+	// reach them through their parent (SP-148).
+	CapabilityIDs []string
 }
 
 // UpdateRequirementInput contains the fields that can be updated on a requirement.
@@ -93,6 +100,15 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 
 	if input.Title == "" {
 		return nil, errors.New(input.Kind + " title is required")
+	}
+	capabilityIDs := uniqueIDs(input.CapabilityIDs)
+	if len(capabilityIDs) > 0 && input.Kind != model.RequirementKindRequirement {
+		return nil, errors.New("only requirements are linked to capabilities; a task reaches them through its parent")
+	}
+	for _, id := range capabilityIDs {
+		if err := s.owns.require(ctx, input.ProductID, ref{kindCapability, id}); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.resolveCategory(ctx, input.ProductID, input.Kind, &input.CategoryID); err != nil {
 		return nil, err
@@ -137,6 +153,13 @@ func (s *BacklogService) CreateRequirement(ctx context.Context, user *model.User
 		r.SequenceNumber = seq
 		if err := s.requirements.Create(ctx, r); err != nil {
 			return fmt.Errorf("create %s: %w", input.Kind, err)
+		}
+		for _, capID := range capabilityIDs {
+			if err := s.capabilities.LinkRequirement(ctx, &model.RequirementCapability{
+				ID: uuid.New().String(), RequirementID: r.ID, CapabilityID: capID, CreatedAt: now,
+			}); err != nil {
+				return fmt.Errorf("link capability: %w", err)
+			}
 		}
 		return s.audit.Create(ctx, &model.AuditEntry{
 			ID: uuid.New().String(), ProductID: r.ProductID, EntityType: r.Kind, EntityID: r.ID,
@@ -1165,4 +1188,19 @@ func (s *BacklogService) ListDefectLinkTargets(ctx context.Context, user *model.
 		linkIDs[link.TargetID] = link.ID
 	}
 	return targetIDs, linkIDs, nil
+}
+
+// uniqueIDs drops empty and repeated IDs, keeping the first occurrence's
+// order.
+func uniqueIDs(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }

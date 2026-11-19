@@ -26,6 +26,8 @@ type RequirementCreate struct {
 	Description      string `json:"description,omitempty"`
 	DefinitionOfDone string `json:"definition_of_done,omitempty"`
 	StatusID         string `json:"status_id,omitempty"`
+	// CapabilityIDs links a new requirement to capabilities (FR-156).
+	CapabilityIDs []string `json:"capability_ids,omitempty"`
 }
 
 // CreateRequirement creates a requirement or task (owner role).
