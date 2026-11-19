@@ -14,7 +14,9 @@ type RequirementFilter struct {
 	Kind       string // empty = all kinds (requirements and tasks)
 	CategoryID string // empty = all categories
 	StatusID   string // empty = all statuses
-	SprintID   string // empty = all sprints
+	SprintID   string // empty = all sprints; FilterNone = no sprint
+	// MilestoneID selects one milestone; FilterNone selects items without one.
+	MilestoneID string
 	// Archived selects archived items (FR-155); the zero value includes
 	// them, so only the views that hide archived items have to say so.
 	Archived ArchivedFilter
@@ -27,6 +29,10 @@ type RequirementStore interface {
 	Update(ctx context.Context, r *model.Requirement) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error)
+	// ListPageByProductID is ListByProductID with sorting, search and paging
+	// (UR-144); CountByProductID counts what the same filter and search match.
+	ListPageByProductID(ctx context.Context, productID string, filter RequirementFilter, params ListParams) ([]*model.Requirement, error)
+	CountByProductID(ctx context.Context, productID string, filter RequirementFilter, search string) (int, error)
 	ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error)
 	// SetParent moves an item under parentID ("" for top level).
 	SetParent(ctx context.Context, id, parentID, updatedAt string) error
@@ -111,28 +117,82 @@ func (s *requirementStore) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *requirementStore) ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error) {
-	query := `SELECT ` + requirementColumns + ` FROM requirements WHERE product_id = ?`
+// RequirementSortColumns maps the sort keys of the requirement and task lists
+// onto SQL expressions (UR-144). Category and status sort by their configured
+// position, not their name, so the order matches the one set up in the
+// product settings and on the board (UC-74).
+var RequirementSortColumns = map[string]string{
+	"identifier": `r.sequence_number`,
+	"title":      `LOWER(r.title)`,
+	"category":   `COALESCE(c.position, 9999)`,
+	"status":     `COALESCE(s.position, 9999)`,
+	"priority":   priorityRank("r.priority"),
+	"created":    `r.created_at`,
+}
+
+// requirementDefaultOrder is itemOrder on the aliased table.
+var requirementDefaultOrder = priorityRank("r.priority") + `, r.created_at, r.sequence_number`
+
+// requirementListFrom joins the tables whose values the list sorts or searches
+// on. Both joins are outer so an item never drops out of the list.
+const requirementListFrom = ` FROM requirements r
+	LEFT JOIN categories c ON r.category_id = c.id
+	LEFT JOIN statuses s ON r.status_id = s.id`
+
+// requirementListWhere builds the WHERE clause shared by the page query and
+// its count, so the two cannot drift apart.
+func requirementListWhere(productID string, filter RequirementFilter, search string) (string, []any) {
+	where := ` WHERE r.product_id = ?`
 	args := []any{productID}
 	if filter.Kind != "" {
-		query += ` AND kind = ?`
+		where += ` AND r.kind = ?`
 		args = append(args, filter.Kind)
 	}
 	if filter.CategoryID != "" {
-		query += ` AND category_id = ?`
+		where += ` AND r.category_id = ?`
 		args = append(args, filter.CategoryID)
 	}
 	if filter.StatusID != "" {
-		query += ` AND status_id = ?`
+		where += ` AND r.status_id = ?`
 		args = append(args, filter.StatusID)
 	}
-	if filter.SprintID != "" {
-		query += ` AND sprint_id = ?`
-		args = append(args, filter.SprintID)
+	where, args = optionalRefWhere(where, args, "r.sprint_id", filter.SprintID)
+	where, args = optionalRefWhere(where, args, "r.milestone_id", filter.MilestoneID)
+	where += filter.Archived.where("r.archived_at")
+	// The search spans the text columns the list shows: the identifier, the
+	// title, the category and the status. Priority and dates are left out, as
+	// a substring match on them does not mean what the user sees (UC-73).
+	if search != "" {
+		pattern := searchPattern(search)
+		like := ` LIKE ? ESCAPE '` + LikeEscape + `'`
+		where += ` AND (LOWER(r.title)` + like +
+			` OR LOWER(COALESCE(c.prefix, '') || '-' || CAST(r.sequence_number AS TEXT))` + like +
+			` OR LOWER(COALESCE(c.name, ''))` + like +
+			` OR LOWER(COALESCE(s.name, ''))` + like + `)`
+		args = append(args, pattern, pattern, pattern, pattern)
 	}
-	query += filter.Archived.where("archived_at")
-	query += ` ORDER BY ` + itemOrder
+	return where, args
+}
+
+func (s *requirementStore) ListByProductID(ctx context.Context, productID string, filter RequirementFilter) ([]*model.Requirement, error) {
+	return s.ListPageByProductID(ctx, productID, filter, ListParams{})
+}
+
+func (s *requirementStore) ListPageByProductID(ctx context.Context, productID string, filter RequirementFilter, params ListParams) ([]*model.Requirement, error) {
+	where, args := requirementListWhere(productID, filter, params.Search)
+	query := `SELECT ` + requirementColumnsQualified + requirementListFrom + where
+	query += orderClause(params, RequirementSortColumns, requirementDefaultOrder, `r.sequence_number, r.id`)
+	limit, limitArgs := limitClause(params)
+	query += limit
+	args = append(args, limitArgs...)
 	return s.listRequirements(ctx, query, args...)
+}
+
+func (s *requirementStore) CountByProductID(ctx context.Context, productID string, filter RequirementFilter, search string) (int, error) {
+	where, args := requirementListWhere(productID, filter, search)
+	var total int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+requirementListFrom+where, args...).Scan(&total)
+	return total, err
 }
 
 func (s *requirementStore) ListByParentID(ctx context.Context, parentID string) ([]*model.Requirement, error) {
@@ -241,6 +301,12 @@ func (s *requirementStore) CountByCategoryID(ctx context.Context, categoryID str
 var requirementColumns = `id, product_id, kind, parent_id, category_id, sequence_number, title, description,
 	definition_of_done, status_id, milestone_id, sprint_id, estimation, priority,
 	is_coarse, ` + activeColumn("requirements") + `, archived_at, created_at, updated_at`
+
+// requirementColumnsQualified is requirementColumns for queries that alias
+// requirements as r and join other tables.
+var requirementColumnsQualified = `r.id, r.product_id, r.kind, r.parent_id, r.category_id, r.sequence_number, r.title, r.description,
+	r.definition_of_done, r.status_id, r.milestone_id, r.sprint_id, r.estimation, r.priority,
+	r.is_coarse, ` + activeColumn("r") + `, r.archived_at, r.created_at, r.updated_at`
 
 func scanRequirement(sc scanner) (*model.Requirement, error) {
 	var r model.Requirement

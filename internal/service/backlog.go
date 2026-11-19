@@ -479,6 +479,34 @@ func (s *BacklogService) ListRequirements(ctx context.Context, user *model.User,
 	return s.requirements.ListByProductID(ctx, productID, filter)
 }
 
+// ListRequirementsPage returns one page of requirements or tasks along with
+// the number the filter and search match overall, which sizes the pagination
+// (UR-144). Requires viewer role.
+func (s *BacklogService) ListRequirementsPage(ctx context.Context, user *model.User, productID string, filter store.RequirementFilter, params store.ListParams) ([]*model.Requirement, int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, 0, err
+	}
+	total, err := s.requirements.CountByProductID(ctx, productID, filter, params.Search)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := s.requirements.ListPageByProductID(ctx, productID, filter, params)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// CountRequirements counts the product's items of the given kind ("" for
+// both), archived or not, ignoring any other filter. The list pages use it to
+// tell "nothing yet" from "nothing matches" (UC-78). Requires viewer role.
+func (s *BacklogService) CountRequirements(ctx context.Context, user *model.User, productID, kind string) (int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return 0, err
+	}
+	return s.requirements.CountByProductID(ctx, productID, store.RequirementFilter{Kind: kind}, "")
+}
+
 // ListChildRequirements returns child requirements. Requires viewer role.
 // ListRequirementsByMilestone returns the requirements assigned to a milestone.
 // Rows belonging to another product are skipped. Requires viewer role.

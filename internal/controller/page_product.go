@@ -4690,37 +4690,6 @@ func (c *PageProductController) buildAuditViews(r *http.Request, user *model.Use
 
 // --- Test Case Pages ---
 
-// TestCases renders GET /products/{id}/test-cases.
-func (c *PageProductController) TestCases(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	testCases, _ := c.testing.ListTestCases(r.Context(), user, productID)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCasesPage(productpage.TestCasesProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Test Cases",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:   user.DisplayName,
-		IsAdmin:       user.IsAdmin,
-		Product:       p,
-		TestCases:     testCases,
-		Components:    c.buildComponentMap(r, user, productID),
-		Capabilities:  c.buildCapabilityMap(r, user, productID),
-		PyramidLevels: c.buildPyramidLevelMap(r, user, productID),
-		CanEdit:       c.canEditTestCases(user, role),
-	}).Render(r.Context(), w)
-}
-
 // TestCaseDetail renders GET /products/{id}/test-cases/{testCaseId}.
 func (c *PageProductController) TestCaseDetail(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
@@ -5706,41 +5675,6 @@ func defaultStatusID(statuses []*model.Status) string {
 }
 
 // --- Requirement Pages ---
-
-// Requirements renders GET /products/{id}/requirements.
-func (c *PageProductController) Requirements(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, requirementsOnly)
-	archived := listArchivedFilter(r)
-	requirements := filterArchived(all, archived)
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, "requirement")
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.RequirementsPage(productpage.RequirementsProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Requirements",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:      user.DisplayName,
-		IsAdmin:          user.IsAdmin,
-		Product:          p,
-		Requirements:     requirements,
-		CategoryPrefixes: prefixes,
-		Statuses:         c.buildStatusMap(r, user, productID, "requirement"),
-		CanEdit:          c.canEditRequirements(user, role),
-		ShowArchived:     archived != store.ArchivedExclude,
-		ProductTotal:     len(all),
-	}).Render(r.Context(), w)
-}
 
 // RequirementDetail renders GET /products/{id}/requirements/{requirementId}.
 func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http.Request) {
@@ -7307,7 +7241,8 @@ func (c *PageProductController) Defects(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if r.Header.Get("HX-Request") == "true" {
+	if tableSwap(r, "defects-table") {
+		props.Fragment = true
 		_ = productpage.DefectsTableContent(props).Render(r.Context(), w)
 		return
 	}
@@ -9046,29 +8981,6 @@ func archivedParam(f, defaultFilter store.ArchivedFilter) string {
 		return "include"
 	}
 	return string(f)
-}
-
-// listArchivedFilter reads the archived state of the requirements and tasks
-// lists from the URL (FR-155); they hide archived items by default.
-func listArchivedFilter(r *http.Request) store.ArchivedFilter {
-	f, _ := store.ParseArchivedFilter(r.URL.Query().Get("archived"), store.ArchivedExclude)
-	return f
-}
-
-// filterArchived keeps the items f selects. The lists filter in memory, as
-// they list every item anyway; it moves into the query once they paginate
-// (UR-144).
-func filterArchived(items []*model.Requirement, f store.ArchivedFilter) []*model.Requirement {
-	if f == store.ArchivedInclude {
-		return items
-	}
-	out := make([]*model.Requirement, 0, len(items))
-	for _, it := range items {
-		if it.Archived() == (f == store.ArchivedOnly) {
-			out = append(out, it)
-		}
-	}
-	return out
 }
 
 // ArchiveItem returns the handler of POST …/{collection}/{item}/archive and

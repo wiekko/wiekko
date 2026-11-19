@@ -22,41 +22,6 @@ import (
 // traceability: there are no capability, test case or defect link tabs here,
 // because a task carries no product statement to trace.
 
-// Tasks renders GET /products/{id}/tasks.
-func (c *PageProductController) Tasks(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
-	productID := r.PathValue("id")
-
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	all, _ := c.backlog.ListRequirements(r.Context(), user, productID, tasksOnly)
-	archived := listArchivedFilter(r)
-	tasks := filterArchived(all, archived)
-	prefixes := c.buildCategoryPrefixMap(r, user, productID, model.RequirementKindTask)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TasksPage(productpage.TasksProps{
-		Meta: templates.PageMeta{
-			Title:     p.Name + " - Tasks",
-			CSRFToken: csrfToken,
-		},
-		DisplayName:      user.DisplayName,
-		IsAdmin:          user.IsAdmin,
-		Product:          p,
-		Tasks:            tasks,
-		CategoryPrefixes: prefixes,
-		Statuses:         c.buildStatusMap(r, user, productID, model.RequirementKindRequirement),
-		CanEdit:          c.canEditRequirements(user, role),
-		ShowArchived:     archived != store.ArchivedExclude,
-		ProductTotal:     len(all),
-	}).Render(r.Context(), w)
-}
-
 // TaskDetail renders GET /products/{id}/tasks/{taskId}.
 func (c *PageProductController) TaskDetail(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())

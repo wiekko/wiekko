@@ -1,8 +1,13 @@
 package ui
 
 // Table renders a responsive table wrapper.
+//
+// The wrapper is positioned so it contains absolutely positioned content
+// such as the sr-only "Actions" header label: without that, the label is
+// placed relative to the page, escapes the scroll box and widens the whole
+// page on narrow screens (UC-60).
 templ Table() {
-	<div class="overflow-x-auto">
+	<div class="relative overflow-x-auto">
 		<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 			{ children... }
 		</table>

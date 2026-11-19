@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 )
 
@@ -304,14 +305,14 @@ func TestDefectsCountLabelNamesBothNumbersWhenFiltered(t *testing.T) {
 	props.Total = 12
 	props.ProductTotal = 68
 
-	if got := defectsCountLabel(props); got != "12 items" {
+	if got := patterns.TableCountLabel(props.State, props.Total, props.ProductTotal); got != "12 items" {
 		t.Errorf("unfiltered label = %q, want %q", got, "12 items")
 	}
 
 	// Under a filter, showing only the matching count reads as if defects had
 	// gone missing.
 	props.State.Search = "gps"
-	if got := defectsCountLabel(props); got != "12 of 68 items" {
+	if got := patterns.TableCountLabel(props.State, props.Total, props.ProductTotal); got != "12 of 68 items" {
 		t.Errorf("filtered label = %q, want %q", got, "12 of 68 items")
 	}
 }

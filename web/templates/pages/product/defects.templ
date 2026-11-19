@@ -14,6 +14,10 @@ import (
 // pagination all swap. Declared once so the controls cannot disagree.
 const defectsTableTarget = "#defects-table"
 
+// defectsCountID is the item count in the page header, which table swaps
+// update out of band.
+const defectsCountID = "defects-count"
+
 // DefectsProps holds data for the defects list page.
 type DefectsProps struct {
 	Meta        templates.PageMeta
@@ -22,6 +26,9 @@ type DefectsProps struct {
 	Product     *model.Product
 	Defects     []*model.Defect
 	Statuses    map[string]*model.Status // status ID → status
+	// Fragment is set when the content is rendered for an htmx swap, which
+	// then also updates the count in the page header.
+	Fragment bool
 	// Environments maps environment ID → name. Empty for products that never
 	// defined one, which also hides the column.
 	Environments map[string]string
@@ -70,20 +77,14 @@ templ DefectsPage(props DefectsProps) {
 					}
 				}
 			} else {
-				<div class="flex items-center justify-between">
-					<div>
-						<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Defects</h1>
-						<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{ defectsCountLabel(props) }</p>
-					</div>
-					<div class="flex items-center gap-3">
-						@defectsViewToggle(props.Product.ID, false)
-						if props.CanCreate {
-							@ui.LinkButton("/products/"+props.Product.ID+"/defects/new", "New Defect", "primary", "md") {
-								@ui.Icon("plus", "sm")
-							}
+				@patterns.TableHeader("Defects", defectsCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal)) {
+					@defectsViewToggle(props.Product.ID, false)
+					if props.CanCreate {
+						@ui.LinkButton("/products/"+props.Product.ID+"/defects/new", "New Defect", "primary", "md") {
+							@ui.Icon("plus", "sm")
 						}
-					</div>
-				</div>
+					}
+				}
 				<div id="defects-table">
 					@DefectsTableContent(props)
 				</div>
@@ -96,39 +97,18 @@ templ DefectsPage(props DefectsProps) {
 // the htmx request for this page returns, so it must carry everything that
 // changes when the user sorts, searches, filters or pages.
 templ DefectsTableContent(props DefectsProps) {
+	if props.Fragment {
+		@patterns.TableCount(defectsCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal))
+	}
 	<div class="space-y-4">
-		@defectsControls(props)
+		@patterns.TableControls(defectsControls(props))
 		@ui.Card() {
 			if len(props.Defects) == 0 && !props.State.Filtered() {
 				@ui.EmptyState("archive", "All defects are archived",
 					"Archived defects are hidden from this list.", "", "")
-				<div class="pb-6 text-center">
-					<a
-						href={ templ.SafeURL(props.State.FilterURL("archived", "include")) }
-						hx-get={ props.State.FilterURL("archived", "include") }
-						hx-target={ defectsTableTarget }
-						hx-swap="innerHTML"
-						hx-push-url="true"
-						class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-					>
-						Show archived defects
-					</a>
-				</div>
+				@patterns.TableEmptyAction(props.State.FilterURL("archived", "include"), defectsTableTarget, "Show archived defects")
 			} else if len(props.Defects) == 0 {
-				@ui.EmptyState("search", "No matching defects",
-					"No defect matches the current search and filters.", "", "")
-				<div class="pb-6 text-center">
-					<a
-						href={ templ.SafeURL(props.State.ClearURL()) }
-						hx-get={ props.State.ClearURL() }
-						hx-target={ defectsTableTarget }
-						hx-swap="innerHTML"
-						hx-push-url="true"
-						class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-					>
-						Clear search and filters
-					</a>
-				</div>
+				@patterns.TableNoMatches(props.State, defectsTableTarget, "defects")
 			} else {
 				@ui.Table() {
 					@ui.TableHead() {
@@ -206,168 +186,27 @@ templ DefectsTableContent(props DefectsProps) {
 	</div>
 }
 
-// defectsControls renders the search box and the collapsible facet drawer.
-//
-// Everything the server needs to rebuild the view lives inside #defects-controls
-// as a named input, and every control includes that whole subtree: typing in the
-// search box must not drop the active facets, and changing a facet must not drop
-// the search or the sort order. Page is deliberately absent — narrowing the
-// result set has to return to page 1, since the page the user was on may no
-// longer exist.
-templ defectsControls(props DefectsProps) {
-	// The panel is a sibling of the row rather than a child of <details>, and
-	// the group-has-* variant below is what ties the two together. Inside the
-	// <details> it inherited that element's box: in flow it grew the flex item,
-	// pushing the vertically-centred search box down and starting the panel at
-	// the toggle's left edge instead of the row's; taken out of flow to fix
-	// that, it then covered the table header. Out here it is a full-width block
-	// that pushes the table down, which is the only arrangement that does none
-	// of the three.
-	<div id="defects-controls" class="group space-y-3">
-		<div class="flex items-center gap-3">
-			<div class="max-w-sm flex-1">
-				@defectsSearchInput(props)
-			</div>
-			// Open reflects the facets only, not the search. Basing it on
-			// "anything is narrowing the list" made the drawer spring open by
-			// itself as soon as the user typed into the search box.
-			<details class="group/filters" open?={ activeDefectFilters(props.State) > 0 }>
-				<summary
-					aria-controls="defect-filter-panel"
-					class="inline-flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset select-none hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800 [&::-webkit-details-marker]:hidden"
-				>
-					@ui.Icon("filter", "sm")
-					Filters
-					if n := activeDefectFilters(props.State); n > 0 {
-						<span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-							{ fmt.Sprintf("%d", n) }
-						</span>
-					}
-					<span class="transition-transform duration-200 group-open/filters:rotate-90">
-						@ui.Icon("chevron-right", "sm")
-					</span>
-				</summary>
-			</details>
-			// Only rendered when something is actually narrowing the list: a
-			// permanent control that does nothing most of the time is noise, and
-			// its appearance doubles as the signal that a filter is on.
-			if props.State.Filtered() {
-				@defectsClearButton(props)
-			}
-		</div>
-		// The ring matches ui.Card's rather than the search box's: the panel
-		// stacks directly on top of the table, so its padded fill needs the same
-		// edge the table has to read as a surface rather than as a stray gap.
-		<div
-			id="defect-filter-panel"
-			class="hidden grid-cols-1 gap-4 rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200 ring-inset group-has-[details[open]]:grid sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-800 dark:ring-gray-700"
-		>
-			@defectsFacet(props, "status_id", "Status", defectStatusOptions(props))
-			@defectsFacet(props, "criticality", "Criticality", defectCriticalityOptions())
-			if len(props.EnvOptions) > 0 {
-				@defectsFacet(props, "environment_id", "Environment", defectEnvironmentOptions(props))
-			}
-			if len(props.SprintOptions) > 0 {
-				@defectsFacet(props, "sprint_id", "Sprint", defectSprintOptions(props))
-			}
-			@defectsFacet(props, "archived", "Archived", ArchivedOptions())
-		</div>
-		// The sort order rides along as hidden fields. htmx sends only the
-		// inputs it is told to include, so without these a filter change would
-		// silently reset the table to its default order.
-		for name, value := range props.State.HiddenInputs() {
-			<input type="hidden" name={ name } value={ value }/>
-		}
-	</div>
-}
-
-// defectsClearButton resets the search and every facet in one step, keeping the
-// sort order — re-sorting is not something the user asked to undo.
-//
-// It sits in the control row rather than inside the drawer because it clears
-// the search too, and a control that reaches outside the panel it lives in
-// would be lying about its scope.
-templ defectsClearButton(props DefectsProps) {
-	<a
-		href={ templ.SafeURL(props.State.ClearURL()) }
-		aria-label="Clear search and filters"
-		hx-get={ props.State.ClearURL() }
-		hx-target={ defectsTableTarget }
-		hx-swap="innerHTML"
-		hx-push-url="true"
-		class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800"
-	>
-		@ui.Icon("x", "sm")
-		Clear all
-	</a>
-}
-
-templ defectsSearchInput(props DefectsProps) {
-	<div class="relative">
-		<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-			@ui.Icon("search", "sm")
-		</div>
-		// The id is load-bearing, not decoration: each keystroke swaps this
-		// input's own container away, and htmx only restores focus and the
-		// caret position to the replaced element if it can find it again by id.
-		<input
-			id="defect-search"
-			type="search"
-			name="q"
-			value={ props.State.Search }
-			placeholder="Search defects…"
-			aria-label="Search defects"
-			class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
-			hx-get={ props.State.BaseURL }
-			hx-target={ defectsTableTarget }
-			hx-swap="innerHTML"
-			hx-trigger="keyup changed delay:300ms, search"
-			hx-include="#defects-controls [name]"
-			hx-push-url="true"
-		/>
-	</div>
-}
-
-templ defectsFacet(props DefectsProps, name, label string, options []templates.SelectOption) {
-	<div
-		hx-get={ props.State.BaseURL }
-		hx-target={ defectsTableTarget }
-		hx-swap="innerHTML"
-		hx-trigger="change"
-		hx-include="#defects-controls [name]"
-		hx-push-url="true"
-	>
-		@ui.Select(ui.SelectProps{
-			ID:      "defect-filter-" + name,
-			Name:    name,
-			Label:   label,
-			Value:   props.State.Filters[name],
-			Options: options,
-		})
-	</div>
-}
-
-// defectsCountLabel states how many defects are shown. Under an active filter
-// it names both numbers, so a narrowed list never reads as if defects had gone
-// missing.
-func defectsCountLabel(props DefectsProps) string {
-	if props.State.Filtered() {
-		return fmt.Sprintf("%d of %d items", props.Total, props.ProductTotal)
+// defectsControls configures the search box and facets of the defects table.
+func defectsControls(props DefectsProps) patterns.TableControlsProps {
+	facets := []patterns.TableFacet{
+		{Name: "status_id", Label: "Status", Options: defectStatusOptions(props)},
+		{Name: "criticality", Label: "Criticality", Options: defectCriticalityOptions()},
 	}
-	return fmt.Sprintf("%d items", props.Total)
-}
-
-// activeDefectFilters counts the facets currently narrowing the list, for the
-// badge on the collapsed drawer — otherwise a filter hidden inside it would be
-// invisible.
-func activeDefectFilters(state ui.ListState) int {
-	n := 0
-	for _, v := range state.Filters {
-		if v != "" {
-			n++
-		}
+	// Offering a facet with nothing but "All" to choose from is noise.
+	if len(props.EnvOptions) > 0 {
+		facets = append(facets, patterns.TableFacet{Name: "environment_id", Label: "Environment", Options: defectEnvironmentOptions(props)})
 	}
-	return n
+	if len(props.SprintOptions) > 0 {
+		facets = append(facets, patterns.TableFacet{Name: "sprint_id", Label: "Sprint", Options: defectSprintOptions(props)})
+	}
+	facets = append(facets, patterns.TableFacet{Name: "archived", Label: "Archived", Options: patterns.ArchivedFacetOptions()})
+	return patterns.TableControlsProps{
+		Key:    "defect",
+		Target: defectsTableTarget,
+		State:  props.State,
+		Noun:   "defects",
+		Facets: facets,
+	}
 }
 
 func defectStatusOptions(props DefectsProps) []templates.SelectOption {
@@ -377,16 +216,6 @@ func defectStatusOptions(props DefectsProps) []templates.SelectOption {
 		options = append(options, templates.SelectOption{Value: s.ID, Label: s.Name})
 	}
 	return options
-}
-
-// ArchivedOptions are the choices of the archived facet (FR-155); hiding
-// archived items is the default.
-func ArchivedOptions() []templates.SelectOption {
-	return []templates.SelectOption{
-		{Value: "", Label: "Hide archived"},
-		{Value: "include", Label: "Show archived"},
-		{Value: "only", Label: "Archived only"},
-	}
 }
 
 func defectCriticalityOptions() []templates.SelectOption {

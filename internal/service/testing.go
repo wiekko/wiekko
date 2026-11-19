@@ -239,6 +239,33 @@ func (s *TestingService) ListTestCases(ctx context.Context, user *model.User, pr
 	return s.testCases.ListByProductID(ctx, productID)
 }
 
+// ListTestCasesPage returns one page of the product's test cases along with
+// the number the filter and search match overall (UR-146). Requires viewer
+// role.
+func (s *TestingService) ListTestCasesPage(ctx context.Context, user *model.User, productID string, filter store.TestCaseFilter, params store.ListParams) ([]*model.TestCase, int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return nil, 0, err
+	}
+	total, err := s.testCases.CountByProductID(ctx, productID, filter, params.Search)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := s.testCases.ListPageByProductID(ctx, productID, filter, params)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// CountTestCases counts all of the product's test cases, ignoring any filter
+// (UC-78). Requires viewer role.
+func (s *TestingService) CountTestCases(ctx context.Context, user *model.User, productID string) (int, error) {
+	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleViewer); err != nil {
+		return 0, err
+	}
+	return s.testCases.CountByProductID(ctx, productID, store.TestCaseFilter{}, "")
+}
+
 // LinkRequirement links a test case to a requirement. Requires developer role.
 func (s *TestingService) LinkRequirement(ctx context.Context, user *model.User, productID, tcID, reqID, linkType string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {

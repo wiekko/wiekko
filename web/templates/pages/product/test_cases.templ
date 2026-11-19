@@ -10,17 +10,40 @@ import (
 	"nexmap.net/web/templates/ui"
 )
 
+// testCasesTableTarget is the element the table controls swap (UR-146).
+const testCasesTableTarget = "#test-cases-table"
+
+// testCasesCountID is the item count in the page header.
+const testCasesCountID = "test-cases-count"
+
 // TestCasesProps holds data for the test cases list page.
 type TestCasesProps struct {
-	Meta            templates.PageMeta
-	DisplayName     string
-	IsAdmin         bool
+	Meta          templates.PageMeta
+	DisplayName   string
+	IsAdmin       bool
 	Product       *model.Product
 	TestCases     []*model.TestCase
 	Components    map[string]string // component ID → name
 	Capabilities  map[string]string // capability ID → name
 	PyramidLevels map[string]string // pyramid level ID → name
 	CanEdit       bool              // developer, owner, or admin
+	// Fragment is set when the content is rendered for an htmx swap, which
+	// then also updates the count in the page header.
+	Fragment bool
+
+	// State is the sort/search/filter/page state of the view, and the source
+	// of every URL the table's controls link to.
+	State ui.ListState
+	// Total counts the test cases matching the current filter; ProductTotal
+	// counts them all (UC-78).
+	Total        int
+	ProductTotal int
+	TotalPages   int
+
+	// Facet options, in display order; empty facets are left out.
+	ComponentOptions    []*model.Component
+	CapabilityOptions   []*model.Capability
+	PyramidLevelOptions []*model.PyramidLevel
 }
 
 templ TestCasesPage(props TestCasesProps) {
@@ -39,124 +62,139 @@ templ TestCasesPage(props TestCasesProps) {
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
 				{Label: "Test Cases"},
 			})
-			if len(props.TestCases) == 0 {
+			if props.ProductTotal == 0 {
 				@patterns.ListPageHeader("Test Cases", "", "", -1)
 				@ui.Card() {
-					if props.CanEdit {
-						@ui.EmptyState("beaker", "No test cases yet", "Create your first test case to start testing.", "New Test Case", "/products/"+props.Product.ID+"/test-cases/new")
-					} else {
-						@ui.EmptyState("beaker", "No test cases yet", "No test cases have been created for this product.", "", "")
-					}
+					@testCasesOnboarding(props)
 				}
 			} else {
-				if props.CanEdit {
-					@patterns.ListPageHeader("Test Cases", "/products/"+props.Product.ID+"/test-cases/new", "New Test Case", len(props.TestCases))
-				} else {
-					@patterns.ListPageHeader("Test Cases", "", "", len(props.TestCases))
+				@patterns.TableHeader("Test Cases", testCasesCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal)) {
+					if props.CanEdit {
+						@ui.LinkButton("/products/"+props.Product.ID+"/test-cases/new", "New Test Case", "primary", "md") {
+							@ui.Icon("plus", "sm")
+						}
+					}
 				}
-				@ui.Card() {
-					@ui.Table() {
-						@ui.TableHead() {
+				<div id="test-cases-table">
+					@TestCasesTableContent(props)
+				</div>
+			}
+		</div>
+	}
+}
+
+// TestCasesTableContent renders the controls, table and pagination; it is
+// what the htmx request for the page returns.
+templ TestCasesTableContent(props TestCasesProps) {
+	if props.Fragment {
+		@patterns.TableCount(testCasesCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal))
+	}
+	<div class="space-y-4">
+		@patterns.TableControls(testCasesControls(props))
+		@ui.Card() {
+			if len(props.TestCases) == 0 && !props.State.Filtered() {
+				@testCasesOnboarding(props)
+			} else if len(props.TestCases) == 0 {
+				@patterns.TableNoMatches(props.State, testCasesTableTarget, "test cases")
+			} else {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.SortHeader("Title", "title", props.State, testCasesTableTarget)
+						@ui.SortHeader("Component", "component", props.State, testCasesTableTarget)
+						@ui.SortHeader("Capability", "capability", props.State, testCasesTableTarget)
+						@ui.SortHeader("Pyramid Level", "pyramid_level", props.State, testCasesTableTarget)
+						@ui.SortHeader("Mode", "mode", props.State, testCasesTableTarget)
+						@ui.SortHeader("Created", "created", props.State, testCasesTableTarget)
+						if props.CanEdit {
 							@ui.TableHeader() {
-								Title
-							}
-							@ui.TableHeader() {
-								Component
-							}
-							@ui.TableHeader() {
-								Capability
-							}
-							@ui.TableHeader() {
-								Pyramid Level
-							}
-							@ui.TableHeader() {
-								Mode
-							}
-							@ui.TableHeader() {
-								Created
-							}
-							if props.CanEdit {
-								@ui.TableHeader() {
-									<span class="sr-only">Actions</span>
-								}
+								<span class="sr-only">Actions</span>
 							}
 						}
-						@ui.TableBody("") {
-							for _, tc := range props.TestCases {
-								@ui.TableRow("") {
+					}
+					@ui.TableBody("") {
+						for _, tc := range props.TestCases {
+							@ui.TableRow("") {
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ tc.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									if tc.ComponentID != "" {
+										if name, ok := props.Components[tc.ComponentID]; ok {
+											<a
+												href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", props.Product.ID, tc.ComponentID)) }
+												class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+											>
+												{ name }
+											</a>
+										} else {
+											{ tc.ComponentID }
+										}
+									} else {
+										@testCaseCellEmpty()
+									}
+								}
+								@ui.TableCellMuted() {
+									if tc.CapabilityID != "" {
+										if name, ok := props.Capabilities[tc.CapabilityID]; ok {
+											<a
+												href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", props.Product.ID, tc.CapabilityID)) }
+												class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+											>
+												{ name }
+											</a>
+										} else {
+											{ tc.CapabilityID }
+										}
+									} else {
+										@testCaseCellEmpty()
+									}
+								}
+								@ui.TableCellMuted() {
+									if tc.PyramidLevelID != "" {
+										if name, ok := props.PyramidLevels[tc.PyramidLevelID]; ok {
+											@patterns.PyramidLevelBadge(name)
+										} else {
+											@patterns.PyramidLevelBadge(tc.PyramidLevelID)
+										}
+									} else {
+										@testCaseCellEmpty()
+									}
+								}
+								@ui.TableCellMuted() {
+									@patterns.ExecutionModeBadge(tc.ExecutionMode)
+								}
+								@ui.TableCellMuted() {
+									{ formatDate(tc.CreatedAt) }
+								}
+								if props.CanEdit {
 									@ui.TableCell() {
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID)) }
-											class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-										>
-											{ tc.Title }
-										</a>
-									}
-									@ui.TableCellMuted() {
-										if tc.ComponentID != "" {
-											if name, ok := props.Components[tc.ComponentID]; ok {
-												<a
-													href={ templ.SafeURL(fmt.Sprintf("/products/%s/components/%s", props.Product.ID, tc.ComponentID)) }
-													class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-												>
-													{ name }
-												</a>
-											} else {
-												{ tc.ComponentID }
-											}
-										} else {
-											@testCaseCellEmpty()
-										}
-									}
-									@ui.TableCellMuted() {
-										if tc.CapabilityID != "" {
-											if name, ok := props.Capabilities[tc.CapabilityID]; ok {
-												<a
-													href={ templ.SafeURL(fmt.Sprintf("/products/%s/capabilities/%s", props.Product.ID, tc.CapabilityID)) }
-													class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-												>
-													{ name }
-												</a>
-											} else {
-												{ tc.CapabilityID }
-											}
-										} else {
-											@testCaseCellEmpty()
-										}
-									}
-									@ui.TableCellMuted() {
-										if tc.PyramidLevelID != "" {
-											if name, ok := props.PyramidLevels[tc.PyramidLevelID]; ok {
-												@patterns.PyramidLevelBadge(name)
-											} else {
-												@patterns.PyramidLevelBadge(tc.PyramidLevelID)
-											}
-										} else {
-											@testCaseCellEmpty()
-										}
-									}
-									@ui.TableCellMuted() {
-										@patterns.ExecutionModeBadge(tc.ExecutionMode)
-									}
-									@ui.TableCellMuted() {
-										{ formatDate(tc.CreatedAt) }
-									}
-									if props.CanEdit {
-										@ui.TableCell() {
-											@patterns.RowActions(
-												fmt.Sprintf("/products/%s/test-cases/%s/edit?return=list", props.Product.ID, tc.ID),
-												fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID),
-												props.Meta.CSRFToken,
-											)
-										}
+										@patterns.RowActions(
+											fmt.Sprintf("/products/%s/test-cases/%s/edit?return=list", props.Product.ID, tc.ID),
+											fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID),
+											props.Meta.CSRFToken,
+										)
 									}
 								}
 							}
 						}
 					}
 				}
+				@ui.Pagination(props.State, props.TotalPages, testCasesTableTarget)
 			}
-		</div>
+		}
+	</div>
+}
+
+templ testCasesOnboarding(props TestCasesProps) {
+	if props.CanEdit {
+		@ui.EmptyState("beaker", "No test cases yet", "Create your first test case to start testing.", "New Test Case", "/products/"+props.Product.ID+"/test-cases/new")
+	} else {
+		@ui.EmptyState("beaker", "No test cases yet", "No test cases have been created for this product.", "", "")
 	}
 }
 
@@ -165,3 +203,45 @@ templ testCaseCellEmpty() {
 	<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
 }
 
+// testCasesControls configures the search box and the component, capability,
+// pyramid level and mode facets (UR-146, UC-83). The reference facets offer
+// "none" too, since all three references are optional.
+func testCasesControls(props TestCasesProps) patterns.TableControlsProps {
+	var facets []patterns.TableFacet
+	if len(props.ComponentOptions) > 0 {
+		values := make([]templates.SelectOption, 0, len(props.ComponentOptions))
+		for _, c := range props.ComponentOptions {
+			values = append(values, templates.SelectOption{Value: c.ID, Label: c.Name})
+		}
+		facets = append(facets, patterns.TableFacet{Name: "component_id", Label: "Component",
+			Options: patterns.FacetOptions("All components", "No component", values...)})
+	}
+	if len(props.CapabilityOptions) > 0 {
+		values := make([]templates.SelectOption, 0, len(props.CapabilityOptions))
+		for _, c := range props.CapabilityOptions {
+			values = append(values, templates.SelectOption{Value: c.ID, Label: c.Name})
+		}
+		facets = append(facets, patterns.TableFacet{Name: "capability_id", Label: "Capability",
+			Options: patterns.FacetOptions("All capabilities", "No capability", values...)})
+	}
+	if len(props.PyramidLevelOptions) > 0 {
+		values := make([]templates.SelectOption, 0, len(props.PyramidLevelOptions))
+		for _, l := range props.PyramidLevelOptions {
+			values = append(values, templates.SelectOption{Value: l.ID, Label: l.Name})
+		}
+		facets = append(facets, patterns.TableFacet{Name: "pyramid_level_id", Label: "Pyramid level",
+			Options: patterns.FacetOptions("All levels", "No level", values...)})
+	}
+	facets = append(facets, patterns.TableFacet{Name: "mode", Label: "Mode",
+		Options: patterns.FacetOptions("All modes", "",
+			templates.SelectOption{Value: model.ExecutionModeAutomatic, Label: "Automatic"},
+			templates.SelectOption{Value: model.ExecutionModeManual, Label: "Manual"},
+		)})
+	return patterns.TableControlsProps{
+		Key:    "test-case",
+		Target: testCasesTableTarget,
+		State:  props.State,
+		Noun:   "test cases",
+		Facets: facets,
+	}
+}

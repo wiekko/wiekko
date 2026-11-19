@@ -9,6 +9,62 @@ import (
 	"nexmap.net/internal/model"
 )
 
+// TestCaseFilter selects the test cases of the test case list (UR-146). Empty
+// fields match everything; FilterNone in a reference field selects test cases
+// without one.
+type TestCaseFilter struct {
+	ComponentID    string
+	CapabilityID   string
+	PyramidLevelID string
+	ExecutionMode  string
+}
+
+// TestCaseSortColumns maps the sort keys of the test case list onto SQL
+// expressions. Pyramid levels sort by their configured position, so unit tests
+// come before end-to-end tests rather than alphabetically (UC-74).
+var TestCaseSortColumns = map[string]string{
+	"title":         `LOWER(t.title)`,
+	"component":     `LOWER(COALESCE(co.name, ''))`,
+	"capability":    `LOWER(COALESCE(ca.name, ''))`,
+	"pyramid_level": `COALESCE(pl.position, 9999)`,
+	"mode":          `t.execution_mode`,
+	"created":       `t.created_at`,
+}
+
+// testCaseListFrom joins the tables whose names the list shows, sorts and
+// searches on; all joins are outer, as every reference is optional.
+const testCaseListFrom = ` FROM test_cases t
+	LEFT JOIN components co ON t.component_id = co.id
+	LEFT JOIN capabilities ca ON t.capability_id = ca.id
+	LEFT JOIN pyramid_levels pl ON t.pyramid_level_id = pl.id`
+
+// testCaseListWhere builds the WHERE clause shared by the page query and its
+// count.
+func testCaseListWhere(productID string, filter TestCaseFilter, search string) (string, []any) {
+	where := ` WHERE t.product_id = ?`
+	args := []any{productID}
+	where, args = optionalRefWhere(where, args, "t.component_id", filter.ComponentID)
+	where, args = optionalRefWhere(where, args, "t.capability_id", filter.CapabilityID)
+	where, args = optionalRefWhere(where, args, "t.pyramid_level_id", filter.PyramidLevelID)
+	if filter.ExecutionMode != "" {
+		where += ` AND t.execution_mode = ?`
+		args = append(args, filter.ExecutionMode)
+	}
+	// The search spans the text columns: title, test identifier (how automatic
+	// tests are referred to), component, capability and pyramid level (UC-73).
+	if search != "" {
+		pattern := searchPattern(search)
+		like := ` LIKE ? ESCAPE '` + LikeEscape + `'`
+		where += ` AND (LOWER(t.title)` + like +
+			` OR LOWER(COALESCE(t.test_identifier, ''))` + like +
+			` OR LOWER(COALESCE(co.name, ''))` + like +
+			` OR LOWER(COALESCE(ca.name, ''))` + like +
+			` OR LOWER(COALESCE(pl.name, ''))` + like + `)`
+		args = append(args, pattern, pattern, pattern, pattern, pattern)
+	}
+	return where, args
+}
+
 // TestCaseStore defines data access operations for test cases.
 type TestCaseStore interface {
 	Create(ctx context.Context, tc *model.TestCase) error
@@ -16,6 +72,11 @@ type TestCaseStore interface {
 	Update(ctx context.Context, tc *model.TestCase) error
 	Delete(ctx context.Context, id string) error
 	ListByProductID(ctx context.Context, productID string) ([]*model.TestCase, error)
+	// ListPageByProductID lists one page of the product's test cases, sorted,
+	// searched and filtered (UR-146); CountByProductID counts what the same
+	// filter and search match.
+	ListPageByProductID(ctx context.Context, productID string, filter TestCaseFilter, params ListParams) ([]*model.TestCase, error)
+	CountByProductID(ctx context.Context, productID string, filter TestCaseFilter, search string) (int, error)
 	ListByCapabilityID(ctx context.Context, capabilityID string) ([]*model.TestCase, error)
 	ListByComponentID(ctx context.Context, componentID string) ([]*model.TestCase, error)
 	LinkRequirement(ctx context.Context, link *model.TestCaseRequirement) error
@@ -89,6 +150,38 @@ func (s *testCaseStore) ListByProductID(ctx context.Context, productID string) (
 		cases = append(cases, tc)
 	}
 	return cases, rows.Err()
+}
+
+func (s *testCaseStore) ListPageByProductID(ctx context.Context, productID string, filter TestCaseFilter, params ListParams) ([]*model.TestCase, error) {
+	where, args := testCaseListWhere(productID, filter, params.Search)
+	query := `SELECT ` + testCaseColumnsQualified + testCaseListFrom + where
+	query += orderClause(params, TestCaseSortColumns, `LOWER(t.title)`, `LOWER(t.title), t.id`)
+	limit, limitArgs := limitClause(params)
+	query += limit
+	args = append(args, limitArgs...)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var cases []*model.TestCase
+	for rows.Next() {
+		tc, err := scanTestCase(rows)
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, tc)
+	}
+	return cases, rows.Err()
+}
+
+func (s *testCaseStore) CountByProductID(ctx context.Context, productID string, filter TestCaseFilter, search string) (int, error) {
+	where, args := testCaseListWhere(productID, filter, search)
+	var total int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+testCaseListFrom+where, args...).Scan(&total)
+	return total, err
 }
 
 func (s *testCaseStore) ListByCapabilityID(ctx context.Context, capabilityID string) ([]*model.TestCase, error) {
@@ -226,6 +319,10 @@ func (s *testCaseStore) ListEnvironments(ctx context.Context, testCaseID string)
 
 const testCaseColumns = `id, product_id, component_id, capability_id, title, description,
 	execution_mode, test_identifier, pyramid_level_id, created_at, updated_at`
+
+// testCaseColumnsQualified is testCaseColumns on the aliased table t.
+const testCaseColumnsQualified = `t.id, t.product_id, t.component_id, t.capability_id, t.title, t.description,
+	t.execution_mode, t.test_identifier, t.pyramid_level_id, t.created_at, t.updated_at`
 
 func scanTestCase(sc scanner) (*model.TestCase, error) {
 	var tc model.TestCase

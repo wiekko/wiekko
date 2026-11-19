@@ -1,0 +1,281 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates"
+	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// BacklogItemsProps holds data for the requirements and the tasks list pages
+// (UR-144, UR-145). Both list the requirements table, one kind each, so they
+// share one template; Kind picks the wording and the URLs.
+type BacklogItemsProps struct {
+	Meta             templates.PageMeta
+	DisplayName      string
+	IsAdmin          bool
+	Product          *model.Product
+	Kind             string // model.RequirementKindRequirement or model.RequirementKindTask
+	Items            []*model.Requirement
+	CategoryPrefixes map[string]string        // category ID → prefix
+	Statuses         map[string]*model.Status // status ID → status
+	CanEdit          bool                     // owner or admin
+	// Fragment is set when the content is rendered for an htmx swap, which
+	// then also updates the count in the page header.
+	Fragment bool
+
+	// State is the sort/search/filter/page state of the view, and the source
+	// of every URL the table's controls link to.
+	State ui.ListState
+	// Total counts the items matching the current filter; ProductTotal counts
+	// all items of the kind, archived ones included. An empty page tells
+	// "nothing yet" from "nothing matches" by them (UC-78).
+	Total        int
+	ProductTotal int
+	TotalPages   int
+
+	// Facet options, in display order. Milestone and sprint facets are left
+	// out when the product has none.
+	StatusOptions    []*model.Status
+	CategoryOptions  []*model.Category
+	MilestoneOptions []*model.Milestone
+	SprintOptions    []*model.Sprint
+}
+
+templ BacklogItemsPage(props BacklogItemsProps) {
+	@layout.AppLayout(layout.AppLayoutProps{
+		Meta:          props.Meta,
+		DisplayName:   props.DisplayName,
+		IsAdmin:       props.IsAdmin,
+		ActiveSection: backlogItemsPath(props.Kind),
+		ProductID:     props.Product.ID,
+		ProductName:   props.Product.Name,
+		WorkflowMode:  props.Product.WorkflowMode,
+	}) {
+		<div class="space-y-6">
+			@ui.Breadcrumb([]templates.BreadcrumbItem{
+				{Label: "Dashboard", Href: "/"},
+				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
+				{Label: backlogItemsTitle(props.Kind)},
+			})
+			if props.ProductTotal == 0 {
+				@patterns.ListPageHeader(backlogItemsTitle(props.Kind), "", "", -1)
+				@ui.Card() {
+					@backlogItemsOnboarding(props)
+				}
+			} else {
+				@patterns.TableHeader(backlogItemsTitle(props.Kind), backlogItemsCountID(props.Kind), patterns.TableCountLabel(props.State, props.Total, props.ProductTotal)) {
+					if props.CanEdit {
+						@ui.LinkButton(backlogItemsURL(props)+"/new", "New "+backlogItemsSingular(props.Kind), "primary", "md") {
+							@ui.Icon("plus", "sm")
+						}
+					}
+				}
+				<div id={ backlogItemsTableID(props.Kind) }>
+					@BacklogItemsTableContent(props)
+				</div>
+			}
+		</div>
+	}
+}
+
+// BacklogItemsTableContent renders the controls, table and pagination. It is
+// what the htmx request for the page returns, so it must carry everything
+// that changes when the user sorts, searches, filters or pages.
+templ BacklogItemsTableContent(props BacklogItemsProps) {
+	{{ target := "#" + backlogItemsTableID(props.Kind) }}
+	if props.Fragment {
+		@patterns.TableCount(backlogItemsCountID(props.Kind), patterns.TableCountLabel(props.State, props.Total, props.ProductTotal))
+	}
+	<div class="space-y-4">
+		@patterns.TableControls(backlogItemsControls(props))
+		@ui.Card() {
+			if len(props.Items) == 0 && !props.State.Filtered() && props.ProductTotal > 0 {
+				// Nothing is filtered but the archived items, hidden by default
+				// (FR-155).
+				@ui.EmptyState("archive", "All "+backlogItemsNoun(props.Kind)+" are archived",
+					"Archived "+backlogItemsNoun(props.Kind)+" are hidden from this list.", "", "")
+				@patterns.TableEmptyAction(props.State.FilterURL("archived", "include"), target, "Show archived "+backlogItemsNoun(props.Kind))
+			} else if len(props.Items) == 0 && !props.State.Filtered() {
+				@backlogItemsOnboarding(props)
+			} else if len(props.Items) == 0 {
+				@patterns.TableNoMatches(props.State, target, backlogItemsNoun(props.Kind))
+			} else {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.SortHeader("ID", "identifier", props.State, target)
+						@ui.SortHeader("Title", "title", props.State, target)
+						@ui.SortHeader("Category", "category", props.State, target)
+						@ui.SortHeader("Status", "status", props.State, target)
+						@ui.SortHeader("Priority", "priority", props.State, target)
+						@ui.SortHeader("Created", "created", props.State, target)
+						if props.CanEdit {
+							@ui.TableHeader() {
+								<span class="sr-only">Actions</span>
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, item := range props.Items {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, item.CategoryID), item.SequenceNumber) }
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("%s/%s", backlogItemsURL(props), item.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ item.Title }
+									</a>
+									if item.Archived() {
+										<span class="ml-2 align-middle">
+											@patterns.ArchivedBadge(true)
+										</span>
+									}
+								}
+								@ui.TableCellMuted() {
+									@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, item.CategoryID), props.Kind)
+								}
+								@ui.TableCellMuted() {
+									@patterns.WorkflowStatusBadge(props.Statuses, item.StatusID)
+								}
+								@ui.TableCellMuted() {
+									@patterns.PriorityBadge(item.Priority)
+								}
+								@ui.TableCellMuted() {
+									{ formatDate(item.CreatedAt) }
+								}
+								if props.CanEdit {
+									@ui.TableCell() {
+										@patterns.RowActions(
+											fmt.Sprintf("%s/%s/edit?return=list", backlogItemsURL(props), item.ID),
+											fmt.Sprintf("%s/%s", backlogItemsURL(props), item.ID),
+											props.Meta.CSRFToken,
+										)
+									}
+								}
+							}
+						}
+					}
+				}
+				@ui.Pagination(props.State, props.TotalPages, target)
+			}
+		}
+	</div>
+}
+
+// backlogItemsOnboarding is the empty state of a product without items of the
+// kind; it invites creating the first one (UC-78).
+templ backlogItemsOnboarding(props BacklogItemsProps) {
+	if props.Kind == model.RequirementKindTask {
+		if props.CanEdit {
+			@ui.EmptyState("list-checks", "No tasks yet", "Tasks cover work that is neither a requirement nor a defect — maintenance, tooling and spikes.", "New Task", backlogItemsURL(props)+"/new")
+		} else {
+			@ui.EmptyState("list-checks", "No tasks yet", "No tasks have been created for this product.", "", "")
+		}
+	} else {
+		if props.CanEdit {
+			@ui.EmptyState("clipboard-list", "No requirements yet", "Create your first requirement to start building the backlog.", "New Requirement", backlogItemsURL(props)+"/new")
+		} else {
+			@ui.EmptyState("clipboard-list", "No requirements yet", "No requirements have been created for this product.", "", "")
+		}
+	}
+}
+
+// backlogItemsControls configures the search box and facets of the table.
+func backlogItemsControls(props BacklogItemsProps) patterns.TableControlsProps {
+	statuses := make([]templates.SelectOption, 0, len(props.StatusOptions))
+	for _, s := range props.StatusOptions {
+		statuses = append(statuses, templates.SelectOption{Value: s.ID, Label: s.Name})
+	}
+	categories := make([]templates.SelectOption, 0, len(props.CategoryOptions))
+	for _, c := range props.CategoryOptions {
+		categories = append(categories, templates.SelectOption{Value: c.ID, Label: c.Prefix + " — " + c.Name})
+	}
+	facets := []patterns.TableFacet{
+		{Name: "status_id", Label: "Status", Options: patterns.FacetOptions("All statuses", "", statuses...)},
+		{Name: "category_id", Label: "Category", Options: patterns.FacetOptions("All categories", "", categories...)},
+	}
+	// A facet with nothing but "All" to choose from is noise.
+	if len(props.MilestoneOptions) > 0 {
+		milestones := make([]templates.SelectOption, 0, len(props.MilestoneOptions))
+		for _, m := range props.MilestoneOptions {
+			milestones = append(milestones, templates.SelectOption{Value: m.ID, Label: m.Name})
+		}
+		facets = append(facets, patterns.TableFacet{Name: "milestone_id", Label: "Milestone",
+			Options: patterns.FacetOptions("All milestones", "No milestone", milestones...)})
+	}
+	if len(props.SprintOptions) > 0 {
+		sprints := make([]templates.SelectOption, 0, len(props.SprintOptions))
+		for _, s := range props.SprintOptions {
+			sprints = append(sprints, templates.SelectOption{Value: s.ID, Label: s.Name})
+		}
+		facets = append(facets, patterns.TableFacet{Name: "sprint_id", Label: "Sprint",
+			Options: patterns.FacetOptions("All sprints", "No sprint", sprints...)})
+	}
+	facets = append(facets, patterns.TableFacet{Name: "archived", Label: "Archived", Options: patterns.ArchivedFacetOptions()})
+	return patterns.TableControlsProps{
+		Key:    backlogItemsSingularKey(props.Kind),
+		Target: "#" + backlogItemsTableID(props.Kind),
+		State:  props.State,
+		Noun:   backlogItemsNoun(props.Kind),
+		Facets: facets,
+	}
+}
+
+func backlogItemsPath(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "tasks"
+	}
+	return "requirements"
+}
+
+func backlogItemsURL(props BacklogItemsProps) string {
+	return "/products/" + props.Product.ID + "/" + backlogItemsPath(props.Kind)
+}
+
+func backlogItemsTitle(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "Tasks"
+	}
+	return "Requirements"
+}
+
+func backlogItemsSingular(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "Task"
+	}
+	return "Requirement"
+}
+
+// backlogItemsNoun names the items in sentences, e.g. "No matching tasks".
+func backlogItemsNoun(kind string) string { return backlogItemsPath(kind) }
+
+// backlogItemsSingularKey prefixes the control element ids: requirement-search,
+// task-filter-panel, ...
+func backlogItemsSingularKey(kind string) string {
+	if kind == model.RequirementKindTask {
+		return "task"
+	}
+	return "requirement"
+}
+
+// BacklogItemsTableID is the id of the element the table controls swap.
+func BacklogItemsTableID(kind string) string { return backlogItemsTableID(kind) }
+
+func backlogItemsTableID(kind string) string { return backlogItemsPath(kind) + "-table" }
+
+func backlogItemsCountID(kind string) string { return backlogItemsPath(kind) + "-count" }
+
+func requirementPrefix(prefixes map[string]string, categoryID string) string {
+	if prefixes != nil {
+		if p, ok := prefixes[categoryID]; ok {
+			return p
+		}
+	}
+	return "??"
+}

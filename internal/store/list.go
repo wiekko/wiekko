@@ -115,3 +115,20 @@ func (f ArchivedFilter) where(column string) string {
 	}
 	return ""
 }
+
+// FilterNone is the facet value that selects rows where an optional reference
+// (a component, a sprint, a pyramid level, ...) is not set.
+const FilterNone = "none"
+
+// optionalRefWhere adds the condition of a facet on an optional reference
+// column: "" adds nothing, FilterNone selects rows without one, and any other
+// value selects rows referencing it.
+func optionalRefWhere(where string, args []any, column, value string) (string, []any) {
+	switch value {
+	case "":
+		return where, args
+	case FilterNone:
+		return where + ` AND ` + column + ` IS NULL`, args
+	}
+	return where + ` AND ` + column + ` = ?`, append(args, value)
+}

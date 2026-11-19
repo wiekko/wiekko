@@ -1,0 +1,295 @@
+package patterns
+
+import (
+	"fmt"
+
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// TableFacet is one facet filter of a table view (UC-73).
+type TableFacet struct {
+	// Name is the query parameter and the name of the <select>, which is what
+	// lets hx-include ship the whole facet set back as the next query string.
+	Name  string
+	Label string
+	// Options lists the choices; the first one, with an empty value, clears
+	// the facet ("All statuses").
+	Options []templates.SelectOption
+}
+
+// TableControlsProps configures the search box and facet drawer of a table
+// view: the defects, requirements, tasks and test cases tables (UR-145).
+type TableControlsProps struct {
+	// Key prefixes the element ids: Key-controls, Key-search,
+	// Key-filter-panel and Key-filter-<facet>.
+	Key string
+	// Target is the element every control swaps, the container of the
+	// table content.
+	Target string
+	State  ui.ListState
+	// Noun names the rows in the search box placeholder and label, e.g.
+	// "defects".
+	Noun   string
+	Facets []TableFacet
+}
+
+// TableControls renders the search box, the collapsible facet drawer and the
+// single reset control of a table view (UC-73, UC-75).
+//
+// Everything the server needs to rebuild the view lives inside Key-controls
+// as a named input, and every control includes that whole subtree: typing in
+// the search box must not drop the active facets, and changing a facet must
+// not drop the search or the sort order. Page is deliberately absent —
+// narrowing the result set has to return to page 1, since the page the user
+// was on may no longer exist.
+templ TableControls(props TableControlsProps) {
+	// The panel is a sibling of the row rather than a child of <details>, and
+	// the group-has-* variant below is what ties the two together. Inside the
+	// <details> it inherited that element's box: in flow it grew the flex item,
+	// pushing the vertically-centred search box down and starting the panel at
+	// the toggle's left edge instead of the row's; taken out of flow to fix
+	// that, it then covered the table header. Out here it is a full-width block
+	// that pushes the table down, which is the only arrangement that does none
+	// of the three.
+	<div id={ props.Key + "-controls" } class="group space-y-3">
+		<div class="flex flex-wrap items-center gap-3">
+			// On phones the search box takes a row of its own and the drawer
+			// toggle and reset wrap below it; next to them it would be squeezed
+			// to a sliver (UC-60).
+			<div class="w-full sm:w-auto sm:max-w-sm sm:flex-1">
+				@tableSearchInput(props)
+			</div>
+			if len(props.Facets) > 0 {
+				// Open reflects the facets only, not the search. Basing it on
+				// "anything is narrowing the list" made the drawer spring open by
+				// itself as soon as the user typed into the search box.
+				<details class="group/filters" open?={ ActiveFacets(props.State) > 0 }>
+					<summary
+						aria-controls={ props.Key + "-filter-panel" }
+						class="inline-flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset select-none hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800 [&::-webkit-details-marker]:hidden"
+					>
+						@ui.Icon("filter", "sm")
+						Filters
+						if n := ActiveFacets(props.State); n > 0 {
+							<span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+								{ fmt.Sprintf("%d", n) }
+							</span>
+						}
+						<span class="transition-transform duration-200 group-open/filters:rotate-90">
+							@ui.Icon("chevron-right", "sm")
+						</span>
+					</summary>
+				</details>
+			}
+			// Only rendered when something is actually narrowing the list: a
+			// permanent control that does nothing most of the time is noise, and
+			// its appearance doubles as the signal that a filter is on.
+			if props.State.Filtered() {
+				@tableClearButton(props)
+			}
+		</div>
+		if len(props.Facets) > 0 {
+			// The ring matches ui.Card's rather than the search box's: the panel
+			// stacks directly on top of the table, so its padded fill needs the
+			// same edge the table has to read as a surface rather than as a
+			// stray gap.
+			<div
+				id={ props.Key + "-filter-panel" }
+				class="hidden grid-cols-1 gap-4 rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200 ring-inset group-has-[details[open]]:grid sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-800 dark:ring-gray-700"
+			>
+				for _, facet := range props.Facets {
+					@tableFacet(props, facet)
+				}
+			</div>
+		}
+		// The sort order rides along as hidden fields. htmx sends only the
+		// inputs it is told to include, so without these a filter change would
+		// silently reset the table to its default order.
+		for name, value := range props.State.HiddenInputs() {
+			<input type="hidden" name={ name } value={ value }/>
+		}
+	</div>
+}
+
+// tableClearButton resets the search and every facet in one step, keeping the
+// sort order — re-sorting is not something the user asked to undo.
+//
+// It sits in the control row rather than inside the drawer because it clears
+// the search too, and a control that reaches outside the panel it lives in
+// would be lying about its scope.
+templ tableClearButton(props TableControlsProps) {
+	<a
+		href={ templ.SafeURL(props.State.ClearURL()) }
+		aria-label="Clear search and filters"
+		hx-get={ props.State.ClearURL() }
+		hx-target={ props.Target }
+		hx-swap="innerHTML"
+		hx-push-url="true"
+		class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800"
+	>
+		@ui.Icon("x", "sm")
+		Clear all
+	</a>
+}
+
+templ tableSearchInput(props TableControlsProps) {
+	<div class="relative">
+		<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+			@ui.Icon("search", "sm")
+		</div>
+		// The id is load-bearing, not decoration: each keystroke swaps this
+		// input's own container away, and htmx only restores focus and the
+		// caret position to the replaced element if it can find it again by id.
+		<input
+			id={ props.Key + "-search" }
+			type="search"
+			name={ ui.ParamSearch }
+			value={ props.State.Search }
+			placeholder={ "Search " + props.Noun + "…" }
+			aria-label={ "Search " + props.Noun }
+			class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+			hx-get={ props.State.BaseURL }
+			hx-target={ props.Target }
+			hx-swap="innerHTML"
+			hx-trigger="keyup changed delay:300ms, search"
+			hx-include={ "#" + props.Key + "-controls [name]" }
+			hx-push-url="true"
+		/>
+	</div>
+}
+
+templ tableFacet(props TableControlsProps, facet TableFacet) {
+	<div
+		hx-get={ props.State.BaseURL }
+		hx-target={ props.Target }
+		hx-swap="innerHTML"
+		hx-trigger="change"
+		hx-include={ "#" + props.Key + "-controls [name]" }
+		hx-push-url="true"
+	>
+		@ui.Select(ui.SelectProps{
+			ID:      props.Key + "-filter-" + facet.Name,
+			Name:    facet.Name,
+			Label:   facet.Label,
+			Value:   props.State.Filters[facet.Name],
+			Options: facet.Options,
+		})
+	</div>
+}
+
+// TableHeader renders the title of a table view page with the row count and,
+// as children, the page's actions. countID names the count so that a table
+// swap can replace it out of band (TableCount) as the filter changes.
+templ TableHeader(title, countID, count string) {
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<div>
+			<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{ title }</h1>
+			@tableCount(countID, count, false)
+		</div>
+		<div class="flex items-center gap-3">
+			{ children... }
+		</div>
+	</div>
+}
+
+// TableCount re-renders the count of a TableHeader from a table swap. The
+// header sits outside the swapped element, so without this it kept the count
+// of the page as first loaded while the filters narrowed the rows below it.
+templ TableCount(countID, count string) {
+	@tableCount(countID, count, true)
+}
+
+templ tableCount(countID, count string, oob bool) {
+	<p
+		id={ countID }
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="mt-1 text-sm text-gray-500 dark:text-gray-400"
+	>{ count }</p>
+}
+
+// TableEmptyAction renders the one link under an empty state of a table view,
+// e.g. "Clear search and filters" (UC-78). It swaps the table like the other
+// controls, so the URL keeps describing what is shown.
+templ TableEmptyAction(href, target, label string) {
+	<div class="pb-6 text-center">
+		<a
+			href={ templ.SafeURL(href) }
+			hx-get={ href }
+			hx-target={ target }
+			hx-swap="innerHTML"
+			hx-push-url="true"
+			class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+		>
+			{ label }
+		</a>
+	</div>
+}
+
+// TableNoMatches is the empty state of a table whose rows are all filtered
+// out: it says so and offers the way back (UC-78), instead of the onboarding
+// state, which would be wrong when rows exist.
+templ TableNoMatches(state ui.ListState, target, noun string) {
+	@ui.EmptyState("search", "No matching "+noun,
+		"No "+singular(noun)+" matches the current search and filters.", "", "")
+	@TableEmptyAction(state.ClearURL(), target, "Clear search and filters")
+}
+
+// TableCountLabel states how many rows are shown. Under an active filter it
+// names both numbers, so a narrowed list never reads as if rows had gone
+// missing.
+func TableCountLabel(state ui.ListState, total, productTotal int) string {
+	if state.Filtered() {
+		return fmt.Sprintf("%d of %d items", total, productTotal)
+	}
+	return fmt.Sprintf("%d items", total)
+}
+
+// ActiveFacets counts the facets narrowing the list, for the badge on the
+// collapsed drawer — otherwise a filter hidden inside it would be invisible.
+func ActiveFacets(state ui.ListState) int {
+	n := 0
+	for _, v := range state.Filters {
+		if v != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// FacetOptions builds a facet's choices: the clearing option labelled all,
+// then one per value. none, when set, adds a choice for rows without a value
+// (store.FilterNone), e.g. "No component".
+func FacetOptions(all, none string, values ...templates.SelectOption) []templates.SelectOption {
+	options := make([]templates.SelectOption, 0, len(values)+2)
+	options = append(options, templates.SelectOption{Value: "", Label: all})
+	options = append(options, values...)
+	if none != "" {
+		options = append(options, templates.SelectOption{Value: FacetNone, Label: none})
+	}
+	return options
+}
+
+// FacetNone mirrors store.FilterNone; templates do not import the store.
+const FacetNone = "none"
+
+// ArchivedFacetOptions are the choices of the archived facet (FR-155); hiding
+// archived items is the default.
+func ArchivedFacetOptions() []templates.SelectOption {
+	return []templates.SelectOption{
+		{Value: "", Label: "Hide archived"},
+		{Value: "include", Label: "Show archived"},
+		{Value: "only", Label: "Archived only"},
+	}
+}
+
+// singular drops the plural s of a table noun for the "No defect matches"
+// sentence; "test cases" becomes "test case".
+func singular(noun string) string {
+	if len(noun) > 1 && noun[len(noun)-1] == 's' {
+		return noun[:len(noun)-1]
+	}
+	return noun
+}
