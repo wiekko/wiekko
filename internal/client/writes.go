@@ -86,6 +86,12 @@ func (c *Client) AddDefectLink(ctx context.Context, productID, defectID, targetT
 	return c.Do(ctx, http.MethodPost, productPath(productID, "defects", defectID, "links"), body, nil)
 }
 
+// RemoveDefectLink removes one of a defect's links by the link's ID
+// (developer role).
+func (c *Client) RemoveDefectLink(ctx context.Context, productID, defectID, linkID string) error {
+	return c.Do(ctx, http.MethodDelete, productPath(productID, "defects", defectID, "links", linkID), nil, nil)
+}
+
 // CreateComment adds a Markdown comment to an entity. ownerType is one of
 // requirement, task, constraint, test_case, component, capability, milestone,
 // defect.

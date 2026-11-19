@@ -157,7 +157,7 @@ loopback address), so a token never crosses the network unencrypted. `--allow-ht
 | `doc` | Documents: `list`, `show`, `create`, `update`, `delete`, `link`/`unlink`, `revisions`, `diff`, `restore`, `get` |
 | `component` | Product structure: `list`, `create`, `update`, `delete` |
 | `capability` | `list`, `show`, `create`, `update`, `delete`, and `link`/`unlink` requirements and constraints |
-| `defect` | `list`, `show`, `status`, `create`, `archive`/`unarchive`, `delete` |
+| `defect` | `list`, `show`, `status`, `create`, `link`/`unlink`, `archive`/`unarchive`, `delete` |
 | `test` | Test cases: `list`, `show`, `sync`, and `link`/`unlink` them to a requirement, capability or component |
 | `campaign` | `status` of the active testing campaign |
 | `comment` | `add` a comment to any commentable item |

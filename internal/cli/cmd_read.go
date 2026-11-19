@@ -288,7 +288,7 @@ func defectGroup() *command {
 		},
 	}
 	return &command{name: "defect", summary: "defects (bugs and issues)", subs: []*command{list, show,
-		defectStatusCommand(), defectCreateCommand(),
+		defectStatusCommand(), defectCreateCommand(), defectLinkCommand(false), defectLinkCommand(true),
 		defectArchiveCommand(true), defectArchiveCommand(false), defectDeleteCommand()}}
 }
 

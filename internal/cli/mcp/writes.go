@@ -42,7 +42,8 @@ func registerWriteTools(s *sdk.Server, h *handlers) {
 		})
 
 	writeTool(s, h, "create_defect", "Report a defect",
-		"Report a bug found while working, optionally linked to the test case that reveals it and the requirement it violates. "+
+		"Report a bug found while working, optionally linked to the test case that reveals it, the requirement it violates "+
+			"and the components and capabilities it affects. "+
 			"Check list_defects first to avoid duplicates. Requires the tester role. Returns the new defect.",
 		false,
 		func(ctx context.Context, sess *ops.Session, in ops.NewDefect) (*ops.DefectDetail, func(io.Writer) error, error) {

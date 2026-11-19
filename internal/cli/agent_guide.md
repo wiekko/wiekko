@@ -69,7 +69,8 @@ into a sprint). An item's `active` field says whether it is.
 | `nexmap defect status DF-17 Done` | Same for a defect you fixed | developer, on active defects only |
 | `nexmap req archive FR-12` / `req unarchive` / `defect archive DF-17` | Hide a closed item (with all items below it) from default lists, the board and sprint planning; reopening brings it back | owner |
 | `nexmap comment add FR-12 --body-file -` | Record a decision, question or finding (stdin avoids quoting trouble; works for `DF-17` too; `--type test_case` etc. for test cases and capabilities) | developer (tester on defects and test cases) |
-| `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first | tester |
+| `nexmap defect create --title … [--test <test identifier>] [--req FR-12] [--component <name>] [--capability <name>] [--criticality high] --body-file -` | Report a bug you found; check `defect list` first. `--component` and `--capability` repeat or take comma-separated names | tester |
+| `nexmap defect link DF-17 [--req …] [--test …] [--component …] [--capability …]` / `defect unlink …` | Record what a defect affects, or remove a wrong link | tester (unlink: developer) |
 | `nexmap task create --title … --parent FR-12 [--body-file -] [--dod …]` | Split a requirement into tasks | owner |
 | `nexmap req update FR-12 --parent FR-3` / `task update MT-4 --parent FR-12` | Move an item below another one; `--parent ""` moves it to the top level | owner |
 | `go test -json ./... \| nexmap test sync [--req FR-12] [--capability <name>] [--pyramid-level unit] --dry-run` | Register new tests as test cases (drop `--dry-run` once the list looks right) | developer |

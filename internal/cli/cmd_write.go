@@ -184,13 +184,15 @@ func defectCreateCommand() *command {
 	var desc textFlags
 	return &command{
 		name:    "defect create",
-		summary: "report a defect, optionally linked to a test case and a requirement (tester role)",
+		summary: "report a defect, optionally linked to a test case, a requirement, components and capabilities (tester role)",
 		flags: func(fs *flag.FlagSet) {
 			fs.StringVar(&in.Title, "title", "", "title (required)")
 			fs.StringVar(&in.Criticality, "criticality", "", "critical, high, medium (default) or low")
 			fs.StringVar(&in.Status, "status", "", "initial status name")
 			fs.StringVar(&in.TestCase, "test", "", "test case revealing the defect: test identifier, short ID or ID")
 			fs.StringVar(&in.Requirement, "req", "", "requirement or task the defect violates, e.g. FR-12")
+			fs.Var((*listFlag)(&in.Components), "component", "component the defect affects (repeatable or comma-separated)")
+			fs.Var((*listFlag)(&in.Capabilities), "capability", "capability the defect affects (repeatable or comma-separated)")
 			desc.bind(fs, "body", "Markdown description")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
@@ -209,6 +211,61 @@ func defectCreateCommand() *command {
 				return err
 			}
 			d, err := s.CreateDefect(ctx, in)
+			if err != nil {
+				return usageIfInput(err)
+			}
+			return a.emit(d, func(w io.Writer, _ output.Format) error { return render.Defect(w, d) })
+		},
+	}
+}
+
+// listFlag is a repeatable flag whose values may also be comma-separated.
+type listFlag []string
+
+func (l *listFlag) String() string { return strings.Join(*l, ",") }
+
+func (l *listFlag) Set(v string) error {
+	for _, part := range strings.Split(v, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			*l = append(*l, part)
+		}
+	}
+	return nil
+}
+
+// defectLinkCommand links a defect to, or unlinks it from, requirements,
+// test cases, components and capabilities (FR-147).
+func defectLinkCommand(unlink bool) *command {
+	var in ops.DefectLinks
+	verb, summary := "link", "link a defect to requirements, test cases, components or capabilities (tester role)"
+	if unlink {
+		verb, summary = "unlink", "remove a defect's links to requirements, test cases, components or capabilities (developer role)"
+	}
+	name := "defect " + verb
+	return &command{
+		name:    name,
+		args:    "<DF-17>",
+		summary: summary,
+		flags: func(fs *flag.FlagSet) {
+			fs.Var((*listFlag)(&in.Requirements), "req", "requirement or task, e.g. FR-12 (repeatable or comma-separated)")
+			fs.Var((*listFlag)(&in.TestCases), "test", "test case: test identifier, short ID or ID (repeatable or comma-separated)")
+			fs.Var((*listFlag)(&in.Components), "component", "component name or ID (repeatable or comma-separated)")
+			fs.Var((*listFlag)(&in.Capabilities), "capability", "capability name or ID (repeatable or comma-separated)")
+		},
+		run: func(ctx context.Context, a *app, args []string) error {
+			ref, err := oneArg(name, "<DF-17>", args)
+			if err != nil {
+				return err
+			}
+			if len(in.Requirements)+len(in.TestCases)+len(in.Components)+len(in.Capabilities) == 0 {
+				return usageErr(errors.New("give --req, --test, --component or --capability"))
+			}
+			in.Defect, in.Unlink = ref, unlink
+			s, err := a.session()
+			if err != nil {
+				return err
+			}
+			d, err := s.LinkDefect(ctx, in)
 			if err != nil {
 				return usageIfInput(err)
 			}

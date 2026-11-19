@@ -214,6 +214,9 @@ type NewDefect struct {
 	Status      string `json:"status,omitempty" jsonschema:"initial status name; omit for the default"`
 	TestCase    string `json:"test_case,omitempty" jsonschema:"test case that reveals the defect: test identifier, short ID or ID"`
 	Requirement string `json:"requirement,omitempty" jsonschema:"requirement or task the defect violates, e.g. FR-12"`
+	// Components and Capabilities are where the defect shows (FR-147).
+	Components   []string `json:"components,omitempty" jsonschema:"components (name or ID) the defect affects"`
+	Capabilities []string `json:"capabilities,omitempty" jsonschema:"capabilities (name or ID) the defect affects"`
 }
 
 var criticalities = []string{"critical", "high", "medium", "low"}
@@ -235,21 +238,18 @@ func (s *Session) CreateDefect(ctx context.Context, in NewDefect) (*DefectDetail
 	if body.StatusID, err = s.initialStatus(ctx, "defect", in.Status); err != nil {
 		return nil, err
 	}
-	type link struct{ targetType, id, label string }
-	var links []link
-	if in.TestCase != "" {
-		tc, err := s.findTestCase(ctx, in.TestCase)
-		if err != nil {
-			return nil, err
-		}
-		links = append(links, link{"test_case", tc.ID, "test case " + ShortID(tc.ID)})
-	}
+	var reqs, tests []string
 	if in.Requirement != "" {
-		r, err := s.requirement(ctx, in.Requirement, "")
-		if err != nil {
-			return nil, err
-		}
-		links = append(links, link{"requirement", r.ID, r.Identifier})
+		reqs = []string{in.Requirement}
+	}
+	if in.TestCase != "" {
+		tests = []string{in.TestCase}
+	}
+	links, err := s.defectTargets(ctx, DefectLinks{
+		Requirements: reqs, TestCases: tests, Components: in.Components, Capabilities: in.Capabilities,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	d, err := s.C.CreateDefect(ctx, s.ProductID, body)
@@ -257,8 +257,111 @@ func (s *Session) CreateDefect(ctx context.Context, in NewDefect) (*DefectDetail
 		return nil, err
 	}
 	for _, l := range links {
-		if err := s.C.AddDefectLink(ctx, s.ProductID, d.ID, l.targetType, l.id); err != nil {
-			return nil, fmt.Errorf("defect %s was created, but linking it to %s failed: %w", d.Identifier, l.label, err)
+		if err := s.C.AddDefectLink(ctx, s.ProductID, d.ID, l.Type, l.ID); err != nil {
+			return nil, fmt.Errorf("defect %s was created, but linking it to %s failed: %w", d.Identifier, l.Label, err)
+		}
+	}
+	return s.ShowDefect(ctx, d.ID)
+}
+
+// DefectLinks names what a defect is linked to, or unlinked from (FR-147).
+type DefectLinks struct {
+	Defect       string   `json:"defect" jsonschema:"the defect, e.g. DF-17"`
+	Requirements []string `json:"requirements,omitempty" jsonschema:"requirements or tasks, e.g. FR-12"`
+	TestCases    []string `json:"test_cases,omitempty" jsonschema:"test cases: test identifier, short ID or ID"`
+	Components   []string `json:"components,omitempty" jsonschema:"components (name or ID)"`
+	Capabilities []string `json:"capabilities,omitempty" jsonschema:"capabilities (name or ID)"`
+	// Unlink removes the named links instead.
+	Unlink bool `json:"-"`
+}
+
+func (l DefectLinks) empty() bool {
+	return len(l.Requirements)+len(l.TestCases)+len(l.Components)+len(l.Capabilities) == 0
+}
+
+// defectTargets resolves the link targets in in, dropping repeats, so a bad
+// reference fails before anything is written.
+func (s *Session) defectTargets(ctx context.Context, in DefectLinks) ([]LinkView, error) {
+	var out []LinkView
+	seen := map[string]bool{}
+	add := func(typ, id, label string) {
+		if !seen[typ+" "+id] {
+			seen[typ+" "+id] = true
+			out = append(out, LinkView{Type: typ, ID: id, Label: label})
+		}
+	}
+	for _, ref := range in.Requirements {
+		r, err := s.requirement(ctx, ref, "")
+		if err != nil {
+			return nil, err
+		}
+		add("requirement", r.ID, r.Identifier)
+	}
+	for _, ref := range in.TestCases {
+		tc, err := s.findTestCase(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		add("test_case", tc.ID, "test case "+ShortID(tc.ID))
+	}
+	for _, ref := range in.Components {
+		c, err := s.findComponent(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		add("component", c.ID, "component "+c.Name)
+	}
+	for _, ref := range in.Capabilities {
+		c, err := s.findCapability(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		add("capability", c.ID, "capability "+c.Name)
+	}
+	return out, nil
+}
+
+// LinkDefect links a defect to requirements, test cases, components and
+// capabilities (tester role), or removes those links (developer role).
+// Linking something already linked changes nothing; unlinking something
+// not linked is an error, raised before any link is removed.
+func (s *Session) LinkDefect(ctx context.Context, in DefectLinks) (*DefectDetail, error) {
+	if in.empty() {
+		return nil, errors.New("name a requirement, test case, component or capability")
+	}
+	d, err := s.findDefect(ctx, in.Defect)
+	if err != nil {
+		return nil, err
+	}
+	targets, err := s.defectTargets(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.C.DefectLinks(ctx, s.ProductID, d.ID)
+	if err != nil {
+		return nil, err
+	}
+	linkIDs := map[string]string{} // "type id" -> link ID
+	for _, l := range existing {
+		linkIDs[l.TargetType+" "+l.TargetID] = l.ID
+	}
+	if in.Unlink {
+		for _, t := range targets {
+			if linkIDs[t.Type+" "+t.ID] == "" {
+				return nil, fmt.Errorf("defect %s is not linked to %s", d.Identifier, t.Label)
+			}
+		}
+	}
+	for _, t := range targets {
+		linkID := linkIDs[t.Type+" "+t.ID]
+		switch {
+		case in.Unlink:
+			err = s.C.RemoveDefectLink(ctx, s.ProductID, d.ID, linkID)
+		case linkID == "":
+			err = s.C.AddDefectLink(ctx, s.ProductID, d.ID, t.Type, t.ID)
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 	return s.ShowDefect(ctx, d.ID)
