@@ -50,6 +50,8 @@ templ AppLayout(props AppLayoutProps) {
 			     inherit its X-CSRF-Token header like every other page request. -->
 			@ui.ModalContainer()
 		</div>
+		<!-- Confirmation dialog for hx-confirm, shown by modal.js (UR-154) -->
+		@ui.ConfirmTemplate()
 		<!-- Toast container -->
 		@ui.ToastContainer()
 		@sidebarScript()

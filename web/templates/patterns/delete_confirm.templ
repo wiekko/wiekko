@@ -30,7 +30,7 @@ templ DeleteConfirmation(entityKind, entityTitle, hxDelete, csrfToken string) {
 		"Delete "+entityKind,
 		deleteConfirmMessage(entityKind, entityTitle),
 		"Delete",
-		"danger",
+		string(ui.ConfirmDanger),
 		"delete",
 		hxDelete,
 		csrfToken,
@@ -90,7 +90,8 @@ templ DeleteWithChildrenConfirmation(entityKind, entityTitle, hxDelete, csrfToke
 				@ui.ModalCancelButton("delete-confirm")
 				<button
 					type="button"
-					class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500"
+					class={ ui.ConfirmButtonClass(ui.ConfirmDanger) }
+					data-confirm-action
 					hx-delete={ hxDelete }
 					hx-include="#delete-children-choice"
 					if csrfToken != "" {

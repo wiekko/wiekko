@@ -734,7 +734,7 @@ templ CampaignCloseConfirmation(props CampaignCloseProps) {
 		"Close campaign",
 		campaignCloseMessage(props.Incomplete),
 		"Close campaign",
-		"primary",
+		string(ui.ConfirmDanger),
 		"post",
 		fmt.Sprintf("/products/%s/campaigns/%s/close", props.ProductID, props.CampaignID),
 		props.CSRFToken,
@@ -743,10 +743,10 @@ templ CampaignCloseConfirmation(props CampaignCloseProps) {
 
 func campaignCloseMessage(incomplete int) string {
 	if incomplete == 0 {
-		return "Closing freezes all results. They can no longer be changed."
+		return "Closing freezes all results. They can no longer be changed. This cannot be undone."
 	}
 	return fmt.Sprintf(
-		"%d result(s) are still pending, blocked or awaiting re-test. Closing freezes them at their current status.",
+		"%d result(s) are still pending, blocked or awaiting re-test. Closing freezes them at their current status. This cannot be undone.",
 		incomplete)
 }
 

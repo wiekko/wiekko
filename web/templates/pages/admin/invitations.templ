@@ -113,7 +113,7 @@ templ invitationRow(inv *model.Invitation) {
 					hx-delete={ "/admin/invitations/" + inv.ID }
 					hx-target={ "#invitation-" + inv.ID }
 					hx-swap="delete"
-					hx-confirm="Revoke this invitation?"
+					{ ui.Confirm(ui.ConfirmDanger, "Revoke invitation", "Revoke", "Revoke the invitation for "+inv.Email+"? Its link stops working. This cannot be undone; you can send a new invitation instead.")... }
 				>
 					Revoke
 				</button>

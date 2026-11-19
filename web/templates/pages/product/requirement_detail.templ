@@ -224,7 +224,7 @@ templ RequirementCapabilitiesTabContent(props RequirementCapabilitiesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/requirements/%s/capabilities/%s", props.ProductID, props.RequirementID, cap.ID) }
 											hx-target="#tab-panel-capabilities"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this capability from the requirement?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink capability", "Unlink", "Unlink capability "+ui.ItemName("", cap.Name)+" from this requirement?")... }
 										>
 											@ui.Icon("unlink", "sm")
 										</button>
@@ -373,7 +373,7 @@ templ RequirementTestCasesTabContent(props RequirementTestCasesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/requirements/%s/test-cases/%s", props.ProductID, props.RequirementID, tc.ID) }
 											hx-target="#tab-panel-test-cases"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this test case from the requirement?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink test case", "Unlink", "Unlink test case "+ui.ItemName("", tc.Title)+" from this requirement?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -536,7 +536,7 @@ templ RequirementDefectsTabContent(props RequirementDefectsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/requirements/%s/defects/%s", props.ProductID, props.RequirementID, props.LinkIDs[d.ID]) }
 											hx-target="#tab-panel-defects"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this defect from the requirement?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink defect", "Unlink", "Unlink defect "+ui.ItemName(d.Identifier, d.Title)+" from this requirement?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

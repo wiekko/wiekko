@@ -461,7 +461,7 @@ templ MemberRow(m TeamMemberView, productID string, isOwnerOrAdmin bool) {
 							class="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
 							hx-post={ "/products/" + productID + "/team/transfer" }
 							hx-vals={ `{"new_owner_id":"` + m.UserID + `"}` }
-							hx-confirm={ "Transfer ownership to " + m.DisplayName + "? You will be demoted to Developer." }
+							{ ui.Confirm(ui.ConfirmDanger, "Transfer ownership", "Transfer", "Transfer ownership of this product to "+m.DisplayName+"? You will be demoted to Developer and cannot undo this yourself; only the new owner can transfer it back.")... }
 						>
 							Transfer Ownership
 						</button>
@@ -471,7 +471,7 @@ templ MemberRow(m TeamMemberView, productID string, isOwnerOrAdmin bool) {
 							hx-delete={ "/products/" + productID + "/team/members/" + m.UserID }
 							hx-target={ "#member-" + m.UserID }
 							hx-swap="delete"
-							hx-confirm={ "Remove " + m.DisplayName + " from this product?" }
+							{ ui.Confirm(ui.ConfirmNeutral, "Remove member", "Remove", "Remove "+m.DisplayName+" from this product? They can be invited again.")... }
 						>
 							Remove
 						</button>
@@ -489,7 +489,7 @@ templ DeleteProductConfirmation(productName, productID, csrfToken string) {
 		"Delete Product",
 		"Are you sure you want to delete \""+productName+"\"? This will permanently remove all associated data. This action cannot be undone.",
 		"Delete Product",
-		"danger",
+		string(ui.ConfirmDanger),
 		"delete",
 		"/products/"+productID,
 		csrfToken,

@@ -133,7 +133,7 @@ templ ActionsCard(target *model.User, isSelf bool, feedback string) {
 							hx-post={ "/admin/users/" + target.ID + "/2fa/reset" }
 							hx-target="#actions-card"
 							hx-swap="outerHTML"
-							hx-confirm={ "Reset two-factor authentication for " + target.Username + "? They can then sign in with their password alone until they set it up again." }
+							{ ui.Confirm(ui.ConfirmDanger, "Reset two-factor authentication", "Reset 2FA", "Reset two-factor authentication for "+target.Username+"? Their current authenticator stops working and cannot be restored. They can sign in with their password alone until they set it up again.")... }
 						>
 							@ui.Icon("shield", "sm")
 							Reset 2FA
@@ -146,7 +146,7 @@ templ ActionsCard(target *model.User, isSelf bool, feedback string) {
 							hx-delete={ "/admin/users/" + target.ID }
 							hx-target="#actions-card"
 							hx-swap="outerHTML"
-							hx-confirm={ "Delete user " + target.Username + "? This cannot be undone." }
+							{ ui.Confirm(ui.ConfirmDanger, "Delete user", "Delete", "Delete user "+target.Username+"? This cannot be undone.")... }
 						>
 							@ui.Icon("trash", "sm")
 							Delete User

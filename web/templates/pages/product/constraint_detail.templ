@@ -194,7 +194,7 @@ templ ConstraintCapabilitiesTabContent(props ConstraintCapabilitiesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/constraints/%s/capabilities/%s", props.ProductID, props.ConstraintID, cap.ID) }
 											hx-target="#tab-panel-capabilities"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this capability from the constraint?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink capability", "Unlink", "Unlink capability "+ui.ItemName("", cap.Name)+" from this constraint?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

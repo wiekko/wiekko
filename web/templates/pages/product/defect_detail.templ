@@ -285,7 +285,7 @@ templ DefectComponentsTabContent(props DefectComponentsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/defects/%s/components/%s", props.ProductID, props.DefectID, props.LinkIDs[comp.ID]) }
 											hx-target="#tab-panel-components"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this component from the defect?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink component", "Unlink", "Unlink component "+ui.ItemName("", comp.Name)+" from this defect?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -428,7 +428,7 @@ templ DefectCapabilitiesTabContent(props DefectCapabilitiesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/defects/%s/capabilities/%s", props.ProductID, props.DefectID, props.LinkIDs[cap.ID]) }
 											hx-target="#tab-panel-capabilities"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this capability from the defect?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink capability", "Unlink", "Unlink capability "+ui.ItemName("", cap.Name)+" from this defect?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -587,7 +587,7 @@ templ DefectTestCasesTabContent(props DefectTestCasesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/defects/%s/test-cases/%s", props.ProductID, props.DefectID, props.LinkIDs[tc.ID]) }
 											hx-target="#tab-panel-test-cases"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this test case from the defect?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink test case", "Unlink", "Unlink test case "+ui.ItemName("", tc.Title)+" from this defect?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -735,7 +735,7 @@ templ DefectRequirementsTabContent(props DefectRequirementsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/defects/%s/requirements/%s", props.ProductID, props.DefectID, props.LinkIDs[req.ID]) }
 											hx-target="#tab-panel-requirements"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this requirement from the defect?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink requirement", "Unlink", "Unlink requirement "+ui.ItemName(model.EntityIdentifier(defectCategoryPrefix(props.CategoryPrefixes, req.CategoryID), req.SequenceNumber), req.Title)+" from this defect?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

@@ -215,7 +215,7 @@ templ tokenRow(tv TokenView) {
 					hx-delete={ "/user/tokens/" + tv.Token.ID }
 					hx-target="#token-table-body"
 					hx-swap="outerHTML"
-					hx-confirm={ "Revoke token \"" + tv.Token.Name + "\"? Applications using it will lose access." }
+					{ ui.Confirm(ui.ConfirmDanger, "Revoke token", "Revoke", "Revoke token "+ui.ItemName("", tv.Token.Name)+"? Applications using it lose access. This cannot be undone; you can create a new token instead.")... }
 				>
 					Revoke
 				</button>

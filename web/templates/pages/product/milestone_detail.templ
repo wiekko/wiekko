@@ -235,7 +235,7 @@ templ MilestoneComponentsTabContent(props MilestoneComponentsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/components/%s", props.ProductID, props.MilestoneID, comp.ID) }
 											hx-target="#tab-panel-components"
 											hx-swap="innerHTML"
-											hx-confirm="Remove this component from the milestone?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Remove component", "Remove", "Remove component "+ui.ItemName("", comp.Name)+" from this milestone?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -381,7 +381,7 @@ templ MilestoneCapabilitiesTabContent(props MilestoneCapabilitiesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/capabilities/%s", props.ProductID, props.MilestoneID, cap.ID) }
 											hx-target="#tab-panel-capabilities"
 											hx-swap="innerHTML"
-											hx-confirm="Remove this capability from the milestone?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Remove capability", "Remove", "Remove capability "+ui.ItemName("", cap.Name)+" from this milestone?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -571,7 +571,7 @@ templ MilestoneRequirementsTabContent(props MilestoneRequirementsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/%s/%s", props.ProductID, props.MilestoneID, props.TabID(), req.ID) }
 											hx-target={ "#tab-panel-" + props.TabID() }
 											hx-swap="innerHTML"
-											hx-confirm={ fmt.Sprintf("Remove this %s from the milestone?", milestoneBacklogNoun(props.Kind)) }
+											{ ui.Confirm(ui.ConfirmNeutral, "Remove "+milestoneBacklogNoun(props.Kind), "Remove", fmt.Sprintf("Remove %s %s from this milestone?", milestoneBacklogNoun(props.Kind), ui.ItemName(model.EntityIdentifier(milestoneCategoryPrefix(props.CategoryPrefixes, req.CategoryID), req.SequenceNumber), req.Title)))... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -715,7 +715,7 @@ templ MilestoneConstraintsTabContent(props MilestoneConstraintsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/constraints/%s", props.ProductID, props.MilestoneID, con.ID) }
 											hx-target="#tab-panel-constraints"
 											hx-swap="innerHTML"
-											hx-confirm="Remove this constraint from the milestone?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Remove constraint", "Remove", "Remove constraint "+ui.ItemName(model.EntityIdentifier(milestoneCategoryPrefix(props.CategoryPrefixes, con.CategoryID), con.SequenceNumber), con.Title)+" from this milestone?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -870,7 +870,7 @@ templ MilestoneDefectsTabContent(props MilestoneDefectsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/defects/%s", props.ProductID, props.MilestoneID, d.ID) }
 											hx-target="#tab-panel-defects"
 											hx-swap="innerHTML"
-											hx-confirm="Remove this defect from the milestone?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Remove defect", "Remove", "Remove defect "+ui.ItemName(d.Identifier, d.Title)+" from this milestone?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -1007,7 +1007,7 @@ templ MilestoneSprintsTabContent(props MilestoneSprintsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/milestones/%s/sprints/%s", props.ProductID, props.MilestoneID, sp.ID) }
 											hx-target="#tab-panel-sprints"
 											hx-swap="innerHTML"
-											hx-confirm="Remove this sprint from the milestone?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Remove sprint", "Remove", "Remove sprint "+ui.ItemName("", sp.Name)+" from this milestone?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

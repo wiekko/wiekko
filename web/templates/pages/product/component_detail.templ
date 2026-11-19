@@ -170,7 +170,7 @@ templ ComponentCapabilitiesTabContent(props ComponentCapabilitiesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/components/%s/capabilities/%s", props.ProductID, props.ComponentID, f.ID) }
 											hx-target="#tab-panel-capabilities"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this capability from the component?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink capability", "Unlink", "Unlink capability "+ui.ItemName("", f.Name)+" from this component?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -318,7 +318,7 @@ templ ComponentTestCasesTabContent(props ComponentTestCasesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/components/%s/test-cases/%s", props.ProductID, props.ComponentID, tc.ID) }
 											hx-target="#tab-panel-test-cases"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this test case from the component?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink test case", "Unlink", "Unlink test case "+ui.ItemName("", tc.Title)+" from this component?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

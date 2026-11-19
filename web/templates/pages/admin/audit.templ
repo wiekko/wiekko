@@ -123,7 +123,7 @@ templ AuditPage(props AuditProps) {
 													class="text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
 													hx-delete={ p.PurgeURL }
 													hx-swap="none"
-													hx-confirm={ fmt.Sprintf("Permanently delete all %d audit entries of %s? This cannot be undone.", p.Entries, p.Name) }
+													{ ui.Confirm(ui.ConfirmDanger, "Purge audit entries", "Purge", fmt.Sprintf("Permanently delete all %d audit entries of %s? This cannot be undone.", p.Entries, ui.ItemName("", p.Name)))... }
 												>
 													Purge
 												</button>

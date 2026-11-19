@@ -78,7 +78,7 @@ templ AttachmentItem(a templates.AttachmentView, csrfToken string) {
 				hx-vals={ csrfVals(csrfToken) }
 				hx-target={ "#attachment-" + a.ID }
 				hx-swap="outerHTML"
-				hx-confirm="Delete this attachment?"
+				{ ui.Confirm(ui.ConfirmDanger, "Delete attachment", "Delete", "Delete attachment "+ui.ItemName("", a.Filename)+"? This cannot be undone.")... }
 			>
 				@ui.Icon("trash", "sm")
 			</button>

@@ -235,7 +235,7 @@ templ TestCaseRequirementsTabContent(props TestCaseRequirementsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/test-cases/%s/requirements/%s", props.ProductID, props.TestCaseID, req.ID) }
 											hx-target="#tab-panel-requirements"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this requirement from the test case?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink requirement", "Unlink", "Unlink requirement "+ui.ItemName(model.EntityIdentifier(testCasePrefix(props.CategoryPrefixes, req.CategoryID), req.SequenceNumber), req.Title)+" from this test case?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

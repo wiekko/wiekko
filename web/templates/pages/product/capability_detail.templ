@@ -184,7 +184,7 @@ templ CapabilityRequirementsTabContent(props CapabilityRequirementsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/capabilities/%s/requirements/%s", props.ProductID, props.CapabilityID, req.ID) }
 											hx-target="#tab-panel-requirements"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this requirement from the capability?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink requirement", "Unlink", "Unlink requirement "+ui.ItemName(model.EntityIdentifier(capabilityCategoryPrefix(props.CategoryPrefixes, req.CategoryID), req.SequenceNumber), req.Title)+" from this capability?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -330,7 +330,7 @@ templ CapabilityTestCasesTabContent(props CapabilityTestCasesTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/capabilities/%s/test-cases/%s", props.ProductID, props.CapabilityID, tc.ID) }
 											hx-target="#tab-panel-test-cases"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this test case from the capability?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink test case", "Unlink", "Unlink test case "+ui.ItemName("", tc.Title)+" from this capability?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>
@@ -474,7 +474,7 @@ templ CapabilityConstraintsTabContent(props CapabilityConstraintsTabProps) {
 											hx-delete={ fmt.Sprintf("/products/%s/capabilities/%s/constraints/%s", props.ProductID, props.CapabilityID, c.ID) }
 											hx-target="#tab-panel-constraints"
 											hx-swap="innerHTML"
-											hx-confirm="Unlink this constraint from the capability?"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink constraint", "Unlink", "Unlink constraint "+ui.ItemName(model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, c.CategoryID), c.SequenceNumber), c.Title)+" from this capability?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

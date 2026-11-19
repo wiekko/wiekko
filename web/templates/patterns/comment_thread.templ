@@ -68,7 +68,7 @@ templ CommentItem(c templates.CommentView, csrfToken string) {
 						hx-vals={ csrfVals(csrfToken) }
 						hx-target={ "#comment-" + c.ID }
 						hx-swap="outerHTML"
-						hx-confirm="Delete this comment?"
+						{ ui.Confirm(ui.ConfirmDanger, "Delete comment", "Delete", "Delete the comment by "+c.AuthorName+" from "+c.CreatedAt+"? This cannot be undone.")... }
 					>
 						@ui.Icon("trash", "sm")
 					</button>

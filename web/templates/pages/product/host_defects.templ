@@ -104,7 +104,7 @@ templ HostDefectsTabContent(props HostDefectsTabProps) {
 											hx-delete={ props.BaseURL + "/defects/" + props.LinkIDs[d.ID] }
 											hx-target="#tab-panel-defects"
 											hx-swap="innerHTML"
-											hx-confirm={ "Unlink this defect from the " + props.Noun + "?" }
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink defect", "Unlink", "Unlink defect "+ui.ItemName(d.Identifier, d.Title)+" from this "+props.Noun+"?")... }
 										>
 											@ui.Icon("trash", "sm")
 										</button>

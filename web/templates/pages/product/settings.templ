@@ -247,7 +247,7 @@ templ categoryRow(productID string, c *model.Category, targetID string, count in
 			hx-swap="outerHTML"
 			hx-trigger="change"
 			if count > 0 {
-				hx-confirm={ prefixRenameWarning(c, count) }
+				{ ui.Confirm(ui.ConfirmNeutral, "Rename prefix", "Rename", prefixRenameWarning(c, count))... }
 			}
 		/>
 		<span class="w-20 shrink-0 text-right text-xs text-gray-500 dark:text-gray-400">{ categoryUsageLabel(count) }</span>
@@ -287,7 +287,7 @@ templ categoryRow(productID string, c *model.Category, targetID string, count in
 			hx-delete={ "/products/" + productID + "/settings/categories/" + c.ID }
 			hx-target={ "#" + targetID }
 			hx-swap="outerHTML"
-			hx-confirm={ "Delete category \"" + c.Name + "\"?" }
+			{ ui.Confirm(ui.ConfirmDanger, "Delete category", "Delete", "Delete category "+ui.ItemName("", c.Name)+"? This cannot be undone.")... }
 		>
 			@ui.Icon("trash", "sm")
 		</button>
@@ -351,7 +351,7 @@ templ StatusesTabContent(productID string, statusSync bool, reqStatuses, defStat
 						type="button"
 						class="inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
 						hx-post={ "/products/" + productID + "/settings/statuses/split" }
-						hx-confirm="This will permanently separate requirement and defect statuses into independent sets. This action cannot be undone. Continue?"
+						{ ui.Confirm(ui.ConfirmDanger, "Split statuses", "Split statuses", "Separate the requirement and defect statuses of this product into independent sets? This cannot be undone.")... }
 						hx-target="#tab-panel-statuses"
 						hx-swap="innerHTML"
 					>
@@ -523,7 +523,7 @@ templ statusRow(productID string, s *model.Status, targetID string, isFirst, isL
 			hx-delete={ "/products/" + productID + "/settings/statuses/" + s.ID }
 			hx-target={ "#" + targetID }
 			hx-swap="outerHTML"
-			hx-confirm={ "Delete status \"" + s.Name + "\"?" }
+			{ ui.Confirm(ui.ConfirmDanger, "Delete status", "Delete", "Delete status "+ui.ItemName("", s.Name)+"? This cannot be undone.")... }
 		>
 			@ui.Icon("trash", "sm")
 		</button>
@@ -558,7 +558,7 @@ templ EnvironmentListFragment(productID string, envs []*model.RuntimeEnvironment
 								hx-delete={ "/products/" + productID + "/settings/environments/" + e.ID }
 								hx-target="#environment-list"
 								hx-swap="outerHTML"
-								hx-confirm={ "Delete environment \"" + e.Name + "\"?" }
+								{ ui.Confirm(ui.ConfirmDanger, "Delete environment", "Delete", "Delete environment "+ui.ItemName("", e.Name)+"? This cannot be undone.")... }
 							>
 								@ui.Icon("trash", "sm")
 							</button>
@@ -687,7 +687,7 @@ templ pyramidRow(productID string, l *model.PyramidLevel, isChild bool) {
 			hx-delete={ "/products/" + productID + "/settings/pyramid/" + l.ID }
 			hx-target="#pyramid-list"
 			hx-swap="outerHTML"
-			hx-confirm={ "Delete level \"" + l.Name + "\"?" }
+			{ ui.Confirm(ui.ConfirmDanger, "Delete pyramid level", "Delete", "Delete pyramid level "+ui.ItemName("", l.Name)+"? This cannot be undone.")... }
 		>
 			@ui.Icon("trash", "sm")
 		</button>

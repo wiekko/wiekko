@@ -10,6 +10,24 @@ import (
 	"nexmap.net/web/templates"
 )
 
+// TestAppLayoutProvidesConfirmDialog guards UR-154: modal.js shows hx-confirm
+// questions in the confirmation template and falls back to the browser's
+// confirm() when either is missing.
+func TestAppLayoutProvidesConfirmDialog(t *testing.T) {
+	var sb strings.Builder
+	err := AppLayout(AppLayoutProps{Meta: templates.PageMeta{Title: "t"}}).
+		Render(templ.WithChildren(context.Background(), templ.NopComponent), &sb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := sb.String()
+	for _, s := range []string{`id="confirm-dialog-template"`, `src="/static/js/modal.js"`} {
+		if !strings.Contains(out, s) {
+			t.Errorf("app layout lacks %s", s)
+		}
+	}
+}
+
 // TestModalInheritsCSRFHeader guards the modal mount point: htmx requests
 // from modal content (link buttons, create forms) get their X-CSRF-Token
 // header only from an ancestor's hx-headers, so #modal has to sit inside
