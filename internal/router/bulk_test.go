@@ -144,3 +144,71 @@ func TestBulkOperationsPages(t *testing.T) {
 		}
 	})
 }
+
+// TestBulkTestCasesPage drives the bulk operations of the test cases table
+// (FR-169): developers select and link; testers cannot select.
+func TestBulkTestCasesPage(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		pid := e.product.ID
+		tc, err := e.svc.Testing.CreateTestCase(ctx, e.admin, service.CreateTestCaseInput{ProductID: pid, Title: "Parses sightings", ExecutionMode: "manual"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, err := e.svc.Backlog.CreateRequirement(ctx, e.admin, service.CreateRequirementInput{ProductID: pid, Title: "Record a sighting"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		page := "/products/" + pid + "/test-cases"
+		do := func(cookie *http.Cookie, method, path string, form url.Values) string {
+			t.Helper()
+			var body *strings.Reader
+			if form != nil {
+				body = strings.NewReader(form.Encode())
+			} else {
+				body = strings.NewReader("")
+			}
+			req, err := http.NewRequest(method, e.srv.URL+path, body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.AddCookie(cookie)
+			if method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Set("X-CSRF-Token", csrfToken(t, e, cookie))
+				req.Header.Set("HX-Request", "true")
+			}
+			resp, err := e.client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return readBody(t, resp)
+		}
+
+		dev := e.invite("dev", model.RoleDeveloper)
+		body := do(dev, http.MethodGet, page, nil)
+		for _, want := range []string{`data-bulk-toggle="test-cases-table"`, `data-bulk-id="` + tc.ID + `"`, `data-bulk-action="link_requirement"`, `data-bulk-action="delete"`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("developer's test cases table lacks %s", want)
+			}
+		}
+		body = do(dev, http.MethodPost, page+"/bulk/preview", url.Values{"action": {"link_requirement"}, "ids": {tc.ID}, "value": {r.ID}})
+		if !strings.Contains(body, "Link 1 test case to") || !strings.Contains(body, tc.ID[:8]) {
+			t.Errorf("link preview:\n%s", body)
+		}
+		body = do(dev, http.MethodPost, page+"/bulk/apply", url.Values{"action": {"link_requirement"}, "ids": {tc.ID}, "value": {r.ID}, "state": {""}})
+		if !strings.Contains(body, "Linked 1 test case.") {
+			t.Errorf("link apply:\n%s", body)
+		}
+		links, _ := e.svc.Testing.ListTestCaseRequirements(ctx, e.admin, pid, tc.ID)
+		if len(links) != 1 {
+			t.Errorf("%d links, want 1", len(links))
+		}
+
+		tester := e.invite("tess", model.RoleTester)
+		if body = do(tester, http.MethodGet, page, nil); strings.Contains(body, "data-bulk-toggle") {
+			t.Error("a tester is offered selection")
+		}
+	})
+}

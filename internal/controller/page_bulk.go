@@ -11,13 +11,14 @@ import (
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
+	"nexmap.net/internal/store"
 	"nexmap.net/web/templates"
 	productpage "nexmap.net/web/templates/pages/product"
 	"nexmap.net/web/templates/patterns"
 )
 
-// Bulk operations on the requirements, tasks and defects tables (FR-130,
-// FR-131). The selection bar asks for a preview, which answers with a
+// Bulk operations on the requirements, tasks, defects and test cases tables
+// (FR-130, FR-131, FR-169). The selection bar asks for a preview, which answers with a
 // confirmation naming what will change and what cannot (SC-92, UC-91); the
 // confirmation applies the operation to the items it previewed, then
 // re-renders the table as it was.
@@ -34,6 +35,7 @@ var bulkTables = map[string]bulkTable{
 	"requirements": {kind: model.RequirementKindRequirement, collection: "requirements", singular: "requirement", plural: "requirements"},
 	"tasks":        {kind: model.RequirementKindTask, collection: "tasks", singular: "task", plural: "tasks"},
 	"defects":      {kind: "defect", collection: "defects", singular: "defect", plural: "defects"},
+	"test-cases":   {kind: service.BulkKindTestCase, collection: "test-cases", singular: "test case", plural: "test cases"},
 }
 
 func bulkTableOf(kind string) bulkTable {
@@ -42,6 +44,8 @@ func bulkTableOf(kind string) bulkTable {
 		return bulkTables["tasks"]
 	case "defect":
 		return bulkTables["defects"]
+	case service.BulkKindTestCase:
+		return bulkTables["test-cases"]
 	default:
 		return bulkTables["requirements"]
 	}
@@ -49,9 +53,14 @@ func bulkTableOf(kind string) bulkTable {
 
 func (t bulkTable) defect() bool { return t.kind == "defect" }
 
+func (t bulkTable) testCase() bool { return t.kind == service.BulkKindTestCase }
+
 func (t bulkTable) region() string {
-	if t.defect() {
+	switch {
+	case t.defect():
 		return "defects-table"
+	case t.testCase():
+		return "test-cases-table"
 	}
 	return productpage.BacklogItemsTableID(t.kind)
 }
@@ -98,6 +107,36 @@ func bulkBar(t bulkTable, p *model.Product, user *model.User, role string, total
 	add(service.BulkUnassign, "Unassign", "user-minus")
 	add(service.BulkArchive, "Archive", "archive")
 	add(service.BulkUnarchive, "Unarchive", "archive-restore")
+	add(service.BulkDelete, "Delete", "trash-2")
+	return props
+}
+
+// testCaseBulkBar configures the selection bar of the test cases table:
+// developers, owners and admins change test cases (FR-111), so they get every
+// operation; the pyramid level only where the product defines levels.
+func testCaseBulkBar(p *model.Product, user *model.User, role string, total int, pyramidLevels bool) patterns.BulkBarProps {
+	t := bulkTables["test-cases"]
+	props := patterns.BulkBarProps{
+		Region:     t.region(),
+		PreviewURL: "/products/" + p.ID + "/" + t.collection + "/bulk/preview",
+		Noun:       t.plural,
+		Total:      total,
+	}
+	if !user.IsAdmin && model.RoleRank(role) < model.RoleRank(model.RoleDeveloper) {
+		return props
+	}
+	add := func(action service.BulkAction, label, icon string) {
+		props.Actions = append(props.Actions, patterns.BulkAction{Action: string(action), Label: label, Icon: icon})
+	}
+	add(service.BulkLinkRequirement, "Link requirement", "link")
+	add(service.BulkUnlinkRequirement, "Unlink requirement", "unlink")
+	add(service.BulkLinkConstraint, "Link constraint", "shield-check")
+	add(service.BulkUnlinkConstraint, "Unlink constraint", "shield-off")
+	add(service.BulkComponent, "Component", "boxes")
+	add(service.BulkCapability, "Capability", "puzzle")
+	if pyramidLevels {
+		add(service.BulkPyramidLevel, "Pyramid level", "triangle")
+	}
 	add(service.BulkDelete, "Delete", "trash-2")
 	return props
 }
@@ -165,6 +204,19 @@ func bulkTableFromPath(r *http.Request) (bulkTable, bool) {
 func (c *PageProductController) matchingIDs(r *http.Request, user *model.User, productID string, t bulkTable, state string) ([]string, error) {
 	sr := stateRequest(r, state)
 	var ids []string
+	if t.testCase() {
+		filter, ls := parseTestCaseListState(sr, "")
+		params := listParams(ls)
+		params.Limit, params.Offset = service.BulkMaxItems+1, 0
+		items, _, err := c.testing.ListTestCasesPage(r.Context(), user, productID, filter, params)
+		if err != nil {
+			return nil, err
+		}
+		for _, tc := range items {
+			ids = append(ids, tc.ID)
+		}
+		return ids, nil
+	}
 	if t.defect() {
 		filter, params, _ := parseDefectListState(sr, "")
 		params.Limit, params.Offset = service.BulkMaxItems+1, 0
@@ -202,6 +254,12 @@ type bulkNamer struct {
 
 func (n *bulkNamer) item(id string) patterns.BulkItem {
 	ctx := n.r.Context()
+	if n.table.testCase() {
+		if tc, err := n.c.testing.GetTestCase(ctx, n.user, n.product, id); err == nil {
+			return patterns.BulkItem{Identifier: shortID(tc.ID), Title: tc.Title}
+		}
+		return patterns.BulkItem{Title: "(no longer exists)"}
+	}
 	if n.table.defect() {
 		if d, err := n.c.backlog.GetDefect(ctx, n.user, n.product, id); err == nil {
 			return patterns.BulkItem{Identifier: d.Identifier, Title: d.Title}
@@ -215,6 +273,15 @@ func (n *bulkNamer) item(id string) patterns.BulkItem {
 		return patterns.BulkItem{Identifier: model.EntityIdentifier(requirementPrefixOf(n.prefixes, it.CategoryID), it.SequenceNumber), Title: it.Title}
 	}
 	return patterns.BulkItem{Title: "(no longer exists)"}
+}
+
+// shortID is how test cases are referred to: the first 8 characters of their
+// ID.
+func shortID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
 }
 
 func requirementPrefixOf(prefixes map[string]string, categoryID string) string {
@@ -293,6 +360,41 @@ func (c *PageProductController) bulkChoices(r *http.Request, user *model.User, p
 			}
 		}
 		return "Sprint", choices
+	case service.BulkLinkRequirement, service.BulkUnlinkRequirement:
+		prefixes := c.buildCategoryPrefixMap(r, user, productID, model.RequirementKindRequirement)
+		items, _ := c.backlog.ListRequirements(ctx, user, productID, store.RequirementFilter{Kind: model.RequirementKindRequirement, Archived: store.ArchivedExclude})
+		for _, it := range items {
+			choices = append(choices, templates.SelectOption{Value: it.ID, Label: model.EntityIdentifier(requirementPrefixOf(prefixes, it.CategoryID), it.SequenceNumber) + " " + it.Title})
+		}
+		return "Requirement", choices
+	case service.BulkLinkConstraint, service.BulkUnlinkConstraint:
+		prefixes := c.buildCategoryPrefixMap(r, user, productID, "constraint")
+		cons, _ := c.constraint.ListConstraints(ctx, user, productID, store.ConstraintFilter{})
+		for _, con := range cons {
+			choices = append(choices, templates.SelectOption{Value: con.ID, Label: model.EntityIdentifier(requirementPrefixOf(prefixes, con.CategoryID), con.SequenceNumber) + " " + con.Title})
+		}
+		return "Constraint", choices
+	case service.BulkComponent:
+		choices = append(choices, templates.SelectOption{Value: "", Label: "No component"})
+		comps, _ := c.component.ListComponents(ctx, user, productID)
+		for _, comp := range comps {
+			choices = append(choices, templates.SelectOption{Value: comp.ID, Label: comp.Name})
+		}
+		return "Component", choices
+	case service.BulkCapability:
+		choices = append(choices, templates.SelectOption{Value: "", Label: "No capability"})
+		caps, _ := c.component.ListCapabilities(ctx, user, productID)
+		for _, capab := range caps {
+			choices = append(choices, templates.SelectOption{Value: capab.ID, Label: capab.Name})
+		}
+		return "Capability", choices
+	case service.BulkPyramidLevel:
+		choices = append(choices, templates.SelectOption{Value: "", Label: "No pyramid level"})
+		levels, _ := c.milestone.ListPyramidLevels(ctx, user, productID)
+		for _, l := range levels {
+			choices = append(choices, templates.SelectOption{Value: l.ID, Label: l.Name})
+		}
+		return "Pyramid level", choices
 	case service.BulkAssign, service.BulkUnassign:
 		for _, m := range c.buildTeamMembers(r, user, productID) {
 			choices = append(choices, templates.SelectOption{Value: m.UserID, Label: m.DisplayName})
@@ -365,6 +467,20 @@ func bulkWording(t bulkTable, action service.BulkAction, n int, valueLabel strin
 		return "Archive", q, "Archive", false
 	case service.BulkUnarchive:
 		return "Unarchive", "Unarchive " + items + ":", "Unarchive", false
+	case service.BulkLinkRequirement:
+		return "Link requirement", "Link " + items + " to " + quoted + ":", "Link", false
+	case service.BulkUnlinkRequirement:
+		return "Unlink requirement", "Unlink " + items + " from " + quoted + ":", "Unlink", false
+	case service.BulkLinkConstraint:
+		return "Link constraint", "Link " + items + " to " + quoted + ":", "Link", false
+	case service.BulkUnlinkConstraint:
+		return "Unlink constraint", "Unlink " + items + " from " + quoted + ":", "Unlink", false
+	case service.BulkComponent:
+		return fieldWording("component", items, valueLabel)
+	case service.BulkCapability:
+		return fieldWording("capability", items, valueLabel)
+	case service.BulkPyramidLevel:
+		return fieldWording("pyramid level", items, valueLabel)
 	case service.BulkDelete:
 		return "Delete", "Delete " + items + ". This cannot be undone:", "Delete", true
 	}
@@ -463,9 +579,20 @@ func (c *PageProductController) BulkPreview(w http.ResponseWriter, r *http.Reque
 	render()
 }
 
+// fieldWording words setting an optional field of test cases, or clearing it
+// with the "No ..." choice.
+func fieldWording(field, items, valueLabel string) (title, question, verb string, danger bool) {
+	title = "Set " + field
+	if valueLabel == "No "+field {
+		return title, "Remove the " + field + " of " + items + ":", "Remove", false
+	}
+	return title, "Set the " + field + " of " + items + " to “" + valueLabel + "”:", "Set", false
+}
+
 func needsChoice(a service.BulkAction) bool {
 	switch a {
-	case service.BulkStatus, service.BulkCategory, service.BulkPriority, service.BulkAssign, service.BulkUnassign:
+	case service.BulkStatus, service.BulkCategory, service.BulkPriority, service.BulkAssign, service.BulkUnassign,
+		service.BulkLinkRequirement, service.BulkUnlinkRequirement, service.BulkLinkConstraint, service.BulkUnlinkConstraint:
 		return true
 	}
 	return false
@@ -484,6 +611,10 @@ func bulkPast(a service.BulkAction) string {
 		return "Assigned"
 	case service.BulkUnassign:
 		return "Unassigned"
+	case service.BulkLinkRequirement, service.BulkLinkConstraint:
+		return "Linked"
+	case service.BulkUnlinkRequirement, service.BulkUnlinkConstraint:
+		return "Unlinked"
 	default:
 		return "Changed"
 	}
@@ -547,6 +678,14 @@ func (c *PageProductController) BulkApply(w http.ResponseWriter, r *http.Request
 // operation changed its items.
 func (c *PageProductController) bulkTableContent(r *http.Request, user *model.User, productID string, t bulkTable, state string) (templ.Component, error) {
 	sr := stateRequest(r, state)
+	if t.testCase() {
+		props, err := c.loadTestCasesProps(sr, user, productID)
+		if err != nil {
+			return nil, err
+		}
+		props.Fragment = true
+		return productpage.TestCasesTableContent(props), nil
+	}
 	if t.defect() {
 		props, err := c.loadDefectsProps(sr, user, productID)
 		if err != nil {

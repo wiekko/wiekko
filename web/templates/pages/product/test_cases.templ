@@ -27,6 +27,9 @@ type TestCasesProps struct {
 	Capabilities  map[string]string // capability ID → name
 	PyramidLevels map[string]string // pyramid level ID → name
 	CanEdit       bool              // developer, owner, or admin
+	// Bulk configures selection and bulk operations; no actions, no selection
+	// (FR-169).
+	Bulk patterns.BulkBarProps
 	// Fragment is set when the content is rendered for an htmx swap, which
 	// then also updates the count in the page header.
 	Fragment bool
@@ -69,6 +72,7 @@ templ TestCasesPage(props TestCasesProps) {
 				}
 			} else {
 				@patterns.TableHeader("Test Cases", testCasesCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal)) {
+					@patterns.BulkSelectButton(props.Bulk)
 					if props.CanEdit {
 						@ui.LinkButton("/products/"+props.Product.ID+"/test-cases/new", "New Test Case", "primary", "md") {
 							@ui.Icon("plus", "sm")
@@ -91,6 +95,7 @@ templ TestCasesTableContent(props TestCasesProps) {
 	}
 	<div class={ "space-y-4", patterns.TableViewRegionClass }>
 		@patterns.TableControls(testCasesControls(props))
+		@patterns.BulkBar(props.Bulk)
 		@ui.TableCard() {
 			if len(props.TestCases) == 0 && !props.State.Filtered() {
 				@testCasesOnboarding(props)
@@ -113,7 +118,7 @@ templ TestCasesTableContent(props TestCasesProps) {
 					}
 					@ui.TableBody("") {
 						for _, tc := range props.TestCases {
-							@ui.TableRow("") {
+							@ui.SelectableRow(tc.ID) {
 								@ui.TableCell() {
 									<a
 										href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", props.Product.ID, tc.ID)) }

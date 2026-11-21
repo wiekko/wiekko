@@ -210,7 +210,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			owns:         owns,
 		},
 		Backlog: backlogSvc,
-		Bulk:    &BulkService{tx: st.Tx, backlog: backlogSvc, authz: authz, productRoles: st.ProductRole},
+		Bulk:    &BulkService{tx: st.Tx, backlog: backlogSvc, testing: testingSvc, authz: authz, productRoles: st.ProductRole},
 		Document: &DocumentService{
 			tx:           st.Tx,
 			documents:    st.Document,

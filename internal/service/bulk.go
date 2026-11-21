@@ -10,9 +10,9 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// Bulk operations (FR-130, FR-131) change many requirements, tasks or defects
-// at once. They hold to SC-92: every item goes through the same BacklogService
-// call as the individual change, so the role checks, activation rules, kanban
+// Bulk operations (FR-130, FR-131, FR-169) change many requirements, tasks,
+// defects or test cases at once. They hold to SC-92: every item goes through
+// the same BacklogService or TestingService call as the individual change, so the role checks, activation rules, kanban
 // columns, archive cascade and history entries apply unchanged, and one
 // item's refusal never blocks the others.
 
@@ -34,7 +34,21 @@ const (
 	BulkArchive     BulkAction = "archive"
 	BulkUnarchive   BulkAction = "unarchive"
 	BulkDelete      BulkAction = "delete"
+
+	// Test cases only (FR-169). Value is the requirement or constraint to
+	// link or unlink, or the capability, component or pyramid level ("" for
+	// none).
+	BulkLinkRequirement   BulkAction = "link_requirement"
+	BulkUnlinkRequirement BulkAction = "unlink_requirement"
+	BulkLinkConstraint    BulkAction = "link_constraint"
+	BulkUnlinkConstraint  BulkAction = "unlink_constraint"
+	BulkCapability        BulkAction = "capability"
+	BulkComponent         BulkAction = "component"
+	BulkPyramidLevel      BulkAction = "pyramid_level"
 )
+
+// BulkKindTestCase is the BulkRequest.Kind of test cases.
+const BulkKindTestCase = "test_case"
 
 // BulkMaxItems caps one bulk operation. Selecting everything that matches a
 // filter can reach far more items than anyone means to change in one go.
@@ -53,8 +67,8 @@ var errDryRun = errors.New("dry run")
 // BulkRequest describes one bulk operation.
 type BulkRequest struct {
 	ProductID string
-	// Kind is model.RequirementKindRequirement, model.RequirementKindTask or
-	// "defect"; items of another kind count as not found.
+	// Kind is model.RequirementKindRequirement, model.RequirementKindTask,
+	// "defect" or BulkKindTestCase; items of another kind count as not found.
 	Kind   string
 	Action BulkAction
 	Value  string
@@ -75,6 +89,7 @@ type BulkOutcome struct {
 type BulkService struct {
 	tx           store.Transactor
 	backlog      *BacklogService
+	testing      *TestingService
 	authz        *Authorizer
 	productRoles store.ProductRoleStore
 }
@@ -134,7 +149,7 @@ func (s *BulkService) Apply(ctx context.Context, user *model.User, req BulkReque
 // deletedAlong reports whether an item that is gone may have been deleted
 // with its parent earlier in the same request.
 func (s *BulkService) deletedAlong(_ context.Context, _ *model.User, req BulkRequest, done []BulkOutcome) bool {
-	if req.Kind == "defect" || req.Children != DeleteChildren {
+	if req.Kind == "defect" || req.Kind == BulkKindTestCase || req.Children != DeleteChildren {
 		return false
 	}
 	for _, o := range done {
@@ -150,6 +165,9 @@ func (s *BulkService) deletedAlong(_ context.Context, _ *model.User, req BulkReq
 func (s *BulkService) validate(ctx context.Context, req BulkRequest) error {
 	if len(req.IDs) > BulkMaxItems {
 		return ErrBulkTooMany
+	}
+	if req.Kind == BulkKindTestCase {
+		return validateTestCaseBulk(req)
 	}
 	defect := req.Kind == "defect"
 	if !defect && req.Kind != model.RequirementKindRequirement && req.Kind != model.RequirementKindTask {
@@ -186,6 +204,20 @@ func (s *BulkService) validate(ctx context.Context, req BulkRequest) error {
 	return nil
 }
 
+// validateTestCaseBulk checks the operations of test cases (FR-169).
+func validateTestCaseBulk(req BulkRequest) error {
+	switch req.Action {
+	case BulkLinkRequirement, BulkUnlinkRequirement, BulkLinkConstraint, BulkUnlinkConstraint:
+		if req.Value == "" {
+			return fmt.Errorf("%w: %s needs a value", errBulkInvalid, req.Action)
+		}
+	case BulkCapability, BulkComponent, BulkPyramidLevel, BulkDelete:
+	default:
+		return fmt.Errorf("%w: test cases have no bulk %q", errBulkInvalid, req.Action)
+	}
+	return nil
+}
+
 // priorityValue reads a priority: 0 for none, 1 the highest (FR-149).
 func priorityValue(v string) (int, error) {
 	p, err := strconv.Atoi(v)
@@ -203,6 +235,9 @@ func IsBulkInvalid(err error) bool {
 
 // one applies the operation to one item through the individual operation.
 func (s *BulkService) one(ctx context.Context, user *model.User, req BulkRequest, id string) error {
+	if req.Kind == BulkKindTestCase {
+		return s.oneTestCase(ctx, user, req, id)
+	}
 	if req.Kind == "defect" {
 		return s.oneDefect(ctx, user, req, id)
 	}
@@ -273,9 +308,48 @@ func (s *BulkService) oneDefect(ctx context.Context, user *model.User, req BulkR
 	return err
 }
 
-// previewDelete checks what deleting one item checks: the owner role and that
-// the item exists and is of the kind.
+// oneTestCase applies the operation to one test case. Linking a linked pair
+// and unlinking an unlinked one change nothing and succeed, as they do one at
+// a time (FR-167).
+func (s *BulkService) oneTestCase(ctx context.Context, user *model.User, req BulkRequest, id string) error {
+	if _, err := s.testing.GetTestCase(ctx, user, req.ProductID, id); err != nil {
+		return err
+	}
+	value := req.Value
+	var in UpdateTestCaseInput
+	switch req.Action {
+	case BulkLinkRequirement:
+		return s.testing.LinkRequirement(ctx, user, req.ProductID, id, req.Value, "")
+	case BulkUnlinkRequirement:
+		return s.testing.UnlinkRequirement(ctx, user, req.ProductID, id, req.Value)
+	case BulkLinkConstraint:
+		return s.testing.LinkConstraint(ctx, user, req.ProductID, id, req.Value)
+	case BulkUnlinkConstraint:
+		return s.testing.UnlinkConstraint(ctx, user, req.ProductID, id, req.Value)
+	case BulkDelete:
+		return s.testing.DeleteTestCase(ctx, user, req.ProductID, id)
+	case BulkCapability:
+		in.CapabilityID = &value
+	case BulkComponent:
+		in.ComponentID = &value
+	case BulkPyramidLevel:
+		in.PyramidLevelID = &value
+	}
+	_, err := s.testing.UpdateTestCase(ctx, user, req.ProductID, id, in)
+	return err
+}
+
+// previewDelete checks what deleting one item checks: the role (owner for
+// backlog items, developer for test cases) and that the item exists and is of
+// the kind.
 func (s *BulkService) previewDelete(ctx context.Context, user *model.User, req BulkRequest, id string) error {
+	if req.Kind == BulkKindTestCase {
+		if _, err := s.authz.RequireRole(ctx, user, req.ProductID, model.RoleDeveloper); err != nil {
+			return err
+		}
+		_, err := s.testing.GetTestCase(ctx, user, req.ProductID, id)
+		return err
+	}
 	if _, err := s.authz.RequireRole(ctx, user, req.ProductID, model.RoleOwner); err != nil {
 		return err
 	}

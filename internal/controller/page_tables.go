@@ -321,6 +321,7 @@ func (c *PageProductController) loadTestCasesProps(r *http.Request, user *model.
 		ComponentOptions:    components,
 		CapabilityOptions:   capabilities,
 		PyramidLevelOptions: levels,
+		Bulk:                testCaseBulkBar(p, user, role, total, len(levels) > 0),
 	}, nil
 }
 
