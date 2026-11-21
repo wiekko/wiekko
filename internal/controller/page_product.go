@@ -37,6 +37,7 @@ type PageProductController struct {
 	document   *service.DocumentService
 	discussion *service.DiscussionService
 	audit      *service.AuditService
+	bulk       *service.BulkService
 
 	// maxUploadBytes mirrors the router's cap so the upload form can state the
 	// limit and rejections can name it.
@@ -46,6 +47,13 @@ type PageProductController struct {
 // NewPageProduct creates a PageProductController.
 func NewPageProduct(product *service.ProductService, dashboard *service.DashboardService, settings *service.SettingService, user *service.UserService, invitation *service.InvitationService, milestone *service.MilestoneService, component *service.ComponentService, testing *service.TestingService, backlog *service.BacklogService, category *service.CategoryService, constraint *service.ConstraintService, discussion *service.DiscussionService, audit *service.AuditService, maxUploadBytes int64) *PageProductController {
 	return &PageProductController{product: product, dashboard: dashboard, settings: settings, user: user, invitation: invitation, milestone: milestone, component: component, testing: testing, backlog: backlog, category: category, constraint: constraint, discussion: discussion, audit: audit, maxUploadBytes: maxUploadBytes}
+}
+
+// WithBulk gives the controller the bulk operations of the requirements,
+// tasks and defects tables (FR-130, FR-131).
+func (c *PageProductController) WithBulk(bulk *service.BulkService) *PageProductController {
+	c.bulk = bulk
+	return c
 }
 
 // ProductSwitcher renders GET /products/switcher, the header/sidebar product
@@ -7004,6 +7012,7 @@ func (c *PageProductController) loadDefectsProps(r *http.Request, user *model.Us
 		Environments:  c.buildEnvironmentMap(r, user, productID),
 		CanCreate:     c.canCreateDefects(user, role),
 		CanEdit:       c.canEditDefects(user, role),
+		Bulk:          bulkBar(bulkTableOf("defect"), p, user, role, total),
 		State:         state,
 		Total:         total,
 		ProductTotal:  productTotal,

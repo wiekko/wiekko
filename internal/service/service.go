@@ -26,6 +26,7 @@ type Services struct {
 	Milestone  *MilestoneService
 	Category   *CategoryService
 	Backlog    *BacklogService
+	Bulk       *BulkService
 	Constraint *ConstraintService
 	Document   *DocumentService
 	Testing    *TestingService
@@ -209,6 +210,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			owns:         owns,
 		},
 		Backlog: backlogSvc,
+		Bulk:    &BulkService{tx: st.Tx, backlog: backlogSvc, authz: authz, productRoles: st.ProductRole},
 		Document: &DocumentService{
 			tx:           st.Tx,
 			documents:    st.Document,

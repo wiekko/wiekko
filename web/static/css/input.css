@@ -173,3 +173,40 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .dark .chroma .o { color: var(--color-gray-400); }
 .dark .chroma .gd { color: var(--color-red-400); }
 .dark .chroma .gi { color: var(--color-emerald-300); }
+
+/* Selection mode of a table with bulk operations (UC-76). A selected row has
+   an indigo tint, stronger than the hover tint, and an indigo bar on its left
+   edge, so the selection does not rest on colour alone. */
+[data-selecting] tr[data-bulk-id] {
+  cursor: pointer;
+  user-select: none;
+}
+
+[data-selecting] tr[data-bulk-id]:hover {
+  background-color: var(--color-gray-50);
+}
+
+.dark [data-selecting] tr[data-bulk-id]:hover {
+  background-color: var(--color-gray-800);
+}
+
+[data-selecting] tr[data-bulk-id][aria-selected="true"] {
+  background-color: var(--color-indigo-50);
+}
+
+.dark [data-selecting] tr[data-bulk-id][aria-selected="true"] {
+  background-color: color-mix(in oklab, var(--color-indigo-900) 45%, transparent);
+}
+
+[data-selecting] tr[data-bulk-id][aria-selected="true"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-indigo-600);
+}
+
+.dark [data-selecting] tr[data-bulk-id][aria-selected="true"] > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-indigo-400);
+}
+
+[data-selecting] tr[data-bulk-id]:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: -2px;
+}

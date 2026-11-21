@@ -23,6 +23,9 @@ type BacklogItemsProps struct {
 	CategoryPrefixes map[string]string        // category ID → prefix
 	Statuses         map[string]*model.Status // status ID → status
 	CanEdit          bool                     // owner or admin
+	// Bulk configures selection and bulk operations; no actions, no selection
+	// (FR-130, FR-131).
+	Bulk patterns.BulkBarProps
 	// Fragment is set when the content is rendered for an htmx swap, which
 	// then also updates the count in the page header.
 	Fragment bool
@@ -68,6 +71,7 @@ templ BacklogItemsPage(props BacklogItemsProps) {
 				}
 			} else {
 				@patterns.TableHeader(backlogItemsTitle(props.Kind), backlogItemsCountID(props.Kind), patterns.TableCountLabel(props.State, props.Total, props.ProductTotal)) {
+					@patterns.BulkSelectButton(props.Bulk)
 					if props.CanEdit {
 						@ui.LinkButton(backlogItemsURL(props)+"/new", "New "+backlogItemsSingular(props.Kind), "primary", "md") {
 							@ui.Icon("plus", "sm")
@@ -92,6 +96,7 @@ templ BacklogItemsTableContent(props BacklogItemsProps) {
 	}
 	<div class={ "space-y-4", patterns.TableViewRegionClass }>
 		@patterns.TableControls(backlogItemsControls(props))
+		@patterns.BulkBar(props.Bulk)
 		@ui.TableCard() {
 			if len(props.Items) == 0 && !props.State.Filtered() && props.ProductTotal > 0 {
 				// Nothing is filtered but the archived items, hidden by default
@@ -120,7 +125,7 @@ templ BacklogItemsTableContent(props BacklogItemsProps) {
 					}
 					@ui.TableBody("") {
 						for _, item := range props.Items {
-							@ui.TableRow("") {
+							@ui.SelectableRow(item.ID) {
 								@ui.TableCellMuted() {
 									{ model.EntityIdentifier(requirementPrefix(props.CategoryPrefixes, item.CategoryID), item.SequenceNumber) }
 								}

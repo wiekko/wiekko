@@ -1,0 +1,146 @@
+package router
+
+import (
+	"context"
+	"database/sql"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+
+	"nexmap.net/internal/database/dbtest"
+	"nexmap.net/internal/model"
+	"nexmap.net/internal/service"
+)
+
+// TestBulkOperationsPages drives the bulk operations of the requirements
+// table (FR-130, FR-131): who may select, the confirmation naming what will
+// and will not change (SC-92, UC-91), and applying it.
+func TestBulkOperationsPages(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		pid := e.product.ID
+		must := func(err error) {
+			t.Helper()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		statuses, err := e.svc.Milestone.ListStatuses(ctx, e.admin, pid, model.RequirementKindRequirement)
+		must(err)
+		var closed *model.Status
+		for _, s := range statuses {
+			if s.IsClosed {
+				closed = s
+			}
+		}
+		if closed == nil {
+			t.Fatal("no closed status")
+		}
+		open, err := e.svc.Backlog.CreateRequirement(ctx, e.admin, service.CreateRequirementInput{ProductID: pid, Title: "Still open"})
+		must(err)
+		done, err := e.svc.Backlog.CreateRequirement(ctx, e.admin, service.CreateRequirementInput{ProductID: pid, Title: "All done"})
+		must(err)
+		_, err = e.svc.Backlog.UpdateRequirement(ctx, e.admin, pid, done.ID, service.UpdateRequirementInput{StatusID: &closed.ID})
+		must(err)
+
+		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+		var admin *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" && c.Value != "" {
+				admin = c
+			}
+		}
+		if admin == nil {
+			t.Fatal("no session cookie")
+		}
+		page := "/products/" + pid + "/requirements"
+		get := func(cookie *http.Cookie) string {
+			t.Helper()
+			r, err := http.NewRequest(http.MethodGet, e.srv.URL+page, nil)
+			must(err)
+			r.AddCookie(cookie)
+			resp, err := e.client().Do(r)
+			must(err)
+			return readBody(t, resp)
+		}
+		post := func(cookie *http.Cookie, step string, form url.Values) (*http.Response, string) {
+			t.Helper()
+			r, err := http.NewRequest(http.MethodPost, e.srv.URL+page+"/bulk/"+step, strings.NewReader(form.Encode()))
+			must(err)
+			r.AddCookie(cookie)
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			r.Header.Set("X-CSRF-Token", csrfToken(t, e, cookie))
+			r.Header.Set("HX-Request", "true")
+			resp, err := e.client().Do(r)
+			must(err)
+			return resp, readBody(t, resp)
+		}
+
+		body := get(admin)
+		for _, want := range []string{`data-bulk-toggle="requirements-table"`, `data-bulk-bar="requirements-table"`, `data-bulk-id="` + open.ID + `"`, `data-bulk-action="priority"`, `data-bulk-action="delete"`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("owner's table lacks %s", want)
+			}
+		}
+
+		// Archiving needs a closed status: the confirmation offers the done
+		// item and names the open one with the reason.
+		ids := open.ID + "," + done.ID
+		_, body = post(admin, "preview", url.Values{"action": {"archive"}, "ids": {ids}})
+		if !strings.Contains(body, "Archive 1") || !strings.Contains(body, "1 can&#39;t be changed:") || !strings.Contains(body, "closed status") {
+			t.Errorf("archive preview does not tell what can and cannot change:\n%s", body)
+		}
+		if got, _ := e.svc.Backlog.GetRequirement(ctx, e.admin, pid, done.ID); got.Archived() {
+			t.Fatal("the preview archived an item")
+		}
+
+		resp, body = post(admin, "apply", url.Values{"action": {"archive"}, "ids": {ids}, "state": {""}})
+		if resp.StatusCode != http.StatusOK || resp.Header.Get("HX-Trigger") != "bulkApplied" {
+			t.Fatalf("apply: %d %q", resp.StatusCode, resp.Header.Get("HX-Trigger"))
+		}
+		if !strings.Contains(body, "Archived 1 requirement.") || !strings.Contains(body, "1 requirement could not be changed") || !strings.Contains(body, `data-bulk-bar="requirements-table"`) {
+			t.Errorf("apply answer lacks the summary or the table:\n%s", body)
+		}
+		if got, _ := e.svc.Backlog.GetRequirement(ctx, e.admin, pid, done.ID); !got.Archived() {
+			t.Error("the done item was not archived")
+		}
+
+		// All matching: the confirmation resolves the filter (archived items
+		// hidden by default) and freezes the IDs it found.
+		_, body = post(admin, "preview", url.Values{"action": {"status"}, "scope": {"matching"}, "state": {""}})
+		if !strings.Contains(body, `name="ids" value="`+open.ID+`"`) || !strings.Contains(body, "Change 1") {
+			t.Errorf("matching preview does not freeze the open item alone:\n%s", body)
+		}
+
+		_, body = post(admin, "preview", url.Values{"action": {"priority"}, "ids": {open.ID}})
+		if !strings.Contains(body, "Set the priority of 1 requirement to “P1 (highest)”") || !strings.Contains(body, `value="0"`) {
+			t.Errorf("priority preview does not default to P1 or lacks “No priority”:\n%s", body)
+		}
+
+		tooMany := strings.Repeat(open.ID+",", service.BulkMaxItems+1)
+		_, body = post(admin, "preview", url.Values{"action": {"milestone"}, "ids": {tooMany}})
+		if !strings.Contains(body, "at most") {
+			t.Error("an oversized selection is not refused")
+		}
+
+		// Developers may only change statuses; viewers cannot select.
+		dev := e.invite("dev", model.RoleDeveloper)
+		body = get(dev)
+		if !strings.Contains(body, `data-bulk-action="status"`) || strings.Contains(body, `data-bulk-action="archive"`) || strings.Contains(body, `data-bulk-action="priority"`) {
+			t.Error("a developer's bar does not offer exactly the status change")
+		}
+		resp, _ = post(dev, "apply", url.Values{"action": {"delete"}, "ids": {open.ID}, "state": {""}})
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("developer delete apply: %d", resp.StatusCode)
+		}
+		if _, err := e.svc.Backlog.GetRequirement(ctx, e.admin, pid, open.ID); err != nil {
+			t.Error("a developer deleted an item in bulk")
+		}
+		viewer := e.invite("viewer", model.RoleViewer)
+		if body = get(viewer); strings.Contains(body, "data-bulk-toggle") {
+			t.Error("a viewer is offered selection")
+		}
+	})
+}

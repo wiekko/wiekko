@@ -34,6 +34,9 @@ type DefectsProps struct {
 	Environments map[string]string
 	CanCreate    bool // tester+ can create
 	CanEdit      bool // owner or admin
+	// Bulk configures selection and bulk operations; no actions, no selection
+	// (FR-130, FR-131).
+	Bulk patterns.BulkBarProps
 
 	// State is the sort/search/filter/page state of the view, and the source of
 	// every URL the table's controls link to.
@@ -79,6 +82,7 @@ templ DefectsPage(props DefectsProps) {
 			} else {
 				@patterns.TableHeader("Defects", defectsCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal)) {
 					@defectsViewToggle(props.Product.ID, false)
+					@patterns.BulkSelectButton(props.Bulk)
 					if props.CanCreate {
 						@ui.LinkButton("/products/"+props.Product.ID+"/defects/new", "New Defect", "primary", "md") {
 							@ui.Icon("plus", "sm")
@@ -102,6 +106,7 @@ templ DefectsTableContent(props DefectsProps) {
 	}
 	<div class={ "space-y-4", patterns.TableViewRegionClass }>
 		@patterns.TableControls(defectsControls(props))
+		@patterns.BulkBar(props.Bulk)
 		@ui.TableCard() {
 			if len(props.Defects) == 0 && !props.State.Filtered() {
 				@ui.EmptyState("archive", "All defects are archived",
@@ -129,7 +134,7 @@ templ DefectsTableContent(props DefectsProps) {
 					}
 					@ui.TableBody("") {
 						for _, d := range props.Defects {
-							@ui.TableRow("") {
+							@ui.SelectableRow(d.ID) {
 								@ui.TableCellMuted() {
 									<span class="whitespace-nowrap">{ d.Identifier }</span>
 								}

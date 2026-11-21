@@ -1,0 +1,326 @@
+package patterns
+
+import (
+	"fmt"
+
+	"nexmap.net/web/templates"
+	"nexmap.net/web/templates/ui"
+)
+
+// Bulk operations (FR-130, FR-131) in the tables of requirements, tasks and
+// defects, selected as UC-76 describes: a "Select" button switches the table
+// into selection mode, where clicking a row selects it, and the filter row
+// turns into the selection bar. bulk-select.js does the selecting; the server
+// previews each operation in a confirmation (UC-91) and applies it item by
+// item (SC-92).
+
+// BulkAction is one operation the selection bar offers.
+type BulkAction struct {
+	Action string // service.BulkAction
+	Label  string
+	Icon   string
+}
+
+// BulkBarProps configures a table's selection bar.
+type BulkBarProps struct {
+	// Region is the ID of the element the table is swapped into.
+	Region string
+	// PreviewURL opens the confirmation of an operation.
+	PreviewURL string
+	// Noun names the items, plural ("requirements").
+	Noun string
+	// Total counts the items matching the search and filters, across pages.
+	Total int
+	// Actions are the operations the user's role allows; none hides selection.
+	Actions []BulkAction
+}
+
+// Enabled reports whether the user can select rows at all (SC-92).
+func (p BulkBarProps) Enabled() bool { return len(p.Actions) > 0 }
+
+// BulkSelectButton switches a table into selection mode. It sits in the page
+// header, next to the table's other actions.
+templ BulkSelectButton(props BulkBarProps) {
+	if props.Enabled() {
+		<button
+			type="button"
+			data-bulk-toggle={ props.Region }
+			aria-pressed="false"
+			title="Select rows for bulk changes. Ctrl/Cmd+click selects a row any time, Shift+click a range; Escape leaves selection."
+			class="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 aria-pressed:bg-indigo-50 aria-pressed:text-indigo-700 aria-pressed:ring-indigo-300 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700 dark:aria-pressed:bg-indigo-950 dark:aria-pressed:text-indigo-300 dark:aria-pressed:ring-indigo-700"
+		>
+			@ui.Icon("list-checks", "sm")
+			Select
+		</button>
+	}
+}
+
+// BulkBar is the selection bar. It is rendered hidden in place of nothing:
+// bulk-select.js shows it and hides the search and filters in selection mode.
+templ BulkBar(props BulkBarProps) {
+	if props.Enabled() {
+		<div
+			data-bulk-bar={ props.Region }
+			data-preview-url={ props.PreviewURL }
+			data-total={ fmt.Sprint(props.Total) }
+			data-noun={ props.Noun }
+			hidden
+			// Its own layer above the table, whose sticky column headers would
+			// otherwise cover the operations menu.
+			class="relative z-20 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-indigo-50 px-3 py-2 ring-1 ring-indigo-200 dark:bg-indigo-950/40 dark:ring-indigo-900"
+		>
+			<button
+				type="button"
+				data-bulk-exit
+				aria-label="Leave selection"
+				title="Leave selection (Escape)"
+				class="rounded-md p-1 text-indigo-700 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-900"
+			>
+				@ui.Icon("x", "sm")
+			</button>
+			<span data-bulk-count role="status" aria-live="polite" class="text-sm font-semibold text-indigo-900 dark:text-indigo-100">0 selected</span>
+			<button type="button" data-bulk-page class={ bulkLinkClass }>Select page</button>
+			<button type="button" data-bulk-matching hidden class={ bulkLinkClass }>
+				{ fmt.Sprintf("Select all %d matching", props.Total) }
+			</button>
+			<button type="button" data-bulk-clear hidden class={ bulkLinkClass }>Clear</button>
+			// Labelled buttons where the bar has room, icons with their name as a
+			// tooltip where it is tighter, and a menu on narrow screens.
+			<div class="ml-auto hidden flex-wrap items-center gap-1.5 lg:flex">
+				for _, a := range props.Actions {
+					<button
+						type="button"
+						data-bulk-action={ a.Action }
+						disabled
+						title={ a.Label }
+						aria-label={ a.Label }
+						class={ "inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium ring-1 ring-inset focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50", bulkActionClass(a.Action) }
+					>
+						@ui.Icon(a.Icon, "sm")
+						<span class="hidden 2xl:inline">{ a.Label }</span>
+					</button>
+				}
+			</div>
+			// On narrow screens the operations fold into one menu, keeping the
+			// bar a line high (UC-60).
+			<div class="ml-auto lg:hidden">
+				@ui.DropdownMenu(props.Region + "-bulk-menu") {
+					@ui.DropdownTrigger() {
+						<button
+							type="button"
+							data-bulk-menu
+							disabled
+							aria-haspopup="menu"
+							class="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-300 ring-inset disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600"
+						>
+							Actions
+							@ui.Icon("chevron-down", "sm")
+						</button>
+					}
+					@ui.DropdownContent() {
+						for _, a := range props.Actions {
+							<button
+								type="button"
+								role="menuitem"
+								data-bulk-action={ a.Action }
+								class={ "flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700", bulkMenuItemClass(a.Action) }
+							>
+								@ui.Icon(a.Icon, "sm")
+								{ a.Label }
+							</button>
+						}
+					}
+				}
+			</div>
+		</div>
+	}
+}
+
+const bulkLinkClass = "text-sm font-medium text-indigo-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded dark:text-indigo-300"
+
+func bulkActionClass(action string) string {
+	if action == "delete" {
+		return "bg-white text-red-700 ring-red-300 hover:bg-red-50 dark:bg-gray-900 dark:text-red-400 dark:ring-red-800 dark:hover:bg-red-950"
+	}
+	return "bg-white text-gray-700 ring-gray-300 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800"
+}
+
+func bulkMenuItemClass(action string) string {
+	if action == "delete" {
+		return "text-red-700 dark:text-red-400"
+	}
+	return "text-gray-700 dark:text-gray-300"
+}
+
+// BulkItem names one item in a bulk confirmation.
+type BulkItem struct {
+	Identifier string
+	Title      string
+}
+
+// BulkRefusal groups the selected items an operation cannot change for the
+// same reason (SC-92).
+type BulkRefusal struct {
+	Reason string
+	Items  []BulkItem
+}
+
+// BulkConfirmProps configures the confirmation of a bulk operation.
+type BulkConfirmProps struct {
+	Title    string // "Change status"
+	Question string // "Change the status of 8 requirements to “Done”?"
+	Verb     string // the confirm button's label
+	Danger   bool   // irreversible: red button (UC-91)
+
+	PreviewURL string
+	ApplyURL   string
+	// Target is the table region the applied operation re-renders.
+	Target string
+
+	Action string
+	// IDs are the items the confirmation offers, frozen when it opened:
+	// applying changes these and no others, even if more match the filter by
+	// then (FR-130). Selection is everything selected, refused items
+	// included, for previewing again with another value.
+	IDs       string
+	Selection string
+	State string // the table's query string, to re-render it as it was
+
+	// ChoiceLabel and Choices offer the operation's value, e.g. the status.
+	ChoiceLabel string
+	Choices     []templates.SelectOption
+	Value       string
+
+	Allowed []BulkItem
+	Refused []BulkRefusal
+	// Children asks what happens to the items below deleted ones.
+	Children bool
+	// Problem replaces everything else when the request cannot be previewed
+	// at all, e.g. too many items.
+	Problem string
+}
+
+const bulkConfirmID = "bulk-confirm"
+
+// maxListedBulkItems caps how many items a bulk confirmation names.
+const maxListedBulkItems = 5
+
+// BulkConfirm is the confirmation of a bulk operation (UC-91): what will
+// happen, to which items, and which selected items it cannot change and why.
+templ BulkConfirm(props BulkConfirmProps) {
+	@ui.Modal(bulkConfirmID, props.Title, "md") {
+		if props.Problem != "" {
+			<p class="text-sm text-gray-600 dark:text-gray-400">{ props.Problem }</p>
+			<div class="mt-4 flex justify-end">
+				@ui.ModalCancelButton(bulkConfirmID)
+			</div>
+		} else {
+			<form id="bulk-form" class="space-y-4">
+				<input type="hidden" name="action" value={ props.Action }/>
+				<input type="hidden" name="ids" value={ props.IDs }/>
+				<input type="hidden" name="selection" value={ props.Selection }/>
+				<input type="hidden" name="state" value={ props.State }/>
+				if len(props.Choices) > 0 {
+					<div>
+						<label for="bulk-value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{ props.ChoiceLabel }</label>
+						<select
+							id="bulk-value"
+							name="value"
+							hx-post={ props.PreviewURL }
+							hx-trigger="change"
+							hx-include="#bulk-form"
+							hx-target="#modal"
+							hx-swap="innerHTML"
+							class="mt-1 block w-full rounded-md border-0 py-1.5 pr-10 pl-3 text-sm text-gray-900 ring-1 ring-gray-300 ring-inset focus:ring-2 focus:ring-indigo-600 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-600"
+						>
+							for _, c := range props.Choices {
+								<option value={ c.Value } selected?={ c.Value == props.Value }>{ c.Label }</option>
+							}
+						</select>
+					</div>
+				} else {
+					<input type="hidden" name="value" value={ props.Value }/>
+				}
+				if len(props.Allowed) > 0 {
+					<div>
+						<p class="text-sm text-gray-700 dark:text-gray-300">{ props.Question }</p>
+						@bulkItemList(props.Allowed)
+					</div>
+				} else {
+					<p class="text-sm text-gray-700 dark:text-gray-300">None of the selected items can be changed this way.</p>
+				}
+				for _, ref := range props.Refused {
+					<div class="rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-900/20">
+						<p class="text-sm font-medium text-amber-800 dark:text-amber-300">
+							{ refusalHeading(len(ref.Items)) }
+							<span class="font-normal">{ ref.Reason }</span>
+						</p>
+						@bulkItemList(ref.Items)
+					</div>
+				}
+				if props.Children && len(props.Allowed) > 0 {
+					<fieldset class="space-y-2">
+						<legend class="text-sm font-medium text-gray-700 dark:text-gray-300">Some of them have items below them. What happens to those?</legend>
+						<label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+							<input type="radio" name="children" value="keep" checked class="mt-0.5 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900"/>
+							<span>Keep them and move them up a level</span>
+						</label>
+						<label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+							<input type="radio" name="children" value="delete" class="mt-0.5 h-4 w-4 border-gray-300 text-red-600 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-900"/>
+							<span>Delete them too, with their comments and attachments</span>
+						</label>
+					</fieldset>
+				}
+			</form>
+			<div class="mt-4 flex justify-end gap-3">
+				@ui.ModalCancelButton(bulkConfirmID)
+				if len(props.Allowed) > 0 {
+					<button
+						type="button"
+						class={ ui.ConfirmButtonClass(bulkVariant(props.Danger)) }
+						data-confirm-action
+						hx-post={ props.ApplyURL }
+						hx-include="#bulk-form"
+						hx-target={ props.Target }
+						hx-swap="innerHTML"
+					>
+						{ fmt.Sprintf("%s %d", props.Verb, len(props.Allowed)) }
+					</button>
+				}
+			</div>
+		}
+	}
+}
+
+templ bulkItemList(items []BulkItem) {
+	<ul class="mt-1 list-disc pl-5 text-sm text-gray-600 dark:text-gray-400">
+		for i, it := range items {
+			if i < maxListedBulkItems {
+				<li><span class="font-mono text-xs">{ it.Identifier }</span> { it.Title }</li>
+			}
+		}
+		if len(items) > maxListedBulkItems {
+			<li>{ fmt.Sprintf("and %d more", len(items)-maxListedBulkItems) }</li>
+		}
+	</ul>
+}
+
+func refusalHeading(n int) string {
+	if n == 1 {
+		return "1 can't be changed:"
+	}
+	return fmt.Sprintf("%d can't be changed:", n)
+}
+
+func bulkVariant(danger bool) ui.ConfirmVariant {
+	if danger {
+		return ui.ConfirmDanger
+	}
+	return ui.ConfirmNeutral
+}
+
+// BulkApplied closes the confirmation after the table was re-rendered.
+templ BulkApplied(message, variant string) {
+	<div id="modal" hx-swap-oob="innerHTML"></div>
+	@ui.ToastOOB(message, variant)
+}

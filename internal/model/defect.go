@@ -39,3 +39,16 @@ const (
 	DefectCriticalityMedium   = "medium"
 	DefectCriticalityLow      = "low"
 )
+
+// DefectCriticalities lists the criticalities, most severe first.
+var DefectCriticalities = []string{DefectCriticalityCritical, DefectCriticalityHigh, DefectCriticalityMedium, DefectCriticalityLow}
+
+// ValidDefectCriticality reports whether c is one of DefectCriticalities.
+func ValidDefectCriticality(c string) bool {
+	for _, v := range DefectCriticalities {
+		if c == v {
+			return true
+		}
+	}
+	return false
+}

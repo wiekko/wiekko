@@ -15,7 +15,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor, svc.Audit, svc.Product)
 	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product)
-	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes)
+	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes).WithBulk(svc.Bulk)
 	productCtrl.UseDocuments(svc.Document)
 	upload := pageUpload(productCtrl)
 
@@ -311,6 +311,10 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 
 	// Requirement pages.
 	mux.Handle("GET /products/{id}/requirements", pageAuthed(http.HandlerFunc(productCtrl.Requirements)))
+	// Bulk operations on the requirements, tasks and defects tables (FR-130,
+	// FR-131); {collection} is one of the three.
+	mux.Handle("POST /products/{id}/{collection}/bulk/preview", pageAuthed(http.HandlerFunc(productCtrl.BulkPreview)))
+	mux.Handle("POST /products/{id}/{collection}/bulk/apply", pageAuthed(http.HandlerFunc(productCtrl.BulkApply)))
 	mux.Handle("GET /products/{id}/requirements/new", pageAuthed(http.HandlerFunc(productCtrl.RequirementCreateForm)))
 	mux.Handle("GET /products/{id}/requirements/new/capability-options", pageAuthed(http.HandlerFunc(productCtrl.RequirementCapabilityOptions)))
 	mux.Handle("GET /products/{id}/requirements/new/capability-chips", pageAuthed(http.HandlerFunc(productCtrl.RequirementCapabilityChips)))

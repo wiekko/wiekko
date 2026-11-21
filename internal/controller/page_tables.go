@@ -186,6 +186,7 @@ func (c *PageProductController) loadBacklogItemsProps(r *http.Request, user *mod
 		CategoryPrefixes: prefixes,
 		Statuses:         statusMap,
 		CanEdit:          c.canEditRequirements(user, role),
+		Bulk:             bulkBar(bulkTableOf(kind), p, user, role, total),
 		State:            state,
 		Total:            total,
 		ProductTotal:     productTotal,
