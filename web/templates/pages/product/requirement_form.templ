@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"nexmap.net/internal/model"
+	"nexmap.net/web"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
 	"nexmap.net/web/templates/patterns"
@@ -410,7 +411,7 @@ templ requirementCapabilityField(props RequirementFormProps) {
 		<noscript>
 			@capabilityCheckboxes(props.CapabilityGroups, props.CapabilityChips)
 		</noscript>
-		<script src="/static/js/capability-field.js" defer></script>
+		<script src={ web.Asset("js/capability-field.js") } defer></script>
 	</div>
 }
 

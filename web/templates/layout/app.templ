@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"nexmap.net/web"
 	"nexmap.net/web/templates"
 	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
@@ -55,7 +56,7 @@ templ AppLayout(props AppLayoutProps) {
 		<!-- Toast container -->
 		@ui.ToastContainer()
 		@sidebarScript()
-		<script src="/static/js/product-switcher.js" defer></script>
+		<script src={ web.Asset("js/product-switcher.js") } defer></script>
 	}
 }
 

@@ -21,7 +21,7 @@ func TestAppLayoutProvidesConfirmDialog(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := sb.String()
-	for _, s := range []string{`id="confirm-dialog-template"`, `src="/static/js/modal.js"`} {
+	for _, s := range []string{`id="confirm-dialog-template"`, `src="/static/js/modal.js?v=`} {
 		if !strings.Contains(out, s) {
 			t.Errorf("app layout lacks %s", s)
 		}

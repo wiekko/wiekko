@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"nexmap.net/internal/model"
+	"nexmap.net/web"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
 	"nexmap.net/web/templates/patterns"
@@ -230,7 +231,7 @@ templ campaignScopePicker(props CampaignFormProps) {
 					</ul>
 				</div>
 			</div>
-			<script src="/static/js/campaign-picker.js" defer></script>
+			<script src={ web.Asset("js/campaign-picker.js") } defer></script>
 		}
 	</div>
 }
