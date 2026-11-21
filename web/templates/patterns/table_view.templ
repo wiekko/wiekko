@@ -294,6 +294,19 @@ func singular(noun string) string {
 	return noun
 }
 
+// TableViewPageClass is the root of a list page whose table scrolls on its
+// own (UR-164). On tall screens the page fills the main area as a flex
+// column: breadcrumb, header and filters keep their height, and the table's
+// region, marked with TableViewRegionClass at every level down to the
+// ui.TableCard, takes what is left, so the rows scroll and nothing above
+// them does. Pages with forms above the table (team, invitations) keep
+// scrolling as a whole: the forms would leave the table a sliver.
+const TableViewPageClass = "space-y-6 tall:flex tall:h-full tall:flex-col"
+
+// TableViewRegionClass marks an element between a TableViewPageClass root
+// and its ui.TableCard: a flex column allowed to shrink below its content.
+const TableViewRegionClass = "tall:flex tall:min-h-0 tall:flex-col"
+
 // TableFrameProps configures a TableFrame.
 type TableFrameProps struct {
 	Controls TableControlsProps
@@ -321,12 +334,12 @@ templ TableFrame(props TableFrameProps) {
 	if props.Fragment {
 		@TableCount(props.CountID, TableCountLabel(props.Controls.State, props.Total, props.ProductTotal))
 	}
-	<div class="space-y-4">
+	<div class={ "space-y-4", TableViewRegionClass }>
 		// A search box and filters over nothing at all are noise.
 		if props.ProductTotal > 0 {
 			@TableControls(props.Controls)
 		}
-		@ui.Card() {
+		@ui.TableCard() {
 			if props.Rows == 0 && (props.ProductTotal == 0 || !props.Controls.State.Filtered()) {
 				@props.Empty
 			} else if props.Rows == 0 {

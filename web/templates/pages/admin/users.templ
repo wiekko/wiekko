@@ -27,9 +27,9 @@ templ UsersPage(props UsersProps) {
 		IsAdmin:       props.IsAdmin,
 		ActiveSection: "admin-users",
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@patterns.TableHeader("Users", "users-count", props.CountLabel())
-			<div id={ UsersTableID }>
+			<div id={ UsersTableID } class={ patterns.TableViewRegionClass }>
 				@UsersTableContent(props)
 			</div>
 		</div>

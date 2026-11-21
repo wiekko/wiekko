@@ -36,7 +36,7 @@ templ ConstraintsPage(props ConstraintsProps) {
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
@@ -55,7 +55,7 @@ templ ConstraintsPage(props ConstraintsProps) {
 						}
 					}
 				}
-				<div id={ ConstraintsTableID }>
+				<div id={ ConstraintsTableID } class={ patterns.TableViewRegionClass }>
 					@ConstraintsTableContent(props)
 				</div>
 			}

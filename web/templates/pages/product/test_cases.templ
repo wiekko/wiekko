@@ -56,7 +56,7 @@ templ TestCasesPage(props TestCasesProps) {
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
@@ -75,7 +75,7 @@ templ TestCasesPage(props TestCasesProps) {
 						}
 					}
 				}
-				<div id="test-cases-table">
+				<div id="test-cases-table" class={ patterns.TableViewRegionClass }>
 					@TestCasesTableContent(props)
 				</div>
 			}
@@ -89,9 +89,9 @@ templ TestCasesTableContent(props TestCasesProps) {
 	if props.Fragment {
 		@patterns.TableCount(testCasesCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal))
 	}
-	<div class="space-y-4">
+	<div class={ "space-y-4", patterns.TableViewRegionClass }>
 		@patterns.TableControls(testCasesControls(props))
-		@ui.Card() {
+		@ui.TableCard() {
 			if len(props.TestCases) == 0 && !props.State.Filtered() {
 				@testCasesOnboarding(props)
 			} else if len(props.TestCases) == 0 {

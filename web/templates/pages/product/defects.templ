@@ -61,7 +61,7 @@ templ DefectsPage(props DefectsProps) {
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
@@ -85,7 +85,7 @@ templ DefectsPage(props DefectsProps) {
 						}
 					}
 				}
-				<div id="defects-table">
+				<div id="defects-table" class={ patterns.TableViewRegionClass }>
 					@DefectsTableContent(props)
 				</div>
 			}
@@ -100,9 +100,9 @@ templ DefectsTableContent(props DefectsProps) {
 	if props.Fragment {
 		@patterns.TableCount(defectsCountID, patterns.TableCountLabel(props.State, props.Total, props.ProductTotal))
 	}
-	<div class="space-y-4">
+	<div class={ "space-y-4", patterns.TableViewRegionClass }>
 		@patterns.TableControls(defectsControls(props))
-		@ui.Card() {
+		@ui.TableCard() {
 			if len(props.Defects) == 0 && !props.State.Filtered() {
 				@ui.EmptyState("archive", "All defects are archived",
 					"Archived defects are hidden from this list.", "", "")

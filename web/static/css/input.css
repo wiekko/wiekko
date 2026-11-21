@@ -3,6 +3,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Screens tall enough for a list page to keep its header and filters in
+   view while only the table scrolls (UR-164). Shorter ones, such as a phone
+   held sideways, scroll the whole page instead. */
+@custom-variant tall (@media (min-height: 40rem));
+
 @source "../templates";
 
 @theme {

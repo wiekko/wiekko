@@ -1,8 +1,26 @@
 package ui
 
+// cardClass is the box of every Card.
+const cardClass = "overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700"
+
 // Card renders a container with rounded corners and shadow.
 templ Card() {
-	<div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+	<div class={ cardClass }>
+		{ children... }
+	</div>
+}
+
+// TableCard is the Card of a list page's table (UR-164). On tall screens it
+// is a flex column that may shrink below its content, so the page keeps its
+// header and filters in view and the Table inside scrolls instead.
+//
+// It never shrinks below a header and about three rows, though: where the
+// controls above take most of the height (a phone with the filters open) the
+// page scrolls again rather than squeezing the table to nothing. The floor
+// applies from four rows on, which are taller than it anyway, so a shorter
+// table is never stretched by it.
+templ TableCard() {
+	<div class={ cardClass, "tall:flex tall:min-h-0 tall:flex-col tall:has-[tbody>tr:nth-child(4)]:min-h-48" }>
 		{ children... }
 	</div>
 }

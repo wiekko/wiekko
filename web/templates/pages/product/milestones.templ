@@ -39,7 +39,7 @@ templ MilestonesPage(props MilestonesProps) {
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
@@ -78,7 +78,7 @@ templ MilestonesPage(props MilestonesProps) {
 				if props.View == "timeline" {
 					@milestonesTimeline(props.Product.ID, props.Milestones)
 				} else {
-					<div id={ MilestonesTableID }>
+					<div id={ MilestonesTableID } class={ patterns.TableViewRegionClass }>
 						@MilestonesTableContent(props)
 					</div>
 				}

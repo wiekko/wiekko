@@ -6,17 +6,23 @@ package ui
 // such as the sr-only "Actions" header label: without that, the label is
 // placed relative to the page, escapes the scroll box and widens the whole
 // page on narrow screens (UC-60).
+//
+// It scrolls both ways. Where a list page bounds its height (TableCard,
+// UR-164) the rows scroll inside it under the sticky column headers; anywhere
+// else its height follows the rows and only the horizontal scrolling shows.
 templ Table() {
-	<div class="relative overflow-x-auto">
+	<div class="relative min-h-0 overflow-auto">
 		<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 			{ children... }
 		</table>
 	</div>
 }
 
-// TableHead renders a table header row.
+// TableHead renders a table header row. It sticks to the top of the table's
+// scroll box (UR-164). The line under it is a shadow on the cells: the
+// table's own divider belongs to the body and scrolls away with it.
 templ TableHead() {
-	<thead class="bg-gray-50 dark:bg-gray-800">
+	<thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 [&_th]:shadow-[inset_0_-1px_0_var(--color-gray-200)] dark:[&_th]:shadow-[inset_0_-1px_0_var(--color-gray-700)]">
 		<tr>
 			{ children... }
 		</tr>

@@ -38,7 +38,7 @@ templ CapabilitiesPage(props CapabilitiesProps) {
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
@@ -57,7 +57,7 @@ templ CapabilitiesPage(props CapabilitiesProps) {
 						}
 					}
 				}
-				<div id={ CapabilitiesTableID }>
+				<div id={ CapabilitiesTableID } class={ patterns.TableViewRegionClass }>
 					@CapabilitiesTableContent(props)
 				</div>
 			}

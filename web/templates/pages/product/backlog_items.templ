@@ -55,7 +55,7 @@ templ BacklogItemsPage(props BacklogItemsProps) {
 		ProductName:   props.Product.Name,
 		WorkflowMode:  props.Product.WorkflowMode,
 	}) {
-		<div class="space-y-6">
+		<div class={ patterns.TableViewPageClass }>
 			@ui.Breadcrumb([]templates.BreadcrumbItem{
 				{Label: "Dashboard", Href: "/"},
 				{Label: props.Product.Name, Href: "/products/" + props.Product.ID},
@@ -74,7 +74,7 @@ templ BacklogItemsPage(props BacklogItemsProps) {
 						}
 					}
 				}
-				<div id={ backlogItemsTableID(props.Kind) }>
+				<div id={ backlogItemsTableID(props.Kind) } class={ patterns.TableViewRegionClass }>
 					@BacklogItemsTableContent(props)
 				</div>
 			}
@@ -90,9 +90,9 @@ templ BacklogItemsTableContent(props BacklogItemsProps) {
 	if props.Fragment {
 		@patterns.TableCount(backlogItemsCountID(props.Kind), patterns.TableCountLabel(props.State, props.Total, props.ProductTotal))
 	}
-	<div class="space-y-4">
+	<div class={ "space-y-4", patterns.TableViewRegionClass }>
 		@patterns.TableControls(backlogItemsControls(props))
-		@ui.Card() {
+		@ui.TableCard() {
 			if len(props.Items) == 0 && !props.State.Filtered() && props.ProductTotal > 0 {
 				// Nothing is filtered but the archived items, hidden by default
 				// (FR-155).
