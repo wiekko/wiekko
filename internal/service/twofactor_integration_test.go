@@ -12,15 +12,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/auth/builtin"
-	"nexmap.net/internal/auth/totp"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/auth/builtin"
+	"wiekko.net/internal/auth/totp"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 // twoFactorEnv wires the real stores against a migrated database, so the TOTP
@@ -339,7 +339,7 @@ func TestTwoFactorScopedEnforcement(t *testing.T) {
 		}
 
 		// A member without 2FA is locked out of the product, but not out of
-		// Nexmap, and not when using a token.
+		// Wiekko, and not when using a token.
 		now := time.Now().UTC().Format(time.RFC3339)
 		bob := &model.User{
 			ID: uuid.NewString(), Username: "bob", Email: "bob@example.com", DisplayName: "Bob",

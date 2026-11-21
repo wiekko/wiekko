@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func newProductService(products *testutil.MockProductStore, roles *testutil.MockProductRoleStore, settings *testutil.MockSettingStore, audit *testutil.MockAuditStore) *ProductService {
@@ -640,7 +640,7 @@ func TestProductCreate_SeedsTaskCategories(t *testing.T) {
 	}
 
 	admin := testutil.MakeUser(func(u *model.User) { u.IsAdmin = true })
-	if _, err := svc.Create(context.Background(), admin, CreateProductInput{Name: "Nexmap"}); err != nil {
+	if _, err := svc.Create(context.Background(), admin, CreateProductInput{Name: "Wiekko"}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 

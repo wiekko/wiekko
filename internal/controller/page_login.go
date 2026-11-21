@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
-	login "nexmap.net/web/templates/pages/login"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
+	login "wiekko.net/web/templates/pages/login"
 )
 
 // PageLoginController handles the login and logout pages.
@@ -123,7 +123,7 @@ func (c *PageLoginController) LoginTOTP(w http.ResponseWriter, r *http.Request) 
 
 // challengeCookieName holds the pending second-step token between the
 // password and the code form. Scoped to /login so nothing else sees it.
-const challengeCookieName = "nexmap_login_challenge"
+const challengeCookieName = "wiekko_login_challenge"
 
 func (c *PageLoginController) setChallengeCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
@@ -152,7 +152,7 @@ func (c *PageLoginController) clearChallengeCookie(w http.ResponseWriter) {
 // finishLogin sets the session cookie and sends the browser to the dashboard.
 func (c *PageLoginController) finishLogin(w http.ResponseWriter, r *http.Request, sessionID string) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "nexmap_session",
+		Name:     "wiekko_session",
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
@@ -224,14 +224,14 @@ func (c *PageLoginController) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Destroy session.
-	cookie, err := r.Cookie("nexmap_session")
+	cookie, err := r.Cookie("wiekko_session")
 	if err == nil {
 		_ = c.auth.Logout(r.Context(), cookie.Value)
 	}
 
 	// Clear session cookie.
 	http.SetCookie(w, &http.Cookie{
-		Name:     "nexmap_session",
+		Name:     "wiekko_session",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,

@@ -8,7 +8,7 @@ import (
 	"database/sql"
 	"strings"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // AuditStore defines data access operations for the audit trail.

@@ -10,9 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
 )
 
 type mockSessionValidator struct {
@@ -62,7 +62,7 @@ func TestAuthenticate_SessionCookie(t *testing.T) {
 	}))
 
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.AddCookie(&http.Cookie{Name: "nexmap_session", Value: "valid-session"})
+	r.AddCookie(&http.Cookie{Name: "wiekko_session", Value: "valid-session"})
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
@@ -147,7 +147,7 @@ func TestAuthenticate_CookiePrecedence(t *testing.T) {
 	}))
 
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.AddCookie(&http.Cookie{Name: "nexmap_session", Value: "sess"})
+	r.AddCookie(&http.Cookie{Name: "wiekko_session", Value: "sess"})
 	r.Header.Set("Authorization", "Bearer nxm_tok")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)

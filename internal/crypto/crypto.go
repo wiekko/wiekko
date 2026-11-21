@@ -41,7 +41,7 @@ type KeyRing struct {
 // At least one key must be provided.
 func NewKeyRing(jsonConfig string) (*KeyRing, error) {
 	if jsonConfig == "" {
-		return nil, errors.New("crypto: encryption key not configured; set NEXMAP_ENCRYPTION_KEY")
+		return nil, errors.New("crypto: encryption key not configured; set WIEKKO_ENCRYPTION_KEY")
 	}
 
 	var rawKeys []keyJSON

@@ -16,7 +16,7 @@ type Overrides struct {
 }
 
 // Settings is the resolved configuration for one CLI invocation. The *Source
-// fields name where a value came from, for `nexmap whoami` and error messages.
+// fields name where a value came from, for `wiekko whoami` and error messages.
 type Settings struct {
 	Server        string
 	ServerSource  string
@@ -27,7 +27,7 @@ type Settings struct {
 	Output        string
 	AllowHTTP     bool
 
-	RepoFile string // path of the .nexmap.json in effect; "" if none
+	RepoFile string // path of the .wiekko.json in effect; "" if none
 	UserFile string // path of the user config file (may not exist yet)
 	User     *User  // loaded user config, for commands that modify it
 }

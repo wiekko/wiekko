@@ -6,11 +6,11 @@ package router
 import (
 	"net/http"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/controller"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/controller"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // mountAPIv1 registers the REST API and returns the token scopes each

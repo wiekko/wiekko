@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // These tests run the multi-step writes on both engines and check that a

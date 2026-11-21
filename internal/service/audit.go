@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // AuditService provides read access to the audit trail.

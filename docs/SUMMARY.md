@@ -1,14 +1,14 @@
 # Summary
 
 <!--
-Navigation of the documentation site (docs.nexmap.net). Only the pages listed
+Navigation of the documentation site (docs.wiekko.net). Only the pages listed
 here are published; spec/ and decisions/ stay in the repository on purpose.
 See CONTRIBUTING.md, "Documentation site".
 -->
 
 [Introduction](index.md)
 
-# Using Nexmap
+# Using Wiekko
 
 - [Concepts](guide/concepts.md)
 - [Getting started](guide/getting-started.md)

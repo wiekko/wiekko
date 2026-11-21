@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // Limits of one automated test run upload (FR-118).
@@ -44,7 +44,7 @@ const (
 	TestRunDefectReused  = "reused"
 )
 
-// TestRunInput is one automated test run, as uploaded by `nexmap utest`.
+// TestRunInput is one automated test run, as uploaded by `wiekko utest`.
 type TestRunInput struct {
 	ProductID   string
 	CampaignID  string // optional; default: the product's active campaign

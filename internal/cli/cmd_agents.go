@@ -18,15 +18,15 @@ import (
 // and other MCP clients.
 const mcpConfigFile = ".mcp.json"
 
-// mcpServerName is the key of the nexmap entry in mcpConfigFile.
-const mcpServerName = "nexmap"
+// mcpServerName is the key of the wiekko entry in mcpConfigFile.
+const mcpServerName = "wiekko"
 
 // agentGuideMarker tags the agent guide once it has been appended to an
 // instructions file, so repeated `init --agents` runs do not duplicate it.
-const agentGuideMarker = "<!-- nexmap:agent-guide -->"
+const agentGuideMarker = "<!-- wiekko:agent-guide -->"
 
-// writeMCPConfig registers `nexmap mcp --read-only` in dir/.mcp.json, keeping
-// every other entry. An existing nexmap entry is left alone unless force is
+// writeMCPConfig registers `wiekko mcp --read-only` in dir/.mcp.json, keeping
+// every other entry. An existing wiekko entry is left alone unless force is
 // set. It returns the file and what happened: created, updated or kept.
 func writeMCPConfig(dir string, force bool) (string, string, error) {
 	path := filepath.Join(dir, mcpConfigFile)
@@ -57,7 +57,7 @@ func writeMCPConfig(dir string, force bool) (string, string, error) {
 
 	// Read-only until the server has token scopes: an agent with this entry
 	// can read the product but not change it.
-	entry, _ := json.Marshal(map[string]any{"command": "nexmap", "args": []string{"mcp", "--read-only"}})
+	entry, _ := json.Marshal(map[string]any{"command": "wiekko", "args": []string{"mcp", "--read-only"}})
 	servers[mcpServerName] = entry
 	doc["mcpServers"], _ = json.Marshal(servers)
 	out, err := json.MarshalIndent(doc, "", "  ")

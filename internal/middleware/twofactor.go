@@ -9,14 +9,14 @@ import (
 	"net/url"
 	"strings"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/model"
 )
 
 // TwoFactorPolicy decides who has to use two-factor authentication (SC-34).
 type TwoFactorPolicy interface {
 	// RequiredFor reports whether an instance-level rule requires the user
-	// to set up 2FA before using Nexmap at all.
+	// to set up 2FA before using Wiekko at all.
 	RequiredFor(ctx context.Context, user *model.User) bool
 	// ProductLocked reports whether the product requires 2FA of its members
 	// and keeps the user, a member without 2FA, out.

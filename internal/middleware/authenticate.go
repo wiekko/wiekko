@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"strings"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
 )
 
 const (
-	sessionCookieName = "nexmap_session"
+	sessionCookieName = "wiekko_session"
 	bearerPrefix      = "Bearer "
 )
 

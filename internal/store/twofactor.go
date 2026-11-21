@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // TwoFactorStore holds TOTP recovery codes and pending login challenges.

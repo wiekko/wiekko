@@ -13,13 +13,13 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/render"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/render"
 )
 
-// documentGroup is `nexmap doc`: documents such as protocols and schemas
-// (FR-140). Nexmap is their source: a body set from a file is an ordinary
+// documentGroup is `wiekko doc`: documents such as protocols and schemas
+// (FR-140). Wiekko is their source: a body set from a file is an ordinary
 // update, and `doc get` writes a body back out.
 func documentGroup() *command {
 	return &command{name: "doc", summary: "documents: protocols, schemas and other texts that define the product",
@@ -144,7 +144,7 @@ func documentUpdateCommand() *command {
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 1 {
-				return usageErr(errors.New("usage: nexmap doc update <DOC-3|ID> [--body-file FILE] [--state …] [--title …] …"))
+				return usageErr(errors.New("usage: wiekko doc update <DOC-3|ID> [--body-file FILE] [--state …] [--title …] …"))
 			}
 			in := ops.DocumentChange{Ref: args[0], Title: set.optional("title", title), Format: set.optional("format", format),
 				State: set.optional("state", state), SupersededBy: set.optional("superseded-by", supersededBy),
@@ -207,7 +207,7 @@ func documentLinkCommand(unlink bool) *command {
 		summary: summary,
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) < 2 {
-				return usageErr(fmt.Errorf("usage: nexmap %s <DOC-3> <FR-12|SC-3|test identifier>…", name))
+				return usageErr(fmt.Errorf("usage: wiekko %s <DOC-3> <FR-12|SC-3|test identifier>…", name))
 			}
 			s, err := a.session()
 			if err != nil {
@@ -281,7 +281,7 @@ func documentRestoreCommand() *command {
 		summary: "make an earlier revision current again, as a new revision (owner role)",
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 2 {
-				return usageErr(errors.New("usage: nexmap doc restore <DOC-3|ID> <revision>"))
+				return usageErr(errors.New("usage: wiekko doc restore <DOC-3|ID> <revision>"))
 			}
 			rev, err := strconv.Atoi(args[1])
 			if err != nil || rev < 1 {

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"nexmap.net/internal/store"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/store"
+	"wiekko.net/web/templates/ui"
 )
 
 // parseState is a shorthand for driving parseDefectListState from a query string.

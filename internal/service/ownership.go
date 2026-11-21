@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // Entity kinds the ownership checker knows. Where a kind doubles as a comment

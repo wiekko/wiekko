@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
 )
 
 // Assignments (UR-171): owners and admins assign any member, developers only

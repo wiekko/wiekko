@@ -8,26 +8,26 @@ import (
 	"time"
 )
 
-func clearNexmapEnv(t *testing.T) {
+func clearWiekkoEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
-		"NEXMAP_HOST", "NEXMAP_PORT", "NEXMAP_LOGLEVEL", "NEXMAP_LOGFILE",
-		"NEXMAP_DB_DRIVER", "NEXMAP_DB_DSN", "NEXMAP_SESSION_TTL",
-		"NEXMAP_PBKDF2_ITERATIONS", "NEXMAP_COOKIE_SECURE",
-		"NEXMAP_ENCRYPTION_KEY", "NEXMAP_ADMIN_USER", "NEXMAP_ADMIN_PASSWORD",
-		"NEXMAP_PUBLIC_URL",
-		"NEXMAP_MAIL_TRANSPORT", "NEXMAP_MAIL_FROM", "NEXMAP_MAIL_MAX_PER_HOUR",
-		"NEXMAP_SMTP_HOST", "NEXMAP_SMTP_PORT", "NEXMAP_SMTP_TLS",
-		"NEXMAP_SMTP_USERNAME", "NEXMAP_SMTP_PASSWORD", "NEXMAP_MAIL_API_KEY",
-		"NEXMAP_MAILGUN_DOMAIN", "NEXMAP_MAILGUN_REGION",
-		"NEXMAP_SCALEWAY_PROJECT_ID", "NEXMAP_SCALEWAY_REGION",
+		"WIEKKO_HOST", "WIEKKO_PORT", "WIEKKO_LOGLEVEL", "WIEKKO_LOGFILE",
+		"WIEKKO_DB_DRIVER", "WIEKKO_DB_DSN", "WIEKKO_SESSION_TTL",
+		"WIEKKO_PBKDF2_ITERATIONS", "WIEKKO_COOKIE_SECURE",
+		"WIEKKO_ENCRYPTION_KEY", "WIEKKO_ADMIN_USER", "WIEKKO_ADMIN_PASSWORD",
+		"WIEKKO_PUBLIC_URL",
+		"WIEKKO_MAIL_TRANSPORT", "WIEKKO_MAIL_FROM", "WIEKKO_MAIL_MAX_PER_HOUR",
+		"WIEKKO_SMTP_HOST", "WIEKKO_SMTP_PORT", "WIEKKO_SMTP_TLS",
+		"WIEKKO_SMTP_USERNAME", "WIEKKO_SMTP_PASSWORD", "WIEKKO_MAIL_API_KEY",
+		"WIEKKO_MAILGUN_DOMAIN", "WIEKKO_MAILGUN_REGION",
+		"WIEKKO_SCALEWAY_PROJECT_ID", "WIEKKO_SCALEWAY_REGION",
 	} {
 		t.Setenv(key, "")
 	}
 }
 
 func TestDefaults(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -67,16 +67,16 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestEnvOverrides(t *testing.T) {
-	clearNexmapEnv(t)
-	t.Setenv("NEXMAP_HOST", "0.0.0.0")
-	t.Setenv("NEXMAP_PORT", "9090")
-	t.Setenv("NEXMAP_LOGLEVEL", "debug")
-	t.Setenv("NEXMAP_LOGFILE", "/var/log/nexmap.log")
-	t.Setenv("NEXMAP_DB_DRIVER", "postgres")
-	t.Setenv("NEXMAP_DB_DSN", "postgres://localhost/nexmap")
-	t.Setenv("NEXMAP_SESSION_TTL", "2h")
-	t.Setenv("NEXMAP_PBKDF2_ITERATIONS", "100000")
-	t.Setenv("NEXMAP_COOKIE_SECURE", "false")
+	clearWiekkoEnv(t)
+	t.Setenv("WIEKKO_HOST", "0.0.0.0")
+	t.Setenv("WIEKKO_PORT", "9090")
+	t.Setenv("WIEKKO_LOGLEVEL", "debug")
+	t.Setenv("WIEKKO_LOGFILE", "/var/log/wiekko.log")
+	t.Setenv("WIEKKO_DB_DRIVER", "postgres")
+	t.Setenv("WIEKKO_DB_DSN", "postgres://localhost/wiekko")
+	t.Setenv("WIEKKO_SESSION_TTL", "2h")
+	t.Setenv("WIEKKO_PBKDF2_ITERATIONS", "100000")
+	t.Setenv("WIEKKO_COOKIE_SECURE", "false")
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -92,14 +92,14 @@ func TestEnvOverrides(t *testing.T) {
 	if cfg.LogLevel != "debug" {
 		t.Errorf("LogLevel = %q, want %q", cfg.LogLevel, "debug")
 	}
-	if cfg.LogFile != "/var/log/nexmap.log" {
-		t.Errorf("LogFile = %q, want %q", cfg.LogFile, "/var/log/nexmap.log")
+	if cfg.LogFile != "/var/log/wiekko.log" {
+		t.Errorf("LogFile = %q, want %q", cfg.LogFile, "/var/log/wiekko.log")
 	}
 	if cfg.DBDriver != "postgres" {
 		t.Errorf("DBDriver = %q, want %q", cfg.DBDriver, "postgres")
 	}
-	if cfg.DBDsn != "postgres://localhost/nexmap" {
-		t.Errorf("DBDsn = %q, want %q", cfg.DBDsn, "postgres://localhost/nexmap")
+	if cfg.DBDsn != "postgres://localhost/wiekko" {
+		t.Errorf("DBDsn = %q, want %q", cfg.DBDsn, "postgres://localhost/wiekko")
 	}
 	if cfg.SessionTTL != 2*time.Hour {
 		t.Errorf("SessionTTL = %v, want %v", cfg.SessionTTL, 2*time.Hour)
@@ -113,10 +113,10 @@ func TestEnvOverrides(t *testing.T) {
 }
 
 func TestEnvDurationParsing(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
 	t.Run("valid duration", func(t *testing.T) {
-		t.Setenv("NEXMAP_SESSION_TTL", "30m")
+		t.Setenv("WIEKKO_SESSION_TTL", "30m")
 		cfg, err := Load(nil)
 		if err != nil {
 			t.Fatalf("Load: %v", err)
@@ -127,7 +127,7 @@ func TestEnvDurationParsing(t *testing.T) {
 	})
 
 	t.Run("invalid duration keeps default", func(t *testing.T) {
-		t.Setenv("NEXMAP_SESSION_TTL", "garbage")
+		t.Setenv("WIEKKO_SESSION_TTL", "garbage")
 		cfg, err := Load(nil)
 		if err != nil {
 			t.Fatalf("Load: %v", err)
@@ -139,10 +139,10 @@ func TestEnvDurationParsing(t *testing.T) {
 }
 
 func TestEnvIntegerParsing(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
 	t.Run("valid integer", func(t *testing.T) {
-		t.Setenv("NEXMAP_PBKDF2_ITERATIONS", "200000")
+		t.Setenv("WIEKKO_PBKDF2_ITERATIONS", "200000")
 		cfg, err := Load(nil)
 		if err != nil {
 			t.Fatalf("Load: %v", err)
@@ -153,7 +153,7 @@ func TestEnvIntegerParsing(t *testing.T) {
 	})
 
 	t.Run("negative keeps default", func(t *testing.T) {
-		t.Setenv("NEXMAP_PBKDF2_ITERATIONS", "-1")
+		t.Setenv("WIEKKO_PBKDF2_ITERATIONS", "-1")
 		cfg, err := Load(nil)
 		if err != nil {
 			t.Fatalf("Load: %v", err)
@@ -164,7 +164,7 @@ func TestEnvIntegerParsing(t *testing.T) {
 	})
 
 	t.Run("non-numeric keeps default", func(t *testing.T) {
-		t.Setenv("NEXMAP_PBKDF2_ITERATIONS", "abc")
+		t.Setenv("WIEKKO_PBKDF2_ITERATIONS", "abc")
 		cfg, err := Load(nil)
 		if err != nil {
 			t.Fatalf("Load: %v", err)
@@ -176,7 +176,7 @@ func TestEnvIntegerParsing(t *testing.T) {
 }
 
 func TestEnvCookieSecure(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
 	for _, tc := range []struct {
 		env  string
@@ -188,7 +188,7 @@ func TestEnvCookieSecure(t *testing.T) {
 		{"0", false},
 	} {
 		t.Run(tc.env, func(t *testing.T) {
-			t.Setenv("NEXMAP_COOKIE_SECURE", tc.env)
+			t.Setenv("WIEKKO_COOKIE_SECURE", tc.env)
 			cfg, err := Load(nil)
 			if err != nil {
 				t.Fatalf("Load: %v", err)
@@ -201,8 +201,8 @@ func TestEnvCookieSecure(t *testing.T) {
 }
 
 func TestEnvEncryptionKey(t *testing.T) {
-	clearNexmapEnv(t)
-	t.Setenv("NEXMAP_ENCRYPTION_KEY", `[{"id":"1","key":"dGVzdC1rZXktMzItYnl0ZXMtbG9uZy1wYWQtaGVyZSE="}]`)
+	clearWiekkoEnv(t)
+	t.Setenv("WIEKKO_ENCRYPTION_KEY", `[{"id":"1","key":"dGVzdC1rZXktMzItYnl0ZXMtbG9uZy1wYWQtaGVyZSE="}]`)
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -214,8 +214,8 @@ func TestEnvEncryptionKey(t *testing.T) {
 }
 
 func TestFlagsOverrideEnv(t *testing.T) {
-	clearNexmapEnv(t)
-	t.Setenv("NEXMAP_HOST", "envhost")
+	clearWiekkoEnv(t)
+	t.Setenv("WIEKKO_HOST", "envhost")
 
 	cfg, err := Load([]string{"-host", "flaghost"})
 	if err != nil {
@@ -227,7 +227,7 @@ func TestFlagsOverrideEnv(t *testing.T) {
 }
 
 func TestFlagsAllFields(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
 	cfg, err := Load([]string{
 		"-host", "flaghost",
@@ -274,7 +274,7 @@ func TestFlagsAllFields(t *testing.T) {
 }
 
 func TestFlagsInvalid(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
 	_, err := Load([]string{"-unknown-flag"})
 	if err == nil {
@@ -283,14 +283,14 @@ func TestFlagsInvalid(t *testing.T) {
 }
 
 func TestPublicURL(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 
-	t.Setenv("NEXMAP_PUBLIC_URL", "https://nexmap.example.com/")
+	t.Setenv("WIEKKO_PUBLIC_URL", "https://wiekko.example.com/")
 	cfg, err := Load(nil)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.PublicURL != "https://nexmap.example.com" {
+	if cfg.PublicURL != "https://wiekko.example.com" {
 		t.Errorf("PublicURL = %q, want trailing slash removed", cfg.PublicURL)
 	}
 
@@ -302,8 +302,8 @@ func TestPublicURL(t *testing.T) {
 		t.Errorf("flag PublicURL = %q", cfg.PublicURL)
 	}
 
-	for _, bad := range []string{"nexmap.example.com", "ftp://nexmap.example.com", "https://", "https://u:p@nexmap.example.com", "https://x.example.com/?a=b"} {
-		t.Setenv("NEXMAP_PUBLIC_URL", bad)
+	for _, bad := range []string{"wiekko.example.com", "ftp://wiekko.example.com", "https://", "https://u:p@wiekko.example.com", "https://x.example.com/?a=b"} {
+		t.Setenv("WIEKKO_PUBLIC_URL", bad)
 		if _, err := Load(nil); err == nil {
 			t.Errorf("Load accepted public URL %q", bad)
 		}
@@ -311,7 +311,7 @@ func TestPublicURL(t *testing.T) {
 }
 
 func TestMailDisabledByDefault(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 	cfg, err := Load(nil)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -322,15 +322,15 @@ func TestMailDisabledByDefault(t *testing.T) {
 }
 
 func TestMailSMTP(t *testing.T) {
-	clearNexmapEnv(t)
-	t.Setenv("NEXMAP_PUBLIC_URL", "https://nexmap.example.com")
-	t.Setenv("NEXMAP_MAIL_TRANSPORT", "smtp")
-	t.Setenv("NEXMAP_MAIL_FROM", "nexmap <noreply@example.com>")
-	t.Setenv("NEXMAP_SMTP_HOST", "mail.example.com")
-	t.Setenv("NEXMAP_SMTP_PORT", "2525")
-	t.Setenv("NEXMAP_SMTP_USERNAME", "u")
-	t.Setenv("NEXMAP_SMTP_PASSWORD", "p")
-	t.Setenv("NEXMAP_MAIL_MAX_PER_HOUR", "10")
+	clearWiekkoEnv(t)
+	t.Setenv("WIEKKO_PUBLIC_URL", "https://wiekko.example.com")
+	t.Setenv("WIEKKO_MAIL_TRANSPORT", "smtp")
+	t.Setenv("WIEKKO_MAIL_FROM", "wiekko <noreply@example.com>")
+	t.Setenv("WIEKKO_SMTP_HOST", "mail.example.com")
+	t.Setenv("WIEKKO_SMTP_PORT", "2525")
+	t.Setenv("WIEKKO_SMTP_USERNAME", "u")
+	t.Setenv("WIEKKO_SMTP_PASSWORD", "p")
+	t.Setenv("WIEKKO_MAIL_MAX_PER_HOUR", "10")
 
 	cfg, err := Load(nil)
 	if err != nil {
@@ -345,26 +345,26 @@ func TestMailSMTP(t *testing.T) {
 // Without a public URL, reset links would be built from the Host header of
 // whoever asks for a reset.
 func TestMailRequiresPublicURL(t *testing.T) {
-	clearNexmapEnv(t)
-	t.Setenv("NEXMAP_MAIL_TRANSPORT", "sendgrid")
-	t.Setenv("NEXMAP_MAIL_FROM", "noreply@example.com")
-	t.Setenv("NEXMAP_MAIL_API_KEY", "k")
+	clearWiekkoEnv(t)
+	t.Setenv("WIEKKO_MAIL_TRANSPORT", "sendgrid")
+	t.Setenv("WIEKKO_MAIL_FROM", "noreply@example.com")
+	t.Setenv("WIEKKO_MAIL_API_KEY", "k")
 	if _, err := Load(nil); err == nil {
-		t.Fatal("Load accepted mail without NEXMAP_PUBLIC_URL")
+		t.Fatal("Load accepted mail without WIEKKO_PUBLIC_URL")
 	}
 }
 
 func TestMailInvalid(t *testing.T) {
 	for name, env := range map[string]map[string]string{
-		"unknown transport": {"NEXMAP_MAIL_TRANSPORT": "pigeon"},
-		"missing from":      {"NEXMAP_MAIL_TRANSPORT": "sendgrid", "NEXMAP_MAIL_API_KEY": "k"},
-		"missing key":       {"NEXMAP_MAIL_TRANSPORT": "mailpace", "NEXMAP_MAIL_FROM": "a@example.com"},
-		"bad port":          {"NEXMAP_MAIL_TRANSPORT": "smtp", "NEXMAP_MAIL_FROM": "a@example.com", "NEXMAP_SMTP_HOST": "h", "NEXMAP_SMTP_PORT": "x"},
-		"bad cap":           {"NEXMAP_MAIL_TRANSPORT": "lettermint", "NEXMAP_MAIL_FROM": "a@example.com", "NEXMAP_MAIL_API_KEY": "k", "NEXMAP_MAIL_MAX_PER_HOUR": "-5"},
+		"unknown transport": {"WIEKKO_MAIL_TRANSPORT": "pigeon"},
+		"missing from":      {"WIEKKO_MAIL_TRANSPORT": "sendgrid", "WIEKKO_MAIL_API_KEY": "k"},
+		"missing key":       {"WIEKKO_MAIL_TRANSPORT": "mailpace", "WIEKKO_MAIL_FROM": "a@example.com"},
+		"bad port":          {"WIEKKO_MAIL_TRANSPORT": "smtp", "WIEKKO_MAIL_FROM": "a@example.com", "WIEKKO_SMTP_HOST": "h", "WIEKKO_SMTP_PORT": "x"},
+		"bad cap":           {"WIEKKO_MAIL_TRANSPORT": "lettermint", "WIEKKO_MAIL_FROM": "a@example.com", "WIEKKO_MAIL_API_KEY": "k", "WIEKKO_MAIL_MAX_PER_HOUR": "-5"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			clearNexmapEnv(t)
-			t.Setenv("NEXMAP_PUBLIC_URL", "https://nexmap.example.com")
+			clearWiekkoEnv(t)
+			t.Setenv("WIEKKO_PUBLIC_URL", "https://wiekko.example.com")
 			for k, v := range env {
 				t.Setenv(k, v)
 			}

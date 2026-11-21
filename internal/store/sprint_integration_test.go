@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // seedSprintProduct inserts a bare product and returns its id. Product names
@@ -44,7 +44,7 @@ func makeStoredSprint(productID, name string) *model.Sprint {
 
 func TestSprintStoreRoundTrip(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
-		productID := seedSprintProduct(t, db, "Nexmap")
+		productID := seedSprintProduct(t, db, "Wiekko")
 		st := &sprintStore{db: db}
 		ctx := context.Background()
 
@@ -81,7 +81,7 @@ func TestSprintStoreRoundTrip(t *testing.T) {
 
 func TestSprintStoreGetActiveByProductID(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
-		productID := seedSprintProduct(t, db, "Nexmap")
+		productID := seedSprintProduct(t, db, "Wiekko")
 		st := &sprintStore{db: db}
 		ctx := context.Background()
 
@@ -129,7 +129,7 @@ func TestSprintStoreGetActiveByProductID(t *testing.T) {
 // no longer active (FR-91). Items outside the sprint keep their activation.
 func TestSprintStoreDeleteReleasesItems(t *testing.T) {
 	forEachDB(t, func(t *testing.T, db *DB) {
-		f := seedDefectFixture(t, db, "Nexmap")
+		f := seedDefectFixture(t, db, "Wiekko")
 		st := &sprintStore{db: db}
 		ctx := context.Background()
 		now := Now()

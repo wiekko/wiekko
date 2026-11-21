@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // Bulk operations (FR-130, FR-131, FR-169, FR-170) change many requirements,

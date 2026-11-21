@@ -13,10 +13,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 // DiscussionService handles the discussion attached to any entity: its comment

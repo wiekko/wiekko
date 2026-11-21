@@ -7,7 +7,7 @@ import (
 	"net/netip"
 	"time"
 
-	"nexmap.net/internal/mail"
+	"wiekko.net/internal/mail"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 	DefaultLogLevel         = "info"
 	DefaultLogFile          = ""
 	DefaultDBDriver         = "sqlite"
-	DefaultDBDsn            = "nexmap.db"
+	DefaultDBDsn            = "wiekko.db"
 	DefaultSessionTTL       = 24 * time.Hour
 	DefaultPBKDF2Iterations = 600_000
 	DefaultCookieSecure     = true
@@ -47,13 +47,13 @@ type Config struct {
 	UploadDir        string
 	MaxUploadBytes   int64
 	AllowedUploads   string
-	// PublicURL is the address users reach the server at ("https://nexmap.example.com"),
+	// PublicURL is the address users reach the server at ("https://wiekko.example.com"),
 	// without a trailing slash. Empty: links are built from the request.
 	PublicURL string
 	// TrustedProxies are the addresses whose X-Forwarded-For header is
 	// believed when determining a client's address. Empty: none.
 	TrustedProxies []netip.Prefix
 	// Mail configures the transport for invitation and password reset emails
-	// (AC-10). Its zero value means nexmap sends no mail.
+	// (AC-10). Its zero value means wiekko sends no mail.
 	Mail mail.Config
 }

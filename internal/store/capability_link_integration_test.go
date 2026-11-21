@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // TestCapabilityLinksAreIdempotent covers DF-3: linking a requirement or a

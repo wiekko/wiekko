@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // criticalityRank orders defects most severe first.

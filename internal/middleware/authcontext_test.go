@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
 )
 
 func TestWithUserRoundTrip(t *testing.T) {

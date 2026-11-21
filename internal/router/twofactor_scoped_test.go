@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // TestScopedTwoFactorEnforcement drives the product and role rules of SC-34

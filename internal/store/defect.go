@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // DefectFilter controls which defects are returned by ListByProductID.

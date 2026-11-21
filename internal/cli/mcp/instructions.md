@@ -1,4 +1,4 @@
-Nexmap holds this product's definition, backlog and QA state: requirements and
+Wiekko holds this product's definition, backlog and QA state: requirements and
 tasks, constraints, documents (protocols, schemas and other definitions),
 components and capabilities, test cases, testing campaigns and defects.
 

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/netip"
 
-	"nexmap.net/internal/controller"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/controller"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
 )
 
 // Options are the settings the HTTP layer needs besides the services.

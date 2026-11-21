@@ -11,10 +11,10 @@ import (
 	"sync"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/testutil"
 )
 
 func newDiscussionService(comments *testutil.MockCommentStore, attachments *testutil.MockAttachmentStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *DiscussionService {

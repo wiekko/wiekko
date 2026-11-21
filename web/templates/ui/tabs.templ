@@ -6,7 +6,7 @@ package ui
 import (
 	"strconv"
 
-	"nexmap.net/web/templates"
+	"wiekko.net/web/templates"
 )
 
 // TabGroup renders a horizontal tab bar. Each tab loads content via htmx.
@@ -68,8 +68,8 @@ templ tabScript() {
 		// A tab listing links carries data-tab-count on its content; keep the
 		// count in the tab label current after every swap, including after
 		// linking or unlinking in a modal (UC-88).
-		if (!window.nexmapTabCounts) {
-			window.nexmapTabCounts = true;
+		if (!window.wiekkoTabCounts) {
+			window.wiekkoTabCounts = true;
 			document.addEventListener('htmx:afterSettle', function() {
 				document.querySelectorAll('.tab-panel').forEach(function(panel) {
 					var src = panel.querySelector('[data-tab-count]');

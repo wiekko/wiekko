@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"nexmap.net/internal/mail"
+	"wiekko.net/internal/mail"
 )
 
 // Mail purposes, for the log. Email is limited to these two (SC-38).
@@ -38,12 +38,12 @@ const (
 // transport is configured.
 var ErrMailDisabled = errors.New("this installation does not send email; create an invitation link instead")
 
-// Mailer composes nexmap's transactional emails and hands them to the
+// Mailer composes wiekko's transactional emails and hands them to the
 // configured transport. A nil Mailer, or one without a transport, sends
 // nothing and reports Enabled() == false.
 //
 // Every message is fixed text: nothing a user typed (product names, display
-// names, notes) ends up in an email, so nexmap cannot be used to carry
+// names, notes) ends up in an email, so wiekko cannot be used to carry
 // someone else's message to an address of their choosing. The only variable
 // parts are the recipient, the instance address, a role and the link.
 type Mailer struct {
@@ -67,7 +67,7 @@ func NewMailer(sender mail.Sender, publicURL string) *Mailer {
 	return m
 }
 
-// Enabled reports whether nexmap can send email.
+// Enabled reports whether wiekko can send email.
 func (m *Mailer) Enabled() bool { return m != nil && m.sender != nil }
 
 // link returns the absolute URL of path on this installation.
@@ -153,7 +153,7 @@ func recipientKey(email string) string {
 // invitationMessage is the invitation email. role is a validated role name
 // (empty for an invitation to the installation only).
 func (m *Mailer) invitationMessage(to, rawToken, role string, expires time.Time) mail.Message {
-	what := "to create an account on Nexmap at " + m.publicURL
+	what := "to create an account on Wiekko at " + m.publicURL
 	if role != "" {
 		what += " and to join a product there as " + role
 	}
@@ -164,19 +164,19 @@ func (m *Mailer) invitationMessage(to, rawToken, role string, expires time.Time)
 		"The link works once and expires on " + expires.UTC().Format("2 January 2006 at 15:04 UTC") + ".\n\n" +
 		"If you did not expect this invitation, ignore this email: no account is\n" +
 		"created without the link.\n\n" +
-		"-- \nNexmap\n"
-	return mail.Message{To: to, Subject: "Your invitation to Nexmap", Text: text}
+		"-- \nWiekko\n"
+	return mail.Message{To: to, Subject: "Your invitation to Wiekko", Text: text}
 }
 
 // passwordResetMessage is the password reset email.
 func (m *Mailer) passwordResetMessage(to, rawToken string, ttl time.Duration) mail.Message {
 	text := "Hello,\n\n" +
-		"someone asked to reset the password of your Nexmap account at\n" +
+		"someone asked to reset the password of your Wiekko account at\n" +
 		m.publicURL + ". If that was you, open this link to choose a new password:\n\n" +
 		m.link("/reset-password/"+rawToken) + "\n\n" +
 		"The link works once and expires in " + strconv.Itoa(int(ttl.Minutes())) + " minutes.\n\n" +
 		"If you did not ask for this, ignore this email: your password stays as it\n" +
 		"is until someone sets a new one through the link.\n\n" +
-		"-- \nNexmap\n"
-	return mail.Message{To: to, Subject: "Reset your Nexmap password", Text: text}
+		"-- \nWiekko\n"
+	return mail.Message{To: to, Subject: "Reset your Wiekko password", Text: text}
 }

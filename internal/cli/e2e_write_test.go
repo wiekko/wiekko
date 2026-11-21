@@ -15,9 +15,9 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/ops"
 )
 
 // as runs the CLI with another user's token.
@@ -39,7 +39,7 @@ func (e *e2e) mustAs(user, stdin string, args ...string) result {
 	e.t.Helper()
 	r := e.as(user, stdin, args...)
 	if r.code != cli.ExitOK {
-		e.t.Fatalf("%s: nexmap %s: exit %d\nstdout: %s\nstderr: %s", user, strings.Join(args, " "), r.code, r.stdout, r.stderr)
+		e.t.Fatalf("%s: wiekko %s: exit %d\nstdout: %s\nstderr: %s", user, strings.Join(args, " "), r.code, r.stdout, r.stderr)
 	}
 	return r
 }

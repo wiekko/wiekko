@@ -6,8 +6,8 @@ package patterns
 import (
 	"fmt"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/web/templates/ui"
 )
 
 // The running version, its documentation and the CLI that matches it
@@ -16,10 +16,10 @@ import (
 const (
 	// docsBase is the documentation site, with a directory per release tag
 	// and /latest/ for the main branch.
-	docsBase = "https://docs.nexmap.net/"
+	docsBase = "https://docs.wiekko.net/"
 	// WebsiteURL is the project website.
-	WebsiteURL = "https://nexmap.net/"
-	// LicenseName and LicenseURL name the licence Nexmap is published under.
+	WebsiteURL = "https://wiekko.net/"
+	// LicenseName and LicenseURL name the licence Wiekko is published under.
 	LicenseName = "EUPL 1.2"
 	LicenseURL  = "https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12"
 	// Copyright is the copyright line of the source files' SPDX headers.
@@ -49,11 +49,11 @@ type InstallCommand struct {
 // the CLI never needs a higher API level than this server implements, or
 // unpinned (the latest release) when release is empty.
 func InstallCommands(release string) []InstallCommand {
-	sh := "curl -fsSL https://nexmap.net/install.sh | sh"
-	ps := "irm https://nexmap.net/install.ps1 | iex"
+	sh := "curl -fsSL https://wiekko.net/install.sh | sh"
+	ps := "irm https://wiekko.net/install.ps1 | iex"
 	if release != "" {
-		sh = "curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=" + release + " sh"
-		ps = "$env:NEXMAP_VERSION='" + release + "'; irm https://nexmap.net/install.ps1 | iex"
+		sh = "curl -fsSL https://wiekko.net/install.sh | WIEKKO_VERSION=" + release + " sh"
+		ps = "$env:WIEKKO_VERSION='" + release + "'; irm https://wiekko.net/install.ps1 | iex"
 	}
 	return []InstallCommand{
 		{Label: "Linux and macOS", Command: sh},
@@ -64,12 +64,12 @@ func InstallCommands(release string) []InstallCommand {
 // AboutModal names the running version, its API level, copyright and
 // licence. The documentation is the user menu's Help entry, not repeated here.
 templ AboutModal() {
-	@ui.Modal(AboutModalID, "About Nexmap", "sm") {
+	@ui.Modal(AboutModalID, "About Wiekko", "sm") {
 		<div class="space-y-4 text-sm">
 			<div class="flex items-center gap-3">
 				<img src="/static/img/logo-icon.svg" alt="" class="h-10 w-10"/>
 				<div>
-					<p class="text-base font-semibold text-gray-900 dark:text-gray-100">Nexmap</p>
+					<p class="text-base font-semibold text-gray-900 dark:text-gray-100">Wiekko</p>
 					<p class="text-gray-500 dark:text-gray-400">Product definition, backlog and QA</p>
 				</div>
 			</div>
@@ -89,7 +89,7 @@ templ AboutModal() {
 				</p>
 				<p class="mt-1">
 					@externalLink(WebsiteURL) {
-						nexmap.net
+						wiekko.net
 					}
 				</p>
 			</div>

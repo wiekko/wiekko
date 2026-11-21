@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // deleteOwned deletes one entity that can carry comments, attachments and

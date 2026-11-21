@@ -13,7 +13,7 @@ import (
 )
 
 // Dialect names the SQL engine behind a DB. Its values match the configured
-// driver names (NEXMAP_DB_DRIVER).
+// driver names (WIEKKO_DB_DRIVER).
 type Dialect string
 
 // Supported dialects.

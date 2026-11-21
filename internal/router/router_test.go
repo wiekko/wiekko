@@ -6,7 +6,7 @@ package router
 import (
 	"testing"
 
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/service"
 )
 
 // TestNewRegistersRoutes guards against duplicate or overlapping route

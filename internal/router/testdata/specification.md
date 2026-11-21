@@ -2,7 +2,7 @@
 
 Birds, offline.
 
-<!-- Exported from Nexmap. Change the items in Nexmap rather than here; identifiers such as FR-12 name them in the CLI and REST API. -->
+<!-- Exported from Wiekko. Change the items in Wiekko rather than here; identifiers such as FR-12 name them in the CLI and REST API. -->
 
 ## Product Structure
 

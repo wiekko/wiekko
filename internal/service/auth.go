@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 const (

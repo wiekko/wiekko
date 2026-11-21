@@ -44,12 +44,12 @@ People who have no account yet can be invited:
 
 1. Under **Invite New User**, enter their email address and the role they should get.
 2. If your installation sends email, choose how the invitation gets there:
-   - **Send the invitation by email**: Nexmap mails the link to that address. You do not see the link
+   - **Send the invitation by email**: Wiekko mails the link to that address. You do not see the link
      yourself, so only the owner of the mailbox can create the account.
-   - **Create a link to pass on myself**: Nexmap shows the link, and you send it through a chat, a forum
+   - **Create a link to pass on myself**: Wiekko shows the link, and you send it through a chat, a forum
      message or any other channel only that person reads: whoever opens it can use it.
 
-   Without email, Nexmap always shows the link.
+   Without email, Wiekko always shows the link.
 3. Choose **Send Invitation**.
 4. The link opens a page where they choose a username and password. Their account gets the invited email
    address, joins the product with the invited role, and they are signed in right away.
@@ -80,7 +80,7 @@ The structure can grow over time; nothing else depends on it being complete.
   **requirements**, each with a definition of done. Link both to the capabilities they concern. See
   [Backlog](backlog.md).
 - Describe how requirements are verified as **test cases**, linked to the requirements they cover. For
-  automated tests, `nexmap test sync` can create the test cases from a test run instead; see
+  automated tests, `wiekko test sync` can create the test cases from a test run instead; see
   [CI integration](../cli/ci-integration.md#setting-up).
 - When it's time to test, run a **testing campaign**; see [Testing](testing.md).
 

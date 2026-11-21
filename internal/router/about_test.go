@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/web/templates/patterns"
 )
 
 // TestVersionAndCLI covers UR-172: the user menu links to the documentation
@@ -25,7 +25,7 @@ func TestVersionAndCLI(t *testing.T) {
 		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
 		var session *http.Cookie
 		for _, c := range resp.Cookies() {
-			if c.Name == "nexmap_session" && c.Value != "" {
+			if c.Name == "wiekko_session" && c.Value != "" {
 				session = c
 			}
 		}
@@ -73,7 +73,7 @@ func TestVersionAndCLI(t *testing.T) {
 				t.Errorf("the tokens page lacks %q", c.Command)
 			}
 		}
-		if want := "nexmap login --server " + e.srv.URL; !strings.Contains(tokens, want) {
+		if want := "wiekko login --server " + e.srv.URL; !strings.Contains(tokens, want) {
 			t.Errorf("the tokens page lacks %q", want)
 		}
 		if !strings.Contains(tokens, patterns.DocsURL("cli/setup.html")) {

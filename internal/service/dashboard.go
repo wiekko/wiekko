@@ -7,8 +7,8 @@ import (
 	"context"
 	"time"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // ProductSummary holds aggregated data for a single product on the dashboard.

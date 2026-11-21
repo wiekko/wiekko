@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // refPattern matches a human-readable identifier such as "FR-12" or "mt-3":

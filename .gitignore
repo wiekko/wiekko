@@ -33,11 +33,11 @@ go.work.sum
 
 # Build output
 web/dist/
-/nexmap
-/nexmapd
-/nexmap.db
-/nexmap.db-shm
-/nexmap.db-wal
+/wiekko
+/wiekkod
+/wiekko.db
+/wiekko.db-shm
+/wiekko.db-wal
 
 # Attachment uploads
 /uploads/

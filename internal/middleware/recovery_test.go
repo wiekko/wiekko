@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"nexmap.net/internal/middleware"
+	"wiekko.net/internal/middleware"
 )
 
 func TestRecovery_NoPanic(t *testing.T) {

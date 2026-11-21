@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // campaignFixture seeds a product, two environments and two test cases, and
@@ -41,7 +41,7 @@ func seedCampaignFixture(t *testing.T, db *DB) campaignFixture {
 	}
 
 	exec(`INSERT INTO products (id, name, description, workflow_mode, estimation_mode, created_at, updated_at)
-	      VALUES (?, 'Nexmap', '', 'kanban', 'none', ?, ?)`, f.productID, now, now)
+	      VALUES (?, 'Wiekko', '', 'kanban', 'none', ?, ?)`, f.productID, now, now)
 	exec(`INSERT INTO runtime_environments (id, product_id, name, created_at) VALUES (?, ?, 'linux', ?)`, f.envA, f.productID, now)
 	exec(`INSERT INTO runtime_environments (id, product_id, name, created_at) VALUES (?, ?, 'macos', ?)`, f.envB, f.productID, now)
 

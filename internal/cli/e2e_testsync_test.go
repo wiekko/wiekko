@@ -3,14 +3,14 @@
 
 package cli_test
 
-// `nexmap test sync` options (FR-119) and the MCP tool, with package-style
+// `wiekko test sync` options (FR-119) and the MCP tool, with package-style
 // identifiers such as example.com/aviary/app.TestX.
 
 import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli/ops"
 )
 
 const packageRun = `{"Action":"run","Package":"example.com/aviary/app","Test":"TestExport_Csv"}

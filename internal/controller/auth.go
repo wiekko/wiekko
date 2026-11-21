@@ -12,10 +12,10 @@ import (
 	"strconv"
 	"time"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // logFailedLogin records a rejected login attempt. The access log alone does not
@@ -94,7 +94,7 @@ func currentSessionID(r *http.Request) string {
 	if middleware.AuthMethodFromContext(r.Context()) != "session" {
 		return ""
 	}
-	cookie, err := r.Cookie("nexmap_session")
+	cookie, err := r.Cookie("wiekko_session")
 	if err != nil {
 		return ""
 	}
@@ -199,7 +199,7 @@ func (c *AuthController) completeTOTP(w http.ResponseWriter, r *http.Request, ch
 
 func (c *AuthController) writeSession(w http.ResponseWriter, result *service.LoginResult) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "nexmap_session",
+		Name:     "wiekko_session",
 		Value:    result.SessionID,
 		Path:     "/",
 		HttpOnly: true,
@@ -215,7 +215,7 @@ func (c *AuthController) writeSession(w http.ResponseWriter, result *service.Log
 
 // Logout handles POST /auth/logout.
 func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("nexmap_session")
+	cookie, err := r.Cookie("wiekko_session")
 	if err != nil {
 		httputil.Error(w, http.StatusBadRequest, "NO_SESSION", "No active session")
 		return
@@ -223,7 +223,7 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 	_ = c.auth.Logout(r.Context(), cookie.Value)
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "nexmap_session",
+		Name:     "wiekko_session",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,

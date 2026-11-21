@@ -9,9 +9,9 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // MockUserStore implements store.UserStore with configurable function fields.

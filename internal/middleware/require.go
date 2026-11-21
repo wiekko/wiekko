@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/httputil"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/httputil"
 )
 
 // RequireAuth rejects unauthenticated requests with 401.

@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/testutil"
 )
 
 func newConstraintService(constraints *testutil.MockConstraintStore, categories *testutil.MockCategoryStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *ConstraintService {

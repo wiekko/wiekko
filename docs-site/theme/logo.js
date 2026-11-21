@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
 // SPDX-License-Identifier: EUPL-1.2
 
-// Nexmap logo at the top of the sidebar, linking to the start page of the
+// Wiekko logo at the top of the sidebar, linking to the start page of the
 // version being read. The SVG is a copy of web/static/img/logo.svg, inlined
 // rather than loaded as an image so that "map" takes the sidebar's text
 // colour (currentColor) and "Nex" can be lightened in the dark themes (see
@@ -11,7 +11,7 @@
   "use strict";
 
   var svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" fill="none" role="img" aria-label="Nexmap">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" fill="none" role="img" aria-label="Wiekko">' +
     '<circle cx="32" cy="32" r="30" fill="#4f46e5"/>' +
     '<circle cx="32" cy="32" r="22" fill="none" stroke="#c7d2fe" stroke-width="1.5" opacity="0.3"/>' +
     '<circle cx="18.8" cy="38.8" r="3.8" fill="#c7d2fe"/>' +

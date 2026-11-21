@@ -10,12 +10,12 @@ import (
 	"net/url"
 	"strconv"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
-	"nexmap.net/web/templates"
-	admin "nexmap.net/web/templates/pages/admin"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/store"
+	"wiekko.net/web/templates"
+	admin "wiekko.net/web/templates/pages/admin"
 )
 
 // Audit renders GET /admin/audit: the whole audit trail, filterable, with the

@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // sprintColumns is the column list shared by every sprint SELECT.

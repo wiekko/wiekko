@@ -5,7 +5,7 @@ package cli_test
 
 // End-to-end tests: the CLI runs in-process against the real router, service
 // and store stack on a throwaway SQLite database. Server packages are imported
-// here only; the CLI itself never links them (see cmd/nexmap/deps_test.go).
+// here only; the CLI itself never links them (see cmd/wiekko/deps_test.go).
 
 import (
 	"bytes"
@@ -21,20 +21,20 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/auth/builtin"
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/devseed"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/router"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/auth/builtin"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/devseed"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/router"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 type e2e struct {
@@ -202,7 +202,7 @@ func (e *e2e) mustRun(stdin string, args ...string) result {
 	e.t.Helper()
 	r := e.run(stdin, "", args...)
 	if r.code != cli.ExitOK {
-		e.t.Fatalf("nexmap %s: exit %d\nstdout: %s\nstderr: %s", strings.Join(args, " "), r.code, r.stdout, r.stderr)
+		e.t.Fatalf("wiekko %s: exit %d\nstdout: %s\nstderr: %s", strings.Join(args, " "), r.code, r.stdout, r.stderr)
 	}
 	return r
 }
@@ -303,10 +303,10 @@ func TestE2EInit(t *testing.T) {
 	path := filepath.Join(e.repoDir, cliconfig.RepoFileName)
 	repo := decode[cliconfig.Repo](t, mustRead(t, path))
 	if repo.Server != e.serverURL || repo.Product != finch.ID {
-		t.Fatalf(".nexmap.json = %+v", repo)
+		t.Fatalf(".wiekko.json = %+v", repo)
 	}
 	if strings.Contains(mustRead(t, path), e.token) {
-		t.Fatal(".nexmap.json must never contain the token")
+		t.Fatal(".wiekko.json must never contain the token")
 	}
 
 	r = e.run("", sub, "init", "--server", e.serverURL, "--product", finch.ID)
@@ -392,13 +392,13 @@ func TestE2EUsage(t *testing.T) {
 	if r := e.run("", "", "frobnicate"); r.code != cli.ExitUsage {
 		t.Fatalf("unknown command: exit %d", r.code)
 	}
-	if r := e.run("", "", "help", "login"); r.code != cli.ExitOK || !strings.Contains(r.stdout, "Usage: nexmap login") {
+	if r := e.run("", "", "help", "login"); r.code != cli.ExitOK || !strings.Contains(r.stdout, "Usage: wiekko login") {
 		t.Fatalf("help login: exit %d, %q", r.code, r.stdout)
 	}
 	if r := e.run("", "", "whoami", "-o", "yaml"); r.code != cli.ExitUsage {
 		t.Fatalf("bad format: exit %d", r.code)
 	}
-	if r := e.run("", "", "whoami", "--server", "http://nexmap.example.com"); r.code != cli.ExitUsage || !strings.Contains(r.stderr, "--allow-http") {
+	if r := e.run("", "", "whoami", "--server", "http://wiekko.example.com"); r.code != cli.ExitUsage || !strings.Contains(r.stderr, "--allow-http") {
 		t.Fatalf("plain http: exit %d, stderr %q", r.code, r.stderr)
 	}
 }
@@ -413,7 +413,7 @@ func mustRead(t *testing.T, path string) string {
 }
 
 // TestE2ETokenDestinationWarning: a token from the environment that goes to
-// the server named in .nexmap.json is pointed out; pinning the server in the
+// the server named in .wiekko.json is pointed out; pinning the server in the
 // environment as well silences it.
 func TestE2ETokenDestinationWarning(t *testing.T) {
 	e := newE2E(t)

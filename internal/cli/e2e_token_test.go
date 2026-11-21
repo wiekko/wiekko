@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // withToken runs the CLI with the given raw token.

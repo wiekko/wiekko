@@ -6,7 +6,7 @@ package router
 import (
 	"net/http"
 
-	"nexmap.net/web"
+	"wiekko.net/web"
 )
 
 func mountStatic(mux *http.ServeMux) {

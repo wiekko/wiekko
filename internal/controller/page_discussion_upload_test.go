@@ -12,14 +12,14 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/testutil"
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/testutil"
+	"wiekko.net/web/templates/patterns"
 )
 
 const testCSRFToken = "csrf-token-001"
@@ -347,12 +347,12 @@ func TestUploadFormCarriesTheClientSideGuard(t *testing.T) {
 	out := sb.String()
 
 	for _, want := range []string{
-		`hx-on::before-request="nexmapGuardUploadSize(event, this)"`,
+		`hx-on::before-request="wiekkoGuardUploadSize(event, this)"`,
 		`data-max-bytes="10485760"`,
 		`data-size-error-id="attachments-size-error"`,
 		`data-server-error-id="attachments-error"`,
 		`id="attachments-size-error"`,
-		"function nexmapGuardUploadSize",
+		"function wiekkoGuardUploadSize",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("upload form is missing %q", want)

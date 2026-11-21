@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/store"
 )
 
 // Known setting keys.

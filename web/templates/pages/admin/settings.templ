@@ -6,9 +6,9 @@ package admin
 import (
 	"strconv"
 
-	"nexmap.net/web/templates"
-	layout "nexmap.net/web/templates/layout"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates"
+	layout "wiekko.net/web/templates/layout"
+	"wiekko.net/web/templates/ui"
 )
 
 // SettingsProps holds the data for the instance settings page.
@@ -50,7 +50,7 @@ templ SettingsPage(props SettingsProps) {
 				@ui.CardBody() {
 					<div class="space-y-4">
 						<p class="text-sm text-gray-500 dark:text-gray-400">
-							Users covered here must set up two-factor authentication before they can use Nexmap. A role applies to users who hold it in at least one product. Product owners can also require two-factor authentication for the members of their product.
+							Users covered here must set up two-factor authentication before they can use Wiekko. A role applies to users who hold it in at least one product. Product owners can also require two-factor authentication for the members of their product.
 						</p>
 						for _, key := range TwoFactorSettingKeys {
 							@SettingToggle(key, TwoFactorSettingLabel(key), TwoFactorSettingDescription(key), props.Settings[key] == "true")

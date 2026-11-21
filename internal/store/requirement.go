@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // RequirementFilter controls which requirements are returned by ListByProductID.

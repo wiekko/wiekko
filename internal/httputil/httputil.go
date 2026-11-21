@@ -77,7 +77,7 @@ func ErrorWithDetails(w http.ResponseWriter, status int, code, message string, d
 }
 
 // RequestBaseURL returns the scheme and host the client used to reach the
-// server ("https://nexmap.example.com"). Behind a TLS-terminating proxy the
+// server ("https://wiekko.example.com"). Behind a TLS-terminating proxy the
 // scheme comes from X-Forwarded-Proto and the host from X-Forwarded-Host if
 // set, else from the Host header the proxy passes on.
 func RequestBaseURL(r *http.Request) string {

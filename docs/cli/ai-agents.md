@@ -1,7 +1,7 @@
 # AI agents
 
 AI coding agents working in a repository can read the product definition, backlog and QA state from
-Nexmap, and, within their user's role, update it. They use either the CLI or, for agents that speak the
+Wiekko, and, within their user's role, update it. They use either the CLI or, for agents that speak the
 Model Context Protocol (Claude Code and others), the same operations as MCP tools.
 
 ## Setting up a repository
@@ -9,47 +9,47 @@ Model Context Protocol (Claude Code and others), the same operations as MCP tool
 After [connecting the repository](setup.md#connecting-a-repository) and logging in:
 
 ```sh
-nexmap init --agents
+wiekko init --agents
 ```
 
-This does two things on top of `nexmap init` (an existing `.nexmap.json` is kept):
+This does two things on top of `wiekko init` (an existing `.wiekko.json` is kept):
 
 - registers the MCP server in the repository's `.mcp.json`, keeping any other servers in it:
 
   ```json
   {
     "mcpServers": {
-      "nexmap": {"command": "nexmap", "args": ["mcp", "--read-only"]}
+      "wiekko": {"command": "wiekko", "args": ["mcp", "--read-only"]}
     }
   }
   ```
 
-  An existing `nexmap` entry is left alone unless you pass `--force`.
-- appends the agent guide (`nexmap agent-guide`) to `CLAUDE.md` if that exists, otherwise to
+  An existing `wiekko` entry is left alone unless you pass `--force`.
+- appends the agent guide (`wiekko agent-guide`) to `CLAUDE.md` if that exists, otherwise to
   `AGENTS.md`, once.
 
 The MCP server uses the same configuration and token as the CLI, so nothing else is needed. If the
 configuration or token is missing, the server still starts and every tool call returns the reason
-(e.g. "run `nexmap login`"), which the agent can pass on to you.
+(e.g. "run `wiekko login`"), which the agent can pass on to you.
 
 ## What agents can do
 
-`nexmap agent-guide` prints the guide agents are given: the commands and tools, how items are
+`wiekko agent-guide` prints the guide agents are given: the commands and tools, how items are
 referenced, and working rules such as treating constraints as binding. Run it to see exactly what an
 agent is told. In short:
 
-- **Read:** `nexmap context -o md` (or the `get_context` tool) for a product briefing, then requirements,
-  tasks, constraints, structure, defects, test cases and the campaign status as needed. `nexmap export`
+- **Read:** `wiekko context -o md` (or the `get_context` tool) for a product briefing, then requirements,
+  tasks, constraints, structure, defects, test cases and the campaign status as needed. `wiekko export`
   (or the `export_specification` tool) gives the whole specification in one Markdown document, which an
   agent can keep a spec file in the repository in sync with. The tool also returns the document's SHA-256,
   so the agent can tell whether the file is current without comparing it. The tool is available on a
   read-only server too.
-- **Work from documents:** protocols, schemas and other definitions live in Nexmap as documents
-  (`nexmap doc show DOC-3`, the `get_document` tool). A requirement, constraint or test case names the
+- **Work from documents:** protocols, schemas and other definitions live in Wiekko as documents
+  (`wiekko doc show DOC-3`, the `get_document` tool). A requirement, constraint or test case names the
   documents linked to it, so an agent finds the definition it has to implement or check code against;
   `doc diff` (the `document_diff` tool) shows what changed in a definition since the code was written.
-- **Turn documents into requirements:** Nexmap has no import. An agent can read a document you give it
-  and create the requirements with the CLI, and, using the identifiers from `nexmap export`, update
+- **Turn documents into requirements:** Wiekko has no import. An agent can read a document you give it
+  and create the requirements with the CLI, and, using the identifiers from `wiekko export`, update
   existing ones instead of duplicating them.
 - **Write:** set the status of requirements, tasks and defects, add comments, report defects, create
   tasks and move items below others, create and update constraints (including whether they are met), change the product structure,

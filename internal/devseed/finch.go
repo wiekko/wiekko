@@ -3,7 +3,7 @@
 
 package devseed
 
-import "nexmap.net/internal/model"
+import "wiekko.net/internal/model"
 
 // seedFinchTracker builds the contrast fixture: a small kanban product with
 // estimation switched off, so both workflow modes are represented without

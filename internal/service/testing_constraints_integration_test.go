@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
 )
 
 // Test case to constraint links (FR-150) on a real database.

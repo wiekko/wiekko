@@ -1,6 +1,6 @@
 # Testing
 
-Testing in Nexmap has two parts: a catalogue of **test cases** that describes how the product is
+Testing in Wiekko has two parts: a catalogue of **test cases** that describes how the product is
 verified, and **testing campaigns** that record the results of one round of testing.
 
 ## Test cases
@@ -26,7 +26,7 @@ lets developers and product owners link more or create one. Below them, under **
 shows the test cases of the constraint's capabilities that are not linked to it. Passing tests are
 evidence for a constraint's compliance; the compliance state itself is still set by a product owner.
 
-Automated tests can be registered in bulk from a test run with `nexmap test sync`; see
+Automated tests can be registered in bulk from a test run with `wiekko test sync`; see
 [CI integration](../cli/ci-integration.md#setting-up).
 
 ## Testing campaigns

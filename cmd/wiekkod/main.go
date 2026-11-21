@@ -16,19 +16,19 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/auth/builtin"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/database"
-	"nexmap.net/internal/devseed"
-	"nexmap.net/internal/logging"
-	"nexmap.net/internal/mail"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/router"
-	"nexmap.net/internal/server"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth/builtin"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/database"
+	"wiekko.net/internal/devseed"
+	"wiekko.net/internal/logging"
+	"wiekko.net/internal/mail"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/router"
+	"wiekko.net/internal/server"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 func main() {
@@ -107,7 +107,7 @@ func main() {
 	provider := builtin.New(st.User, cfg.PBKDF2Iterations)
 
 	// Mail for invitations and password resets (AC-10); nil when not
-	// configured, and nexmap then hands out invitation links only.
+	// configured, and wiekko then hands out invitation links only.
 	sender, err := mail.New(cfg.Mail)
 	if err != nil {
 		slog.Error("failed to set up mail", "err", err)

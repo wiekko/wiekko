@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/testutil"
 )
 
 func settingsGetFunc(settings map[string]string) func(context.Context, string) (string, error) {

@@ -6,7 +6,7 @@ package controller
 import (
 	"net/http"
 
-	templates "nexmap.net/web/templates/pages/dev"
+	templates "wiekko.net/web/templates/pages/dev"
 )
 
 // DevController handles development-only routes.

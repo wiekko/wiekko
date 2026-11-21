@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/web/templates/patterns"
 )
 
 const testMaxUpload = 10 << 20 // 10 MiB

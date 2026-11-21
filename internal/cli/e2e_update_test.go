@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/update"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/update"
 )
 
 // releaseSite serves latest (with api level) as the newest release, built for
@@ -48,7 +48,7 @@ func newReleaseSite(t *testing.T, latest string, apiLevel int) *releaseSite {
 	} else {
 		gz := gzip.NewWriter(&buf)
 		tw := tar.NewWriter(gz)
-		tw.WriteHeader(&tar.Header{Name: "nexmap", Mode: 0o755, Size: int64(len(bin)), Typeflag: tar.TypeReg})
+		tw.WriteHeader(&tar.Header{Name: "wiekko", Mode: 0o755, Size: int64(len(bin)), Typeflag: tar.TypeReg})
 		tw.Write(bin)
 		tw.Close()
 		gz.Close()

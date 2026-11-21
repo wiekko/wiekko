@@ -39,7 +39,7 @@ type LoginBlockedError struct {
 func (e *LoginBlockedError) Error() string { return ErrTooManyLoginAttempts.Error() }
 func (e *LoginBlockedError) Unwrap() error { return ErrTooManyLoginAttempts }
 
-// loginLimiter counts failed logins in memory. nexmapd runs as a single
+// loginLimiter counts failed logins in memory. wiekkod runs as a single
 // process, so the counters need no shared storage; a restart clears them.
 type loginLimiter struct {
 	mu      sync.Mutex

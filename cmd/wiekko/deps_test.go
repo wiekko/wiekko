@@ -9,16 +9,16 @@ import (
 	"testing"
 )
 
-// allowedModulePackages lists the nexmap.net packages the CLI may link. The CLI
+// allowedModulePackages lists the wiekko.net packages the CLI may link. The CLI
 // talks to the server through the REST API only (AC-16); importing server
 // packages would couple it to server internals and bloat the binary with the
 // database drivers, templates and web assets.
 var allowedModulePackages = []string{
-	"nexmap.net/cmd/nexmap",
-	"nexmap.net/internal/buildinfo",
-	"nexmap.net/internal/client",
-	"nexmap.net/internal/cli",
-	"nexmap.net/internal/ingest",
+	"wiekko.net/cmd/wiekko",
+	"wiekko.net/internal/buildinfo",
+	"wiekko.net/internal/client",
+	"wiekko.net/internal/cli",
+	"wiekko.net/internal/ingest",
 }
 
 // allowedThirdParty lists the non-module, non-standard-library dependencies.
@@ -42,7 +42,7 @@ var allowedThirdParty = []string{
 // out of the rest of the CLI.
 const (
 	mcpSDK     = "github.com/modelcontextprotocol/go-sdk/"
-	mcpPackage = "nexmap.net/internal/cli/mcp"
+	mcpPackage = "wiekko.net/internal/cli/mcp"
 )
 
 func TestCLIDependencies(t *testing.T) {
@@ -53,7 +53,7 @@ func TestCLIDependencies(t *testing.T) {
 	if err != nil {
 		t.Skip("go tool not on PATH")
 	}
-	out, err := exec.Command(goBin, "list", "-deps", "-f", "{{if not .Standard}}{{.ImportPath}}{{end}}", "nexmap.net/cmd/nexmap").Output()
+	out, err := exec.Command(goBin, "list", "-deps", "-f", "{{if not .Standard}}{{.ImportPath}}{{end}}", "wiekko.net/cmd/wiekko").Output()
 	if err != nil {
 		t.Fatalf("go list: %v", err)
 	}
@@ -66,13 +66,13 @@ func TestCLIDependencies(t *testing.T) {
 
 	// Direct imports of each of the CLI's own packages.
 	out, err = exec.Command(goBin, "list", "-deps", "-f",
-		`{{if not .Standard}}{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{"\n"}}{{end}}`, "nexmap.net/cmd/nexmap").Output()
+		`{{if not .Standard}}{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{"\n"}}{{end}}`, "wiekko.net/cmd/wiekko").Output()
 	if err != nil {
 		t.Fatalf("go list: %v", err)
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 0 || !strings.HasPrefix(fields[0], "nexmap.net/") || fields[0] == mcpPackage {
+		if len(fields) == 0 || !strings.HasPrefix(fields[0], "wiekko.net/") || fields[0] == mcpPackage {
 			continue
 		}
 		for _, imp := range fields[1:] {
@@ -84,7 +84,7 @@ func TestCLIDependencies(t *testing.T) {
 }
 
 func allowed(pkg string) bool {
-	if strings.HasPrefix(pkg, "nexmap.net/") {
+	if strings.HasPrefix(pkg, "wiekko.net/") {
 		for _, p := range allowedModulePackages {
 			if pkg == p || strings.HasPrefix(pkg, p+"/") {
 				return true

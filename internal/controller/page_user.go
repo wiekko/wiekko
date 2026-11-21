@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/web/templates"
-	userpage "nexmap.net/web/templates/pages/user"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/web/templates"
+	userpage "wiekko.net/web/templates/pages/user"
 )
 
 // PageUserController handles user profile and token pages.

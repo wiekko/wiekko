@@ -44,7 +44,7 @@ func TestConfigValidate(t *testing.T) {
 		t.Error("empty config must leave mail off")
 	}
 
-	c := ok(Config{Transport: "SMTP", From: "nexmap <noreply@example.com>", SMTPHost: "mail.example.com"})
+	c := ok(Config{Transport: "SMTP", From: "wiekko <noreply@example.com>", SMTPHost: "mail.example.com"})
 	if c.Transport != "smtp" || c.SMTPPort != 587 || c.SMTPTLS != "starttls" || c.MaxPerHour != DefaultMaxPerHour {
 		t.Errorf("smtp defaults: %+v", c)
 	}
@@ -101,8 +101,8 @@ func TestCheckMessage(t *testing.T) {
 }
 
 func TestBuildMessage(t *testing.T) {
-	from := mustAddr(t, "Nexmap Ünïcode <noreply@example.com>")
-	msg := Message{To: "ada@example.com", Subject: "Réinitialiser", Text: "Hello\nopen https://nexmap.example.com/reset-password/" + strings.Repeat("ab", 32) + "\n"}
+	from := mustAddr(t, "Wiekko Ünïcode <noreply@example.com>")
+	msg := Message{To: "ada@example.com", Subject: "Réinitialiser", Text: "Hello\nopen https://wiekko.example.com/reset-password/" + strings.Repeat("ab", 32) + "\n"}
 	data, err := buildMessage(from, msg, time.Date(2026, 11, 14, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
@@ -200,11 +200,11 @@ func apiServer(t *testing.T, status int, respBody string) (*httptest.Server, *re
 	return srv, rec
 }
 
-var testMsg = Message{To: "ada@example.com", Subject: "Your invitation", Text: "Open https://nexmap.example.com/accept-invite/tok"}
+var testMsg = Message{To: "ada@example.com", Subject: "Your invitation", Text: "Open https://wiekko.example.com/accept-invite/tok"}
 
 func TestMailgun(t *testing.T) {
 	srv, rec := apiServer(t, http.StatusOK, `{"id":"x"}`)
-	s := newMailgun(Config{APIKey: "key-1", MailgunDomain: "mg.example.com"}, mustAddr(t, "nexmap <noreply@example.com>"))
+	s := newMailgun(Config{APIKey: "key-1", MailgunDomain: "mg.example.com"}, mustAddr(t, "wiekko <noreply@example.com>"))
 	s.baseURL = srv.URL
 	if err := s.Send(context.Background(), testMsg); err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestMailgun(t *testing.T) {
 
 func TestSendGrid(t *testing.T) {
 	srv, rec := apiServer(t, http.StatusAccepted, "")
-	s := newSendGrid(Config{APIKey: "SG.k"}, mustAddr(t, "nexmap <noreply@example.com>"))
+	s := newSendGrid(Config{APIKey: "SG.k"}, mustAddr(t, "wiekko <noreply@example.com>"))
 	s.baseURL = srv.URL
 	if err := s.Send(context.Background(), testMsg); err != nil {
 		t.Fatal(err)
@@ -262,7 +262,7 @@ func TestMailPace(t *testing.T) {
 
 func TestScaleway(t *testing.T) {
 	srv, rec := apiServer(t, http.StatusOK, `{"emails":[]}`)
-	s := newScaleway(Config{APIKey: "scw-secret", ScalewayProjectID: "proj-1", ScalewayRegion: "fr-par"}, mustAddr(t, "nexmap <noreply@example.com>"))
+	s := newScaleway(Config{APIKey: "scw-secret", ScalewayProjectID: "proj-1", ScalewayRegion: "fr-par"}, mustAddr(t, "wiekko <noreply@example.com>"))
 	s.baseURL = srv.URL
 	if err := s.Send(context.Background(), testMsg); err != nil {
 		t.Fatal(err)
@@ -270,7 +270,7 @@ func TestScaleway(t *testing.T) {
 	if rec.path != "/transactional-email/v1alpha1/regions/fr-par/emails" || rec.header.Get("X-Auth-Token") != "scw-secret" {
 		t.Errorf("path %q, token %q", rec.path, rec.header.Get("X-Auth-Token"))
 	}
-	for _, want := range []string{`"from":{"email":"noreply@example.com","name":"nexmap"}`, `"to":[{"email":"ada@example.com"}]`, `"project_id":"proj-1"`, `"text":"Open`} {
+	for _, want := range []string{`"from":{"email":"noreply@example.com","name":"wiekko"}`, `"to":[{"email":"ada@example.com"}]`, `"project_id":"proj-1"`, `"text":"Open`} {
 		if !strings.Contains(rec.body, want) {
 			t.Errorf("body lacks %s: %s", want, rec.body)
 		}

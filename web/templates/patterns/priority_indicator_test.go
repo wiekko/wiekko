@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/web/templates"
+	"wiekko.net/web/templates"
 )
 
 // TestPriorityBadge checks how a priority is shown: a set priority as a

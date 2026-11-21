@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates/ui"
 )
 
 // rowTable sorts, searches, filters and pages the rows of a table view held

@@ -13,15 +13,15 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/mail"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/mail"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/testutil"
 
 	"net/http/httptest"
 	"time"
@@ -76,7 +76,7 @@ func newTestEnvWithMail(t *testing.T, sender mail.Sender) *testEnv {
 		Invitation: invitations,
 	}
 
-	cfg := &config.Config{SessionTTL: time.Hour, PublicURL: "https://nexmap.example.com"}
+	cfg := &config.Config{SessionTTL: time.Hour, PublicURL: "https://wiekko.example.com"}
 	blobs, err := storage.NewFS(t.TempDir(), 1<<20)
 	if err != nil {
 		t.Fatalf("storage.NewFS: %v", err)

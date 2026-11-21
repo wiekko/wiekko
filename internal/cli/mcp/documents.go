@@ -9,9 +9,9 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/render"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/render"
 )
 
 // registerDocumentReadTools offers the documents that define the product

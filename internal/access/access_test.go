@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 func TestParseGrantsRoundTrip(t *testing.T) {

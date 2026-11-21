@@ -3,7 +3,7 @@
 
 package devseed
 
-import "nexmap.net/internal/model"
+import "wiekko.net/internal/model"
 
 // seedAviary builds the main demo fixture: a bird-watching logbook app run in
 // scrum mode with story points. It is deliberately the fuller of the two

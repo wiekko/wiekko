@@ -10,9 +10,9 @@ import (
 
 	"github.com/a-h/templ"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/web/templates/patterns"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/model"
+	"wiekko.net/web/templates/patterns"
+	"wiekko.net/web/templates/ui"
 )
 
 // The remaining tables of UR-145 render through patterns.TableFrame: every

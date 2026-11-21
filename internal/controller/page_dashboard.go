@@ -6,10 +6,10 @@ package controller
 import (
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
-	"nexmap.net/web/templates"
-	dashboard "nexmap.net/web/templates/pages/dashboard"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
+	"wiekko.net/web/templates"
+	dashboard "wiekko.net/web/templates/pages/dashboard"
 )
 
 // PageDashboardController handles the dashboard page.

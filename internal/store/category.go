@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // CategoryStore defines data access operations for categories.

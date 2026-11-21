@@ -7,10 +7,10 @@ import (
 	"errors"
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/web/templates/patterns"
 )
 
 // Assignees on the detail pages of requirements, tasks and defects (UR-171):

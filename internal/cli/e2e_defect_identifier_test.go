@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli/ops"
 )
 
 var defectIdentifierRE = regexp.MustCompile(`^DF-[1-9][0-9]*$`)

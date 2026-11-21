@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"nexmap.net/web"
+	"wiekko.net/web"
 )
 
 // TestStaticCacheControl: requests for the current version of an asset may be

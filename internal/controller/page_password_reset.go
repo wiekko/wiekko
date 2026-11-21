@@ -9,9 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
-	login "nexmap.net/web/templates/pages/login"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
+	login "wiekko.net/web/templates/pages/login"
 )
 
 // PagePasswordResetController serves the password reset pages (SC-37):

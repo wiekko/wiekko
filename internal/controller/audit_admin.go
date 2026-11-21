@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // auditPageSize is the number of entries per page of the admin audit view.

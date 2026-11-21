@@ -19,10 +19,10 @@ import (
 	"strconv"
 	"strings"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/client"
 )
 
 func versionCommand() *command {
@@ -80,7 +80,7 @@ func initCommand() *command {
 		summary: "create " + config.RepoFileName + " for this repository (server and product); --agents also sets up AI agents",
 		flags: func(fs *flag.FlagSet) {
 			fs.StringVar(&dir, "dir", "", "directory to write "+config.RepoFileName+" to (default: repository root)")
-			fs.BoolVar(&force, "force", false, "overwrite an existing "+config.RepoFileName+" (and the nexmap entry in "+mcpConfigFile+")")
+			fs.BoolVar(&force, "force", false, "overwrite an existing "+config.RepoFileName+" (and the wiekko entry in "+mcpConfigFile+")")
 			fs.BoolVar(&agents, "agents", false, "also register the MCP server in "+mcpConfigFile+" and add the agent guide to CLAUDE.md or AGENTS.md")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
@@ -214,7 +214,7 @@ func apiCommand() *command {
 			case 2:
 				method, path = strings.ToUpper(args[0]), args[1]
 			default:
-				return usageErr(errors.New("usage: nexmap api [METHOD] PATH [--data JSON|@file|@-]"))
+				return usageErr(errors.New("usage: wiekko api [METHOD] PATH [--data JSON|@file|@-]"))
 			}
 			if strings.Contains(path, "{product}") {
 				id, err := a.requireProduct()
@@ -250,7 +250,7 @@ func apiCommand() *command {
 				return nil
 			}
 			apiErr := client.ParseError(resp)
-			fmt.Fprintf(a.io.Stderr, "nexmap: %s\n", apiErr.Error())
+			fmt.Fprintf(a.io.Stderr, "wiekko: %s\n", apiErr.Error())
 			if resp.StatusCode == http.StatusNotFound {
 				return silentExit(ExitNotFound)
 			}

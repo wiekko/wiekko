@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli/ops"
 )
 
 func hasConstraint(refs []ops.Ref, identifier string) bool {

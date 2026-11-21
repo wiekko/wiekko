@@ -8,9 +8,9 @@ import (
 	"errors"
 	"net/http"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
 )
 
 // TestRunController handles automated test run uploads (FR-118).

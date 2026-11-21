@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // Session is the context of one invocation: a client, a product, and caches

@@ -18,10 +18,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/client"
-	"nexmap.net/internal/ingest"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/client"
+	"wiekko.net/internal/ingest"
 )
 
 // reportFlags are the input options shared by utest and test sync.
@@ -58,7 +58,7 @@ func (p *parsed) failed() bool {
 }
 
 // readReports parses the given files, or stdin when there are none. Stdin is
-// copied to stdout as it is read (unless quiet), so `go test … | nexmap utest`
+// copied to stdout as it is read (unless quiet), so `go test … | wiekko utest`
 // keeps the test log visible in the build output.
 func (a *app) readReports(files []string, f reportFlags, passthrough bool) (*parsed, error) {
 	switch f.format {
@@ -240,18 +240,18 @@ func (a *app) emitTestRun(p *parsed, run client.TestRun, rep *client.TestRunRepo
 
 	var b strings.Builder
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "nexmap: %d tests parsed (%d passed, %d failed, %d skipped)", len(p.results), counts["passed"], counts["failed"], counts["skipped"])
+	fmt.Fprintf(&b, "wiekko: %d tests parsed (%d passed, %d failed, %d skipped)", len(p.results), counts["passed"], counts["failed"], counts["skipped"])
 	for _, e := range p.errors {
 		fmt.Fprintf(&b, "\n  error: %s", firstLine(e))
 	}
 	b.WriteString("\n")
 	switch {
 	case rep == nil:
-		b.WriteString("nexmap: nothing to upload\n")
+		b.WriteString("wiekko: nothing to upload\n")
 	case rep.DryRun:
 		writeDryRun(&b, rep)
 	case !rep.Recorded:
-		b.WriteString("nexmap: no active campaign — results not recorded\n")
+		b.WriteString("wiekko: no active campaign — results not recorded\n")
 		writeUnmatched(&b, rep)
 	default:
 		writeRecorded(&b, rep)
@@ -280,7 +280,7 @@ func campaignLabel(rep *client.TestRunReport) string {
 
 func writeRecorded(b *strings.Builder, rep *client.TestRunReport) {
 	sum := rep.Summary
-	fmt.Fprintf(b, "nexmap: recorded in %s: %d updated, %d unchanged", campaignLabel(rep), sum["updated"], sum["unchanged"])
+	fmt.Fprintf(b, "wiekko: recorded in %s: %d updated, %d unchanged", campaignLabel(rep), sum["updated"], sum["unchanged"])
 	if n := sum["defects_created"] + sum["defects_reused"]; n > 0 {
 		fmt.Fprintf(b, ", defects: %d created, %d reused", sum["defects_created"], sum["defects_reused"])
 	}
@@ -325,18 +325,18 @@ func writeUnmatched(b *strings.Builder, rep *client.TestRunReport) {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		fmt.Fprintf(b, "nexmap: %d other tests not recorded: %s\n", quiet[k], k)
+		fmt.Fprintf(b, "wiekko: %d other tests not recorded: %s\n", quiet[k], k)
 	}
 	if len(keys) > 0 {
-		b.WriteString("nexmap: `nexmap utest --dry-run` lists them; `nexmap test sync` creates missing test cases\n")
+		b.WriteString("wiekko: `wiekko utest --dry-run` lists them; `wiekko test sync` creates missing test cases\n")
 	}
 }
 
 func writeDryRun(b *strings.Builder, rep *client.TestRunReport) {
 	if rep.Campaign == nil {
-		b.WriteString("nexmap: dry run — no active campaign, nothing would be recorded\n")
+		b.WriteString("wiekko: dry run — no active campaign, nothing would be recorded\n")
 	} else {
-		fmt.Fprintf(b, "nexmap: dry run against %s — nothing recorded\n", campaignLabel(rep))
+		fmt.Fprintf(b, "wiekko: dry run against %s — nothing recorded\n", campaignLabel(rep))
 	}
 	rows := make([][]string, 0, len(rep.Results))
 	for _, o := range rep.Results {

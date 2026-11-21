@@ -9,8 +9,8 @@ package cli_test
 import (
 	"testing"
 
-	"nexmap.net/internal/cli"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	"wiekko.net/internal/cli/ops"
 )
 
 func TestE2EArchiveBacklogItems(t *testing.T) {

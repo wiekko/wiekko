@@ -9,14 +9,14 @@ import (
 
 	"github.com/a-h/templ"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
-	"nexmap.net/web/templates"
-	admin "nexmap.net/web/templates/pages/admin"
-	productpage "nexmap.net/web/templates/pages/product"
-	"nexmap.net/web/templates/patterns"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
+	"wiekko.net/web/templates"
+	admin "wiekko.net/web/templates/pages/admin"
+	productpage "wiekko.net/web/templates/pages/product"
+	"wiekko.net/web/templates/patterns"
+	"wiekko.net/web/templates/ui"
 )
 
 // The table views of UR-145 whose rows are sorted, searched, filtered and

@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // PATStore defines data access operations for personal access tokens.

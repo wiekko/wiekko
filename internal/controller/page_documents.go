@@ -9,13 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/textdiff"
-	"nexmap.net/web/templates"
-	productpage "nexmap.net/web/templates/pages/product"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/textdiff"
+	"wiekko.net/web/templates"
+	productpage "wiekko.net/web/templates/pages/product"
 )
 
 // --- Document pages (FR-50..FR-58, FR-108) ---

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"time"
 
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/store"
 )
 
 // inTx runs fn as one transaction through t (see store.Transactor). A nil t —

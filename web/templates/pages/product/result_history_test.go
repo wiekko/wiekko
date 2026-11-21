@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 func renderToString(t *testing.T, render func(*strings.Builder) error) string {

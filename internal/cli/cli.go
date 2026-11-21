@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
 // SPDX-License-Identifier: EUPL-1.2
 
-// Package cli implements the nexmap command line client. It talks to a Nexmap
+// Package cli implements the wiekko command line client. It talks to a Wiekko
 // server exclusively through internal/client (AC-16) and never imports server
 // packages.
 package cli
@@ -16,11 +16,11 @@ import (
 	"sort"
 	"strings"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/client"
 )
 
 // Exit codes. They are part of the CLI contract for scripts and agents.
@@ -63,7 +63,7 @@ type globals struct {
 }
 
 func (g *globals) bind(fs *flag.FlagSet) {
-	fs.StringVar(&g.server, "server", g.server, "Nexmap server URL (env "+config.EnvServer+")")
+	fs.StringVar(&g.server, "server", g.server, "Wiekko server URL (env "+config.EnvServer+")")
 	fs.StringVar(&g.product, "product", g.product, "product ID (env "+config.EnvProduct+")")
 	fs.StringVar(&g.output, "output", g.output, "output format: table, md or json (env "+config.EnvOutput+")")
 	fs.StringVar(&g.output, "o", g.output, "shorthand for --output")
@@ -126,7 +126,7 @@ func Run(ctx context.Context, args []string, io IO) int {
 	a := &app{io: io}
 
 	// Global flags may precede the command name.
-	top := flag.NewFlagSet("nexmap", flag.ContinueOnError)
+	top := flag.NewFlagSet("wiekko", flag.ContinueOnError)
 	top.SetOutput(io.Stderr)
 	a.globals.bind(top)
 	top.Usage = func() { a.usage(io.Stderr) }
@@ -160,7 +160,7 @@ func Run(ctx context.Context, args []string, io IO) int {
 	}
 	cmd := lookup(name)
 	if cmd == nil {
-		fmt.Fprintf(io.Stderr, "nexmap: unknown command %q\n\n", name)
+		fmt.Fprintf(io.Stderr, "wiekko: unknown command %q\n\n", name)
 		a.usage(io.Stderr)
 		return ExitUsage
 	}
@@ -176,7 +176,7 @@ func Run(ctx context.Context, args []string, io IO) int {
 		}
 		sub := cmd.sub(rest[0])
 		if sub == nil {
-			fmt.Fprintf(io.Stderr, "nexmap: unknown command %q\n\n", cmd.name+" "+rest[0])
+			fmt.Fprintf(io.Stderr, "wiekko: unknown command %q\n\n", cmd.name+" "+rest[0])
 			a.commandUsage(io.Stderr, cmd, nil)
 			return ExitUsage
 		}
@@ -184,7 +184,7 @@ func Run(ctx context.Context, args []string, io IO) int {
 	}
 
 	// Global flags are accepted after the command name as well.
-	fs := flag.NewFlagSet("nexmap "+cmd.name, flag.ContinueOnError)
+	fs := flag.NewFlagSet("wiekko "+cmd.name, flag.ContinueOnError)
 	fs.SetOutput(io.Stderr)
 	a.globals.bind(fs)
 	if cmd.flags != nil {
@@ -281,7 +281,7 @@ func (a *app) newClient(withToken bool) (*client.Client, error) {
 
 // warnTokenDestination points out, once per run, that the token from the
 // environment is about to go to a server chosen by the repository's
-// .nexmap.json. Stored tokens are kept per server, so a changed file cannot
+// .wiekko.json. Stored tokens are kept per server, so a changed file cannot
 // redirect them; the environment's token goes wherever the file says. In CI a
 // branch that edits the file could thus collect the job's token, which is why
 // the server should be set next to the token there.
@@ -291,13 +291,13 @@ func (a *app) warnTokenDestination() {
 		return
 	}
 	a.warnedTokenDestination = true
-	fmt.Fprintf(a.io.Stderr, "nexmap: warning: sending the token from %s to %s, the server named in %s. Set %s as well, so that a changed file cannot redirect the token.\n",
+	fmt.Fprintf(a.io.Stderr, "wiekko: warning: sending the token from %s to %s, the server named in %s. Set %s as well, so that a changed file cannot redirect the token.\n",
 		config.EnvToken, s.Server, s.RepoFile, config.EnvServer)
 }
 
 func (a *app) clientFor(server, token string, withToken bool) (*client.Client, error) {
 	if server == "" {
-		return nil, usageErr(fmt.Errorf("no server configured: pass --server, set %s, or run `nexmap init`", config.EnvServer))
+		return nil, usageErr(fmt.Errorf("no server configured: pass --server, set %s, or run `wiekko init`", config.EnvServer))
 	}
 	opts := []client.Option{client.WithUserAgent(userAgent())}
 	if withToken {
@@ -315,7 +315,7 @@ func (a *app) clientFor(server, token string, withToken bool) (*client.Client, e
 	}
 	// Checked after client.New so an unusable server URL is reported first.
 	if withToken && token == "" {
-		return nil, usageErr(fmt.Errorf("not logged in to %s: run `nexmap login` or set %s", c.Server(), config.EnvToken))
+		return nil, usageErr(fmt.Errorf("not logged in to %s: run `wiekko login` or set %s", c.Server(), config.EnvToken))
 	}
 	return c, nil
 }
@@ -323,13 +323,13 @@ func (a *app) clientFor(server, token string, withToken bool) (*client.Client, e
 // requireProduct returns the resolved product ID or a usage error.
 func (a *app) requireProduct() (string, error) {
 	if a.settings.Product == "" {
-		return "", usageErr(fmt.Errorf("no product configured: pass --product, set %s, or run `nexmap init`", config.EnvProduct))
+		return "", usageErr(fmt.Errorf("no product configured: pass --product, set %s, or run `wiekko init`", config.EnvProduct))
 	}
 	return a.settings.Product, nil
 }
 
 func userAgent() string {
-	return fmt.Sprintf("nexmap/%s (%s/%s)", buildinfo.String(), runtime.GOOS, runtime.GOARCH)
+	return fmt.Sprintf("wiekko/%s (%s/%s)", buildinfo.String(), runtime.GOOS, runtime.GOARCH)
 }
 
 // exitError carries an explicit exit code.
@@ -379,40 +379,40 @@ func (a *app) fail(err error) int {
 	}
 	msg := err.Error()
 	if client.IsUnauthorized(err) {
-		msg += "\n(the token is missing, invalid, expired or revoked: run `nexmap login`)"
+		msg += "\n(the token is missing, invalid, expired or revoked: run `wiekko login`)"
 	}
 	if client.IsForbidden(err) {
 		msg += "\n(not permitted for your role in this product; ask a product owner)"
 	}
-	fmt.Fprintf(a.io.Stderr, "nexmap: %s\n", msg)
+	fmt.Fprintf(a.io.Stderr, "wiekko: %s\n", msg)
 	return code
 }
 
 func (a *app) usage(w io.Writer) {
 	var b strings.Builder
-	b.WriteString("nexmap — command line client for Nexmap\n\n")
-	b.WriteString("Usage:\n  nexmap [global flags] <command> [arguments]\n\nCommands:\n")
+	b.WriteString("wiekko — command line client for Wiekko\n\n")
+	b.WriteString("Usage:\n  wiekko [global flags] <command> [arguments]\n\nCommands:\n")
 	cmds := commands()
 	sort.Slice(cmds, func(i, j int) bool { return cmds[i].name < cmds[j].name })
 	for _, c := range cmds {
 		fmt.Fprintf(&b, "  %-12s %s\n", c.name, c.summary)
 	}
-	b.WriteString("  help         show help for a command, e.g. `nexmap help req show`\n\n")
+	b.WriteString("  help         show help for a command, e.g. `wiekko help req show`\n\n")
 	b.WriteString("Global flags:\n")
-	b.WriteString("  --server URL     Nexmap server (env NEXMAP_SERVER, .nexmap.json)\n")
-	b.WriteString("  --product ID     product (env NEXMAP_PRODUCT, .nexmap.json)\n")
-	b.WriteString("  -o, --output F   table, md or json (env NEXMAP_OUTPUT)\n")
+	b.WriteString("  --server URL     Wiekko server (env WIEKKO_SERVER, .wiekko.json)\n")
+	b.WriteString("  --product ID     product (env WIEKKO_PRODUCT, .wiekko.json)\n")
+	b.WriteString("  -o, --output F   table, md or json (env WIEKKO_OUTPUT)\n")
 	b.WriteString("  --allow-http     allow plain HTTP to non-local servers\n\n")
-	b.WriteString("Credentials come from NEXMAP_TOKEN or `nexmap login`.\n")
-	b.WriteString("AI agents: `nexmap agent-guide` explains usage, `nexmap context` briefs on the product.\n")
-	b.WriteString("CI: `go test -json ./... | nexmap utest --env linux` records results in the active campaign.\n")
+	b.WriteString("Credentials come from WIEKKO_TOKEN or `wiekko login`.\n")
+	b.WriteString("AI agents: `wiekko agent-guide` explains usage, `wiekko context` briefs on the product.\n")
+	b.WriteString("CI: `go test -json ./... | wiekko utest --env linux` records results in the active campaign.\n")
 	b.WriteString("Exit codes: 0 ok, 1 usage/config, 2 API/auth error, 3 not found, 4 tests failed (utest --exit-code).\n")
 	_, _ = io.WriteString(w, b.String())
 }
 
 func (a *app) commandUsage(w io.Writer, c *command, fs *flag.FlagSet) {
 	if len(c.subs) > 0 {
-		fmt.Fprintf(w, "Usage: nexmap %s <command> [flags]\n\n%s\n\nCommands:\n", c.name, c.summary)
+		fmt.Fprintf(w, "Usage: wiekko %s <command> [flags]\n\n%s\n\nCommands:\n", c.name, c.summary)
 		for _, s := range c.subs {
 			name := strings.TrimPrefix(s.name, c.name+" ")
 			if s.args != "" {
@@ -422,7 +422,7 @@ func (a *app) commandUsage(w io.Writer, c *command, fs *flag.FlagSet) {
 		}
 		return
 	}
-	fmt.Fprintf(w, "Usage: nexmap %s", c.name)
+	fmt.Fprintf(w, "Usage: wiekko %s", c.name)
 	if c.args != "" {
 		fmt.Fprintf(w, " %s", c.args)
 	}

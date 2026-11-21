@@ -1,11 +1,11 @@
-# Deploying nexmap.net on Coolify
+# Deploying wiekko.net on Coolify
 
 Internal runbook: how the download site (landing page, CLI install scripts, CLI release archives) is
 deployed, and how to set it up again. For how the site is built, see `CONTRIBUTING.md`, "Download site".
 
 ## Overview
 
-The site is its own Coolify application, next to the Nexmap server and the documentation site, built from
+The site is its own Coolify application, next to the Wiekko server and the documentation site, built from
 the same Forgejo repository (`ssh://git@forge.my-universe.com:22222/daemotron/nexmap.git`, private) on
 branch **`stable`**.
 
@@ -13,9 +13,9 @@ branch **`stable`**.
 just release vX.Y.Z push ──▶ stable moves to the release commit ──webhook──▶ Coolify
                                                                               │
      docker build -f site/Dockerfile ◀────────────────────────────────────────┘
-       ├─ dist: builds nexmap for linux/darwin/windows × amd64/arm64,
+       ├─ dist: builds wiekko for linux/darwin/windows × amd64/arm64,
        │        packages the archives, SHA256SUMS, release.json
-       └─ runtime: nginx (unprivileged), the site, this release in /opt/nexmap/releases/
+       └─ runtime: nginx (unprivileged), the site, this release in /opt/wiekko/releases/
 
      container start ─▶ 40-publish-releases.sh
        ├─ copies the release to /data/releases/<version>/ (volume), unless it is there already
@@ -27,12 +27,12 @@ a release, and the newest one. The build refuses a `+dev` tree, so a deployment 
 `main` fails instead of publishing a development build.
 
 Each image contains only its own release; **the volume is what keeps older releases downloadable** (CI
-jobs pin versions, `nexmap update vX.Y.Z` installs one). Releases on the volume are never overwritten.
+jobs pin versions, `wiekko update vX.Y.Z` installs one). Releases on the volume are never overwritten.
 
 ## What you need
 
 - A Coolify v4 server.
-- DNS records for `nexmap.net` and `www.nexmap.net` pointing at it.
+- DNS records for `wiekko.net` and `www.wiekko.net` pointing at it.
 - Access to the Forgejo repository as an administrator of it (deploy key, webhook).
 
 No token: unlike the documentation site, the build needs no git tags.
@@ -41,12 +41,12 @@ No token: unlike the documentation site, the build needs no git tags.
 
 ### 1. Coolify application
 
-1. Create an application from the private repository, in the same way as the Nexmap server's (SSH with a
+1. Create an application from the private repository, in the same way as the Wiekko server's (SSH with a
    deploy key, registered read-only in Forgejo under **Settings → Deploy keys**).
 2. Branch **`stable`**.
 3. Build pack **Dockerfile**, base directory `/`, Dockerfile location `/site/Dockerfile`. The base directory
    has to be the repository root: the build compiles the CLI.
-4. Exposed port `8080`, domains `https://nexmap.net,https://www.nexmap.net`. nginx redirects `www.` to the
+4. Exposed port `8080`, domains `https://wiekko.net,https://www.wiekko.net`. nginx redirects `www.` to the
    apex itself, so both just need to reach the container.
 5. **Persistent storage:** a volume mounted at `/data` (Coolify's default). The releases live in
    `/data/releases/`. The image prepares `/data` for its user (uid 101), so a fresh named volume is
@@ -70,9 +70,9 @@ publish-releases: latest is v1.0.0
 Then:
 
 ```sh
-curl -fsS https://nexmap.net/releases/latest.json     # {"version":"v1.0.0","api_level":1}
-curl -fsSI https://www.nexmap.net/ | grep -i location # https://nexmap.net/
-curl -fsSL https://nexmap.net/install.sh | sh          # installs the CLI
+curl -fsS https://wiekko.net/releases/latest.json     # {"version":"v1.0.0","api_level":1}
+curl -fsSI https://www.wiekko.net/ | grep -i location # https://wiekko.net/
+curl -fsSL https://wiekko.net/install.sh | sh          # installs the CLI
 ```
 
 Releases from before the site existed are not on the volume. To publish one, see "Publishing a release
@@ -84,7 +84,7 @@ by hand".
   release. Nothing else to do.
 - A redeploy of the same commit changes nothing: the release is on the volume already, and stays as it
   is.
-- **Changes to the landing page or the install scripts** reach nexmap.net with the next release. To
+- **Changes to the landing page or the install scripts** reach wiekko.net with the next release. To
   publish them sooner, nothing short of a release helps: the site deploys `stable` only.
 
 ## Publishing a release by hand
@@ -124,4 +124,4 @@ either way.
 | Build fails with `dist: 'vX.Y.Z+dev' is not a release version` | The application builds a branch other than `stable`. |
 | Container exits with `publish-releases: /data/releases is not writable` | The volume is not writable by uid 101: use a named volume, or fix the bind mount's owner. |
 | `latest.json` is 404 | Nothing was published yet; check the container log for `publish-releases`. |
-| `www.nexmap.net` shows a certificate error | Coolify did not get a certificate for it: both domains must be on the application. |
+| `www.wiekko.net` shows a certificate error | Coolify did not get a certificate for it: both domains must be on the application. |

@@ -1,11 +1,11 @@
 # CI Integration
 
-`nexmap utest` records automated test results in the product's active testing campaign (FR-24, FR-118). It reads a test report from stdin or from files, maps each test to an automatic test case by its **test identifier**, and uploads the run in one request.
+`wiekko utest` records automated test results in the product's active testing campaign (FR-24, FR-118). It reads a test report from stdin or from files, maps each test to an automatic test case by its **test identifier**, and uploads the run in one request.
 
 ```sh
-go test -json ./... | nexmap utest --env linux-amd64
-go test -v ./...    | nexmap utest --identifier-style name   # format auto-detected
-nexmap utest --format junit reports/*.xml
+go test -json ./... | wiekko utest --env linux-amd64
+go test -v ./...    | wiekko utest --identifier-style name   # format auto-detected
+wiekko utest --format junit reports/*.xml
 ```
 
 ## What happens to a run
@@ -27,20 +27,20 @@ Each status change is recorded in the result history with the token's user, the 
 ## Setting up
 
 1. **Create a token for CI** under *API Tokens* in the user menu (`/user/tokens`) with the *CI ingestion* preset (`tests:write` only), restricted to the product, and with a role cap of *tester*. The job then cannot touch anything but test results, even with a token from a product owner. A dedicated CI user with the *tester* role works as well.
-2. **Register the tests** as automatic test cases with a test identifier. `nexmap test sync` creates the missing ones from a report (developer role):
+2. **Register the tests** as automatic test cases with a test identifier. `wiekko test sync` creates the missing ones from a report (developer role):
    ```sh
-   go test -json ./... | nexmap test sync --dry-run   # review first
-   go test -json ./... | nexmap test sync
+   go test -json ./... | wiekko test sync --dry-run   # review first
+   go test -json ./... | wiekko test sync
    ```
    `--component` or `--capability` files the new test cases in the product structure, `--pyramid-level unit`
    sets their level and `--req FR-12` links them to the requirement they verify; all options are checked
    before anything is created. Subtests (`TestX/case`) get no test case of their own when their parent is
    in the report, since results roll up into the parent. Use the same `--identifier-style` here as for
-   `nexmap utest`. New test cases join campaigns created afterwards; an active campaign keeps the scope it
+   `wiekko utest`. New test cases join campaigns created afterwards; an active campaign keeps the scope it
    was created with.
-3. **Check the mapping** before wiring CI: `go test -json ./... | nexmap utest --dry-run` shows how each test maps to a test case and what would change.
-4. **Install the CLI** in the job with the install script (see [Setup](setup.md#installing)), pinned to a version so a new release never changes a build unannounced: `curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh`. As root (most CI containers) it installs into `/usr/local/bin`, otherwise into `~/.local/bin`, which may need adding to the job's `PATH`. The update notice stays off in CI.
-5. **Configure the job** with `NEXMAP_SERVER`, `NEXMAP_PRODUCT` and the secret `NEXMAP_TOKEN`. The product may come from a committed `.nexmap.json` instead (see [Setup](setup.md#configuration)), but set the server in the job: the token goes to whatever server is configured, and a branch that changes the file must not be able to send it elsewhere. The CLI prints a warning when it sends `NEXMAP_TOKEN` to a server taken from `.nexmap.json`.
+3. **Check the mapping** before wiring CI: `go test -json ./... | wiekko utest --dry-run` shows how each test maps to a test case and what would change.
+4. **Install the CLI** in the job with the install script (see [Setup](setup.md#installing)), pinned to a version so a new release never changes a build unannounced: `curl -fsSL https://wiekko.net/install.sh | WIEKKO_VERSION=v1.0.0 sh`. As root (most CI containers) it installs into `/usr/local/bin`, otherwise into `~/.local/bin`, which may need adding to the job's `PATH`. The update notice stays off in CI.
+5. **Configure the job** with `WIEKKO_SERVER`, `WIEKKO_PRODUCT` and the secret `WIEKKO_TOKEN`. The product may come from a committed `.wiekko.json` instead (see [Setup](setup.md#configuration)), but set the server in the job: the token goes to whatever server is configured, and a branch that changes the file must not be able to send it elsewhere. The CLI prints a warning when it sends `WIEKKO_TOKEN` to a server taken from `.wiekko.json`.
 
 ## Options
 
@@ -57,7 +57,7 @@ Each status change is recorded in the result history with the token's user, the 
 
 When reading stdin, `utest` copies its input to stdout so the test log stays in the build output, then prints a summary. With `-o json` it prints only the JSON report.
 
-**Exit status.** In `go test -json ./... | nexmap utest`, the shell reports the exit status of `nexmap`, not of `go test`. Either let `nexmap` fail the job with `--exit-code`, or use `set -o pipefail` (bash) so a failing `go test` still fails it. Without either, the job passes even when tests fail.
+**Exit status.** In `go test -json ./... | wiekko utest`, the shell reports the exit status of `wiekko`, not of `go test`. Either let `wiekko` fail the job with `--exit-code`, or use `set -o pipefail` (bash) so a failing `go test` still fails it. Without either, the job passes even when tests fail.
 
 ## GitHub Actions
 
@@ -72,16 +72,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - name: Install nexmap
+      - name: Install wiekko
         run: |
-          curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh
+          curl -fsSL https://wiekko.net/install.sh | WIEKKO_VERSION=v1.0.0 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Test
         env:
-          NEXMAP_SERVER: https://nexmap.example.com
-          NEXMAP_PRODUCT: ${{ vars.NEXMAP_PRODUCT }}
-          NEXMAP_TOKEN: ${{ secrets.NEXMAP_TOKEN }}
-        run: go test -json ./... | nexmap utest --env linux-amd64 --exit-code
+          WIEKKO_SERVER: https://wiekko.example.com
+          WIEKKO_PRODUCT: ${{ vars.WIEKKO_PRODUCT }}
+          WIEKKO_TOKEN: ${{ secrets.WIEKKO_TOKEN }}
+        run: go test -json ./... | wiekko utest --env linux-amd64 --exit-code
 ```
 
 For a build matrix, pass the matrix value: `--env ${{ matrix.os }}`, with one runtime environment per OS in the product.
@@ -92,12 +92,12 @@ For a build matrix, pass the matrix value: `--env ${{ matrix.os }}`, with one ru
 test:
   image: golang:1.26
   variables:
-    NEXMAP_SERVER: https://nexmap.example.com
-    NEXMAP_PRODUCT: "<product id>"
-    # NEXMAP_TOKEN: set as a masked CI/CD variable
+    WIEKKO_SERVER: https://wiekko.example.com
+    WIEKKO_PRODUCT: "<product id>"
+    # WIEKKO_TOKEN: set as a masked CI/CD variable
   script:
-    - curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh
-    - go test -json ./... | nexmap utest --env linux-amd64 --exit-code
+    - curl -fsSL https://wiekko.net/install.sh | WIEKKO_VERSION=v1.0.0 sh
+    - go test -json ./... | wiekko utest --env linux-amd64 --exit-code
 ```
 
 ## Forgejo / Gitea Actions
@@ -113,12 +113,12 @@ jobs:
       image: golang:1.26
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v4
-      - run: curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=v1.0.0 sh
+      - run: curl -fsSL https://wiekko.net/install.sh | WIEKKO_VERSION=v1.0.0 sh
       - env:
-          NEXMAP_SERVER: https://nexmap.example.com
-          NEXMAP_PRODUCT: ${{ vars.NEXMAP_PRODUCT }}
-          NEXMAP_TOKEN: ${{ secrets.NEXMAP_TOKEN }}
-        run: go test -json ./... | nexmap utest --env linux-amd64 --exit-code
+          WIEKKO_SERVER: https://wiekko.example.com
+          WIEKKO_PRODUCT: ${{ vars.WIEKKO_PRODUCT }}
+          WIEKKO_TOKEN: ${{ secrets.WIEKKO_TOKEN }}
+        run: go test -json ./... | wiekko utest --env linux-amd64 --exit-code
 ```
 
 ## Other ecosystems
@@ -127,10 +127,10 @@ Anything that writes JUnit XML works: pytest (`--junitxml=report.xml`), jest (`j
 
 ```sh
 pytest --junitxml=report.xml; status=$?
-nexmap utest --format junit report.xml
+wiekko utest --format junit report.xml
 exit $status
 ```
 
 With the default `package` style, pytest identifiers look like `tests.test_calc.test_add` and Surefire ones like `com.example.CalcTest.testAdd`; jest-junit's default (classname equal to name) yields the test title.
 
-The upload endpoint behind `nexmap utest` is described in the [REST API reference](../api/rest.md#test-runs).
+The upload endpoint behind `wiekko utest` is described in the [REST API reference](../api/rest.md#test-runs).

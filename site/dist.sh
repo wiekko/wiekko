@@ -7,7 +7,7 @@
 # Usage: site/dist.sh OUT_DIR
 #
 # Writes OUT_DIR/<version>/:
-#   nexmap_<version>_<os>_<arch>.tar.gz   (.zip for windows), binary + LICENSE
+#   wiekko_<version>_<os>_<arch>.tar.gz   (.zip for windows), binary + LICENSE
 #   SHA256SUMS                            sha256sum format
 #   release.json                          {"version": …, "api_level": …}
 #
@@ -24,20 +24,20 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 # -buildvcs=false: release binaries carry neither VCS data nor a module
-# version, which is how `nexmap update` tells them from `go install` builds.
+# version, which is how `wiekko update` tells them from `go install` builds.
 ldflags="-s -w"
 if [ -n "${VERSION:-}" ]; then
-    ldflags="$ldflags -X nexmap.net/internal/buildinfo.Version=$VERSION"
+    ldflags="$ldflags -X wiekko.net/internal/buildinfo.Version=$VERSION"
 fi
 build() { # GOOS GOARCH OUTFILE
-    CGO_ENABLED=0 GOOS=$1 GOARCH=$2 go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$3" ./cmd/nexmap
+    CGO_ENABLED=0 GOOS=$1 GOARCH=$2 go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$3" ./cmd/wiekko
 }
 
 # Ask a native build for its version and API level, so the metadata matches
 # exactly what the binaries report. It runs outside the repository and with
 # an empty configuration, so it never contacts a server.
-build "$(go env GOOS)" "$(go env GOARCH)" "$work/native/nexmap"
-info=$(cd "$work" && env -u NEXMAP_SERVER NEXMAP_CONFIG_DIR="$work/config" ./native/nexmap version -o json)
+build "$(go env GOOS)" "$(go env GOARCH)" "$work/native/wiekko"
+info=$(cd "$work" && env -u WIEKKO_SERVER WIEKKO_CONFIG_DIR="$work/config" ./native/wiekko version -o json)
 field() {
     printf '%s\n' "$info" | sed -n "s/^ *\"$1\": *\"\{0,1\}\([^\",]*\)\"\{0,1\},\{0,1\}\$/\1/p" | head -n 1
 }
@@ -64,13 +64,13 @@ for target in $targets; do
     os=${target%/*}
     arch=${target#*/}
     dir="$work/$os-$arch"
-    bin=nexmap
-    [ "$os" = windows ] && bin=nexmap.exe
+    bin=wiekko
+    [ "$os" = windows ] && bin=wiekko.exe
     build "$os" "$arch" "$dir/$bin"
     cp LICENSE "$dir/LICENSE"
     # Fixed timestamps and owners, so the same binaries give the same archive.
     touch -d @0 "$dir/$bin" "$dir/LICENSE"
-    name="nexmap_${version}_${os}_${arch}"
+    name="wiekko_${version}_${os}_${arch}"
     if [ "$os" = windows ]; then
         (cd "$dir" && zip -qX "$dest/$name.zip" "$bin" LICENSE)
     else
@@ -79,5 +79,5 @@ for target in $targets; do
     echo "dist:   $os/$arch"
 done
 
-(cd "$dest" && sha256sum nexmap_* >SHA256SUMS)
+(cd "$dest" && sha256sum wiekko_* >SHA256SUMS)
 printf '{"version":"%s","api_level":%s}\n' "$version" "$api_level" >"$dest/release.json"

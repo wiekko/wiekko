@@ -5,7 +5,7 @@
 // so that dev-mode instances have something to look at without clicking every
 // entity into existence first.
 //
-// It runs only when NEXMAP_DEV_MODE is set and the database was just created
+// It runs only when WIEKKO_DEV_MODE is set and the database was just created
 // (no users existed before the admin bootstrap). Everything goes through the
 // service layer, so the demo data is subject to the same validation as data
 // entered through the UI, and this package stops compiling — or fails loudly at
@@ -19,10 +19,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/store"
 )
 
 // DemoPassword is the shared password of every seeded demo account. Dev mode

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"nexmap.net/web/templates"
+	"wiekko.net/web/templates"
 )
 
 // Notices explain on the page a user lands on why they were sent there. They

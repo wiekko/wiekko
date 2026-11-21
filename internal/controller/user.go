@@ -6,10 +6,10 @@ package controller
 import (
 	"net/http"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
 )
 
 // UserController handles current-user endpoints.

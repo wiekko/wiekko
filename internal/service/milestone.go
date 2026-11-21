@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // MilestoneService handles milestones, sprints, statuses, pyramid levels, and runtime environments.

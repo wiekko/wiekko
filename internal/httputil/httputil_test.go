@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/httputil"
+	"wiekko.net/internal/httputil"
 )
 
 func TestJSON(t *testing.T) {
@@ -132,17 +132,17 @@ func TestDecodeJSON(t *testing.T) {
 }
 
 func TestRequestBaseURL(t *testing.T) {
-	r := httptest.NewRequest(http.MethodGet, "http://nexmap.internal:8080/x", nil)
-	if got := httputil.RequestBaseURL(r); got != "http://nexmap.internal:8080" {
+	r := httptest.NewRequest(http.MethodGet, "http://wiekko.internal:8080/x", nil)
+	if got := httputil.RequestBaseURL(r); got != "http://wiekko.internal:8080" {
 		t.Errorf("plain: %q", got)
 	}
 	r.Header.Set("X-Forwarded-Proto", "https")
-	r.Header.Set("X-Forwarded-Host", "nexmap.example.com, other")
-	if got := httputil.RequestBaseURL(r); got != "https://nexmap.example.com" {
+	r.Header.Set("X-Forwarded-Host", "wiekko.example.com, other")
+	if got := httputil.RequestBaseURL(r); got != "https://wiekko.example.com" {
 		t.Errorf("forwarded: %q", got)
 	}
 	r.Header.Set("X-Forwarded-Proto", "javascript")
-	if got := httputil.RequestBaseURL(r); got != "http://nexmap.example.com" {
+	if got := httputil.RequestBaseURL(r); got != "http://wiekko.example.com" {
 		t.Errorf("bad proto: %q", got)
 	}
 }

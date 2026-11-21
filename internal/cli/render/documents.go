@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
 )
 
 var documentHeaders = []string{"ID", "Title", "Format", "State", "Rev"}

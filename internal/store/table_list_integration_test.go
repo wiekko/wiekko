@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // Table list queries of the requirements, tasks (UR-144, UR-145) and test

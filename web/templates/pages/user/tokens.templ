@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"strings"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
-	"nexmap.net/web/templates"
-	layout "nexmap.net/web/templates/layout"
-	"nexmap.net/web/templates/patterns"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
+	"wiekko.net/web/templates"
+	layout "wiekko.net/web/templates/layout"
+	"wiekko.net/web/templates/patterns"
+	"wiekko.net/web/templates/ui"
 )
 
 // TokenView is a display-ready token with computed status.
@@ -551,7 +551,7 @@ templ CommandLine(props CLIProps) {
 					<h4 class="font-medium text-gray-900 dark:text-gray-100">1. Install the CLI</h4>
 					if props.Release != "" {
 						<p class="text-gray-500 dark:text-gray-400">
-							These commands install <span class="font-mono">nexmap { props.Release }</span>, the version of this server.
+							These commands install <span class="font-mono">wiekko { props.Release }</span>, the version of this server.
 						</p>
 					} else {
 						<p class="text-gray-500 dark:text-gray-400">
@@ -565,7 +565,7 @@ templ CommandLine(props CLIProps) {
 				<div class="space-y-2">
 					<h4 class="font-medium text-gray-900 dark:text-gray-100">2. Sign in to this server</h4>
 					<p class="text-gray-500 dark:text-gray-400">Run this and paste a token created on this page when asked.</p>
-					@copyableCommand("", "nexmap login --server "+props.ServerURL)
+					@copyableCommand("", "wiekko login --server "+props.ServerURL)
 				</div>
 			</div>
 		}

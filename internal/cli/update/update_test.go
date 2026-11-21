@@ -117,9 +117,9 @@ func zipOf(t *testing.T, files map[string][]byte) []byte {
 
 func TestExtract(t *testing.T) {
 	bin := []byte("binary")
-	files := map[string][]byte{"LICENSE": []byte("EUPL-1.2"), "nexmap": bin, "nexmap.exe": bin}
+	files := map[string][]byte{"LICENSE": []byte("EUPL-1.2"), "wiekko": bin, "wiekko.exe": bin}
 	for name, data := range map[string][]byte{"a.tar.gz": tarGz(t, files), "a.zip": zipOf(t, files)} {
-		got, err := Extract(name, data, "nexmap")
+		got, err := Extract(name, data, "wiekko")
 		if err != nil || !bytes.Equal(got, bin) {
 			t.Errorf("%s: got %q, %v", name, got, err)
 		}
@@ -127,7 +127,7 @@ func TestExtract(t *testing.T) {
 			t.Errorf("%s: extracting a missing file must fail", name)
 		}
 	}
-	if _, err := Extract("a.rar", nil, "nexmap"); err == nil {
+	if _, err := Extract("a.rar", nil, "wiekko"); err == nil {
 		t.Error("unknown formats must fail")
 	}
 }
@@ -135,7 +135,7 @@ func TestExtract(t *testing.T) {
 // releaseSite serves one release, v1.2.0, for the running platform.
 func releaseSite(t *testing.T, tamper bool) (*httptest.Server, []byte) {
 	t.Helper()
-	bin := []byte("new nexmap " + runtime.GOOS)
+	bin := []byte("new wiekko " + runtime.GOOS)
 	name := ArchiveName("v1.2.0", runtime.GOOS, runtime.GOARCH)
 	files := map[string][]byte{BinaryName(runtime.GOOS): bin}
 	archive := tarGz(t, files)

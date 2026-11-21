@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"strconv"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/textdiff"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/textdiff"
 )
 
 // DocumentController handles document endpoints (FR-50..FR-58).

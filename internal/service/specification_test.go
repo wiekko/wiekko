@@ -6,7 +6,7 @@ package service
 import (
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 func TestBuildSections(t *testing.T) {

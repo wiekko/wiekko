@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // Archiving (FR-155) takes closed backlog items out of the default views

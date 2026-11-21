@@ -8,7 +8,7 @@ import (
 	"errors"
 	"net/http"
 
-	"nexmap.net/internal/httputil"
+	"wiekko.net/internal/httputil"
 )
 
 const csrfHeader = "X-CSRF-Token"

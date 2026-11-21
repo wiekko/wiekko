@@ -4,10 +4,10 @@
 package dev
 
 import (
-	"nexmap.net/web/templates"
-	layout "nexmap.net/web/templates/layout"
-	"nexmap.net/web/templates/patterns"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates"
+	layout "wiekko.net/web/templates/layout"
+	"wiekko.net/web/templates/patterns"
+	"wiekko.net/web/templates/ui"
 )
 
 templ CataloguePage() {
@@ -16,7 +16,7 @@ templ CataloguePage() {
 			<div class="flex items-start justify-between">
 				<div>
 					<h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Component Catalogue</h1>
-					<p class="mt-2 text-gray-500 dark:text-gray-400">Visual reference for all Nexmap UI components.</p>
+					<p class="mt-2 text-gray-500 dark:text-gray-400">Visual reference for all Wiekko UI components.</p>
 				</div>
 				@ui.ThemeToggle()
 			</div>
@@ -235,7 +235,7 @@ templ CataloguePage() {
 				<div class="space-y-4">
 					@ui.Breadcrumb([]templates.BreadcrumbItem{
 						{Label: "Products", Href: "#"},
-						{Label: "Nexmap", Href: "#"},
+						{Label: "Wiekko", Href: "#"},
 						{Label: "Requirements"},
 					})
 					@ui.Breadcrumb([]templates.BreadcrumbItem{
@@ -385,7 +385,7 @@ templ CataloguePage() {
 				@patterns.DetailPageHeader(
 					[]templates.BreadcrumbItem{
 						{Label: "Products", Href: "#"},
-						{Label: "Nexmap", Href: "#"},
+						{Label: "Wiekko", Href: "#"},
 						{Label: "REQ-001"},
 					},
 					"Login page redesign",

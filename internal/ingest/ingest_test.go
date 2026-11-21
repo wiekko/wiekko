@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/ingest"
+	"wiekko.net/internal/ingest"
 )
 
 type want struct {

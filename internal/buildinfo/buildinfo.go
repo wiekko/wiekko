@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 // Package buildinfo reports the version of the running binary. It is shared by
-// the server (nexmapd) and the CLI (nexmap), so it must stay free of any
+// the server (wiekkod) and the CLI (wiekko), so it must stay free of any
 // dependency beyond the standard library.
 package buildinfo
 
@@ -28,7 +28,7 @@ var source string
 
 // Version overrides everything when set at link time:
 //
-//	go build -ldflags "-X nexmap.net/internal/buildinfo.Version=v1.2.3" ./cmd/nexmap
+//	go build -ldflags "-X wiekko.net/internal/buildinfo.Version=v1.2.3" ./cmd/wiekko
 var Version = ""
 
 // Revision is the commit a build without VCS metadata was made from, set at

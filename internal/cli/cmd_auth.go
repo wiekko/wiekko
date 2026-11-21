@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"strings"
 
-	"nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/client"
 )
 
 func loginCommand() *command {
@@ -67,7 +67,7 @@ func loginCommand() *command {
 }
 
 // readToken reads the PAT: hidden prompt on a terminal, else the first line
-// of stdin (`echo $TOKEN | nexmap login`). There is deliberately no flag for
+// of stdin (`echo $TOKEN | wiekko login`). There is deliberately no flag for
 // the token itself, which would leak via shell history and process listings.
 func (a *app) readToken(server string) (string, error) {
 	var token string

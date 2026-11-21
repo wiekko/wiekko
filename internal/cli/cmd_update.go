@@ -15,10 +15,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/update"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/update"
 )
 
 // The background update check runs at most once per interval and never
@@ -71,7 +71,7 @@ func updateCommand() *command {
 	return &command{
 		name:    "update",
 		args:    "[VERSION]",
-		summary: "update nexmap to the newest release, or to VERSION; --check only reports",
+		summary: "update wiekko to the newest release, or to VERSION; --check only reports",
 		flags: func(fs *flag.FlagSet) {
 			fs.BoolVar(&check, "check", false, "only report whether a newer release exists")
 			fs.BoolVar(&force, "force", false, "reinstall the same version, or install one the configured server does not support")
@@ -125,13 +125,13 @@ func updateCommand() *command {
 			}
 
 			if installedWithGoInstall() {
-				return usageErr(fmt.Errorf("this nexmap was installed with `go install`; update it the same way, e.g. `go install nexmap.net/cmd/nexmap@%s`", target.Version))
+				return usageErr(fmt.Errorf("this wiekko was installed with `go install`; update it the same way, e.g. `go install wiekko.net/cmd/wiekko@%s`", target.Version))
 			}
 			if want == "" && !update.Valid(current) {
-				return usageErr(fmt.Errorf("this is a development build (%s); pass the version to install, e.g. `nexmap update %s`", current, target.Version))
+				return usageErr(fmt.Errorf("this is a development build (%s); pass the version to install, e.g. `wiekko update %s`", current, target.Version))
 			}
 			if !force && (target.Version == current || (want == "" && update.Compare(target.Version, current) < 0)) {
-				fmt.Fprintf(a.io.Stderr, "nexmap %s is up to date\n", current)
+				fmt.Fprintf(a.io.Stderr, "wiekko %s is up to date\n", current)
 				return nil
 			}
 			if !force {
@@ -142,7 +142,7 @@ func updateCommand() *command {
 
 			exe, err := a.executable()
 			if err != nil {
-				return fmt.Errorf("locate the running nexmap: %w", err)
+				return fmt.Errorf("locate the running wiekko: %w", err)
 			}
 			update.CleanupOld(exe)
 			bin, err := uc.Download(ctx, target.Version, runtime.GOOS, runtime.GOARCH)
@@ -151,7 +151,7 @@ func updateCommand() *command {
 			}
 			if err := update.Replace(exe, bin); err != nil {
 				if errors.Is(err, fs.ErrPermission) {
-					return fmt.Errorf("cannot replace %s: %w; run the update with the rights to write there (e.g. sudo), or reinstall nexmap into a directory you own", exe, err)
+					return fmt.Errorf("cannot replace %s: %w; run the update with the rights to write there (e.g. sudo), or reinstall wiekko into a directory you own", exe, err)
 				}
 				return fmt.Errorf("replace %s: %w", exe, err)
 			}
@@ -186,7 +186,7 @@ func (a *app) checkServerSupports(ctx context.Context, target *update.Release) e
 	if err != nil || v.APILevel >= target.APILevel {
 		return nil
 	}
-	return usageErr(fmt.Errorf("nexmap %s needs API level %d, but the server at %s implements %d; upgrade the server first, or pass --force",
+	return usageErr(fmt.Errorf("wiekko %s needs API level %d, but the server at %s implements %d; upgrade the server first, or pass --force",
 		target.Version, target.APILevel, c.Server(), v.APILevel))
 }
 
@@ -209,7 +209,7 @@ type updateCheck struct {
 // startUpdateCheck looks for a newer release in the background, at most once
 // a day. It stays off wherever an extra line on stderr could get in the way:
 // when stderr is not a terminal, in CI, for the MCP server, for development
-// builds, and when NEXMAP_NO_UPDATE_CHECK is set. It returns nil when no
+// builds, and when WIEKKO_NO_UPDATE_CHECK is set. It returns nil when no
 // check runs.
 func (a *app) startUpdateCheck(ctx context.Context, cmd *command) *updateCheck {
 	getenv := a.io.Getenv
@@ -239,7 +239,7 @@ func (a *app) startUpdateCheck(ctx context.Context, cmd *command) *updateCheck {
 		}
 		_ = update.SaveState(file, update.State{CheckedAt: time.Now(), Latest: r.Version})
 		if update.Compare(r.Version, current) > 0 {
-			u.notice = fmt.Sprintf("nexmap: %s is available (you have %s); run `nexmap update`", r.Version, current)
+			u.notice = fmt.Sprintf("wiekko: %s is available (you have %s); run `wiekko update`", r.Version, current)
 		}
 	}()
 	return u

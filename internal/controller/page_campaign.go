@@ -10,11 +10,11 @@ import (
 	"sort"
 	"strconv"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/web/templates"
-	productpage "nexmap.net/web/templates/pages/product"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/web/templates"
+	productpage "wiekko.net/web/templates/pages/product"
 )
 
 // --- Campaign list ---

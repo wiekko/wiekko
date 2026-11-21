@@ -4,11 +4,11 @@
 package service
 
 import (
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/mail"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/mail"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 // Services groups all service interfaces.

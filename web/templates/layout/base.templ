@@ -4,8 +4,8 @@
 package templates
 
 import (
-	"nexmap.net/web"
-	"nexmap.net/web/templates"
+	"wiekko.net/web"
+	"wiekko.net/web/templates"
 )
 
 // Base renders the HTML shell that loads CSS, fonts, and htmx.
@@ -18,9 +18,9 @@ templ Base(meta templates.PageMeta) {
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>
 				if meta.Title != "" {
-					{ meta.Title } — Nexmap
+					{ meta.Title } — Wiekko
 				} else {
-					Nexmap
+					Wiekko
 				}
 			</title>
 			<link rel="icon" type="image/svg+xml" href="/static/img/logo-icon.svg"/>

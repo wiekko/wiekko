@@ -1,16 +1,16 @@
 # CLI decisions
 
-Decisions behind the `nexmap` command line client and its MCP server: what was chosen, and why.
+Decisions behind the `wiekko` command line client and its MCP server: what was chosen, and why.
 
-## Two binaries: `nexmap` is the CLI, `nexmapd` the server
+## Two binaries: `wiekko` is the CLI, `wiekkod` the server
 
 The server binary embeds the web assets, templ output, both SQL drivers and the migrations. CI runners and
 agent sandboxes should download a small client instead, so the CLI is a separate binary. The CLI name
-matches the `nexmap utest` wording of FR-118; the server, previously `cmd/nexmap`, became `nexmapd`.
+matches the `wiekko utest` wording of FR-118; the server, previously `cmd/wiekko`, became `wiekkod`.
 AC-7 (the server ships as a single executable) still holds.
 
 The CLI is a pure REST client (AC-16) with no business logic of its own (AC-11). It must not import the
-server's `internal/store`, `internal/service`, `internal/database` or `web/` packages; `cmd/nexmap/deps_test.go`
+server's `internal/store`, `internal/service`, `internal/database` or `web/` packages; `cmd/wiekko/deps_test.go`
 enforces this.
 
 ## Agent access first, CI ingestion second
@@ -21,13 +21,13 @@ server shipped in the first release rather than later.
 
 ## Configuration in JSON, tokens never in the repository
 
-The repository file `.nexmap.json` holds only the server and product and is meant to be committed. Tokens
-live in the user configuration file (mode 0600) or in `NEXMAP_TOKEN`. JSON keeps the CLI free of
+The repository file `.wiekko.json` holds only the server and product and is meant to be committed. Tokens
+live in the user configuration file (mode 0600) or in `WIEKKO_TOKEN`. JSON keeps the CLI free of
 dependencies; TOML can be added later as a second decoder for the same structure if JSON proves
 impractical.
 
 There is no `--token` flag, since a token on the command line leaks through shell history and process
-listings; `nexmap login` reads it from a hidden prompt or stdin. Password login is not offered: the CLI
+listings; `wiekko login` reads it from a hidden prompt or stdin. Password login is not offered: the CLI
 authenticates with personal access tokens only (SC-32).
 
 ## Plain HTTP only to the local machine
@@ -53,7 +53,7 @@ status or category names.
 
 ## Read-only MCP by default
 
-`nexmap init --agents` registers the MCP server with `--read-only`, so writes through an agent are
+`wiekko init --agents` registers the MCP server with `--read-only`, so writes through an agent are
 opt-in. This is a default, not a guarantee: an agent that runs shell commands can call the CLI's write
 commands. The guarantee is a read-only token ([access tokens](access-tokens.md)), which the server
 enforces. The CLI enforces nothing on its own.
@@ -73,7 +73,7 @@ categories; it shares the category prefixes' namespace so that no identifier is 
 
 ## The specification export is rendered by the server
 
-`nexmap export` fetches a finished Markdown document from `GET /products/{p}/specification` rather than
+`wiekko export` fetches a finished Markdown document from `GET /products/{p}/specification` rather than
 assembling it from the list endpoints. Choosing what goes in and in which order is product logic (AC-11),
 one request is cheaper than dozens, and other clients of the REST API get the same document.
 
@@ -87,11 +87,11 @@ There is no import (FR-138). Turning prose into formal requirements needs judgem
 brings and a parser does not; the agent creates items through the CLI or REST API, and the identifiers
 in an export let it update items instead of duplicating them.
 
-## Distribution through nexmap.net, built on the server
+## Distribution through wiekko.net, built on the server
 
-The repository is private, so `go install nexmap.net/cmd/nexmap` cannot work for anyone else: the module
+The repository is private, so `go install wiekko.net/cmd/wiekko` cannot work for anyone else: the module
 is neither on a public proxy nor reachable through a `go-import` tag. The CLI is distributed as prebuilt
-archives on nexmap.net instead, with install scripts for sh and PowerShell (FR-142).
+archives on wiekko.net instead, with install scripts for sh and PowerShell (FR-142).
 
 The archives are built by the download site's own image (`site/`), which Coolify deploys from `stable`, the
 same way the documentation site is built. What is published is exactly what was tagged, built with the
@@ -105,12 +105,12 @@ tag (`just dist`). Signing the checksums is left for later; it would need a key 
 
 ## Update notice once a day, on a terminal only
 
-`nexmap update` replaces the binary in place: next to it, then by rename, which Windows allows for a
+`wiekko update` replaces the binary in place: next to it, then by rename, which Windows allows for a
 running executable when the old file is renamed first. It refuses binaries from `go install`, which belong
 to the Go toolchain, and releases that need a higher API level than the configured server offers.
 
 The background check for a newer release exists because users would otherwise keep old clients for
 good. It must never cost anything in automation, so it only runs with stderr on a terminal, not in CI, not
-for `nexmap mcp` (whose stdio belongs to the agent), not for development builds, and at most once a day.
+for `wiekko mcp` (whose stdio belongs to the agent), not for development builds, and at most once a day.
 It runs in parallel with the command and is dropped after two seconds, so a slow or unreachable site
 never delays work.

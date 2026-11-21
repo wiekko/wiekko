@@ -8,8 +8,8 @@ build
 web/dist
 **/*_templ.go
 *.exe
-nexmap
-nexmapd
+wiekko
+wiekkod
 *.db
 *.db-shm
 *.db-wal

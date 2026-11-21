@@ -11,8 +11,8 @@ import (
 	"sort"
 	"strings"
 
-	"nexmap.net/internal/client"
-	"nexmap.net/internal/ingest"
+	"wiekko.net/internal/client"
+	"wiekko.net/internal/ingest"
 )
 
 // CampaignID resolves a campaign by name, ID or ID prefix.
@@ -41,7 +41,7 @@ type SyncResult struct {
 // files them (FR-119).
 type TestSync struct {
 	// Identifiers are the test identifiers of a run. The MCP tool may give a
-	// Report instead, which is parsed like `nexmap test sync` input.
+	// Report instead, which is parsed like `wiekko test sync` input.
 	Identifiers     []string `json:"test_identifiers,omitempty" jsonschema:"test identifiers from a test run, e.g. example.com/app.TestAdd; give these or report"`
 	Report          string   `json:"report,omitempty" jsonschema:"a test report to read the identifiers from: go test -json or -v output, or JUnit XML"`
 	IdentifierStyle string   `json:"identifier_style,omitempty" jsonschema:"package (default: pkg/path.TestName) or name (TestName); must match how the CI uploads results"`

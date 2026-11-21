@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // CampaignResultStore defines data access operations for campaign results and

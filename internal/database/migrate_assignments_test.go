@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"nexmap.net/internal/database"
+	"wiekko.net/internal/database"
 )
 
 // TestMigrationEndsAssignmentsWithMembership checks migration 6 (UR-171):

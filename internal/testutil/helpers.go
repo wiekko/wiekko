@@ -6,8 +6,8 @@ package testutil
 import (
 	"time"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
 )
 
 // MakeUser returns an active user with sensible defaults. Overrides can customize fields.

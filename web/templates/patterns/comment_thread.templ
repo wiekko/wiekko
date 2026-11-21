@@ -4,8 +4,8 @@
 package patterns
 
 import (
-	"nexmap.net/web/templates"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates"
+	"wiekko.net/web/templates/ui"
 )
 
 // CommentList renders a comment thread with an add form.
@@ -92,7 +92,7 @@ templ CommentForm(hxPost, csrfToken string) {
 		hx-post={ hxPost }
 		hx-target="#comments"
 		hx-swap="beforeend"
-		hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Nexmap-Error')) this.reset()"
+		hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Wiekko-Error')) this.reset()"
 		class="flex gap-3"
 	>
 		<input type="hidden" name="_csrf" value={ csrfToken }/>

@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/store"
 )
 
 // testProductID is the product unit tests act in; testOwnership reports every

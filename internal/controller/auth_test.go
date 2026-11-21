@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/controller"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/controller"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func TestAuthLogin(t *testing.T) {
@@ -42,12 +42,12 @@ func TestAuthLogin(t *testing.T) {
 		cookies := w.Result().Cookies()
 		found := false
 		for _, c := range cookies {
-			if c.Name == "nexmap_session" && c.Value != "" {
+			if c.Name == "wiekko_session" && c.Value != "" {
 				found = true
 			}
 		}
 		if !found {
-			t.Fatal("nexmap_session cookie not set")
+			t.Fatal("wiekko_session cookie not set")
 		}
 
 		// Verify response has csrf_token.
@@ -100,7 +100,7 @@ func TestAuthLogout(t *testing.T) {
 		ctrl := controller.NewAuth(env.Services.Auth, env.Services.User, false)
 
 		r := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
-		r.AddCookie(&http.Cookie{Name: "nexmap_session", Value: "sess-1"})
+		r.AddCookie(&http.Cookie{Name: "wiekko_session", Value: "sess-1"})
 		w := httptest.NewRecorder()
 		ctrl.Logout(w, r)
 
@@ -110,7 +110,7 @@ func TestAuthLogout(t *testing.T) {
 
 		// Verify cookie is cleared.
 		for _, c := range w.Result().Cookies() {
-			if c.Name == "nexmap_session" && c.MaxAge != -1 {
+			if c.Name == "wiekko_session" && c.MaxAge != -1 {
 				t.Fatal("cookie should have MaxAge=-1")
 			}
 		}

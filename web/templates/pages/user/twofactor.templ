@@ -6,9 +6,9 @@ package user
 import (
 	"strconv"
 
-	"nexmap.net/web/templates"
-	layout "nexmap.net/web/templates/layout"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates"
+	layout "wiekko.net/web/templates/layout"
+	"wiekko.net/web/templates/ui"
 )
 
 // TOTPSetupView is what the setup step shows: the QR code and the secret for manual entry.
@@ -49,7 +49,7 @@ type TwoFactorSetupProps struct {
 	DisplayName string
 	IsAdmin     bool
 	// InstanceRule is set when an instance-level rule requires 2FA: the user
-	// cannot use Nexmap until it is set up.
+	// cannot use Wiekko until it is set up.
 	InstanceRule bool
 	EnforcedBy   string
 	// ProductName is the product the page was opened for, which requires 2FA.
@@ -71,7 +71,7 @@ templ TwoFactorSetupPage(props TwoFactorSetupProps) {
 				<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Set up two-factor authentication</h1>
 				if props.InstanceRule {
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-						Two-factor authentication is { props.EnforcedBy }. Finish the setup below to continue using Nexmap.
+						Two-factor authentication is { props.EnforcedBy }. Finish the setup below to continue using Wiekko.
 					</p>
 				} else if props.ProductName != "" {
 					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">

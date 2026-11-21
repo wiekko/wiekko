@@ -10,7 +10,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"nexmap.net/web/templates"
+	"wiekko.net/web/templates"
 )
 
 // TestAppLayoutProvidesConfirmDialog guards UR-154: modal.js shows hx-confirm

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
 // SPDX-License-Identifier: EUPL-1.2
 
-// Package templates provides templ UI components for the Nexmap frontend.
+// Package templates provides templ UI components for the Wiekko frontend.
 package templates
 
 import "strings"

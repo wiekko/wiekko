@@ -6,9 +6,9 @@ package router
 import (
 	"net/http"
 
-	"nexmap.net/internal/controller"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/controller"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
 )
 
 func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64, publicURL string) {

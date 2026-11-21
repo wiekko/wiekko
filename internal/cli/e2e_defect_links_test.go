@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	"wiekko.net/internal/cli/ops"
 )
 
 // defectLinked reports whether d has a link of the given type whose label

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func newComponentService(components *testutil.MockComponentStore, capabilities *testutil.MockCapabilityStore, audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *ComponentService {

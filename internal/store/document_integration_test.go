@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // TestDocumentStore covers documents, their revisions and links

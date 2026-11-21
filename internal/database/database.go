@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"nexmap.net/internal/config"
+	"wiekko.net/internal/config"
 )
 
 // Open returns a *sql.DB for the configured driver and DSN.

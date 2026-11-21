@@ -16,10 +16,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // UserService handles user account operations.
@@ -290,7 +290,7 @@ const (
 )
 
 // validateEmail checks that email is a plain address ("ada@example.com"),
-// already trimmed. The address is not verified â€” nexmap sends no email â€” but
+// already trimmed. The address is not verified â€” wiekko sends no email â€” but
 // it is shown to administrators and owners and must not be free text.
 func validateEmail(email string) error {
 	addr, err := mail.ParseAddress(email)

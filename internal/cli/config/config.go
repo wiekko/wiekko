@@ -14,38 +14,38 @@ import (
 	"os"
 	"path/filepath"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // RepoFileName is the repository config file, committed alongside the code.
 // It never holds credentials.
-const RepoFileName = ".nexmap.json"
+const RepoFileName = ".wiekko.json"
 
 // Environment variables the CLI reads.
 const (
-	EnvServer    = "NEXMAP_SERVER"
-	EnvProduct   = "NEXMAP_PRODUCT"
-	EnvToken     = "NEXMAP_TOKEN"
-	EnvOutput    = "NEXMAP_OUTPUT"
-	EnvAllowHTTP = "NEXMAP_ALLOW_HTTP"
+	EnvServer    = "WIEKKO_SERVER"
+	EnvProduct   = "WIEKKO_PRODUCT"
+	EnvToken     = "WIEKKO_TOKEN"
+	EnvOutput    = "WIEKKO_OUTPUT"
+	EnvAllowHTTP = "WIEKKO_ALLOW_HTTP"
 	// EnvConfigDir overrides the user config directory (default:
-	// os.UserConfigDir()/nexmap).
-	EnvConfigDir = "NEXMAP_CONFIG_DIR"
+	// os.UserConfigDir()/wiekko).
+	EnvConfigDir = "WIEKKO_CONFIG_DIR"
 	// EnvNoUpdateCheck turns off the daily check for a newer release.
-	EnvNoUpdateCheck = "NEXMAP_NO_UPDATE_CHECK"
+	EnvNoUpdateCheck = "WIEKKO_NO_UPDATE_CHECK"
 	// EnvReleasesURL overrides where releases are looked up and downloaded
 	// (default: update.DefaultBaseURL).
-	EnvReleasesURL = "NEXMAP_RELEASES_URL"
+	EnvReleasesURL = "WIEKKO_RELEASES_URL"
 )
 
-// Repo is the content of .nexmap.json. Unknown fields are ignored so an older
+// Repo is the content of .wiekko.json. Unknown fields are ignored so an older
 // CLI can read a file written for a newer one.
 type Repo struct {
 	Server  string `json:"server,omitempty"`
 	Product string `json:"product,omitempty"`
 }
 
-// FindRepo looks for .nexmap.json in dir and its parents. It returns the path
+// FindRepo looks for .wiekko.json in dir and its parents. It returns the path
 // and content of the first one found, or "" and nil when there is none.
 func FindRepo(dir string) (string, *Repo, error) {
 	dir, err := filepath.Abs(dir)
@@ -125,7 +125,7 @@ func UserDir(getenv func(string) string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("locate user config directory: %w (set %s)", err, EnvConfigDir)
 	}
-	return filepath.Join(base, "nexmap"), nil
+	return filepath.Join(base, "wiekko"), nil
 }
 
 // UserFile returns the path of the user config file.

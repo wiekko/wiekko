@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"nexmap.net/internal/ingest/report"
+	"wiekko.net/internal/ingest/report"
 )
 
 // suite covers both <testsuites> and <testsuite>; suites may nest.

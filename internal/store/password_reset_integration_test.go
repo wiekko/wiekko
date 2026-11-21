@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/model"
 )
 
 func TestPasswordResetStore(t *testing.T) {

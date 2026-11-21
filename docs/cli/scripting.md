@@ -12,7 +12,7 @@ The output formats and exit codes below are a stable contract for scripts and AI
 
 The default is `table` whether or not stdout is a terminal, so a command's output never changes with the
 environment it runs in: scripts must ask for `-o json` explicitly. To change your personal default, set
-`NEXMAP_OUTPUT` or `output` in the user configuration file (see [Setup](setup.md#configuration)).
+`WIEKKO_OUTPUT` or `output` in the user configuration file (see [Setup](setup.md#configuration)).
 
 ## Errors and exit codes
 
@@ -24,7 +24,7 @@ environment it runs in: scripts must ask for `-o json` explicitly. To change you
 | `3` | Not found: the item does not exist or is not visible to you |
 | `4` | Tests failed (only `utest --exit-code`) |
 
-Errors go to stderr as a single line, `nexmap: <message>`, followed by a hint for authentication and
+Errors go to stderr as a single line, `wiekko: <message>`, followed by a hint for authentication and
 role errors. With `-o json`, stderr carries `{"error": {"code": "…", "message": "…"}}` instead.
 
 A role refusal (exit 2) is final: retrying will not help; the user needs a different role in the product.
@@ -35,20 +35,20 @@ Commands that take a description or comment body accept it from a file or stdin 
 avoids shell quoting problems with markdown:
 
 ```sh
-nexmap comment add FR-12 --body-file - <<'EOF'
+wiekko comment add FR-12 --body-file - <<'EOF'
 Decided to keep the old endpoint until **v2**.
 EOF
 ```
 
 ## Raw API calls
 
-For anything without a dedicated command, `nexmap api` sends an authenticated request to the
+For anything without a dedicated command, `wiekko api` sends an authenticated request to the
 [REST API](../api/rest.md) and prints the response:
 
 ```sh
-nexmap api /products/{product}/requirements -o json
-nexmap api POST /products/{product}/requirements --data @new.json
-generate-body | nexmap api POST /products/{product}/requirements --data @-
+wiekko api /products/{product}/requirements -o json
+wiekko api POST /products/{product}/requirements --data @new.json
+generate-body | wiekko api POST /products/{product}/requirements --data @-
 ```
 
 The method defaults to `GET`; `{product}` in the path is replaced with the configured product; `--data`

@@ -4,7 +4,7 @@
 # Entrypoint hook of the download site (site/Dockerfile): publishes the release
 # built into the image on the persistent volume, before nginx starts.
 #
-# - Copies each release from /opt/nexmap/releases/<version>/ to
+# - Copies each release from /opt/wiekko/releases/<version>/ to
 #   /data/releases/<version>/ unless it is there already. A release on the
 #   volume is never replaced, so its checksums stay what users downloaded.
 # - Points /data/releases/latest.json at it if it is a final release. The site
@@ -16,7 +16,7 @@
 # a half-written release.
 set -eu
 
-src=/opt/nexmap/releases
+src=/opt/wiekko/releases
 dst=/data/releases
 semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
 

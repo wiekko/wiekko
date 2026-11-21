@@ -10,7 +10,7 @@ import (
 	"slices"
 	"testing"
 
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates/ui"
 )
 
 type tableRow struct {

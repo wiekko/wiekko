@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // hostileBody tries every way in that the rendering must close.

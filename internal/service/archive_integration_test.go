@@ -9,9 +9,9 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // Archiving (FR-155) on a real database: the archived state lives in SQL and

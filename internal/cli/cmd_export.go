@@ -12,8 +12,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
 )
 
 // exportView is export's -o json output.

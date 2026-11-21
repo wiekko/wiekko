@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"nexmap.net/internal/config"
+	"wiekko.net/internal/config"
 )
 
 const shutdownTimeout = 10 * time.Second

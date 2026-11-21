@@ -11,10 +11,10 @@ import (
 	"io"
 	"strings"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/render"
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/render"
+	"wiekko.net/internal/client"
 )
 
 // session builds the ops session for the configured server and product.
@@ -47,7 +47,7 @@ func noArgs(name string, args []string) error {
 
 func oneArg(name, what string, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", usageErr(fmt.Errorf("usage: nexmap %s %s", name, what))
+		return "", usageErr(fmt.Errorf("usage: wiekko %s %s", name, what))
 	}
 	return args[0], nil
 }
@@ -223,7 +223,7 @@ func capabilityGroup() *command {
 		summary: "show a capability with its requirements, constraints, test cases and defects",
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) == 0 {
-				return usageErr(errors.New("usage: nexmap capability show <name|ID>"))
+				return usageErr(errors.New("usage: wiekko capability show <name|ID>"))
 			}
 			s, err := a.session()
 			if err != nil {

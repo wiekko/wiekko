@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/model"
 )
 
 // ts renders a fixed offset from now in the canonical stored format.

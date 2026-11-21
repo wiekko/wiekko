@@ -34,13 +34,13 @@ func TestNormalizeServer(t *testing.T) {
 		in, want string
 		wantErr  bool
 	}{
-		{in: "https://Nexmap.Example.com/", want: "https://nexmap.example.com"},
-		{in: "https://nexmap.example.com/api/v1", want: "https://nexmap.example.com"},
-		{in: "https://nexmap.example.com/api/v1/", want: "https://nexmap.example.com"},
-		{in: "https://example.com/nexmap/?x=1#y", want: "https://example.com/nexmap"},
+		{in: "https://Wiekko.Example.com/", want: "https://wiekko.example.com"},
+		{in: "https://wiekko.example.com/api/v1", want: "https://wiekko.example.com"},
+		{in: "https://wiekko.example.com/api/v1/", want: "https://wiekko.example.com"},
+		{in: "https://example.com/wiekko/?x=1#y", want: "https://example.com/wiekko"},
 		{in: "http://localhost:8080", want: "http://localhost:8080"},
-		{in: "nexmap.example.com", wantErr: true},
-		{in: "ftp://nexmap.example.com", wantErr: true},
+		{in: "wiekko.example.com", wantErr: true},
+		{in: "ftp://wiekko.example.com", wantErr: true},
 		{in: "", wantErr: true},
 		{in: "https://", wantErr: true},
 	}
@@ -57,7 +57,7 @@ func TestNormalizeServer(t *testing.T) {
 }
 
 func TestNewRefusesPlainHTTPToRemoteHost(t *testing.T) {
-	if _, err := New("http://nexmap.example.com"); !errors.Is(err, ErrInsecureServer) {
+	if _, err := New("http://wiekko.example.com"); !errors.Is(err, ErrInsecureServer) {
 		t.Fatalf("err = %v, want ErrInsecureServer", err)
 	}
 	for _, s := range []string{"http://localhost:8080", "http://127.0.0.1:8080", "http://[::1]:8080", "http://app.localhost"} {
@@ -65,7 +65,7 @@ func TestNewRefusesPlainHTTPToRemoteHost(t *testing.T) {
 			t.Errorf("New(%q) = %v, want nil", s, err)
 		}
 	}
-	if _, err := New("http://nexmap.example.com", AllowInsecure()); err != nil {
+	if _, err := New("http://wiekko.example.com", AllowInsecure()); err != nil {
 		t.Fatalf("AllowInsecure: %v", err)
 	}
 }
@@ -78,12 +78,12 @@ func TestDoSendsTokenAndDecodesEnvelope(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer nxp_secret" {
 			t.Errorf("Authorization = %q", got)
 		}
-		if got := r.Header.Get("User-Agent"); got != "nexmap/test" {
+		if got := r.Header.Get("User-Agent"); got != "wiekko/test" {
 			t.Errorf("User-Agent = %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"data":{"id":"u1","username":"ada","is_admin":true}}`)
-	}, WithToken("nxp_secret"), WithUserAgent("nexmap/test"))
+	}, WithToken("nxp_secret"), WithUserAgent("wiekko/test"))
 
 	u, err := c.Me(context.Background())
 	if err != nil {
@@ -217,14 +217,14 @@ func TestServerSubpathIsKept(t *testing.T) {
 		_, _ = io.WriteString(w, `{"data":{"version":"v","api_level":1}}`)
 	}))
 	t.Cleanup(srv.Close)
-	c, err := New(srv.URL + "/nexmap/")
+	c, err := New(srv.URL + "/wiekko/")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	if _, err := c.Version(context.Background()); err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if gotPath != "/nexmap/api/v1/version" {
+	if gotPath != "/wiekko/api/v1/version" {
 		t.Fatalf("path = %q", gotPath)
 	}
 }

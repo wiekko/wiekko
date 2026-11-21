@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // ProductService handles product CRUD and member management.

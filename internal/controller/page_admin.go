@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/web/templates"
-	admin "nexmap.net/web/templates/pages/admin"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/web/templates"
+	admin "wiekko.net/web/templates/pages/admin"
 )
 
 // PageAdminController handles admin page routes.

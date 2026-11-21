@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // InvitationController handles invitation endpoints.

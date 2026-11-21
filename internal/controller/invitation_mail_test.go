@@ -12,10 +12,10 @@ import (
 	"sync"
 	"testing"
 
-	"nexmap.net/internal/controller"
-	"nexmap.net/internal/mail"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/controller"
+	"wiekko.net/internal/mail"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 type recordingSender struct {
@@ -88,7 +88,7 @@ func TestInvitationAPIDelivery(t *testing.T) {
 			t.Fatalf("status = %d, body: %s", w.Code, w.Body.String())
 		}
 		data := decodeData(t, w.Body.String())
-		if data["delivery"] != "link" || data["raw_token"] == nil || !strings.HasPrefix(data["url"].(string), "https://nexmap.example.com/accept-invite/") {
+		if data["delivery"] != "link" || data["raw_token"] == nil || !strings.HasPrefix(data["url"].(string), "https://wiekko.example.com/accept-invite/") {
 			t.Errorf("data = %v", data)
 		}
 		if len(sender.sent) != 0 {

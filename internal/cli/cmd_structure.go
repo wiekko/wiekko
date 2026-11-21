@@ -11,9 +11,9 @@ import (
 	"io"
 	"strings"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/render"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/render"
 )
 
 // Commands that change the product structure, constraints and traceability
@@ -62,7 +62,7 @@ func (f *flagsSet) optionalText(a *app, t *textFlags, name string) (*string, err
 func joinedRef(usage string, args []string) (string, error) {
 	ref := strings.TrimSpace(strings.Join(args, " "))
 	if ref == "" {
-		return "", usageErr(errors.New("usage: nexmap " + usage))
+		return "", usageErr(errors.New("usage: wiekko " + usage))
 	}
 	return ref, nil
 }
@@ -319,7 +319,7 @@ func capabilityLinkCommand(unlink bool) *command {
 		run: func(ctx context.Context, a *app, args []string) error {
 			capability, items := splitCapabilityItems(args)
 			if capability == "" || len(items) == 0 {
-				return usageErr(fmt.Errorf("usage: nexmap %s <capability> <FR-12|AC-3>…", name))
+				return usageErr(fmt.Errorf("usage: wiekko %s <capability> <FR-12|AC-3>…", name))
 			}
 			s, err := a.session()
 			if err != nil {
@@ -393,7 +393,7 @@ func constraintUpdateCommand() *command {
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 1 {
-				return usageErr(errors.New("usage: nexmap constraint update <AC-3|ID> [--compliance …] [--title …] [--category …] [--body …]"))
+				return usageErr(errors.New("usage: wiekko constraint update <AC-3|ID> [--compliance …] [--title …] [--category …] [--body …]"))
 			}
 			in := ops.ConstraintChange{Ref: args[0], Title: set.optional("title", title),
 				Category: set.optional("category", category), Compliance: set.optional("compliance", compliance)}
@@ -435,7 +435,7 @@ func testLinkCommand(unlink bool) *command {
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 1 {
-				return usageErr(fmt.Errorf("usage: nexmap %s <test> [--req FR-12] [--constraint SC-30] [--capability …] [--component …]", name))
+				return usageErr(fmt.Errorf("usage: wiekko %s <test> [--req FR-12] [--constraint SC-30] [--capability …] [--component …]", name))
 			}
 			if in.Requirement == "" && len(in.Constraints) == 0 && in.Capability == "" && in.Component == "" {
 				return usageErr(errors.New("give --req, --constraint, --capability or --component"))

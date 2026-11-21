@@ -16,9 +16,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
-	"nexmap.net/internal/textdiff"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
+	"wiekko.net/internal/textdiff"
 )
 
 // Limits on document input. The body limit keeps a document under the

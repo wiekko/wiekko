@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 // Package update finds, downloads and installs CLI releases from the download
-// site (nexmap.net/releases, see site/ in the repository). It only uses the
+// site (wiekko.net/releases, see site/ in the repository). It only uses the
 // standard library.
 //
 // The site's layout, written by site/Dockerfile and its entrypoint hook:
@@ -10,7 +10,7 @@
 //	<base>/latest.json                         the newest final release
 //	<base>/<version>/release.json              {"version": …, "api_level": …}
 //	<base>/<version>/SHA256SUMS                sha256sum format, one line per archive
-//	<base>/<version>/nexmap_<version>_<os>_<arch>.tar.gz   (.zip for windows)
+//	<base>/<version>/wiekko_<version>_<os>_<arch>.tar.gz   (.zip for windows)
 package update
 
 import (
@@ -36,7 +36,7 @@ import (
 )
 
 // DefaultBaseURL is where releases are published.
-const DefaultBaseURL = "https://nexmap.net/releases"
+const DefaultBaseURL = "https://wiekko.net/releases"
 
 // Size limits for what the site returns, so a broken or hostile response
 // cannot exhaust memory.
@@ -109,15 +109,15 @@ func ArchiveName(version, goos, goarch string) string {
 	if goos == "windows" {
 		ext = ".zip"
 	}
-	return fmt.Sprintf("nexmap_%s_%s_%s%s", version, goos, goarch, ext)
+	return fmt.Sprintf("wiekko_%s_%s_%s%s", version, goos, goarch, ext)
 }
 
 // BinaryName is the executable's name inside the archive.
 func BinaryName(goos string) string {
 	if goos == "windows" {
-		return "nexmap.exe"
+		return "wiekko.exe"
 	}
-	return "nexmap"
+	return "wiekko"
 }
 
 // Download fetches the archive of version for goos/goarch, checks it against
@@ -249,7 +249,7 @@ func Replace(exe string, bin []byte) error {
 	if fi, err := os.Stat(exe); err == nil {
 		mode = fi.Mode().Perm() | 0o100
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(exe), ".nexmap-update-*")
+	tmp, err := os.CreateTemp(filepath.Dir(exe), ".wiekko-update-*")
 	if err != nil {
 		return err
 	}

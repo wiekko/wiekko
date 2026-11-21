@@ -11,8 +11,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"nexmap.net/internal/database"
-	"nexmap.net/internal/database/dbtest"
+	"wiekko.net/internal/database"
+	"wiekko.net/internal/database/dbtest"
 )
 
 // eachEmpty runs fn per engine on an empty, unmigrated database.

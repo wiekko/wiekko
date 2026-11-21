@@ -3,7 +3,7 @@
 
 package cli_test
 
-// `nexmap export` (FR-137) against the seeded Aviary product.
+// `wiekko export` (FR-137) against the seeded Aviary product.
 
 import (
 	"crypto/sha256"
@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/cli"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/cli"
+	"wiekko.net/internal/service"
 )
 
 func TestE2EExport(t *testing.T) {
@@ -71,7 +71,7 @@ func TestE2EMCPExport(t *testing.T) {
 	s := e.startMCP("mcp", "--read-only")
 	text, got := mustTool(t, s, "export_specification", map[string]any{})
 	if text != want {
-		t.Fatal("export_specification differs from `nexmap export`")
+		t.Fatal("export_specification differs from `wiekko export`")
 	}
 	m := got.(map[string]any)
 	sum := sha256.Sum256([]byte(want))
@@ -82,6 +82,6 @@ func TestE2EMCPExport(t *testing.T) {
 		t.Error("the document is duplicated in the structured result")
 	}
 	if text, _ := mustTool(t, s, "export_specification", map[string]any{"tasks": true}); text != wantTasks {
-		t.Error("export_specification with tasks differs from `nexmap export --tasks`")
+		t.Error("export_specification with tasks differs from `wiekko export --tasks`")
 	}
 }

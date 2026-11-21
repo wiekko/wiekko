@@ -2,9 +2,9 @@
 
 ## License and sign-off
 
-Nexmap is licensed under the [European Union Public Licence v1.2](LICENSE) (`EUPL-1.2`).
+Wiekko is licensed under the [European Union Public Licence v1.2](LICENSE) (`EUPL-1.2`).
 
-Nexmap does not accept outside contributions at this time: the public repository on GitHub is a read-only
+Wiekko does not accept outside contributions at this time: the public repository on GitHub is a read-only
 mirror, and pull requests and issues there are not reviewed. The rules below apply to every commit in the
 development repository and to any contribution accepted in the future, which is licensed under the same
 terms.
@@ -34,7 +34,7 @@ the exception: they must never change, so they carry no header. Third-party file
 
 ## Building
 
-Nexmap needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is
+Wiekko needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is
 built and tested with. Older distribution packages work as well: since Go 1.21, `go` reads that line,
 fetches the named toolchain once (from the Go module proxy, verified against the Go checksum database)
 and uses it for this repository, `gopls` included. This needs automatic toolchain switching, which some
@@ -49,7 +49,7 @@ Local builds need `just` and the Tailwind CSS v4 standalone CLI (`tailwindcss`) 
 generator needs no install: the `justfile` runs it at the version pinned in `go.mod`.
 
 ```sh
-just build     # vet and build nexmapd and nexmap
+just build     # vet and build wiekkod and wiekko
 just dev       # regenerate templates and CSS on change, run the server
 just test      # SQLite only: PostgreSQL subtests skip without a server
 just test-pg   # also PostgreSQL, on a throwaway server in a container
@@ -57,8 +57,8 @@ just test-pg   # also PostgreSQL, on a throwaway server in a container
 
 | Binary    | Source        | Purpose                                                      |
 |-----------|---------------|--------------------------------------------------------------|
-| `nexmapd` | `cmd/nexmapd` | The server: web UI and REST API                              |
-| `nexmap`  | `cmd/nexmap`  | The command line client, talking to the server via REST only |
+| `wiekkod` | `cmd/wiekkod` | The server: web UI and REST API                              |
+| `wiekko`  | `cmd/wiekko`  | The command line client, talking to the server via REST only |
 
 For release binaries, `just container-build [os] [arch]` builds in a container (podman, else docker;
 override with `CONTAINER_ENGINE`) with Go, templ and Tailwind pinned in the `Dockerfile`, and
@@ -94,7 +94,7 @@ commits and the tag. Deployments track `stable`, so they get releases only; pre-
 from `release/*` branches leave it alone. The push only fast-forwards `stable`: never commit to it or
 move it by hand, or the next release's push fails.
 
-Moving `stable` also publishes the release's CLI binaries on nexmap.net (see "Download site" below);
+Moving `stable` also publishes the release's CLI binaries on wiekko.net (see "Download site" below);
 releases from `release/*` branches are published there by hand.
 
 The tags still matter: the documentation site publishes one version per tag (see below). The
@@ -104,16 +104,16 @@ builds only.
 ## Testing
 
 Integration tests run on both SQLite and PostgreSQL to catch dialect differences. The PostgreSQL runs need
-a server named by `NEXMAP_TEST_POSTGRES_DSN` (a `postgres://` URL whose role may create databases);
+a server named by `WIEKKO_TEST_POSTGRES_DSN` (a `postgres://` URL whose role may create databases);
 `just test-pg` starts one with podman or docker and removes it afterwards. Without a server those subtests
-are skipped, not failed; set `NEXMAP_TEST_POSTGRES=required` where PostgreSQL coverage must not be
+are skipped, not failed; set `WIEKKO_TEST_POSTGRES=required` where PostgreSQL coverage must not be
 skipped silently, such as CI.
 
-Every top-level Go test is a test case in Nexmap, identified as `nexmap.net/<package>.<TestName>`, with a
+Every top-level Go test is a test case in Wiekko, identified as `wiekko.net/<package>.<TestName>`, with a
 pyramid level (Unit; Integration for tests against a database; End-to-End for the CLI's `e2e_*` tests)
 and the capability it belongs to. Register new tests with, for example,
-`go test -json ./internal/service | nexmap test sync --capability Backlog --pyramid-level Unit`, and
-link a test to the requirement it verifies with `nexmap test link <identifier> --req FR-12`. Name the
+`go test -json ./internal/service | wiekko test sync --capability Backlog --pyramid-level Unit`, and
+link a test to the requirement it verifies with `wiekko test link <identifier> --req FR-12`. Name the
 requirement in the test's comment, too.
 
 ## Web UI routes and forms
@@ -126,12 +126,12 @@ header from the app layout. A plain HTML form (no `hx-post`) must carry it itsel
 
 ## Specification and documentation
 
-The specification (what Nexmap *shall* do) lives in Nexmap itself, as a product on cloud.nexmap.net that
-`.nexmap.json` binds this repository to; `AGENTS.md` explains how to read it with the `nexmap` CLI or its
+The specification (what Wiekko *shall* do) lives in Wiekko itself, as a product on cloud.wiekko.net that
+`.wiekko.json` binds this repository to; `AGENTS.md` explains how to read it with the `wiekko` CLI or its
 MCP server. Access to that product is by invitation: ask a maintainer for an account, then run
-`nexmap login`. Identifiers in code, comments and docs (FR-…, AC-…, SC-…, UC-…, DOC-…) are the ones in
-Nexmap. The specification used to live in `docs/spec/` with other identifiers; each item in Nexmap names
-its earlier one as its legacy ID, and git history has the old files. `docs/` describes how Nexmap behaves
+`wiekko login`. Identifiers in code, comments and docs (FR-…, AC-…, SC-…, UC-…, DOC-…) are the ones in
+Wiekko. The specification used to live in `docs/spec/` with other identifiers; each item in Wiekko names
+its earlier one as its legacy ID, and git history has the old files. `docs/` describes how Wiekko behaves
 and how to use it, for administrators, users and CLI users; see [docs/index.md](docs/index.md).
 
 Implementation plans live in `docs/tmp/` while their work is in progress. When a plan is done, move what
@@ -140,7 +140,7 @@ docs never link into `docs/tmp/`.
 
 ## Documentation site
 
-The user, administrator, CLI and API documentation is published at `docs.nexmap.net`, built with
+The user, administrator, CLI and API documentation is published at `docs.wiekko.net`, built with
 [mdBook](https://rust-lang.github.io/mdBook/). The pages stay in `docs/`; `docs-site/` holds only the site
 tooling, so none of it is published.
 
@@ -177,14 +177,14 @@ releases, and moving to another server.
 
 ## Download site
 
-nexmap.net serves a landing page, the CLI install scripts (`install.sh`, `install.ps1`) and the CLI release
-archives under `/releases/`, which `nexmap update` also reads. Everything for it lives in `site/`:
+wiekko.net serves a landing page, the CLI install scripts (`install.sh`, `install.ps1`) and the CLI release
+archives under `/releases/`, which `wiekko update` also reads. Everything for it lives in `site/`:
 
 - `site/www/`: the landing page and the install scripts, served as they are. `site/www/favicon.svg` is a
   copy of `docs-site/theme/favicon.svg`, and `index.html` inlines a copy of `web/static/img/logo.svg`;
   update them when the logo changes.
 - `site/dist.sh`: builds the CLI for linux, darwin and windows on amd64 and arm64, and writes per release
-  `nexmap_<version>_<os>_<arch>.tar.gz` (`.zip` for windows), `SHA256SUMS` and `release.json`
+  `wiekko_<version>_<os>_<arch>.tar.gz` (`.zip` for windows), `SHA256SUMS` and `release.json`
   (`{"version", "api_level"}`). Only release versions are packaged; a `+dev` tree fails.
 - `site/Dockerfile`: runs `dist.sh` with the pinned Go toolchain and serves the result with nginx on port
   8080. Each image holds only the release it was built from.
@@ -197,7 +197,7 @@ together.
 - **Build the archives:** `just dist` from a release tag, or `just dist v9.9.9` for a test build of the
   working tree; the result lands in `build/dist/<version>/`.
 - **Preview:** `just site-container v9.9.9` serves the site on port 8080. To try an update, run a CLI with
-  `NEXMAP_RELEASES_URL=http://localhost:8080/releases`.
+  `WIEKKO_RELEASES_URL=http://localhost:8080/releases`.
 
 ### Deployment
 

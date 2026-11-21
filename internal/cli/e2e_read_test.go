@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/ops"
 )
 
 // newAviary returns a seeded environment configured for the Aviary product.
@@ -251,7 +251,7 @@ func TestE2EContext(t *testing.T) {
 	}
 
 	guide := e.mustRun("", "agent-guide").stdout
-	if !strings.Contains(guide, "nexmap context") || !strings.Contains(guide, "nexmap req show") {
+	if !strings.Contains(guide, "wiekko context") || !strings.Contains(guide, "wiekko req show") {
 		t.Errorf("agent guide:\n%s", guide)
 	}
 }

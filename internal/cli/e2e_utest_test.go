@@ -3,7 +3,7 @@
 
 package cli_test
 
-// `nexmap utest` and `nexmap test sync` end to end against the seeded Aviary
+// `wiekko utest` and `wiekko test sync` end to end against the seeded Aviary
 // product, whose active campaign "Sprint 13 Verification" contains:
 //   - TestPublish_StripsExifLocation      pending
 //   - TestSyncQueue_ReplayIdempotent      passed
@@ -15,9 +15,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/ops"
 )
 
 const aviaryRun = `=== RUN   TestPublish_StripsExifLocation

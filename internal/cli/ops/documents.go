@@ -10,11 +10,11 @@ import (
 	"regexp"
 	"strings"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // Documents (FR-50..FR-58, FR-140): long-form texts that define part of
-// the product, such as protocols and schemas. Nexmap is their source; files
+// the product, such as protocols and schemas. Wiekko is their source; files
 // in a repository are written from it (FR-51, FR-139).
 
 // DocumentSummary is one row of a document list.

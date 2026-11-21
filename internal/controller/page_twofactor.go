@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/web/templates"
-	userpage "nexmap.net/web/templates/pages/user"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/web/templates"
+	userpage "wiekko.net/web/templates/pages/user"
 )
 
 // twoFactorCard builds the card state for a user who is not in the middle of

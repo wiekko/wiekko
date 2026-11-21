@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/mail"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/mail"
 )
 
-const accountEnvURL = "https://nexmap.example.com"
+const accountEnvURL = "https://wiekko.example.com"
 
 type pageSender struct {
 	mu   sync.Mutex

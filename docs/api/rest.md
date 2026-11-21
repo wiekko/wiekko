@@ -1,6 +1,6 @@
 # REST API
 
-The REST API under `/api/v1` is the interface for the `nexmap` CLI and third-party systems. The web UI uses
+The REST API under `/api/v1` is the interface for the `wiekko` CLI and third-party systems. The web UI uses
 its own endpoints and does not go through it.
 
 ## Authentication
@@ -110,7 +110,7 @@ or `definition_of_done`: linking the pair again with a `link_type` changes it, w
 
 - `POST /api/v1/products/{p}/invitations` (owner; `settings:write`) invites someone who has no account
   yet, with `{"email": …, "role": …}`, and answers with the invitation's `url`. With
-  `"delivery": "email"` (only if the server [sends mail](../admin/configuration.md#mail)), Nexmap emails
+  `"delivery": "email"` (only if the server [sends mail](../admin/configuration.md#mail)), Wiekko emails
   the link to that address instead, and the answer carries neither `url` nor `raw_token`. Invitation
   emails are limited per inviter and per address (`429 TOO_MANY_ATTEMPTS`); if the email cannot be sent,
   the answer is `502 MAIL_NOT_SENT` and no invitation is left behind. `"delivery": "link"` is the
@@ -162,7 +162,7 @@ is evidence for the constraint's compliance; compliance itself stays the owner's
 
 ### Documents
 
-Documents are the protocols, schemas and other texts that define the product. Nexmap holds them; a
+Documents are the protocols, schemas and other texts that define the product. Wiekko holds them; a
 repository gets copies through the [export](#specification-export).
 
 - `GET /api/v1/products/{p}/documents` lists them, without bodies unless `?body=true`; filter with

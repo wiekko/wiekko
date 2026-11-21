@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/cli"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	"wiekko.net/internal/cli/ops"
 )
 
 func TestE2EStructureWrites(t *testing.T) {

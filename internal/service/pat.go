@@ -13,10 +13,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // PATService handles personal access token operations.

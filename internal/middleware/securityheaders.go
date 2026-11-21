@@ -29,7 +29,7 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"frame-ancestors 'none'"
 
 // SecurityHeaders is middleware that sets standard security response headers.
-// With https set (the server is reached over HTTPS, see NEXMAP_COOKIE_SECURE)
+// With https set (the server is reached over HTTPS, see WIEKKO_COOKIE_SECURE)
 // it also tells browsers to use HTTPS only for the next year.
 func SecurityHeaders(https bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

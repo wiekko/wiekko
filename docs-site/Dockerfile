@@ -1,7 +1,7 @@
-# Documentation site (docs.nexmap.net): mdBook pages for main and every release
+# Documentation site (docs.wiekko.net): mdBook pages for main and every release
 # tag, served by nginx on port 8080. Build from the repository root:
 #
-#   docker build -f docs-site/Dockerfile -t nexmap-docs .   (or: just docs-container)
+#   docker build -f docs-site/Dockerfile -t wiekko-docs .   (or: just docs-container)
 #
 # The release tags come from .git in the build context. Without it (Coolify),
 # build.sh clones the repository with a read-only token, passed as the BuildKit

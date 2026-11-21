@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/middleware"
+	"wiekko.net/internal/middleware"
 )
 
 func TestClientIP(t *testing.T) {

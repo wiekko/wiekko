@@ -157,7 +157,7 @@ func TestResolvePrecedence(t *testing.T) {
 		}
 	})
 
-	t.Run("NEXMAP_TOKEN beats stored token", func(t *testing.T) {
+	t.Run("WIEKKO_TOKEN beats stored token", func(t *testing.T) {
 		env := map[string]string{EnvConfigDir: cfgDir, EnvToken: "tok-from-env", EnvAllowHTTP: "1"}
 		s, err := Resolve(repoDir, envFunc(env), Overrides{})
 		if err != nil {

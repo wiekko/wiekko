@@ -3,7 +3,7 @@
 
 package cli_test
 
-// `nexmap doc` and the documents in `nexmap export` (FR-50..FR-58,
+// `wiekko doc` and the documents in `wiekko export` (FR-50..FR-58,
 // FR-139..FR-141) against the seeded Aviary product.
 
 import (
@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/cli"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/cli"
+	"wiekko.net/internal/service"
 )
 
 type docView struct {
@@ -155,7 +155,7 @@ func TestE2EMCPDocuments(t *testing.T) {
 	_, viaMCP := mustTool(t, s, "get_document", map[string]any{"ref": ref})
 	viaCLI := generic(t, decode[any](t, e.mustRun("", "doc", "show", ref, "-o", "json").stdout))
 	if a, b := generic(t, viaMCP), viaCLI; !jsonEqual(a, b) {
-		t.Errorf("get_document differs from `nexmap doc show`:\n%v\n%v", a, b)
+		t.Errorf("get_document differs from `wiekko doc show`:\n%v\n%v", a, b)
 	}
 	mustTool(t, s, "update_document", map[string]any{"ref": ref, "body": "{}\n"})
 	if text, _ := mustTool(t, s, "document_diff", map[string]any{"ref": ref}); !strings.Contains(text, "+{}") {

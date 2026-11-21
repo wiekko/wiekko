@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // Writes to the product structure, constraints and traceability links

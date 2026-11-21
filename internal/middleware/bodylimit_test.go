@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
 )
 
 const tooLargeText = "That is too large to send. The limit is 1 MiB."

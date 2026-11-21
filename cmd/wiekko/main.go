@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
 // SPDX-License-Identifier: EUPL-1.2
 
-// Command nexmap is the Nexmap command line client: repository and CI
-// integration, and an entry point for AI agents. It talks to a Nexmap server
-// (nexmapd) through the REST API only.
+// Command wiekko is the Wiekko command line client: repository and CI
+// integration, and an entry point for AI agents. It talks to a Wiekko server
+// (wiekkod) through the REST API only.
 package main
 
 import (
@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/term"
 
-	"nexmap.net/internal/cli"
+	"wiekko.net/internal/cli"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 func processIO() cli.IO {
 	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "nexmap: %v\n", err)
+		fmt.Fprintf(os.Stderr, "wiekko: %v\n", err)
 		os.Exit(cli.ExitUsage)
 	}
 	stdinFD := int(os.Stdin.Fd())

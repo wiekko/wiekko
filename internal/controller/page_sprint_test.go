@@ -6,7 +6,7 @@ package controller
 import (
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 func sprintSummaryStatuses() (req, def []*model.Status) {

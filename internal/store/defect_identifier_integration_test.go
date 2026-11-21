@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // TestDefectIdentifiers covers defect numbering and identifiers (FR-49).

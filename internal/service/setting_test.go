@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/testutil"
 )
 
 func TestSettingUpdate(t *testing.T) {

@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	login "nexmap.net/web/templates/pages/login"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	login "wiekko.net/web/templates/pages/login"
 )
 
 // PageRegisterController serves the public account pages: self-registration
@@ -186,7 +186,7 @@ func isInvitationError(err error) bool {
 
 func invitationIntro(d *service.InvitationDetails) string {
 	if d.ProductName == "" {
-		return "You have been invited to Nexmap. Choose a username and password to create your account."
+		return "You have been invited to Wiekko. Choose a username and password to create your account."
 	}
 	return "You have been invited to join " + d.ProductName + " as " + d.Role + ". Choose a username and password to create your account."
 }

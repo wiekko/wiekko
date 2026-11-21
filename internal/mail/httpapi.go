@@ -19,7 +19,7 @@ import (
 const apiTimeout = 15 * time.Second
 
 // maxAPIResponse is how much of a response is read (and thrown away) so the
-// connection can be reused; a misbehaving endpoint cannot make nexmap buffer
+// connection can be reused; a misbehaving endpoint cannot make wiekko buffer
 // more.
 const maxAPIResponse = 64 << 10
 
@@ -62,7 +62,7 @@ func do(ctx context.Context, client *http.Client, r apiRequest) error {
 	}
 	req.Header.Set("Content-Type", r.contentType)
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "nexmap")
+	req.Header.Set("User-Agent", "wiekko")
 	if r.basicUser != "" {
 		req.SetBasicAuth(r.basicUser, r.basicPass)
 	}

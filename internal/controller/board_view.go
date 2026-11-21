@@ -4,8 +4,8 @@
 package controller
 
 import (
-	"nexmap.net/internal/model"
-	"nexmap.net/web/templates"
+	"wiekko.net/internal/model"
+	"wiekko.net/web/templates"
 )
 
 // This file holds the projection from domain entities onto board columns and

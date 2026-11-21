@@ -144,7 +144,7 @@ func (f *fakeSMTP) serve() {
 
 func smtpSenderFor(t *testing.T, f *fakeSMTP, clientTLS *tls.Config, mode, user, pass string) *smtpSender {
 	t.Helper()
-	cfg := Config{Transport: "smtp", From: "nexmap <noreply@example.com>", SMTPHost: "127.0.0.1", SMTPPort: f.port(), SMTPTLS: mode, SMTPUsername: user, SMTPPassword: pass}
+	cfg := Config{Transport: "smtp", From: "wiekko <noreply@example.com>", SMTPHost: "127.0.0.1", SMTPPort: f.port(), SMTPTLS: mode, SMTPUsername: user, SMTPPassword: pass}
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}

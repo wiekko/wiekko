@@ -7,7 +7,7 @@ import (
 	"context"
 	"flag"
 
-	"nexmap.net/internal/cli/mcp"
+	"wiekko.net/internal/cli/mcp"
 )
 
 func mcpCommand() *command {

@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"nexmap.net/internal/middleware"
+	"wiekko.net/internal/middleware"
 )
 
 func TestChain(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // Structure returns the component → capability tree.

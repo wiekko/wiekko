@@ -11,8 +11,8 @@ import (
 
 	"github.com/a-h/templ"
 
-	"nexmap.net/web"
-	"nexmap.net/web/templates"
+	"wiekko.net/web"
+	"wiekko.net/web/templates"
 )
 
 // TestLayoutAssetURLsCarryVersion: every stylesheet and script the app

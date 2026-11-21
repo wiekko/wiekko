@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // TestAccountSafeguards covers the rules that keep an instance and its

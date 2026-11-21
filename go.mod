@@ -1,4 +1,4 @@
-module nexmap.net
+module wiekko.net
 
 go 1.26.0
 

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
 // SPDX-License-Identifier: EUPL-1.2
 
-// Package client is a typed client for the Nexmap REST API (/api/v1). It is the
+// Package client is a typed client for the Wiekko REST API (/api/v1). It is the
 // only way the CLI talks to a server (AC-16) and must not import any server
 // package: the JSON wire format is the contract.
 package client
@@ -35,9 +35,9 @@ const (
 // unencrypted (SC-26).
 var ErrInsecureServer = errors.New("refusing to send credentials over plain HTTP to a non-local server; use https:// (or allow plain HTTP explicitly)")
 
-// Client talks to one Nexmap server.
+// Client talks to one Wiekko server.
 type Client struct {
-	base       *url.URL // server root, e.g. https://nexmap.example.com
+	base       *url.URL // server root, e.g. https://wiekko.example.com
 	token      string
 	httpClient *http.Client
 	userAgent  string
@@ -70,7 +70,7 @@ func WithBackoff(f func(attempt int) time.Duration) Option {
 // AllowInsecure permits plain HTTP to non-local hosts.
 func AllowInsecure() Option { return func(c *Client) { c.insecure = true } }
 
-// New creates a Client for server, the root URL of a Nexmap installation. A
+// New creates a Client for server, the root URL of a Wiekko installation. A
 // trailing /api/v1 is tolerated and stripped.
 func New(server string, opts ...Option) (*Client, error) {
 	base, err := NormalizeServer(server)
@@ -82,7 +82,7 @@ func New(server string, opts ...Option) (*Client, error) {
 	c := &Client{
 		base:       u,
 		httpClient: &http.Client{Timeout: DefaultTimeout},
-		userAgent:  "nexmap-client",
+		userAgent:  "wiekko-client",
 		maxRetries: DefaultMaxRetries,
 		backoff:    defaultBackoff,
 	}
@@ -148,7 +148,7 @@ func defaultBackoff(attempt int) time.Duration {
 }
 
 // Response is the raw outcome of a request, for callers that print the body
-// as is (the `nexmap api` command).
+// as is (the `wiekko api` command).
 type Response struct {
 	StatusCode int
 	Header     http.Header

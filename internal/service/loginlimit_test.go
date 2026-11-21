@@ -110,8 +110,8 @@ func TestAcceptURL(t *testing.T) {
 	if got := s.AcceptURL("tok", "https://req.example.com"); got != "https://req.example.com/accept-invite/tok" {
 		t.Errorf("from request: %q", got)
 	}
-	s.publicURL = "https://nexmap.example.com"
-	if got := s.AcceptURL("tok", "http://internal:8080"); got != "https://nexmap.example.com/accept-invite/tok" {
+	s.publicURL = "https://wiekko.example.com"
+	if got := s.AcceptURL("tok", "http://internal:8080"); got != "https://wiekko.example.com/accept-invite/tok" {
 		t.Errorf("from public URL: %q", got)
 	}
 }

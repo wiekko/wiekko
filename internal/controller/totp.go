@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
 )
 
 // TOTPController handles the two-factor authentication API endpoints.

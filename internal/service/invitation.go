@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 const invitationTTL = 7 * 24 * time.Hour // 7 days
@@ -46,7 +46,7 @@ type InvitationService struct {
 	tx          store.Transactor
 	invitations store.InvitationStore
 	authz       *Authorizer
-	// publicURL is the configured server address (NEXMAP_PUBLIC_URL), or
+	// publicURL is the configured server address (WIEKKO_PUBLIC_URL), or
 	// empty to build invitation links from the request.
 	publicURL string
 

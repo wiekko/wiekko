@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
-	"nexmap.net/web/templates"
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
+	"wiekko.net/web/templates"
+	"wiekko.net/web/templates/patterns"
 )
 
 // Comment and attachment tabs.
@@ -444,7 +444,7 @@ func oversizeMessage(maxBytes int64) string {
 
 // discussionErrorHeader marks a response as a rejection even though it carries
 // a 200 status, so the form knows not to reset and discard the user's input.
-const discussionErrorHeader = "HX-Nexmap-Error"
+const discussionErrorHeader = "HX-Wiekko-Error"
 
 // writeDiscussionError sends the message as an out-of-band swap into region.
 //

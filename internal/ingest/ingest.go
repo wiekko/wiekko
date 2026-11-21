@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: EUPL-1.2
 
 // Package ingest turns test runner reports into test results for upload to a
-// Nexmap campaign (FR-118). Format-specific parsers live in subpackages; this
+// Wiekko campaign (FR-118). Format-specific parsers live in subpackages; this
 // package holds the shared result type, format detection and the dispatcher.
 //
 // It is part of the CLI and must not import server packages.
@@ -14,9 +14,9 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"nexmap.net/internal/ingest/gotest"
-	"nexmap.net/internal/ingest/junit"
-	"nexmap.net/internal/ingest/report"
+	"wiekko.net/internal/ingest/gotest"
+	"wiekko.net/internal/ingest/junit"
+	"wiekko.net/internal/ingest/report"
 )
 
 // Result and Report are shared by all parsers.

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/web/templates/patterns"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/model"
+	"wiekko.net/web/templates/patterns"
+	"wiekko.net/web/templates/ui"
 )
 
 func defectsTestProps() DefectsProps {

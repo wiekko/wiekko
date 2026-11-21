@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/database/dbtest"
+	"wiekko.net/internal/database/dbtest"
 )
 
 func TestAttemptLimiter(t *testing.T) {

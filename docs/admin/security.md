@@ -1,31 +1,31 @@
 # Security
 
-This page covers what an administrator has to set up and look after to run Nexmap safely. Every setting
+This page covers what an administrator has to set up and look after to run Wiekko safely. Every setting
 mentioned is described in the [configuration reference](configuration.md).
 
 ## TLS and the reverse proxy
 
-`nexmapd` speaks plain HTTP. Run it behind a reverse proxy that terminates TLS (on Coolify, the built-in
+`wiekkod` speaks plain HTTP. Run it behind a reverse proxy that terminates TLS (on Coolify, the built-in
 Traefik does this), and do not expose its port to the network directly:
 
-- Leave `NEXMAP_COOKIE_SECURE` at `true`. Browsers then send the session cookie over HTTPS only, and
+- Leave `WIEKKO_COOKIE_SECURE` at `true`. Browsers then send the session cookie over HTTPS only, and
   the server sends `Strict-Transport-Security`, so browsers that have visited once refuse plain HTTP for
   a year.
 - The client address of sessions, failed logins and the limits below comes from the `X-Forwarded-For`
   header, but only when the request arrives from a trusted proxy
-  ([`NEXMAP_TRUSTED_PROXIES`](configuration.md#network), by default loopback and private networks).
+  ([`WIEKKO_TRUSTED_PROXIES`](configuration.md#network), by default loopback and private networks).
   A request from any other address is taken to come from that address, whatever its header says. From a
   trusted proxy the header is read from the end, skipping trusted proxies, so entries a client wrote
   itself do not count, whether the proxy replaces the header or appends to it.
-- If machines other than the proxy can reach `nexmapd` on a private network, set
-  `NEXMAP_TRUSTED_PROXIES` to the proxy's address. Otherwise they can claim any client address and
+- If machines other than the proxy can reach `wiekkod` on a private network, set
+  `WIEKKO_TRUSTED_PROXIES` to the proxy's address. Otherwise they can claim any client address and
   evade the limits.
 
 - The server refuses form posts and API calls that a browser sends on behalf of another site. Modern
   browsers state the origin of a request themselves; for older ones the server compares the `Origin`
   header with the `Host` header, so the proxy has to pass the original `Host` on (Traefik and Caddy do;
   nginx needs `proxy_set_header Host $host`). Setting
-  [`NEXMAP_PUBLIC_URL`](configuration.md#network) makes that comparison independent of the proxy.
+  [`WIEKKO_PUBLIC_URL`](configuration.md#network) makes that comparison independent of the proxy.
 
 ### Response headers
 
@@ -39,14 +39,14 @@ make sure it does not replace these with weaker ones.
 
 ### Request limits
 
-Request bodies are capped at 1 MiB, attachment uploads at `NEXMAP_MAX_UPLOAD_BYTES` plus 1 MiB for the
+Request bodies are capped at 1 MiB, attachment uploads at `WIEKKO_MAX_UPLOAD_BYTES` plus 1 MiB for the
 form around the file, and test run uploads at 32 MiB; larger requests get `413`. A request has to be
 received within 5 minutes and answered within 10.
 
 ## The encryption key
 
 Personal data (email addresses and display names) is encrypted in the database with AES-256-GCM.
-Usernames are treated as pseudonyms and are not encrypted. The key comes from `NEXMAP_ENCRYPTION_KEY`,
+Usernames are treated as pseudonyms and are not encrypted. The key comes from `WIEKKO_ENCRYPTION_KEY`,
 a JSON list of keys with an ID and a base64-encoded 32-byte key each:
 
 ```json
@@ -67,7 +67,7 @@ another user's record: it no longer decrypts there. Values written by a version 
 existed are still read and are bound the next time the record is saved.
 
 **Back up the key separately from the database.** Without it, the personal data in a database backup
-cannot be decrypted, and Nexmap has no way to recover it. Conversely, a database backup stored together
+cannot be decrypted, and Wiekko has no way to recover it. Conversely, a database backup stored together
 with its key protects nothing. See [Backup and restore](backup.md).
 
 ### Rotating the key
@@ -91,8 +91,8 @@ Rotation is incomplete today, so rotate only when you have a reason to, such as 
 
 ## The first administrator
 
-On the very first start, when the database has no users, `nexmapd` creates an administrator from
-`NEXMAP_ADMIN_USER` and `NEXMAP_ADMIN_PASSWORD`. If the username is unset it is `admin`; if the password is
+On the very first start, when the database has no users, `wiekkod` creates an administrator from
+`WIEKKO_ADMIN_USER` and `WIEKKO_ADMIN_PASSWORD`. If the username is unset it is `admin`; if the password is
 unset, a random one is generated and **written to the log**.
 
 Set both variables for the first start. If you rely on the generated password, read it from the log, sign
@@ -109,7 +109,7 @@ Once users exist, both variables are ignored and can be removed.
   - **Instance-wide**, under *Two-Factor Authentication* in the instance settings (`/admin/settings`):
     for *all users*, for *administrators*, and for *product owners*, *developers*, *testers* or
     *viewers*. A role switch covers users who hold that role in at least one product. Users covered
-    are sent to the setup page after signing in and cannot use Nexmap until 2FA is set up; API calls
+    are sent to the setup page after signing in and cannot use Wiekko until 2FA is set up; API calls
     with their session get `403 TOTP_SETUP_REQUIRED`. A common setup is to require it for
     administrators and product owners and leave the rest to the products.
   - **Per product**, by its owners under *Settings → General* (*Require two-factor authentication*).
@@ -126,7 +126,7 @@ Once users exist, both variables are ignored and can be removed.
   the values it read last, so enforcement does not lapse in the meantime.
 - **Usernames and email addresses** are unique regardless of case: `Admin` cannot be registered next to
   `admin`, and signing in accepts either spelling.
-- **Passwords** are stored as salted PBKDF2-SHA256 hashes (`NEXMAP_PBKDF2_ITERATIONS`). The instance
+- **Passwords** are stored as salted PBKDF2-SHA256 hashes (`WIEKKO_PBKDF2_ITERATIONS`). The instance
   settings can require uppercase and lowercase letters, digits and special characters in new passwords,
   and a minimum length from 8 to 128 characters.
 - **The password is asked for again** before two things a session alone must not be enough for: deleting
@@ -138,7 +138,7 @@ Once users exist, both variables are ignored and can be removed.
   sign-in page (see [Email](#email)). Without mail, administrators set new passwords for users from the
   user's detail page. Either way, the new password ends all of that user's sessions, and a second factor
   stays on.
-- **Sessions** expire after `NEXMAP_SESSION_TTL` (24 hours by default). The database stores only a hash
+- **Sessions** expire after `WIEKKO_SESSION_TTL` (24 hours by default). The database stores only a hash
   of each session token, so a database backup contains nothing that works as a session cookie. Changing a password ends the
   user's other sessions, keeping only the one the change was made from; an administrator setting a new
   password ends all of that user's sessions. Personal access tokens stay valid either way; revoke them
@@ -169,9 +169,9 @@ People get an account in one of two ways:
 
 - **Invitation:** a product owner invites someone to their product with a role (on the product's Team
   page), or an administrator invites someone to the installation (`/admin/invitations`). With mail, the
-  inviter chooses whether Nexmap emails the link to the invited address or shows it to the inviter to
-  pass on; without mail, Nexmap always shows it (built from
-  [`NEXMAP_PUBLIC_URL`](configuration.md#network) if set). Whoever holds the link can create the
+  inviter chooses whether Wiekko emails the link to the invited address or shows it to the inviter to
+  pass on; without mail, Wiekko always shows it (built from
+  [`WIEKKO_PUBLIC_URL`](configuration.md#network) if set). Whoever holds the link can create the
   account, so treat it as a secret: it works once, expires after 7 days, and is never written to the log.
   An emailed link is not shown to the inviter, so the new account has proven that its owner reads that
   mailbox. Accounts created from an invitation skip moderation.
@@ -188,13 +188,13 @@ the installation without a product.
 
 ## Email
 
-Nexmap sends email only when [configured](configuration.md#mail), and then only invitations and password
-reset links. It sends nothing else (no notifications), and no part of Nexmap lets anyone choose what an
+Wiekko sends email only when [configured](configuration.md#mail), and then only invitations and password
+reset links. It sends nothing else (no notifications), and no part of Wiekko lets anyone choose what an
 email says. The safeguards:
 
 - **Fixed text.** Both emails are fixed text with the address of the installation, the link and its
   expiry; an invitation also names the role. Nothing a user typed (product names, display names) is put
-  into an email, so nobody can use Nexmap to carry their own message to an address of their choosing.
+  into an email, so nobody can use Wiekko to carry their own message to an address of their choosing.
 - **One recipient.** Every email goes to exactly one plain address. Lists, display names and line breaks
   are refused, so the recipient and headers cannot be manipulated.
 - **Invitation emails** need a signed-in product owner or administrator (or their access token with
@@ -210,13 +210,13 @@ email says. The safeguards:
   stores only a hash of the token. Using the link sets the new password, ends all of the user's sessions,
   and leaves two-factor authentication on: the user signs in anew with the second factor. Locked
   accounts, and accounts awaiting approval or deletion, cannot use a reset link.
-- **A cap for the installation**, `NEXMAP_MAIL_MAX_PER_HOUR` (100 by default), limits all emails
+- **A cap for the installation**, `WIEKKO_MAIL_MAX_PER_HOUR` (100 by default), limits all emails
   together, whatever the other limits let through.
-- **Links point to `NEXMAP_PUBLIC_URL`** only, which is required with mail. A reset link built from the
+- **Links point to `WIEKKO_PUBLIC_URL`** only, which is required with mail. A reset link built from the
   request's `Host` header could be made to point to someone else's server.
 - **Tracking is off** for the mailer APIs that have a switch for it (Mailgun, SendGrid, Lettermint):
   tracking would route every link, token included, through the provider's redirector.
-- **SMTP is encrypted**: with `starttls`, Nexmap refuses to send through a relay that does not offer
+- **SMTP is encrypted**: with `starttls`, Wiekko refuses to send through a relay that does not offer
   STARTTLS, and it sends credentials over TLS only.
 
 The limits are kept in memory and reset when the server restarts, like the login limits. Reset links
@@ -241,11 +241,11 @@ last used; revoke those that are no longer needed under *API Tokens* (`/user/tok
 
 ## Attachments
 
-By default, every file type can be uploaded. To restrict this, set `NEXMAP_ALLOWED_UPLOAD_TYPES`; the
+By default, every file type can be uploaded. To restrict this, set `WIEKKO_ALLOWED_UPLOAD_TYPES`; the
 server then also checks that the content matches the extension. Attachments are always served as
-downloads and never rendered by the browser, but Nexmap does not scan them for malware.
+downloads and never rendered by the browser, but Wiekko does not scan them for malware.
 
 ## Development mode
 
-`NEXMAP_DEV_MODE` fills a new database with demo users whose password is publicly known (it is in the
+`WIEKKO_DEV_MODE` fills a new database with demo users whose password is publicly known (it is in the
 source code and the log). Never enable it on a server that others can reach.

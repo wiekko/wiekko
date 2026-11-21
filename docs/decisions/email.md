@@ -6,7 +6,7 @@ it is described in [Configuration](../admin/configuration.md#mail), what it guar
 
 ## Mail is optional
 
-Without a configured transport Nexmap behaves as before: invitations are links the inviter passes on, and
+Without a configured transport Wiekko behaves as before: invitations are links the inviter passes on, and
 administrators set new passwords. Small installations need no mail service, and nothing else depends on
 it. The password reset pages answer 404 without mail, and the sign-in page keeps pointing to an
 administrator.
@@ -23,7 +23,7 @@ opens.
 
 ## Invitations: email or link, the inviter decides
 
-With mail, the inviter chooses whether Nexmap emails the invitation or shows the link. Links stay
+With mail, the inviter chooses whether Wiekko emails the invitation or shows the link. Links stay
 useful for people reached through chat or forum messages. An emailed link is never shown to the
 inviter, so an account created from it proves that its owner reads that mailbox. The API keeps `link` as
 its default, so existing scripts keep working, and only answers with the token for links.
@@ -51,17 +51,17 @@ it ends all sessions and leaves two-factor authentication on: a reset proves con
 of the second factor. The password policy is checked before the link is used up, so a rejected password
 does not cost the link.
 
-## Links come from `NEXMAP_PUBLIC_URL`
+## Links come from `WIEKKO_PUBLIC_URL`
 
 Invitation links shown in the browser may still be built from the request when no public URL is set.
 Links in emails may not: on the public reset form, the `Host` header is whatever the requester sends, and
 a reset link pointing to their server would hand them the token. Mail therefore requires
-`NEXMAP_PUBLIC_URL`, and the server does not start without it.
+`WIEKKO_PUBLIC_URL`, and the server does not start without it.
 
 ## Limits in memory, plus a cap
 
 The limits per inviter, per recipient, per client address and per account live in memory like the login
-limits: Nexmap is a single process, and a restart clears them. Above them sits a cap on all emails per
+limits: Wiekko is a single process, and a restart clears them. Above them sits a cap on all emails per
 hour, so that a mistake or an unforeseen path costs at most that many emails rather than the sending
 domain's reputation.
 

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/model"
+	"wiekko.net/web/templates/ui"
 )
 
 // The requirements, tasks (UR-144, UR-145) and test cases (UR-146) tables

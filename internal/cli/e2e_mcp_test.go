@@ -3,7 +3,7 @@
 
 package cli_test
 
-// `nexmap mcp` end to end: the command runs in-process through cli.Run with
+// `wiekko mcp` end to end: the command runs in-process through cli.Run with
 // piped stdin/stdout, and a real MCP client from the SDK talks to it.
 
 import (
@@ -20,12 +20,12 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"nexmap.net/internal/cli"
-	cliconfig "nexmap.net/internal/cli/config"
-	"nexmap.net/internal/cli/ops"
+	"wiekko.net/internal/cli"
+	cliconfig "wiekko.net/internal/cli/config"
+	"wiekko.net/internal/cli/ops"
 )
 
-// startMCP runs `nexmap <args>` (an mcp command) and connects a client to it.
+// startMCP runs `wiekko <args>` (an mcp command) and connects a client to it.
 // Closing the session ends the server, whose exit code is checked on cleanup.
 func (e *e2e) startMCP(args ...string) *sdk.ClientSession {
 	t := e.t
@@ -51,17 +51,17 @@ func (e *e2e) startMCP(args ...string) *sdk.ClientSession {
 	c := sdk.NewClient(&sdk.Implementation{Name: "e2e", Version: "test"}, nil)
 	session, err := c.Connect(ctx, &sdk.IOTransport{Reader: outR, Writer: inW}, nil)
 	if err != nil {
-		t.Fatalf("connect to nexmap mcp: %v (stderr %q)", err, stderr.String())
+		t.Fatalf("connect to wiekko mcp: %v (stderr %q)", err, stderr.String())
 	}
 	t.Cleanup(func() {
 		_ = session.Close()
 		select {
 		case code := <-done:
 			if code != cli.ExitOK {
-				t.Errorf("nexmap mcp exited %d, stderr %q", code, stderr.String())
+				t.Errorf("wiekko mcp exited %d, stderr %q", code, stderr.String())
 			}
 		case <-time.After(10 * time.Second):
-			t.Error("nexmap mcp did not stop after the client disconnected")
+			t.Error("wiekko mcp did not stop after the client disconnected")
 		}
 	})
 	return session
@@ -269,7 +269,7 @@ func TestE2EMCPNotLoggedIn(t *testing.T) {
 	delete(e.env, cliconfig.EnvToken)
 	s := e.startMCP("mcp")
 	res := callTool(t, s, "get_context", map[string]any{})
-	if !res.IsError || !strings.Contains(toolText(res), "nexmap login") {
+	if !res.IsError || !strings.Contains(toolText(res), "wiekko login") {
 		t.Fatalf("isError=%v, text %q", res.IsError, toolText(res))
 	}
 
@@ -299,7 +299,7 @@ func TestE2EInitAgents(t *testing.T) {
 		t.Fatalf("first init --agents: %s", r.stdout)
 	}
 	if decode[cliconfig.Repo](t, mustRead(t, repoConfig)).Product != finch.ID {
-		t.Fatal(".nexmap.json not written")
+		t.Fatal(".wiekko.json not written")
 	}
 	type mcpFile struct {
 		MCPServers map[string]struct {
@@ -307,12 +307,12 @@ func TestE2EInitAgents(t *testing.T) {
 			Args    []string `json:"args"`
 		} `json:"mcpServers"`
 	}
-	entry := decode[mcpFile](t, mustRead(t, mcpConfig)).MCPServers["nexmap"]
-	if entry.Command != "nexmap" || !reflect.DeepEqual(entry.Args, []string{"mcp", "--read-only"}) {
-		t.Fatalf("nexmap MCP entry = %+v", entry)
+	entry := decode[mcpFile](t, mustRead(t, mcpConfig)).MCPServers["wiekko"]
+	if entry.Command != "wiekko" || !reflect.DeepEqual(entry.Args, []string{"mcp", "--read-only"}) {
+		t.Fatalf("wiekko MCP entry = %+v", entry)
 	}
 	guide := mustRead(t, agentsMD)
-	if !strings.Contains(guide, "nexmap context") || !strings.Contains(guide, "get_context") {
+	if !strings.Contains(guide, "wiekko context") || !strings.Contains(guide, "get_context") {
 		t.Fatalf("AGENTS.md lacks the guide: %.200q", guide)
 	}
 
@@ -334,11 +334,11 @@ func TestE2EInitAgents(t *testing.T) {
 	}
 	doc := decode[map[string]any](t, mustRead(t, mcpConfig))
 	servers := doc["mcpServers"].(map[string]any)
-	if servers["other"] == nil || servers["nexmap"] == nil || doc["extra"] == nil {
+	if servers["other"] == nil || servers["wiekko"] == nil || doc["extra"] == nil {
 		t.Fatalf(".mcp.json lost entries: %v", doc)
 	}
 	claude := mustRead(t, claudeMD)
-	if !strings.HasPrefix(claude, "# Project rules\n\n") || strings.Count(claude, "<!-- nexmap:agent-guide -->") != 1 {
+	if !strings.HasPrefix(claude, "# Project rules\n\n") || strings.Count(claude, "<!-- wiekko:agent-guide -->") != 1 {
 		t.Fatalf("CLAUDE.md = %.300q", claude)
 	}
 

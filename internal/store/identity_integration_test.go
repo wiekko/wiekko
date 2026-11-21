@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"nexmap.net/internal/crypto"
+	"wiekko.net/internal/crypto"
 )
 
 // TestUserLookupIgnoresCase checks that usernames and email addresses are

@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/store"
 )
 
 // AdminController handles admin-only endpoints.

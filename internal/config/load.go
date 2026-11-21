@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"nexmap.net/internal/mail"
+	"wiekko.net/internal/mail"
 )
 
 func Load(args []string) (*Config, error) {
@@ -21,7 +21,7 @@ func Load(args []string) (*Config, error) {
 	trustedProxies := DefaultTrustedProxies
 
 	applyEnv(cfg)
-	if v, ok := os.LookupEnv("NEXMAP_TRUSTED_PROXIES"); ok {
+	if v, ok := os.LookupEnv("WIEKKO_TRUSTED_PROXIES"); ok {
 		trustedProxies = v
 	}
 
@@ -67,67 +67,67 @@ func defaults() *Config {
 }
 
 func applyEnv(cfg *Config) {
-	if v := os.Getenv("NEXMAP_HOST"); v != "" {
+	if v := os.Getenv("WIEKKO_HOST"); v != "" {
 		cfg.Host = v
 	}
-	if v := os.Getenv("NEXMAP_PORT"); v != "" {
+	if v := os.Getenv("WIEKKO_PORT"); v != "" {
 		cfg.Port = v
 	}
-	if v := os.Getenv("NEXMAP_LOGLEVEL"); v != "" {
+	if v := os.Getenv("WIEKKO_LOGLEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
-	if v := os.Getenv("NEXMAP_LOGFILE"); v != "" {
+	if v := os.Getenv("WIEKKO_LOGFILE"); v != "" {
 		cfg.LogFile = v
 	}
-	if v := os.Getenv("NEXMAP_DB_DRIVER"); v != "" {
+	if v := os.Getenv("WIEKKO_DB_DRIVER"); v != "" {
 		cfg.DBDriver = v
 	}
-	if v := os.Getenv("NEXMAP_DB_DSN"); v != "" {
+	if v := os.Getenv("WIEKKO_DB_DSN"); v != "" {
 		cfg.DBDsn = v
 	}
-	if v := os.Getenv("NEXMAP_SESSION_TTL"); v != "" {
+	if v := os.Getenv("WIEKKO_SESSION_TTL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.SessionTTL = d
 		}
 	}
-	if v := os.Getenv("NEXMAP_PBKDF2_ITERATIONS"); v != "" {
+	if v := os.Getenv("WIEKKO_PBKDF2_ITERATIONS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.PBKDF2Iterations = n
 		}
 	}
-	if v := os.Getenv("NEXMAP_COOKIE_SECURE"); v != "" {
+	if v := os.Getenv("WIEKKO_COOKIE_SECURE"); v != "" {
 		cfg.CookieSecure = v == "true" || v == "1"
 	}
-	if v := os.Getenv("NEXMAP_ENCRYPTION_KEY"); v != "" {
+	if v := os.Getenv("WIEKKO_ENCRYPTION_KEY"); v != "" {
 		cfg.EncryptionKey = v
 	}
-	if v := os.Getenv("NEXMAP_DEV_MODE"); v != "" {
+	if v := os.Getenv("WIEKKO_DEV_MODE"); v != "" {
 		cfg.DevMode = v == "true" || v == "1"
 	}
-	if v := os.Getenv("NEXMAP_ADMIN_USER"); v != "" {
+	if v := os.Getenv("WIEKKO_ADMIN_USER"); v != "" {
 		cfg.InitialAdminUser = v
 	}
-	if v := os.Getenv("NEXMAP_ADMIN_PASSWORD"); v != "" {
+	if v := os.Getenv("WIEKKO_ADMIN_PASSWORD"); v != "" {
 		cfg.InitialAdminPass = v
 	}
-	if v := os.Getenv("NEXMAP_UPLOAD_DIR"); v != "" {
+	if v := os.Getenv("WIEKKO_UPLOAD_DIR"); v != "" {
 		cfg.UploadDir = v
 	}
-	if v := os.Getenv("NEXMAP_MAX_UPLOAD_BYTES"); v != "" {
+	if v := os.Getenv("WIEKKO_MAX_UPLOAD_BYTES"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
 			cfg.MaxUploadBytes = n
 		}
 	}
-	if v := os.Getenv("NEXMAP_ALLOWED_UPLOAD_TYPES"); v != "" {
+	if v := os.Getenv("WIEKKO_ALLOWED_UPLOAD_TYPES"); v != "" {
 		cfg.AllowedUploads = v
 	}
-	if v := os.Getenv("NEXMAP_PUBLIC_URL"); v != "" {
+	if v := os.Getenv("WIEKKO_PUBLIC_URL"); v != "" {
 		cfg.PublicURL = v
 	}
 }
 
 func applyFlags(cfg *Config, args []string, trustedProxies *string) error {
-	fs := flag.NewFlagSet("nexmap", flag.ContinueOnError)
+	fs := flag.NewFlagSet("wiekko", flag.ContinueOnError)
 
 	// Pointers to shadow vars; only applied when `flag.Visit` reports them set.
 	host := fs.String("host", "", "")
@@ -200,7 +200,7 @@ func normalizePublicURL(raw string) (string, error) {
 	}
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", fmt.Errorf("config: public URL %q must be an absolute http or https URL, like https://nexmap.example.com", raw)
+		return "", fmt.Errorf("config: public URL %q must be an absolute http or https URL, like https://wiekko.example.com", raw)
 	}
 	if u.RawQuery != "" || u.Fragment != "" || u.User != nil {
 		return "", fmt.Errorf("config: public URL %q must not contain credentials, a query or a fragment", raw)
@@ -239,21 +239,21 @@ func ParseTrustedProxies(spec string) ([]netip.Prefix, error) {
 // secrets, and command line flags are visible to every user of the machine.
 func loadMail(cfg *Config) error {
 	m := mail.Config{
-		Transport:         os.Getenv("NEXMAP_MAIL_TRANSPORT"),
-		From:              strings.TrimSpace(os.Getenv("NEXMAP_MAIL_FROM")),
-		SMTPHost:          strings.TrimSpace(os.Getenv("NEXMAP_SMTP_HOST")),
-		SMTPTLS:           os.Getenv("NEXMAP_SMTP_TLS"),
-		SMTPUsername:      os.Getenv("NEXMAP_SMTP_USERNAME"),
-		SMTPPassword:      os.Getenv("NEXMAP_SMTP_PASSWORD"),
-		APIKey:            os.Getenv("NEXMAP_MAIL_API_KEY"),
-		MailgunDomain:     strings.TrimSpace(os.Getenv("NEXMAP_MAILGUN_DOMAIN")),
-		MailgunRegion:     os.Getenv("NEXMAP_MAILGUN_REGION"),
-		ScalewayProjectID: strings.TrimSpace(os.Getenv("NEXMAP_SCALEWAY_PROJECT_ID")),
-		ScalewayRegion:    os.Getenv("NEXMAP_SCALEWAY_REGION"),
+		Transport:         os.Getenv("WIEKKO_MAIL_TRANSPORT"),
+		From:              strings.TrimSpace(os.Getenv("WIEKKO_MAIL_FROM")),
+		SMTPHost:          strings.TrimSpace(os.Getenv("WIEKKO_SMTP_HOST")),
+		SMTPTLS:           os.Getenv("WIEKKO_SMTP_TLS"),
+		SMTPUsername:      os.Getenv("WIEKKO_SMTP_USERNAME"),
+		SMTPPassword:      os.Getenv("WIEKKO_SMTP_PASSWORD"),
+		APIKey:            os.Getenv("WIEKKO_MAIL_API_KEY"),
+		MailgunDomain:     strings.TrimSpace(os.Getenv("WIEKKO_MAILGUN_DOMAIN")),
+		MailgunRegion:     os.Getenv("WIEKKO_MAILGUN_REGION"),
+		ScalewayProjectID: strings.TrimSpace(os.Getenv("WIEKKO_SCALEWAY_PROJECT_ID")),
+		ScalewayRegion:    os.Getenv("WIEKKO_SCALEWAY_REGION"),
 	}
 	for name, dst := range map[string]*int{
-		"NEXMAP_MAIL_MAX_PER_HOUR": &m.MaxPerHour,
-		"NEXMAP_SMTP_PORT":         &m.SMTPPort,
+		"WIEKKO_MAIL_MAX_PER_HOUR": &m.MaxPerHour,
+		"WIEKKO_SMTP_PORT":         &m.SMTPPort,
 	} {
 		v := strings.TrimSpace(os.Getenv(name))
 		if v == "" {
@@ -272,7 +272,7 @@ func loadMail(cfg *Config) error {
 	// "forgot password" form, the Host header is whatever the requester sends,
 	// and a reset link pointing at their server would hand them the token.
 	if m.Enabled() && cfg.PublicURL == "" {
-		return fmt.Errorf("config: sending mail (NEXMAP_MAIL_TRANSPORT) requires NEXMAP_PUBLIC_URL, the address the links in the emails point to")
+		return fmt.Errorf("config: sending mail (WIEKKO_MAIL_TRANSPORT) requires WIEKKO_PUBLIC_URL, the address the links in the emails point to")
 	}
 	cfg.Mail = m
 	return nil

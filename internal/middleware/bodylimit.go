@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	"nexmap.net/internal/httputil"
+	"wiekko.net/internal/httputil"
 )
 
 const (
@@ -173,7 +173,7 @@ const bodyErrorPage = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%[1]s · Nexmap</title>
+<title>%[1]s · Wiekko</title>
 <style>
 body{font-family:system-ui,sans-serif;max-width:36rem;margin:4rem auto;padding:0 1rem;line-height:1.5;color:#1f2937;background:#fff}
 h1{font-size:1.25rem}

@@ -9,7 +9,7 @@ import (
 )
 
 func TestTrustedProxies(t *testing.T) {
-	clearNexmapEnv(t)
+	clearWiekkoEnv(t)
 	contains := func(cfg *Config, ip string) bool {
 		addr := netip.MustParseAddr(ip)
 		for _, p := range cfg.TrustedProxies {
@@ -34,7 +34,7 @@ func TestTrustedProxies(t *testing.T) {
 		}
 	}
 
-	t.Setenv("NEXMAP_TRUSTED_PROXIES", "192.0.2.7, 198.51.100.0/24")
+	t.Setenv("WIEKKO_TRUSTED_PROXIES", "192.0.2.7, 198.51.100.0/24")
 	if cfg, err = Load(nil); err != nil {
 		t.Fatalf("Load with env: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestTrustedProxies(t *testing.T) {
 	}
 
 	for _, bad := range []string{"proxy.example.com", "10.0.0.0/33", "10.0.0.1,nope"} {
-		t.Setenv("NEXMAP_TRUSTED_PROXIES", bad)
+		t.Setenv("WIEKKO_TRUSTED_PROXIES", bad)
 		if _, err := Load(nil); err == nil {
 			t.Errorf("Load accepted trusted proxies %q", bad)
 		}

@@ -6,7 +6,7 @@ package middleware
 import (
 	"context"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 var (

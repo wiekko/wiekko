@@ -1,6 +1,6 @@
 # Test ingestion decisions
 
-Decisions behind recording automated test results in testing campaigns (`nexmap utest`,
+Decisions behind recording automated test results in testing campaigns (`wiekko utest`,
 `POST /products/{p}/test-runs`): what was chosen, and why. How to use it is described in
 [CI integration](../cli/ci-integration.md).
 
@@ -57,7 +57,7 @@ A subtest (`TestX/case`) without a test case of its own counts towards `TestX`: 
 the parent, and the failing subtests' output goes into its defect. Test catalogues therefore do not need
 an entry for every table-driven case.
 
-`nexmap test sync` follows the same rule when it creates test cases: an identifier is a subtest only if
+`wiekko test sync` follows the same rule when it creates test cases: an identifier is a subtest only if
 its parent is in the same report. A slash alone does not decide it, because package-qualified
 identifiers (`example.com/app.TestX`) contain slashes of their own, and Go always reports the parent of
 a subtest.

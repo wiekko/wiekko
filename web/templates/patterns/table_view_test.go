@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/web/templates"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates"
+	"wiekko.net/web/templates/ui"
 )
 
 func tableControlsProps() TableControlsProps {

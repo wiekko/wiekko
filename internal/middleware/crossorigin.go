@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"nexmap.net/internal/httputil"
+	"wiekko.net/internal/httputil"
 )
 
 // CrossOrigin rejects state-changing requests that a browser sends on behalf
@@ -22,7 +22,7 @@ import (
 // which is compared with the Host header. Requests without either header — the
 // CLI, CI jobs, scripts — are not from a browser and pass.
 //
-// publicURL (NEXMAP_PUBLIC_URL), if set, is accepted as an origin as well, for
+// publicURL (WIEKKO_PUBLIC_URL), if set, is accepted as an origin as well, for
 // the Origin comparison behind a proxy that does not pass the Host header on.
 func CrossOrigin(publicURL string) (func(http.Handler) http.Handler, error) {
 	protection := http.NewCrossOriginProtection()

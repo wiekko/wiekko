@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/service"
 )
 
 // resourceScopes maps the resource segments of API paths to their scope.

@@ -14,7 +14,7 @@ import (
 	"slices"
 	"strings"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // Scope names an area of the API a token can be granted.

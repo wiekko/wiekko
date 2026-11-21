@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // fixedPolicy enforces 2FA instance-wide when required is set, and locks

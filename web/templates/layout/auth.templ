@@ -3,7 +3,7 @@
 
 package templates
 
-import "nexmap.net/web/templates"
+import "wiekko.net/web/templates"
 
 // AuthLayout renders the unauthenticated page layout (login, register, accept-invite).
 // A centered card on a neutral background.
@@ -15,7 +15,7 @@ templ AuthLayout(meta templates.PageMeta) {
 				<div class="flex flex-col items-center">
 					<div class="flex items-center gap-3">
 						<img src="/static/img/logo-icon.svg" alt="" class="h-12 w-12"/>
-						<span class="text-2xl font-bold text-gray-900 dark:text-gray-100">Nexmap</span>
+						<span class="text-2xl font-bold text-gray-900 dark:text-gray-100">Wiekko</span>
 					</div>
 					if meta.Title != "" {
 						<h2 class="mt-6 text-center text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">

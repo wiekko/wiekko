@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func newAuditService(audit *testutil.MockAuditStore, roles *testutil.MockProductRoleStore) *AuditService {

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // RequirementQuery filters ListRequirements. Empty fields do not filter.

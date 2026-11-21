@@ -6,7 +6,7 @@ package controller
 import (
 	"net/http"
 
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/web/templates/patterns"
 )
 
 // About handles GET /about: the About dialog of the user menu, swapped into

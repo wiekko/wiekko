@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"testing"
 
-	"nexmap.net/internal/controller"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/controller"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func TestGetMe(t *testing.T) {

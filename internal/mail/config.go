@@ -29,10 +29,10 @@ const (
 var scalewayRegions = []string{"fr-par"}
 
 // Config selects and configures the mail transport. The zero value (no
-// Transport) means nexmap sends no mail.
+// Transport) means wiekko sends no mail.
 type Config struct {
 	Transport  string
-	From       string // "Nexmap <noreply@example.com>" or a bare address
+	From       string // "Wiekko <noreply@example.com>" or a bare address
 	MaxPerHour int    // messages per hour across the instance
 
 	SMTPHost     string
@@ -63,16 +63,16 @@ func (c *Config) Validate() error {
 
 	from, err := mail.ParseAddress(c.From)
 	if c.From == "" || err != nil || strings.ContainsAny(c.From, "\r\n") {
-		return fmt.Errorf("mail: NEXMAP_MAIL_FROM must be an address like nexmap@example.com or \"Nexmap <nexmap@example.com>\"")
+		return fmt.Errorf("mail: WIEKKO_MAIL_FROM must be an address like wiekko@example.com or \"Wiekko <wiekko@example.com>\"")
 	}
 	if len(from.Address) > maxAddressLength {
-		return fmt.Errorf("mail: NEXMAP_MAIL_FROM is too long")
+		return fmt.Errorf("mail: WIEKKO_MAIL_FROM is too long")
 	}
 	if c.MaxPerHour == 0 {
 		c.MaxPerHour = DefaultMaxPerHour
 	}
 	if c.MaxPerHour < 0 {
-		return fmt.Errorf("mail: NEXMAP_MAIL_MAX_PER_HOUR must be a positive number")
+		return fmt.Errorf("mail: WIEKKO_MAIL_MAX_PER_HOUR must be a positive number")
 	}
 
 	switch c.Transport {
@@ -80,42 +80,42 @@ func (c *Config) Validate() error {
 		return c.validateSMTP()
 	case TransportMailgun:
 		if c.APIKey == "" || c.MailgunDomain == "" {
-			return fmt.Errorf("mail: the mailgun transport needs NEXMAP_MAIL_API_KEY and NEXMAP_MAILGUN_DOMAIN")
+			return fmt.Errorf("mail: the mailgun transport needs WIEKKO_MAIL_API_KEY and WIEKKO_MAILGUN_DOMAIN")
 		}
 		c.MailgunRegion = strings.ToLower(strings.TrimSpace(c.MailgunRegion))
 		if c.MailgunRegion == "" {
 			c.MailgunRegion = DefaultMailgunRegion
 		}
 		if c.MailgunRegion != "us" && c.MailgunRegion != "eu" {
-			return fmt.Errorf("mail: NEXMAP_MAILGUN_REGION must be us or eu")
+			return fmt.Errorf("mail: WIEKKO_MAILGUN_REGION must be us or eu")
 		}
 		if strings.ContainsAny(c.MailgunDomain, "/?#@ ") {
-			return fmt.Errorf("mail: NEXMAP_MAILGUN_DOMAIN must be a domain name like mg.example.com")
+			return fmt.Errorf("mail: WIEKKO_MAILGUN_DOMAIN must be a domain name like mg.example.com")
 		}
 	case TransportSendGrid, TransportMailPace, TransportLettermint:
 		if c.APIKey == "" {
-			return fmt.Errorf("mail: the %s transport needs NEXMAP_MAIL_API_KEY", c.Transport)
+			return fmt.Errorf("mail: the %s transport needs WIEKKO_MAIL_API_KEY", c.Transport)
 		}
 	case TransportScaleway:
 		if c.APIKey == "" || c.ScalewayProjectID == "" {
-			return fmt.Errorf("mail: the scaleway transport needs NEXMAP_MAIL_API_KEY (the secret key) and NEXMAP_SCALEWAY_PROJECT_ID")
+			return fmt.Errorf("mail: the scaleway transport needs WIEKKO_MAIL_API_KEY (the secret key) and WIEKKO_SCALEWAY_PROJECT_ID")
 		}
 		c.ScalewayRegion = strings.ToLower(strings.TrimSpace(c.ScalewayRegion))
 		if c.ScalewayRegion == "" {
 			c.ScalewayRegion = DefaultScalewayRegion
 		}
 		if !slices.Contains(scalewayRegions, c.ScalewayRegion) {
-			return fmt.Errorf("mail: NEXMAP_SCALEWAY_REGION must be one of %s", strings.Join(scalewayRegions, ", "))
+			return fmt.Errorf("mail: WIEKKO_SCALEWAY_REGION must be one of %s", strings.Join(scalewayRegions, ", "))
 		}
 	default:
-		return fmt.Errorf("mail: NEXMAP_MAIL_TRANSPORT %q is not one of smtp, mailgun, sendgrid, mailpace, scaleway, lettermint", c.Transport)
+		return fmt.Errorf("mail: WIEKKO_MAIL_TRANSPORT %q is not one of smtp, mailgun, sendgrid, mailpace, scaleway, lettermint", c.Transport)
 	}
 	return nil
 }
 
 func (c *Config) validateSMTP() error {
 	if c.SMTPHost == "" {
-		return fmt.Errorf("mail: the smtp transport needs NEXMAP_SMTP_HOST")
+		return fmt.Errorf("mail: the smtp transport needs WIEKKO_SMTP_HOST")
 	}
 	c.SMTPTLS = strings.ToLower(strings.TrimSpace(c.SMTPTLS))
 	if c.SMTPTLS == "" {
@@ -125,10 +125,10 @@ func (c *Config) validateSMTP() error {
 	case SMTPTLSStartTLS, SMTPTLSImplicit:
 	case SMTPTLSNone:
 		if c.SMTPUsername != "" || c.SMTPPassword != "" {
-			return fmt.Errorf("mail: NEXMAP_SMTP_TLS=none cannot be combined with credentials; they would cross the network unencrypted")
+			return fmt.Errorf("mail: WIEKKO_SMTP_TLS=none cannot be combined with credentials; they would cross the network unencrypted")
 		}
 	default:
-		return fmt.Errorf("mail: NEXMAP_SMTP_TLS must be starttls, tls or none")
+		return fmt.Errorf("mail: WIEKKO_SMTP_TLS must be starttls, tls or none")
 	}
 	if c.SMTPPort == 0 {
 		c.SMTPPort = 587
@@ -137,10 +137,10 @@ func (c *Config) validateSMTP() error {
 		}
 	}
 	if c.SMTPPort < 1 || c.SMTPPort > 65535 {
-		return fmt.Errorf("mail: NEXMAP_SMTP_PORT must be a port number")
+		return fmt.Errorf("mail: WIEKKO_SMTP_PORT must be a port number")
 	}
 	if (c.SMTPUsername == "") != (c.SMTPPassword == "") {
-		return fmt.Errorf("mail: NEXMAP_SMTP_USERNAME and NEXMAP_SMTP_PASSWORD must be set together")
+		return fmt.Errorf("mail: WIEKKO_SMTP_USERNAME and WIEKKO_SMTP_PASSWORD must be set together")
 	}
 	return nil
 }

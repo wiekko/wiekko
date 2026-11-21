@@ -7,8 +7,8 @@ import (
 	"context"
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
 )
 
 // refResolver turns an entity reference from the URL into the entity's ID.

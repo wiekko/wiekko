@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"sort"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	productpage "nexmap.net/web/templates/pages/product"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	productpage "wiekko.net/web/templates/pages/product"
 )
 
 // Derived links (UR-160) follow the product structure one step along

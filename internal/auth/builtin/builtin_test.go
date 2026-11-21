@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/auth/builtin"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/auth/builtin"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func newProvider(users *testutil.MockUserStore) *builtin.Provider {

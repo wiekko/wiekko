@@ -3,7 +3,7 @@
 
 // Package specdoc renders a product specification as Markdown (FR-137): the
 // product structure, constraints, requirements and, on request, tasks, in
-// the style of Nexmap's former docs/spec/requirements.md.
+// the style of Wiekko's former docs/spec/requirements.md.
 //
 // Rendering is a pure function of a Document. The caller decides what goes
 // in and in which order; Render only formats, and formats identically for
@@ -87,7 +87,7 @@ type DocumentEntry struct {
 
 // header explains where the document comes from. It carries no timestamp
 // on purpose: two exports of an unchanged product must be identical.
-const header = "<!-- Exported from Nexmap. Change the items in Nexmap rather than here; " +
+const header = "<!-- Exported from Wiekko. Change the items in Wiekko rather than here; " +
 	"identifiers such as FR-12 name them in the CLI and REST API. -->"
 
 // Render formats the document as Markdown, ending with a single newline.

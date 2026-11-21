@@ -6,8 +6,8 @@ package controller
 import (
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/web/templates"
+	"wiekko.net/internal/model"
+	"wiekko.net/web/templates"
 )
 
 func TestCanMoveCards(t *testing.T) {

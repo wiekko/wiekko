@@ -16,8 +16,8 @@ undone, so [back up](backup.md#upgrades) before a release reaches your instance.
 
 ## Container image
 
-The `Dockerfile`'s default stage is the server image: `nexmapd` alone on a distroless base, running as a
-non-root user, listening on port 8080 on all interfaces, with a `HEALTHCHECK` (`nexmapd healthcheck`).
+The `Dockerfile`'s default stage is the server image: `wiekkod` alone on a distroless base, running as a
+non-root user, listening on port 8080 on all interfaces, with a `HEALTHCHECK` (`wiekkod healthcheck`).
 It keeps the SQLite database and attachments in `/data`, so mount persistent storage there. Migrations
 run automatically when the server starts.
 
@@ -30,9 +30,9 @@ Create the application with the **Dockerfile** build pack and:
 - set the branch to `stable` (see [which version to deploy](#which-version-to-deploy)). With
   automatic deployment on, every release then updates the instance, and nothing else does;
 - add persistent storage (a volume) with destination path `/data`;
-- set the environment variables, at least `NEXMAP_ENCRYPTION_KEY` (see
-  [generating a key](security.md#the-encryption-key)), and `NEXMAP_ADMIN_USER` / `NEXMAP_ADMIN_PASSWORD`
-  for the first start; `NEXMAP_PUBLIC_URL` with the application's domain; for PostgreSQL, `NEXMAP_DB_DRIVER=postgres` and `NEXMAP_DB_DSN`. All variables are
+- set the environment variables, at least `WIEKKO_ENCRYPTION_KEY` (see
+  [generating a key](security.md#the-encryption-key)), and `WIEKKO_ADMIN_USER` / `WIEKKO_ADMIN_PASSWORD`
+  for the first start; `WIEKKO_PUBLIC_URL` with the application's domain; for PostgreSQL, `WIEKKO_DB_DRIVER=postgres` and `WIEKKO_DB_DSN`. All variables are
   listed in the [configuration reference](configuration.md);
 - nothing for the version: it comes from the source tree (`internal/buildinfo/VERSION`). A release
   reports its version (`v0.9.1`), a build between releases the release it is based on and, when
@@ -42,16 +42,16 @@ Create the application with the **Dockerfile** build pack and:
 Ports (8080) and the health check come from the image. Leave Coolify's own health check (in the
 application's **Healthcheck** settings) turned off: Coolify runs it through `/bin/sh` and, for the HTTP
 type, `curl` or `wget` inside the container, and the distroless image has none of them, so it fails
-with `stat /bin/sh: no such file or directory`. The image's `HEALTHCHECK` runs `nexmapd healthcheck`
+with `stat /bin/sh: no such file or directory`. The image's `HEALTHCHECK` runs `wiekkod healthcheck`
 directly and needs no shell. Coolify's proxy terminates TLS; see
 [Security](security.md#tls-and-the-reverse-proxy) for what the server expects from it.
 
 ## After the first start
 
-Sign in as the administrator created from `NEXMAP_ADMIN_USER` / `NEXMAP_ADMIN_PASSWORD` (or with the
+Sign in as the administrator created from `WIEKKO_ADMIN_USER` / `WIEKKO_ADMIN_PASSWORD` (or with the
 generated password from the log, see [the first administrator](security.md#the-first-administrator)).
 Then change the administrator's email address on the profile page, and review the instance settings under
 `/admin/settings`: self-registration, moderation, product creation, enforced 2FA and password rules.
 
-Nexmap makes no backups itself: set them up before relying on the instance, see
+Wiekko makes no backups itself: set them up before relying on the instance, see
 [Backup and restore](backup.md).

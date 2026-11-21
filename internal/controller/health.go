@@ -7,8 +7,8 @@ import (
 	"io"
 	"net/http"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/httputil"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/httputil"
 )
 
 // Health handles GET /health and returns a JSON status response.
@@ -19,7 +19,7 @@ func Health(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Version handles GET /version. It is public so a client can check
-// compatibility before it has credentials (e.g. `nexmap version`, `nexmap login`).
+// compatibility before it has credentials (e.g. `wiekko version`, `wiekko login`).
 func Version(w http.ResponseWriter, _ *http.Request) {
 	httputil.JSON(w, http.StatusOK, map[string]any{
 		"version":   buildinfo.String(),

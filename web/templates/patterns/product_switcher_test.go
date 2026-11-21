@@ -6,7 +6,7 @@ package patterns
 import (
 	"testing"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 func TestSwitchTargetURL(t *testing.T) {

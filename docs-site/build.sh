@@ -127,11 +127,11 @@ cat > "$out/index.html" <<EOF
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Nexmap documentation</title>
+<title>Wiekko documentation</title>
 <meta http-equiv="refresh" content="0; url=$start/">
 <link rel="canonical" href="$start/">
 </head>
-<body><p><a href="$start/">Nexmap documentation</a></p></body>
+<body><p><a href="$start/">Wiekko documentation</a></p></body>
 </html>
 EOF
 

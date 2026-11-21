@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
-	"nexmap.net/web/templates"
-	productpage "nexmap.net/web/templates/pages/product"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
+	"wiekko.net/web/templates"
+	productpage "wiekko.net/web/templates/pages/product"
+	"wiekko.net/web/templates/ui"
 )
 
 // Table views (UR-144, UR-145, UR-146): the requirements, tasks and test cases

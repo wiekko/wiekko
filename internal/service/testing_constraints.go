@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // Test case to constraint links (FR-150). A test that verifies a constraint,

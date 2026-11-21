@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
 // SPDX-License-Identifier: EUPL-1.2
 
-// Package mail sends nexmap's transactional emails (AC-10): invitations and
+// Package mail sends wiekko's transactional emails (AC-10): invitations and
 // password resets, nothing else (SC-38). It talks to an SMTP relay or to one
 // of a few mailer HTTP APIs, all implemented on the standard library.
 //
@@ -32,7 +32,7 @@ type Sender interface {
 	Name() string
 }
 
-// Transports nexmap can send through.
+// Transports wiekko can send through.
 const (
 	TransportSMTP       = "smtp"
 	TransportMailgun    = "mailgun"

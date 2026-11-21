@@ -1,4 +1,4 @@
-# Deploying docs.nexmap.net on Coolify
+# Deploying docs.wiekko.net on Coolify
 
 Internal runbook: how the documentation site is deployed, and how to set it up again on another Coolify
 server. This file lives in `docs-site/`, outside the mdBook source, so it is never published. For how the
@@ -6,7 +6,7 @@ site is built and organised, see `CONTRIBUTING.md`, "Documentation site".
 
 ## Overview
 
-The site is its own Coolify application, next to the Nexmap server, built from the same Forgejo
+The site is its own Coolify application, next to the Wiekko server, built from the same Forgejo
 repository (`ssh://git@forge.my-universe.com:22222/daemotron/nexmap.git`, private) on branch `main`.
 
 ```
@@ -25,14 +25,14 @@ the release tags are not in the build context. Whether Coolify clones shallow do
 ## What you need
 
 - A Coolify v4 server with Docker BuildKit (Coolify logs "Docker … with BuildKit and Buildx detected").
-- A DNS record for `docs.nexmap.net` pointing at that server.
+- A DNS record for `docs.wiekko.net` pointing at that server.
 - Access to the Forgejo repository as an administrator of it (deploy key, webhook, collaborator).
 
 ## Setting up
 
 ### 1. Read-only token for the release tags
 
-1. In Forgejo, create a user for the build, e.g. `nexmap-docs`. A dedicated user keeps the token from
+1. In Forgejo, create a user for the build, e.g. `wiekko-docs`. A dedicated user keeps the token from
    reaching any other repository.
 2. Add it to the repository as a collaborator with **Read** access.
 3. Signed in as that user, create an access token under **Settings → Applications** with only the
@@ -40,13 +40,13 @@ the release tags are not in the build context. Whether Coolify clones shallow do
 
 ### 2. Coolify application
 
-1. Create an application from the private repository, in the same way as the Nexmap server's: Coolify
+1. Create an application from the private repository, in the same way as the Wiekko server's: Coolify
    clones over SSH with a deploy key, which has to be registered in Forgejo (repository **Settings →
    Deploy keys**, read-only). On a new server, that is a new key.
 2. Branch `main`.
 3. Build pack **Dockerfile**, base directory `/`, Dockerfile location `/docs-site/Dockerfile`. The base
    directory has to be the repository root: the build needs `docs/`, not only `docs-site/`.
-4. Exposed port `8080`, domain `https://docs.nexmap.net`.
+4. Exposed port `8080`, domain `https://docs.wiekko.net`.
 5. Health check: path `/versions.json`, port `8080`. Every build writes that file, and nginx serves it
    uncached.
 6. If your Coolify version offers watch paths, set them to `docs/**` and `docs-site/**`, so changes to the
@@ -87,8 +87,8 @@ docs-site: built latest v0.2.0 v0.1.0 (stable: v0.2.0)
 Then check the site:
 
 ```sh
-curl -fsS https://docs.nexmap.net/versions.json   # {"latest": "latest", "stable": ..., "versions": [...]}
-curl -fsSI https://docs.nexmap.net/latest/        # 200
+curl -fsS https://docs.wiekko.net/versions.json   # {"latest": "latest", "stable": ..., "versions": [...]}
+curl -fsSI https://docs.wiekko.net/latest/        # 200
 ```
 
 The root redirects to `/stable/`, or to `/latest/` while there is no release.
@@ -104,7 +104,7 @@ The root redirects to `/stable/`, or to `/latest/` while there is no release.
 
 ## Moving to another server
 
-1. Point the DNS record of `docs.nexmap.net` at the new server.
+1. Point the DNS record of `docs.wiekko.net` at the new server.
 2. Set up the application there as in "Setting up", step 2, with a new deploy key in Forgejo.
 3. Add `DOCS_GIT_TOKEN` again (the existing build user and token can stay; or rotate it now) and turn on
    BuildKit secrets.

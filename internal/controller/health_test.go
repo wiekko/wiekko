@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/controller"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/controller"
 )
 
 func TestHealth(t *testing.T) {

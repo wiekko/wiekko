@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // SessionStore defines data access operations for sessions.

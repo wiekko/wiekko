@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // TestBulkOperationsPages drives the bulk operations of the requirements
@@ -51,7 +51,7 @@ func TestBulkOperationsPages(t *testing.T) {
 		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
 		var admin *http.Cookie
 		for _, c := range resp.Cookies() {
-			if c.Name == "nexmap_session" && c.Value != "" {
+			if c.Name == "wiekko_session" && c.Value != "" {
 				admin = c
 			}
 		}
@@ -243,7 +243,7 @@ func TestBulkConstraintsPage(t *testing.T) {
 		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
 		var admin *http.Cookie
 		for _, c := range resp.Cookies() {
-			if c.Name == "nexmap_session" && c.Value != "" {
+			if c.Name == "wiekko_session" && c.Value != "" {
 				admin = c
 			}
 		}

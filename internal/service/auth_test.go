@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func newAuthService(users *testutil.MockUserStore, sessions *testutil.MockSessionStore, pats *testutil.MockPATStore, provider *testutil.MockAuthProvider) *AuthService {

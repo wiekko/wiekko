@@ -19,7 +19,7 @@ image=${PG_IMAGE:-docker.io/library/postgres:18}
 # Git Bash on Windows would rewrite container paths like /var/lib/...
 export MSYS_NO_PATHCONV=1
 
-id=$($engine run -d --rm -e POSTGRES_PASSWORD=nexmap -p 127.0.0.1::5432 \
+id=$($engine run -d --rm -e POSTGRES_PASSWORD=wiekko -p 127.0.0.1::5432 \
     --tmpfs /var/lib/postgresql "$image" \
     -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=500)
 trap '$engine rm -f "$id" >/dev/null' EXIT
@@ -38,6 +38,6 @@ until $engine exec "$id" pg_isready -q -h 127.0.0.1 -U postgres; do
 done
 
 port=$($engine port "$id" 5432/tcp | head -n 1 | sed 's/.*://')
-export NEXMAP_TEST_POSTGRES_DSN="postgres://postgres:nexmap@127.0.0.1:${port}/postgres?sslmode=disable"
-export NEXMAP_TEST_POSTGRES=required
+export WIEKKO_TEST_POSTGRES_DSN="postgres://postgres:wiekko@127.0.0.1:${port}/postgres?sslmode=disable"
+export WIEKKO_TEST_POSTGRES=required
 go test "$@"

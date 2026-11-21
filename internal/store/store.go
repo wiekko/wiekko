@@ -6,7 +6,7 @@ package store
 import (
 	"database/sql"
 
-	"nexmap.net/internal/crypto"
+	"wiekko.net/internal/crypto"
 )
 
 // Store groups all data access interfaces.

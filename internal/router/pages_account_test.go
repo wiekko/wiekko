@@ -23,15 +23,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/auth/builtin"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/mail"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth/builtin"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/mail"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 func TestMain(m *testing.M) { os.Exit(dbtest.Main(m)) }
@@ -147,7 +147,7 @@ func readBody(t *testing.T, resp *http.Response) string {
 
 func hasSession(resp *http.Response) bool {
 	for _, c := range resp.Cookies() {
-		if c.Name == "nexmap_session" && c.Value != "" {
+		if c.Name == "wiekko_session" && c.Value != "" {
 			return true
 		}
 	}
@@ -331,7 +331,7 @@ func TestPasswordChangeEndsOtherSessions(t *testing.T) {
 			t.Helper()
 			resp, _ := e.post("/login", url.Values{"username": {"pat"}, "password": {goodPassword}})
 			for _, c := range resp.Cookies() {
-				if c.Name == "nexmap_session" && c.Value != "" {
+				if c.Name == "wiekko_session" && c.Value != "" {
 					return c
 				}
 			}
@@ -432,7 +432,7 @@ func TestPageRoutesRequireCSRF(t *testing.T) {
 		resp, _ := e.post("/login", url.Values{"username": {"ops"}, "password": {goodPassword}})
 		var session *http.Cookie
 		for _, c := range resp.Cookies() {
-			if c.Name == "nexmap_session" {
+			if c.Name == "wiekko_session" {
 				session = c
 			}
 		}

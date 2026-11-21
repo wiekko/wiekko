@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func TestPATCreate(t *testing.T) {

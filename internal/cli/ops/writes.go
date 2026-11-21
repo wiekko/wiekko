@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/client"
 )
 
 // Write operations. Each resolves names and references client-side, validates

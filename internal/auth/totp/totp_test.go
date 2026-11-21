@@ -78,8 +78,8 @@ func TestGenerateSecret(t *testing.T) {
 }
 
 func TestProvisioningURI(t *testing.T) {
-	uri := ProvisioningURI("Nexmap", "alice", "ABCDEF")
-	for _, want := range []string{"otpauth://totp/Nexmap:alice?", "secret=ABCDEF", "issuer=Nexmap", "digits=6", "period=30"} {
+	uri := ProvisioningURI("Wiekko", "alice", "ABCDEF")
+	for _, want := range []string{"otpauth://totp/Wiekko:alice?", "secret=ABCDEF", "issuer=Wiekko", "digits=6", "period=30"} {
 		if !strings.Contains(uri, want) {
 			t.Errorf("URI %q missing %q", uri, want)
 		}
@@ -113,7 +113,7 @@ func TestRecoveryCodes(t *testing.T) {
 }
 
 func TestQRCodeSVG(t *testing.T) {
-	svg, err := QRCodeSVG(ProvisioningURI("Nexmap", "alice", rfcSecret))
+	svg, err := QRCodeSVG(ProvisioningURI("Wiekko", "alice", rfcSecret))
 	if err != nil {
 		t.Fatal(err)
 	}

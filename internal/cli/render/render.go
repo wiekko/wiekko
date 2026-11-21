@@ -14,8 +14,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
 )
 
 // table writes rows as an aligned table, or as a markdown table for md.
@@ -511,9 +511,9 @@ func Context(w io.Writer, v *ops.ContextView) error {
 
 	d.h(2, "Next steps")
 	d.list([]string{
-		"`nexmap req show <ID>` — full requirement with definition of done, tests and defects",
-		"`nexmap req list --open` / `nexmap defect list --open` — the full lists",
-		"`nexmap constraint show <ID>`, `nexmap capability show <name>`, `nexmap test show <test identifier>`",
+		"`wiekko req show <ID>` — full requirement with definition of done, tests and defects",
+		"`wiekko req list --open` / `wiekko defect list --open` — the full lists",
+		"`wiekko constraint show <ID>`, `wiekko capability show <name>`, `wiekko test show <test identifier>`",
 	})
 	return d.write(w)
 }

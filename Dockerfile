@@ -1,9 +1,9 @@
-# Reproducible build of nexmapd and nexmap. Everything the build needs (Go,
+# Reproducible build of wiekkod and wiekko. Everything the build needs (Go,
 # templ, Tailwind, just) is pinned here, so the host only needs podman or
 # docker.
 #
 # Stages:
-#   runtime (default, last): the nexmapd server image, as deployed by Coolify's
+#   runtime (default, last): the wiekkod server image, as deployed by Coolify's
 #            Dockerfile build pack. Data lives in /data (mount a volume there).
 #   export:  just the binaries; `just container-build [os] [arch]` copies them to
 #            build/<os>-<arch>/.
@@ -70,14 +70,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     git config --global --add safe.directory /src; \
     ldflags="-s -w"; \
     if [ -n "${VERSION:-}" ]; then \
-        ldflags="$ldflags -X nexmap.net/internal/buildinfo.Version=${VERSION}"; \
+        ldflags="$ldflags -X wiekko.net/internal/buildinfo.Version=${VERSION}"; \
     elif [ -n "${SOURCE_COMMIT:-}" ]; then \
-        ldflags="$ldflags -X nexmap.net/internal/buildinfo.Revision=${SOURCE_COMMIT}"; \
+        ldflags="$ldflags -X wiekko.net/internal/buildinfo.Revision=${SOURCE_COMMIT}"; \
     fi; \
     just generate css; \
     go vet ./...; \
     mkdir -p /out /data/uploads; \
-    for cmd in nexmapd nexmap; do \
+    for cmd in wiekkod wiekko; do \
         CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath \
             -ldflags "$ldflags" -o /out/ ./cmd/"$cmd"; \
     done
@@ -87,23 +87,23 @@ COPY --from=build /out/ /out/
 
 FROM ${RUNTIME_IMAGE} AS runtime
 
-COPY --from=build /out/nexmapd /usr/local/bin/nexmapd
+COPY --from=build /out/wiekkod /usr/local/bin/wiekkod
 # Owned by the image's nonroot user, so a fresh volume mounted here is
 # writable (Docker copies ownership into an empty named volume).
 COPY --from=build --chown=65532:65532 /data /data
 
 # Listen on all interfaces: the reverse proxy (Coolify's Traefik) reaches the
 # container over its network, never via localhost.
-ENV NEXMAP_HOST=0.0.0.0 \
-    NEXMAP_PORT=8080 \
-    NEXMAP_DB_DSN=/data/nexmap.db \
-    NEXMAP_UPLOAD_DIR=/data/uploads
+ENV WIEKKO_HOST=0.0.0.0 \
+    WIEKKO_PORT=8080 \
+    WIEKKO_DB_DSN=/data/wiekko.db \
+    WIEKKO_UPLOAD_DIR=/data/uploads
 
 USER 65532:65532
 WORKDIR /data
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD ["/usr/local/bin/nexmapd", "healthcheck"]
+    CMD ["/usr/local/bin/wiekkod", "healthcheck"]
 
-ENTRYPOINT ["/usr/local/bin/nexmapd"]
+ENTRYPOINT ["/usr/local/bin/wiekkod"]

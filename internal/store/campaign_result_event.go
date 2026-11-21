@@ -7,7 +7,7 @@ import (
 	"context"
 	"database/sql"
 
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/model"
 )
 
 // CampaignResultEventStore defines data access operations for the immutable

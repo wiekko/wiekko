@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	"nexmap.net/internal/config"
+	"wiekko.net/internal/config"
 )
 
-// healthcheck implements `nexmapd healthcheck`: it asks the server running
+// healthcheck implements `wiekkod healthcheck`: it asks the server running
 // with the same configuration (environment and flags) whether it is up, and
 // returns the process exit code. It exists for container HEALTHCHECKs, so the
 // image needs no curl or wget.

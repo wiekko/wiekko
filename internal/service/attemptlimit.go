@@ -45,7 +45,7 @@ func (e *AttemptsBlockedError) Unwrap() error { return ErrTooManyAttempts }
 
 // attemptLimiter counts events per key within a window that starts at the
 // first event; reaching max blocks the key until that window ends. Like the
-// login limiter it lives in memory: nexmapd is a single process, and a restart
+// login limiter it lives in memory: wiekkod is a single process, and a restart
 // clears the counters. A nil limiter never blocks.
 type attemptLimiter struct {
 	max    int

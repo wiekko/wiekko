@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"nexmap.net/internal/auth"
-	"nexmap.net/internal/auth/totp"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth"
+	"wiekko.net/internal/auth/totp"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // Instance settings that make TOTP mandatory (SC-34). SettingTwoFactorEnforced
@@ -73,7 +73,7 @@ func TwoFactorRoleGroup(role string) string {
 type TwoFactorRequirement struct {
 	// Instance lists the instance-level rules that cover the user, e.g.
 	// "all users", "administrators", "product owners". While it is not empty
-	// the user must set up 2FA before using Nexmap at all.
+	// the user must set up 2FA before using Wiekko at all.
 	Instance []string
 	// Products are the products the user is a member of that require 2FA.
 	// Without 2FA the user cannot reach them.
@@ -122,7 +122,7 @@ func joinWords(words []string) string {
 }
 
 // totpIssuer is the issuer name authenticator apps display next to the account.
-const totpIssuer = "Nexmap"
+const totpIssuer = "Wiekko"
 
 var (
 	// ErrInvalidTOTPCode is returned when a TOTP or recovery code does not match
@@ -195,7 +195,7 @@ func (s *TwoFactorService) clock() time.Time {
 // users who have not enrolled in with a password alone for as long as the
 // fault lasts, and one that does not enforce it does not lock anyone out. Only
 // before the first successful read is there nothing to go by, and nothing is
-// enforced; nexmapd reads the settings once at startup (LoadPolicy), so that
+// enforced; wiekkod reads the settings once at startup (LoadPolicy), so that
 // does not arise there.
 func (s *TwoFactorService) policy(ctx context.Context) *twoFactorPolicy {
 	all, err := s.settings.GetAll(ctx)
@@ -277,7 +277,7 @@ func (s *TwoFactorService) instanceRules(ctx context.Context, user *model.User) 
 
 // RequiredFor reports whether an instance-level rule requires the user to use
 // two-factor authentication, i.e. whether they must set it up before using
-// Nexmap at all. Products that require 2FA are not considered here; they only
+// Wiekko at all. Products that require 2FA are not considered here; they only
 // keep users without it out of themselves (see Authorizer.RequireRole).
 func (s *TwoFactorService) RequiredFor(ctx context.Context, user *model.User) bool {
 	return len(s.instanceRules(ctx, user)) > 0

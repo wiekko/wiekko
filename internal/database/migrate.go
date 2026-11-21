@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strconv"
 
-	"nexmap.net/internal/database/migrations"
+	"wiekko.net/internal/database/migrations"
 )
 
 // Migrations are plain SQL files named NNNNN_name.sql in
@@ -32,7 +32,7 @@ import (
 // lock before it runs.
 //
 // Migrate refuses to run when the database has migrations this binary does not
-// know (it was migrated by a newer nexmapd) or when a known migration is
+// know (it was migrated by a newer wiekkod) or when a known migration is
 // missing below newer applied ones.
 //
 // Because migrations run inside a transaction, statements PostgreSQL forbids
@@ -46,7 +46,8 @@ const migrationTable = "schema_migrations"
 const gooseTable = "goose_db_version"
 
 // pgLockKey is the advisory lock key serialising migrations on PostgreSQL
-// ("nexmap" in ASCII).
+// ("nexmap" in ASCII, the project's former name; kept so that
+// instances of both names never migrate at the same time).
 const pgLockKey = 0x6e65786d6170
 
 type migration struct {
@@ -288,7 +289,7 @@ func plan(known []migration, applied []int64) ([]migration, error) {
 	var latest int64
 	for _, v := range applied {
 		if !isKnown[v] {
-			return nil, fmt.Errorf("migrate: the database has migration %d, which this nexmapd does not know; it was migrated by a newer version", v)
+			return nil, fmt.Errorf("migrate: the database has migration %d, which this wiekkod does not know; it was migrated by a newer version", v)
 		}
 		latest = v
 	}

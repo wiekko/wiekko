@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 func TestInvitationCreate(t *testing.T) {

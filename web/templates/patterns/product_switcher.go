@@ -3,7 +3,7 @@
 
 package patterns
 
-import "nexmap.net/internal/model"
+import "wiekko.net/internal/model"
 
 // productSections are the AppLayout ActiveSection values that map directly onto
 // a /products/{id}/<section> URL. Detail and form pages set the same section as

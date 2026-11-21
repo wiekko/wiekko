@@ -11,9 +11,9 @@ import (
 	"io"
 	"strings"
 
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/render"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/render"
 )
 
 // Write commands. Every one is bounded by the token user's product role on
@@ -47,7 +47,7 @@ func (t *textFlags) value(a *app, name string) (string, error) {
 // statusArgs splits "<ref> <status words…>"; status names may contain spaces.
 func statusArgs(name string, args []string) (string, string, error) {
 	if len(args) < 2 {
-		return "", "", usageErr(fmt.Errorf("usage: nexmap %s <item> <status>", name))
+		return "", "", usageErr(fmt.Errorf("usage: wiekko %s <item> <status>", name))
 	}
 	return args[0], strings.Join(args[1:], " "), nil
 }
@@ -155,7 +155,7 @@ func requirementUpdateCommand(group, fixedKind string) *command {
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 1 {
-				return usageErr(fmt.Errorf("usage: nexmap %s <FR-12|ID> [--parent <FR-3|\"\">] [--priority N]", name))
+				return usageErr(fmt.Errorf("usage: wiekko %s <FR-12|ID> [--parent <FR-3|\"\">] [--priority N]", name))
 			}
 			in := ops.BacklogItemChange{Ref: args[0], Parent: set.optional("parent", parent),
 				Priority: set.optionalPriority(priority), Kind: fixedKind}
@@ -341,7 +341,7 @@ func commentGroup() *command {
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) == 0 {
-				return usageErr(errors.New("usage: nexmap comment add <FR-12|ref> --body-file -"))
+				return usageErr(errors.New("usage: wiekko comment add <FR-12|ref> --body-file -"))
 			}
 			// Capability and component names may contain spaces.
 			in.Ref = strings.Join(args, " ")
@@ -460,7 +460,7 @@ func archiveVerb(archived bool) string {
 // oneRef reads the single item reference of a command.
 func oneRef(name string, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", usageErr(fmt.Errorf("usage: nexmap %s <item>", name))
+		return "", usageErr(fmt.Errorf("usage: wiekko %s <item>", name))
 	}
 	return args[0], nil
 }

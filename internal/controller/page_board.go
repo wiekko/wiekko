@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"strings"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
-	"nexmap.net/internal/store"
-	"nexmap.net/web/templates"
-	productpage "nexmap.net/web/templates/pages/product"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
+	"wiekko.net/internal/store"
+	"wiekko.net/web/templates"
+	productpage "wiekko.net/web/templates/pages/product"
 )
 
 // Board renders GET /products/{id}/board — the kanban board for a product.

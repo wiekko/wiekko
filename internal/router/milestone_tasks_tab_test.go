@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // TestMilestoneTasksTab checks that a milestone lists its tasks on a Tasks
@@ -60,7 +60,7 @@ func TestMilestoneTasksTab(t *testing.T) {
 		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
 		var cookie *http.Cookie
 		for _, c := range resp.Cookies() {
-			if c.Name == "nexmap_session" && c.Value != "" {
+			if c.Name == "wiekko_session" && c.Value != "" {
 				cookie = c
 			}
 		}

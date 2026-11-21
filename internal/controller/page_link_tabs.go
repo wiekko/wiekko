@@ -6,10 +6,10 @@ package controller
 import (
 	"net/http"
 
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
-	productpage "nexmap.net/web/templates/pages/product"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
+	productpage "wiekko.net/web/templates/pages/product"
 )
 
 // Detail pages place links by how many items they point to (UC-88): what an

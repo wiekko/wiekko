@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/testutil"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/testutil"
 )
 
 // recordingPurger stands in for DiscussionService in entity-service tests and

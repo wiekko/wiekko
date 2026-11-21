@@ -98,7 +98,7 @@ func (s *smtpSender) Send(ctx context.Context, msg Message) error {
 	}
 	if s.mode == SMTPTLSStartTLS {
 		if ok, _ := c.Extension("STARTTLS"); !ok {
-			return errors.New("smtp: the server does not offer STARTTLS, which NEXMAP_SMTP_TLS=starttls requires")
+			return errors.New("smtp: the server does not offer STARTTLS, which WIEKKO_SMTP_TLS=starttls requires")
 		}
 		if err := c.StartTLS(s.tlsConf()); err != nil {
 			return fmt.Errorf("smtp: starttls: %w", err)
@@ -144,7 +144,7 @@ func smtpError(stage string, err error) error {
 	return fmt.Errorf("smtp: %s failed", stage)
 }
 
-// helloName is the name nexmap greets the relay with: the domain of its own
+// helloName is the name wiekko greets the relay with: the domain of its own
 // sender address, which relays accept more readily than "localhost".
 func helloName(from string) string {
 	if d := domainOf(from); d != "" && d != from {

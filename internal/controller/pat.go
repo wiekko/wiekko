@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"strings"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // PATController handles personal access token endpoints.

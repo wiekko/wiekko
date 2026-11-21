@@ -9,8 +9,8 @@ import (
 	"errors"
 	"testing"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
 )
 
 // Bulk operations (FR-130, FR-131) apply the individual operation to each

@@ -15,14 +15,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"nexmap.net/internal/auth/builtin"
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/crypto"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/mail"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/storage"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/auth/builtin"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/crypto"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/mail"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/storage"
+	"wiekko.net/internal/store"
 )
 
 // fakeSender records messages instead of sending them.
@@ -57,7 +57,7 @@ type mailEnv struct {
 	alice  *model.User
 }
 
-const mailTestURL = "https://nexmap.example.com"
+const mailTestURL = "https://wiekko.example.com"
 
 func newMailEnv(t *testing.T, driver string, conn *sql.DB, withMail bool) *mailEnv {
 	t.Helper()

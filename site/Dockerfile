@@ -1,8 +1,8 @@
-# Download site (nexmap.net): the landing page, the CLI install scripts and the
+# Download site (wiekko.net): the landing page, the CLI install scripts and the
 # CLI release archives under /releases/, served by nginx on port 8080. Build
 # from the repository root:
 #
-#   docker build -f site/Dockerfile -t nexmap-site .   (or: just site-container)
+#   docker build -f site/Dockerfile -t wiekko-site .   (or: just site-container)
 #
 # Stages:
 #   dist:    builds and packages the CLI for every platform (site/dist.sh)
@@ -52,7 +52,7 @@ FROM ${RUNTIME_IMAGE} AS runtime
 
 COPY site/nginx.conf /etc/nginx/conf.d/default.conf
 COPY site/www/ /usr/share/nginx/html/
-COPY --from=dist /dist/ /opt/nexmap/releases/
+COPY --from=dist /dist/ /opt/wiekko/releases/
 # Owned by the image's user (101), so a fresh named volume mounted at /data is
 # writable (Docker copies ownership into an empty named volume).
 COPY --from=dist --chown=101:101 /data /data

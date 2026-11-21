@@ -23,11 +23,11 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"nexmap.net/internal/buildinfo"
-	"nexmap.net/internal/cli/ops"
-	"nexmap.net/internal/cli/output"
-	"nexmap.net/internal/cli/render"
-	"nexmap.net/internal/client"
+	"wiekko.net/internal/buildinfo"
+	"wiekko.net/internal/cli/ops"
+	"wiekko.net/internal/cli/output"
+	"wiekko.net/internal/cli/render"
+	"wiekko.net/internal/client"
 )
 
 // Options configure a server.
@@ -50,8 +50,8 @@ var instructions string
 // New builds the MCP server with all tools registered.
 func New(opts Options) *sdk.Server {
 	s := sdk.NewServer(&sdk.Implementation{
-		Name:    "nexmap",
-		Title:   "Nexmap",
+		Name:    "wiekko",
+		Title:   "Wiekko",
 		Version: buildinfo.String(),
 	}, &sdk.ServerOptions{
 		Instructions: instructions,
@@ -67,7 +67,7 @@ func New(opts Options) *sdk.Server {
 }
 
 // Serve runs the server over newline-delimited JSON on r/w (stdin/stdout for
-// `nexmap mcp`) until the client disconnects or ctx is cancelled.
+// `wiekko mcp`) until the client disconnects or ctx is cancelled.
 func Serve(ctx context.Context, opts Options, r io.Reader, w io.Writer) error {
 	in := &eofReader{r: r}
 	err := New(opts).Run(ctx, &sdk.IOTransport{Reader: io.NopCloser(in), Writer: nopWriteCloser{w}})
@@ -284,9 +284,9 @@ func registerReadTools(s *sdk.Server, h *handlers) {
 func toolError(err error) error {
 	switch {
 	case client.IsUnauthorized(err):
-		return fmt.Errorf("%w (the Nexmap token is missing, invalid, expired or revoked: run `nexmap login` or set NEXMAP_TOKEN)", err)
+		return fmt.Errorf("%w (the Wiekko token is missing, invalid, expired or revoked: run `wiekko login` or set WIEKKO_TOKEN)", err)
 	case client.IsForbidden(err):
-		return fmt.Errorf("%w (not permitted for your Nexmap role in this product; ask a product owner)", err)
+		return fmt.Errorf("%w (not permitted for your Wiekko role in this product; ask a product owner)", err)
 	}
 	return err
 }

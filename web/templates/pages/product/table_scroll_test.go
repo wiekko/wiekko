@@ -9,7 +9,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"nexmap.net/web/templates/patterns"
+	"wiekko.net/web/templates/patterns"
 )
 
 // UR-164: on list pages, only the table scrolls. Its column headers stick to

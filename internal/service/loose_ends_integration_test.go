@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // These tests cover what deleting a test case, an environment, a backlog item

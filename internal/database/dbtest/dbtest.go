@@ -3,7 +3,7 @@
 
 // Package dbtest gives integration tests a migrated database on every
 // supported engine: SQLite in a temp file, and PostgreSQL on a server named by
-// NEXMAP_TEST_POSTGRES_DSN.
+// WIEKKO_TEST_POSTGRES_DSN.
 //
 // A package opts in with a TestMain:
 //
@@ -14,13 +14,13 @@
 // The PostgreSQL runs exist to catch dialect differences that SQLite hides, but
 // not every machine has a server, so they need one to be named:
 //
-//	NEXMAP_TEST_POSTGRES_DSN=postgres://user:pass@host:port/postgres
+//	WIEKKO_TEST_POSTGRES_DSN=postgres://user:pass@host:port/postgres
 //
 // `just test-pg` starts a throwaway server in a container and sets it. The
 // DSN's database is only used to create and drop the test databases, so the
 // role needs CREATEDB. Without a DSN (or with -short, or with
-// NEXMAP_TEST_POSTGRES=off) the PostgreSQL subtests are skipped and say so;
-// NEXMAP_TEST_POSTGRES=required turns a missing DSN into a failure instead,
+// WIEKKO_TEST_POSTGRES=off) the PostgreSQL subtests are skipped and say so;
+// WIEKKO_TEST_POSTGRES=required turns a missing DSN into a failure instead,
 // for runs that must cover PostgreSQL.
 package dbtest
 
@@ -37,8 +37,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"nexmap.net/internal/config"
-	"nexmap.net/internal/database"
+	"wiekko.net/internal/config"
+	"wiekko.net/internal/database"
 )
 
 // Engine driver names, as accepted by database.Open and database.Migrate.
@@ -49,10 +49,10 @@ const (
 
 const (
 	// EnvPostgresDSN names the PostgreSQL server the tests use.
-	EnvPostgresDSN = "NEXMAP_TEST_POSTGRES_DSN"
+	EnvPostgresDSN = "WIEKKO_TEST_POSTGRES_DSN"
 	// EnvPostgres is "off" (or "0", "false") to skip the PostgreSQL runs even
 	// with a DSN, or "required" to fail when there is no DSN.
-	EnvPostgres = "NEXMAP_TEST_POSTGRES"
+	EnvPostgres = "WIEKKO_TEST_POSTGRES"
 )
 
 var (
@@ -112,7 +112,7 @@ func setupPostgres(dsn string) error {
 
 	var b [4]byte
 	_, _ = rand.Read(b[:])
-	dbPrefix = fmt.Sprintf("nexmap_test_%d_%s", os.Getpid(), hex.EncodeToString(b[:]))
+	dbPrefix = fmt.Sprintf("wiekko_test_%d_%s", os.Getpid(), hex.EncodeToString(b[:]))
 	templateDB = dbPrefix + "_template"
 	if err := createTemplate(); err != nil {
 		_ = dropDatabase(templateDB)

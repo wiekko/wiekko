@@ -7,10 +7,10 @@ import (
 	"errors"
 	"net/http"
 
-	"nexmap.net/internal/httputil"
-	"nexmap.net/internal/middleware"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/httputil"
+	"wiekko.net/internal/middleware"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/service"
 )
 
 // TestingController handles test case, campaign, and campaign result endpoints.

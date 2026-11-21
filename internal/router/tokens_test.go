@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/database/dbtest"
-	"nexmap.net/internal/service"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/database/dbtest"
+	"wiekko.net/internal/service"
 )
 
 // TestRestrictedTokens drives restricted personal access tokens over HTTP

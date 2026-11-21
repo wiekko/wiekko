@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	"nexmap.net/internal/access"
-	"nexmap.net/internal/model"
-	"nexmap.net/internal/store"
+	"wiekko.net/internal/access"
+	"wiekko.net/internal/model"
+	"wiekko.net/internal/store"
 )
 
 // ErrForbidden is returned when a user lacks sufficient permissions.

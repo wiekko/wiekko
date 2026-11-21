@@ -6,8 +6,8 @@ package controller
 import (
 	"testing"
 
-	"nexmap.net/internal/model"
-	productpage "nexmap.net/web/templates/pages/product"
+	"wiekko.net/internal/model"
+	productpage "wiekko.net/web/templates/pages/product"
 )
 
 func TestIsOverride(t *testing.T) {

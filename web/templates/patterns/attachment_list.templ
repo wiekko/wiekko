@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"nexmap.net/web/templates"
-	"nexmap.net/web/templates/ui"
+	"wiekko.net/web/templates"
+	"wiekko.net/web/templates/ui"
 )
 
 // Error region IDs shared between these templates and the page handlers.
@@ -107,7 +107,7 @@ templ AttachmentsEmptied() {
 
 // UploadForm renders a file upload form using htmx multipart encoding.
 //
-// A rejected upload comes back as 200 with an HX-Nexmap-Error header and the
+// A rejected upload comes back as 200 with an HX-Wiekko-Error header and the
 // message as an out-of-band swap. htmx ignores non-2xx responses entirely, and
 // its htmx:beforeSwap event fires on the swap target (#attachments) rather
 // than on this form, so a hook here could not intercept them. The header keeps
@@ -118,8 +118,8 @@ templ UploadForm(hxPost, csrfToken string, maxBytes int64) {
 		hx-target="#attachments"
 		hx-swap="beforeend"
 		hx-encoding="multipart/form-data"
-		hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Nexmap-Error')) this.reset()"
-		hx-on::before-request="nexmapGuardUploadSize(event, this)"
+		hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Wiekko-Error')) this.reset()"
+		hx-on::before-request="wiekkoGuardUploadSize(event, this)"
 		data-max-bytes={ formatInt(maxBytes) }
 		data-size-error-id={ attachmentsSizeErrorRegion }
 		data-server-error-id={ AttachmentsErrorRegion }
@@ -157,7 +157,7 @@ templ UploadForm(hxPost, csrfToken string, maxBytes int64) {
 // that skips this.
 templ uploadSizeGuardScript() {
 	<script>
-		function nexmapGuardUploadSize(evt, form) {
+		function wiekkoGuardUploadSize(evt, form) {
 			var sizeErr = document.getElementById(form.dataset.sizeErrorId);
 			if (sizeErr) sizeErr.classList.add('hidden');
 
