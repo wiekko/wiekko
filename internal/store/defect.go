@@ -67,6 +67,9 @@ type DefectStore interface {
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, defectID, userID string) error
 	ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error)
+	// UnassignFromProduct removes userID from every defect of productID and
+	// returns those defects' IDs, for their history (UR-171).
+	UnassignFromProduct(ctx context.Context, productID, userID string) ([]string, error)
 	AddLink(ctx context.Context, link *model.DefectLink) error
 	RemoveLink(ctx context.Context, id string) error
 	// RemoveLinksToTarget removes every link pointing at targetID. target_id
@@ -253,6 +256,34 @@ func (s *defectStore) Unassign(ctx context.Context, defectID, userID string) err
 		`DELETE FROM defect_assignments WHERE defect_id = ? AND user_id = ?`,
 		defectID, userID)
 	return err
+}
+
+func (s *defectStore) UnassignFromProduct(ctx context.Context, productID, userID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT d.id FROM defect_assignments a
+		 JOIN defects d ON d.id = a.defect_id
+		 WHERE d.product_id = ? AND a.user_id = ? ORDER BY d.id`,
+		productID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`DELETE FROM defect_assignments WHERE user_id = ?
+		 AND defect_id IN (SELECT id FROM defects WHERE product_id = ?)`,
+		userID, productID)
+	return ids, err
 }
 
 func (s *defectStore) ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error) {

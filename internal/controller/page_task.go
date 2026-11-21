@@ -354,6 +354,7 @@ func (c *PageProductController) taskDetailProps(r *http.Request, user *model.Use
 		Children:         children,
 		TabCounts:        c.taskTabCounts(r, user, p.ID, task),
 		CanEdit:          c.canEditRequirements(user, role),
+		Assignees:        c.assigneesProps(r, user, p.ID, "tasks", task.ID, task.Kind, task.IsActive),
 	}
 }
 

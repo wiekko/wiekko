@@ -604,6 +604,7 @@ type MockRequirementStore struct {
 	AssignFunc              func(ctx context.Context, a *model.Assignment) error
 	UnassignFunc            func(ctx context.Context, requirementID, userID string) error
 	ListAssigneesFunc       func(ctx context.Context, requirementID string) ([]*model.Assignment, error)
+	UnassignFromProductFunc func(ctx context.Context, productID, userID string) ([]*model.Requirement, error)
 	ListPageByProductIDFunc func(ctx context.Context, productID string, filter store.RequirementFilter, params store.ListParams) ([]*model.Requirement, error)
 	CountByProductIDFunc    func(ctx context.Context, productID string, filter store.RequirementFilter, search string) (int, error)
 }
@@ -686,6 +687,9 @@ func (m *MockRequirementStore) Unassign(ctx context.Context, requirementID, user
 func (m *MockRequirementStore) ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error) {
 	return m.ListAssigneesFunc(ctx, requirementID)
 }
+func (m *MockRequirementStore) UnassignFromProduct(ctx context.Context, productID, userID string) ([]*model.Requirement, error) {
+	return m.UnassignFromProductFunc(ctx, productID, userID)
+}
 
 // MockDefectStore implements store.DefectStore with configurable function fields.
 type MockDefectStore struct {
@@ -704,6 +708,7 @@ type MockDefectStore struct {
 	AssignFunc              func(ctx context.Context, a *model.Assignment) error
 	UnassignFunc            func(ctx context.Context, defectID, userID string) error
 	ListAssigneesFunc       func(ctx context.Context, defectID string) ([]*model.Assignment, error)
+	UnassignFromProductFunc func(ctx context.Context, productID, userID string) ([]string, error)
 	AddLinkFunc             func(ctx context.Context, link *model.DefectLink) error
 	RemoveLinkFunc          func(ctx context.Context, id string) error
 	RemoveLinksToTargetFunc func(ctx context.Context, targetID string) error
@@ -784,6 +789,9 @@ func (m *MockDefectStore) Unassign(ctx context.Context, defectID, userID string)
 }
 func (m *MockDefectStore) ListAssignees(ctx context.Context, defectID string) ([]*model.Assignment, error) {
 	return m.ListAssigneesFunc(ctx, defectID)
+}
+func (m *MockDefectStore) UnassignFromProduct(ctx context.Context, productID, userID string) ([]string, error) {
+	return m.UnassignFromProductFunc(ctx, productID, userID)
 }
 func (m *MockDefectStore) AddLink(ctx context.Context, link *model.DefectLink) error {
 	return m.AddLinkFunc(ctx, link)

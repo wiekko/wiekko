@@ -31,6 +31,8 @@ type TaskDetailProps struct {
 	Children         []*model.Requirement
 	CanEdit          bool
 	TabCounts map[string]int // tab ID → number of linked items (UC-88)
+	// Assignees are shown in the header and the Overview (UR-171).
+	Assignees patterns.AssigneesProps
 }
 
 templ TaskDetailPage(props TaskDetailProps) {
@@ -58,6 +60,7 @@ templ TaskDetailPage(props TaskDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@patterns.CategoryBadge(requirementPrefix(props.CategoryPrefixes, props.Task.CategoryID), model.RequirementKindTask)
+				@patterns.AssigneeMenu(props.Assignees)
 				@patterns.ArchiveControls(taskArchiveProps(props))
 			}
 			<!-- Tabs -->
@@ -99,6 +102,7 @@ templ TaskOverviewTabContent(props TaskDetailProps) {
 					@patterns.DetailField("Parent", "")
 				}
 				@workflowStatusField(props.Status)
+				@patterns.AssigneeField(props.Assignees.Assigned)
 				if props.Task.MilestoneID != "" && props.MilestoneName != "" {
 					@requirementLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.Product.ID, props.Task.MilestoneID))
 				} else {

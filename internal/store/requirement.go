@@ -46,6 +46,9 @@ type RequirementStore interface {
 	Assign(ctx context.Context, a *model.Assignment) error
 	Unassign(ctx context.Context, requirementID, userID string) error
 	ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error)
+	// UnassignFromProduct removes userID from every requirement and task of
+	// productID and returns those items, for their history (UR-171).
+	UnassignFromProduct(ctx context.Context, productID, userID string) ([]*model.Requirement, error)
 	// SetArchivedAt archives the item at archivedAt, or unarchives it when
 	// archivedAt is empty (FR-155).
 	SetArchivedAt(ctx context.Context, id, archivedAt, updatedAt string) error
@@ -234,6 +237,34 @@ func (s *requirementStore) Unassign(ctx context.Context, requirementID, userID s
 		`DELETE FROM requirement_assignments WHERE requirement_id = ? AND user_id = ?`,
 		requirementID, userID)
 	return err
+}
+
+func (s *requirementStore) UnassignFromProduct(ctx context.Context, productID, userID string) ([]*model.Requirement, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT r.id, r.kind FROM requirement_assignments a
+		 JOIN requirements r ON r.id = a.requirement_id
+		 WHERE r.product_id = ? AND a.user_id = ? ORDER BY r.id`,
+		productID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+	var items []*model.Requirement
+	for rows.Next() {
+		r := &model.Requirement{ProductID: productID}
+		if err := rows.Scan(&r.ID, &r.Kind); err != nil {
+			return nil, err
+		}
+		items = append(items, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`DELETE FROM requirement_assignments WHERE user_id = ?
+		 AND requirement_id IN (SELECT id FROM requirements WHERE product_id = ?)`,
+		userID, productID)
+	return items, err
 }
 
 func (s *requirementStore) ListAssignees(ctx context.Context, requirementID string) ([]*model.Assignment, error) {

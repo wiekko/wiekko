@@ -44,7 +44,7 @@ func appliedVersions(t *testing.T, db *sql.DB) []int64 {
 }
 
 // latestVersions are the versions of all embedded migrations.
-var latestVersions = []int64{1, 2, 3, 4, 5}
+var latestVersions = []int64{1, 2, 3, 4, 5, 6}
 
 func wantVersions(t *testing.T, db *sql.DB, want ...int64) {
 	t.Helper()

@@ -324,6 +324,10 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("POST /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementUpdate)))
 	mux.Handle("DELETE /products/{id}/requirements/{requirementId}", pageAuthed(http.HandlerFunc(productCtrl.RequirementDelete)))
 	mux.Handle("POST /products/{id}/requirements/{requirementId}/archive", pageAuthed(productCtrl.ArchiveItem("requirementId", "requirements", true)))
+	// Assignees from the detail page header (UR-171).
+	mux.Handle("POST /products/{id}/requirements/{itemId}/assignees", pageAuthed(productCtrl.ItemAssignees("requirements", "requirement")))
+	mux.Handle("POST /products/{id}/tasks/{itemId}/assignees", pageAuthed(productCtrl.ItemAssignees("tasks", "task")))
+	mux.Handle("POST /products/{id}/defects/{itemId}/assignees", pageAuthed(productCtrl.ItemAssignees("defects", "defect")))
 	mux.Handle("POST /products/{id}/requirements/{requirementId}/unarchive", pageAuthed(productCtrl.ArchiveItem("requirementId", "requirements", false)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.RequirementDeleteConfirm)))
 	mux.Handle("GET /products/{id}/requirements/{requirementId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.RequirementOverviewTab)))

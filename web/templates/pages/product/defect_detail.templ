@@ -20,6 +20,8 @@ type DefectDetailProps struct {
 	Overview    DefectOverviewProps
 	CanEdit     bool
 	TabCounts map[string]int // tab ID → number of linked items (UC-88)
+	// Assignees are shown in the header and the Overview (UR-171).
+	Assignees patterns.AssigneesProps
 }
 
 templ DefectDetailPage(props DefectDetailProps) {
@@ -47,6 +49,7 @@ templ DefectDetailPage(props DefectDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@patterns.CriticalityBadge(props.Defect.Criticality)
+				@patterns.AssigneeMenu(props.Assignees)
 				@patterns.ArchiveControls(defectArchiveProps(props))
 			}
 			<!-- Tabs -->
@@ -90,6 +93,8 @@ type DefectOverviewProps struct {
 	MilestoneName   string
 	SprintName      string
 	EnvironmentName string
+	// Assigned are the defect's assignees (UR-171).
+	Assigned []patterns.Assignee
 	// Verification is the campaign result trail behind this defect, one entry
 	// per result it ever failed (FR-48, FR-123).
 	Verification []DefectVerificationGroup
@@ -117,6 +122,7 @@ templ DefectOverviewTabContent(props DefectOverviewProps) {
 						@patterns.CriticalityBadge(props.Defect.Criticality)
 					}
 					@workflowStatusField(props.Status)
+					@patterns.AssigneeField(props.Assigned)
 					if props.Defect.MilestoneID != "" && props.MilestoneName != "" {
 						@defectLinkedField("Milestone", props.MilestoneName, fmt.Sprintf("/products/%s/milestones/%s", props.ProductID, props.Defect.MilestoneID))
 					} else {

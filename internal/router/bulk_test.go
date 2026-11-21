@@ -128,7 +128,7 @@ func TestBulkOperationsPages(t *testing.T) {
 		// Developers may only change statuses; viewers cannot select.
 		dev := e.invite("dev", model.RoleDeveloper)
 		body = get(dev)
-		if !strings.Contains(body, `data-bulk-action="status"`) || strings.Contains(body, `data-bulk-action="archive"`) || strings.Contains(body, `data-bulk-action="priority"`) {
+		if !strings.Contains(body, `data-bulk-action="status"`) || !strings.Contains(body, `data-bulk-action="assign"`) || strings.Contains(body, `data-bulk-action="archive"`) || strings.Contains(body, `data-bulk-action="priority"`) {
 			t.Error("a developer's bar does not offer exactly the status change")
 		}
 		resp, _ = post(dev, "apply", url.Values{"action": {"delete"}, "ids": {open.ID}, "state": {""}})

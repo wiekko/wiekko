@@ -183,6 +183,8 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			pyramidLevels: st.PyramidLevel,
 			settings:      st.Setting,
 			attachments:   discussionSvc,
+			requirements:  st.Requirement,
+			defects:       st.Defect,
 			audit:         st.Audit,
 			authz:         authz,
 		},

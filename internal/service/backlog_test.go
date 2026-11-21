@@ -636,8 +636,12 @@ func TestAssignRequirement(t *testing.T) {
 		svc := newBacklogService(
 			&testutil.MockRequirementStore{
 				AssignFunc: func(_ context.Context, _ *model.Assignment) error { assigned = true; return nil },
+				GetByIDFunc: func(_ context.Context, id string) (*model.Requirement, error) {
+					return &model.Requirement{ID: id, ProductID: "product-001", Kind: model.RequirementKindRequirement}, nil
+				},
+				ListAssigneesFunc: func(context.Context, string) ([]*model.Assignment, error) { return nil, nil },
 			},
-			nil, nil, ownerRoles(),
+			nil, &testutil.MockAuditStore{CreateFunc: func(context.Context, *model.AuditEntry) error { return nil }}, ownerRoles(),
 		)
 
 		err := svc.AssignRequirement(context.Background(), testutil.MakeUser(), "product-001", "req-001", "user-002")
@@ -664,8 +668,14 @@ func TestUnassignRequirement(t *testing.T) {
 		svc := newBacklogService(
 			&testutil.MockRequirementStore{
 				UnassignFunc: func(_ context.Context, _, _ string) error { unassigned = true; return nil },
+				GetByIDFunc: func(_ context.Context, id string) (*model.Requirement, error) {
+					return &model.Requirement{ID: id, ProductID: "product-001", Kind: model.RequirementKindRequirement}, nil
+				},
+				ListAssigneesFunc: func(context.Context, string) ([]*model.Assignment, error) {
+					return []*model.Assignment{{UserID: "user-002"}}, nil
+				},
 			},
-			nil, nil, ownerRoles(),
+			nil, &testutil.MockAuditStore{CreateFunc: func(context.Context, *model.AuditEntry) error { return nil }}, ownerRoles(),
 		)
 
 		err := svc.UnassignRequirement(context.Background(), testutil.MakeUser(), "product-001", "req-001", "user-002")
@@ -1127,8 +1137,12 @@ func TestAssignDefect(t *testing.T) {
 		svc := newBacklogService(nil,
 			&testutil.MockDefectStore{
 				AssignFunc: func(_ context.Context, _ *model.Assignment) error { assigned = true; return nil },
+				GetByIDFunc: func(_ context.Context, id string) (*model.Defect, error) {
+					return &model.Defect{ID: id, ProductID: "product-001"}, nil
+				},
+				ListAssigneesFunc: func(context.Context, string) ([]*model.Assignment, error) { return nil, nil },
 			},
-			nil, ownerRoles(),
+			&testutil.MockAuditStore{CreateFunc: func(context.Context, *model.AuditEntry) error { return nil }}, ownerRoles(),
 		)
 
 		err := svc.AssignDefect(context.Background(), testutil.MakeUser(), "product-001", "defect-001", "user-002")
@@ -1155,8 +1169,14 @@ func TestUnassignDefect(t *testing.T) {
 		svc := newBacklogService(nil,
 			&testutil.MockDefectStore{
 				UnassignFunc: func(_ context.Context, _, _ string) error { unassigned = true; return nil },
+				GetByIDFunc: func(_ context.Context, id string) (*model.Defect, error) {
+					return &model.Defect{ID: id, ProductID: "product-001"}, nil
+				},
+				ListAssigneesFunc: func(context.Context, string) ([]*model.Assignment, error) {
+					return []*model.Assignment{{UserID: "user-002"}}, nil
+				},
 			},
-			nil, ownerRoles(),
+			&testutil.MockAuditStore{CreateFunc: func(context.Context, *model.AuditEntry) error { return nil }}, ownerRoles(),
 		)
 
 		err := svc.UnassignDefect(context.Background(), testutil.MakeUser(), "product-001", "defect-001", "user-002")

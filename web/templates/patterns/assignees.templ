@@ -1,0 +1,168 @@
+package patterns
+
+import (
+	"fmt"
+	"strings"
+
+	"nexmap.net/web/templates/ui"
+)
+
+// AssigneeMenuID is the element the assignee control of a detail page's header
+// is swapped into after a change (UR-171).
+const AssigneeMenuID = "item-assignees"
+
+// AssigneeFieldID is the Overview's "Assigned to" field, updated out of band
+// with the control.
+const AssigneeFieldID = "item-assignees-field"
+
+// Assignee is one person in an assignee list or menu.
+type Assignee struct {
+	UserID   string
+	Name     string
+	Assigned bool
+}
+
+// AssigneesProps configures a requirement's, task's or defect's assignees
+// (UR-171).
+type AssigneesProps struct {
+	// URL takes a POST of user_id and assign (true or false).
+	URL string
+	// Assigned are the item's assignees.
+	Assigned []Assignee
+	// Choices are the people the viewer may assign or unassign: every member
+	// for owners and admins, the viewer alone for a developer on an item
+	// activated for work, none otherwise (read-only).
+	Choices []Assignee
+	// SelfOnly words the choices as "Assign me" / "Unassign me".
+	SelfOnly bool
+}
+
+// maxAvatars caps the avatars the header shows before "+n".
+const maxAvatars = 3
+
+// AssigneeMenu shows an item's assignees in its page header and, for those who
+// may change them, a menu that assigns or unassigns without the edit form. No
+// confirmation: a change is undone the same way (UC-91).
+templ AssigneeMenu(props AssigneesProps) {
+	<div id={ AssigneeMenuID } class="inline-flex">
+		if len(props.Choices) > 0 {
+			@ui.DropdownMenu(AssigneeMenuID + "-menu") {
+				@ui.DropdownTrigger() {
+					<button
+						type="button"
+						class="flex cursor-pointer items-center gap-1 rounded-md py-1 pr-1.5 pl-1 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:hover:bg-gray-800"
+						aria-haspopup="menu"
+						aria-label={ "Assigned to: " + assigneeNames(props.Assigned) + ". Change assignees" }
+						title="Change assignees"
+					>
+						@assigneeSummary(props.Assigned)
+						<span class="text-gray-500 dark:text-gray-400">
+							@ui.Icon("chevron-down", "sm")
+						</span>
+					</button>
+				}
+				@ui.DropdownContent() {
+					for _, c := range props.Choices {
+						@ui.DropdownAction(c.Assigned, templ.Attributes{
+							"hx-post":    props.URL,
+							"hx-vals":    fmt.Sprintf(`{"user_id":%q,"assign":"%t"}`, c.UserID, !c.Assigned),
+							"hx-target":  "#" + AssigneeMenuID,
+							"hx-swap":    "outerHTML",
+							"aria-label": choiceLabel(c, props.SelfOnly),
+						}) {
+							<span class="truncate">{ choiceLabel(c, props.SelfOnly) }</span>
+						}
+					}
+				}
+			}
+		} else {
+			<span aria-label={ "Assigned to: " + assigneeNames(props.Assigned) }>
+				@assigneeSummary(props.Assigned)
+			</span>
+		}
+	</div>
+}
+
+// assigneeSummary is the compact form of the header: overlapping avatars, or
+// "Unassigned".
+templ assigneeSummary(assigned []Assignee) {
+	if len(assigned) == 0 {
+		<span class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+			@ui.Icon("user", "sm")
+			Unassigned
+		</span>
+	} else {
+		<span class="flex -space-x-1.5" title={ assigneeNames(assigned) }>
+			for i, a := range assigned {
+				if i < maxAvatars {
+					<span class="rounded-full ring-2 ring-white dark:ring-gray-900">
+						@ui.UserAvatar(a.Name, "sm")
+					</span>
+				}
+			}
+			if len(assigned) > maxAvatars {
+				<span class="flex h-6 items-center rounded-full bg-gray-100 px-1.5 text-xs font-medium text-gray-600 ring-2 ring-white dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-900">
+					{ fmt.Sprintf("+%d", len(assigned)-maxAvatars) }
+				</span>
+			}
+		</span>
+	}
+}
+
+// AssigneeField is the Overview's "Assigned to" field.
+templ AssigneeField(assigned []Assignee) {
+	<div>
+		<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Assigned to</dt>
+		@assigneeFieldValue(assigned, false)
+	</div>
+}
+
+// AssigneeFieldOOB replaces the Overview's field after the header control
+// changed the assignees, so both show the same.
+templ AssigneeFieldOOB(assigned []Assignee) {
+	@assigneeFieldValue(assigned, true)
+}
+
+templ assigneeFieldValue(assigned []Assignee, oob bool) {
+	<dd
+		id={ AssigneeFieldID }
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="mt-1 text-sm text-gray-900 dark:text-gray-100"
+	>
+		if len(assigned) == 0 {
+			<span class="text-gray-400 dark:text-gray-500">&mdash;</span>
+		} else {
+			<ul class="flex flex-wrap gap-x-4 gap-y-1">
+				for _, a := range assigned {
+					<li class="flex items-center gap-1.5">
+						@ui.UserAvatar(a.Name, "sm")
+						{ a.Name }
+					</li>
+				}
+			</ul>
+		}
+	</dd>
+}
+
+func assigneeNames(assigned []Assignee) string {
+	if len(assigned) == 0 {
+		return "nobody"
+	}
+	names := make([]string, len(assigned))
+	for i, a := range assigned {
+		names[i] = a.Name
+	}
+	return strings.Join(names, ", ")
+}
+
+func choiceLabel(c Assignee, selfOnly bool) string {
+	if !selfOnly {
+		return c.Name
+	}
+	if c.Assigned {
+		return "Unassign me"
+	}
+	return "Assign me"
+}

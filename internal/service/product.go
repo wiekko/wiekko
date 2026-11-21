@@ -24,8 +24,12 @@ type ProductService struct {
 	pyramidLevels store.PyramidLevelStore
 	settings      store.SettingStore
 	attachments   productPurger
-	audit         store.AuditStore
-	authz         *Authorizer
+	// requirements and defects end a removed member's assignments (UR-171);
+	// nil in unit tests that do not care.
+	requirements store.RequirementStore
+	defects      store.DefectStore
+	audit        store.AuditStore
+	authz        *Authorizer
 }
 
 // CreateProductInput contains the fields required to create a product.
@@ -619,8 +623,46 @@ func (s *ProductService) RemoveMember(ctx context.Context, user *model.User, pro
 		if err := s.productRoles.Delete(ctx, targetUserID, productID); err != nil {
 			return err
 		}
+		if err := s.unassignFormerMember(ctx, user, productID, targetUserID); err != nil {
+			return err
+		}
 		return s.auditMember(ctx, user, productID, targetUserID, oldRole, "")
 	})
+}
+
+// unassignFormerMember ends a removed member's assignments to the product's
+// requirements, tasks and defects, each with a history entry (UR-171).
+func (s *ProductService) unassignFormerMember(ctx context.Context, user *model.User, productID, targetUserID string) error {
+	if s.requirements == nil || s.defects == nil {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	record := func(kind, id string) error {
+		return s.audit.Create(ctx, &model.AuditEntry{
+			ID: uuid.New().String(), ProductID: productID, EntityType: kind, EntityID: id,
+			UserID: user.ID, Action: AuditActionUnassign, FieldName: AuditFieldAssignee,
+			OldValue: targetUserID, CreatedAt: now,
+		})
+	}
+	items, err := s.requirements.UnassignFromProduct(ctx, productID, targetUserID)
+	if err != nil {
+		return fmt.Errorf("unassign former member: %w", err)
+	}
+	for _, it := range items {
+		if err := record(it.Kind, it.ID); err != nil {
+			return err
+		}
+	}
+	defects, err := s.defects.UnassignFromProduct(ctx, productID, targetUserID)
+	if err != nil {
+		return fmt.Errorf("unassign former member: %w", err)
+	}
+	for _, id := range defects {
+		if err := record("defect", id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ListMembers returns all members of a product.

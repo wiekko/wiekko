@@ -4547,13 +4547,23 @@ func (c *PageProductController) buildAuditViews(r *http.Request, user *model.Use
 	views := make([]templates.AuditEntryView, 0, len(entries))
 	for _, e := range entries {
 		name := userName(userMap, e.UserID)
+		oldValue, newValue := e.OldValue, e.NewValue
+		// Assignments record the assignee's ID; show their name (UR-171).
+		if e.FieldName == service.AuditFieldAssignee {
+			if oldValue != "" {
+				oldValue = userName(userMap, oldValue)
+			}
+			if newValue != "" {
+				newValue = userName(userMap, newValue)
+			}
+		}
 		views = append(views, templates.AuditEntryView{
 			ID:        e.ID,
 			UserName:  name,
 			Action:    e.Action,
 			FieldName: e.FieldName,
-			OldValue:  e.OldValue,
-			NewValue:  e.NewValue,
+			OldValue:  oldValue,
+			NewValue:  newValue,
 			CreatedAt: e.CreatedAt,
 		})
 	}
@@ -5605,6 +5615,7 @@ func (c *PageProductController) RequirementDetail(w http.ResponseWriter, r *http
 		Children:         children,
 		CanEdit:          c.canEditRequirements(user, role),
 		TabCounts:        c.requirementTabCounts(r, user, productID, req.ID),
+		Assignees:        c.assigneesProps(r, user, productID, "requirements", req.ID, req.Kind, req.IsActive),
 	}).Render(r.Context(), w)
 }
 
@@ -6153,6 +6164,7 @@ func (c *PageProductController) RequirementOverviewTab(w http.ResponseWriter, r 
 	_ = productpage.RequirementOverviewTabContent(productpage.RequirementDetailProps{
 		Product:          p,
 		Requirement:      req,
+		Assignees:        c.assigneesProps(r, user, productID, "requirements", req.ID, req.Kind, req.IsActive),
 		CategoryPrefixes: prefixes,
 		CategoryNames:    catNames,
 		Status:           c.resolveStatus(r, user, productID, req.StatusID, "requirement"),
@@ -7083,6 +7095,7 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 		Overview:    c.buildDefectOverview(r, user, p, d),
 		CanEdit:     c.canEditDefects(user, role),
 		TabCounts:   c.defectTabCounts(r, user, p.ID, d.ID),
+		Assignees:   c.assigneesProps(r, user, p.ID, "defects", d.ID, "defect", d.IsActive),
 	}).Render(r.Context(), w)
 }
 
@@ -7090,6 +7103,7 @@ func (c *PageProductController) DefectDetail(w http.ResponseWriter, r *http.Requ
 // result trail that shows whether the fix was re-tested.
 func (c *PageProductController) buildDefectOverview(r *http.Request, user *model.User, p *model.Product, d *model.Defect) productpage.DefectOverviewProps {
 	return productpage.DefectOverviewProps{
+		Assigned:        c.assigneesProps(r, user, p.ID, "defects", d.ID, "defect", d.IsActive).Assigned,
 		ProductID:       p.ID,
 		EstimationMode:  p.EstimationMode,
 		WorkflowMode:    p.WorkflowMode,

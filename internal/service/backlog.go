@@ -636,33 +636,41 @@ func (s *BacklogService) validateParent(ctx context.Context, productID, childID,
 	return errors.New("parent chain is too deep")
 }
 
-// AssignRequirement assigns a user to a requirement. Requires owner role.
+// AssignRequirement assigns a member of the product to a requirement or task
+// (FR-101, UR-171); see changeAssignee for who may.
 func (s *BacklogService) AssignRequirement(ctx context.Context, user *model.User, productID, reqID, targetUserID string) error {
-	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
-		return err
-	}
-	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, reqID}); err != nil {
-		return err
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	return s.requirements.Assign(ctx, &model.Assignment{
-		ID:        uuid.New().String(),
-		TargetID:  reqID,
-		UserID:    targetUserID,
-		CreatedAt: now,
-	})
+	return s.changeRequirementAssignee(ctx, user, productID, reqID, targetUserID, true)
 }
 
-// UnassignRequirement removes a user from a requirement. Requires owner role.
+// UnassignRequirement removes a user from a requirement or task; see
+// changeAssignee for who may.
 func (s *BacklogService) UnassignRequirement(ctx context.Context, user *model.User, productID, reqID, targetUserID string) error {
-	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+	return s.changeRequirementAssignee(ctx, user, productID, reqID, targetUserID, false)
+}
+
+func (s *BacklogService) changeRequirementAssignee(ctx context.Context, user *model.User, productID, reqID, targetUserID string, assign bool) error {
+	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
+	if err != nil {
 		return err
 	}
 	if err := s.owns.require(ctx, productID, ref{kindBacklogItem, reqID}); err != nil {
 		return err
 	}
-	return s.requirements.Unassign(ctx, reqID, targetUserID)
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockEntity(reqID)); err != nil {
+			return err
+		}
+		r, err := s.requirements.GetByID(ctx, reqID)
+		if err != nil {
+			return err
+		}
+		return s.changeAssignee(ctx, user, role, assigneeTarget{
+			productID: productID, id: reqID, kind: r.Kind, active: r.IsActive,
+			list:   s.requirements.ListAssignees,
+			add:    s.requirements.Assign,
+			remove: s.requirements.Unassign,
+		}, targetUserID, assign)
+	})
 }
 
 // ListRequirementAssignees returns assignees for a requirement. Requires viewer role.
@@ -1097,34 +1105,117 @@ func (s *BacklogService) ListDefectsByMilestone(ctx context.Context, user *model
 	return out, nil
 }
 
-// AssignDefect assigns a user to a defect. Requires owner role.
+// AssignDefect assigns a member of the product to a defect (FR-101,
+// UR-171); see changeAssignee for who may.
 func (s *BacklogService) AssignDefect(ctx context.Context, user *model.User, productID, defID, targetUserID string) error {
-	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
+	return s.changeDefectAssignee(ctx, user, productID, defID, targetUserID, true)
+}
+
+// UnassignDefect removes a user from a defect; see changeAssignee for who
+// may.
+func (s *BacklogService) UnassignDefect(ctx context.Context, user *model.User, productID, defID, targetUserID string) error {
+	return s.changeDefectAssignee(ctx, user, productID, defID, targetUserID, false)
+}
+
+func (s *BacklogService) changeDefectAssignee(ctx context.Context, user *model.User, productID, defID, targetUserID string, assign bool) error {
+	role, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper)
+	if err != nil {
 		return err
 	}
 	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
 		return err
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	return s.defects.Assign(ctx, &model.Assignment{
-		ID:        uuid.New().String(),
-		TargetID:  defID,
-		UserID:    targetUserID,
-		CreatedAt: now,
+	return inTx(ctx, s.tx, func(ctx context.Context) error {
+		if err := lock(ctx, s.tx, lockEntity(defID)); err != nil {
+			return err
+		}
+		d, err := s.defects.GetByID(ctx, defID)
+		if err != nil {
+			return err
+		}
+		return s.changeAssignee(ctx, user, role, assigneeTarget{
+			productID: productID, id: defID, kind: "defect", active: d.IsActive,
+			list:   s.defects.ListAssignees,
+			add:    s.defects.Assign,
+			remove: s.defects.Unassign,
+		}, targetUserID, assign)
 	})
 }
 
-// UnassignDefect removes a user from a defect. Requires owner role.
-func (s *BacklogService) UnassignDefect(ctx context.Context, user *model.User, productID, defID, targetUserID string) error {
-	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleOwner); err != nil {
-		return err
-	}
-	if err := s.owns.require(ctx, productID, ref{kindDefect, defID}); err != nil {
-		return err
-	}
-	return s.defects.Unassign(ctx, defID, targetUserID)
+// ErrNotMember is returned for assigning a user who is no member of the
+// product (UR-171).
+var ErrNotMember = errors.New("only members of the product can be assigned")
+
+// assigneeTarget is the item whose assignees change, with its store calls.
+type assigneeTarget struct {
+	productID, id, kind string
+	active              bool
+	list                func(ctx context.Context, id string) ([]*model.Assignment, error)
+	add                 func(ctx context.Context, a *model.Assignment) error
+	remove              func(ctx context.Context, id, userID string) error
 }
+
+// changeAssignee assigns targetUserID to an item or unassigns them (UR-171).
+// Owners and admins change anyone's assignment; developers only their own,
+// and only on items activated for work, as for status changes (FR-114).
+// Only members can be assigned. A change that changes nothing (assigning the
+// assigned, unassigning the unassigned) succeeds without a trace (FR-167);
+// every other one leaves a history entry naming the assignee by ID.
+func (s *BacklogService) changeAssignee(ctx context.Context, user *model.User, role string, t assigneeTarget, targetUserID string, assign bool) error {
+	if roleRank(role) < roleRank(model.RoleOwner) {
+		if targetUserID != user.ID {
+			return fmt.Errorf("%w: developers can only assign or unassign themselves", ErrForbidden)
+		}
+		if !t.active {
+			return fmt.Errorf("%w: the %s has not been activated for work, so only a product owner can change its assignees", ErrForbidden, t.kind)
+		}
+	}
+	if assign {
+		if _, err := s.authz.productRoles.GetByUserAndProduct(ctx, targetUserID, t.productID); err != nil {
+			return ErrNotMember
+		}
+	}
+
+	current, err := t.list(ctx, t.id)
+	if err != nil {
+		return err
+	}
+	assigned := false
+	for _, a := range current {
+		if a.UserID == targetUserID {
+			assigned = true
+		}
+	}
+	if assigned == assign {
+		return nil
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	entry := &model.AuditEntry{
+		ID: uuid.New().String(), ProductID: t.productID, EntityType: t.kind, EntityID: t.id,
+		UserID: user.ID, FieldName: AuditFieldAssignee, CreatedAt: now,
+	}
+	if assign {
+		if err := t.add(ctx, &model.Assignment{ID: uuid.New().String(), TargetID: t.id, UserID: targetUserID, CreatedAt: now}); err != nil {
+			return err
+		}
+		entry.Action, entry.NewValue = AuditActionAssign, targetUserID
+	} else {
+		if err := t.remove(ctx, t.id, targetUserID); err != nil {
+			return err
+		}
+		entry.Action, entry.OldValue = AuditActionUnassign, targetUserID
+	}
+	return s.audit.Create(ctx, entry)
+}
+
+// History of assignments (UR-171): the assignee's user ID is the value, which
+// pages resolve to a name when they show it.
+const (
+	AuditActionAssign   = "assign"
+	AuditActionUnassign = "unassign"
+	AuditFieldAssignee  = "assignee"
+)
 
 // ListDefectAssignees returns assignees for a defect. Requires viewer role.
 func (s *BacklogService) ListDefectAssignees(ctx context.Context, user *model.User, productID, defID string) ([]*model.Assignment, error) {

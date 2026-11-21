@@ -81,7 +81,8 @@ func (t bulkTable) noun(n int) string {
 
 // bulkBar configures the selection bar of a table for the user's role: the
 // operations each role may apply to single items (SC-92). Developers change
-// statuses; owners and admins do everything; others cannot select.
+// statuses and assign or unassign themselves (UR-171); owners and admins do
+// everything; others cannot select.
 func bulkBar(t bulkTable, p *model.Product, user *model.User, role string, total int) patterns.BulkBarProps {
 	props := patterns.BulkBarProps{
 		Region:     t.region(),
@@ -98,6 +99,8 @@ func bulkBar(t bulkTable, p *model.Product, user *model.User, role string, total
 	}
 	add(service.BulkStatus, "Status", "circle-dot")
 	if !owner {
+		add(service.BulkAssign, "Assign me", "user-plus")
+		add(service.BulkUnassign, "Unassign me", "user-minus")
 		return props
 	}
 	if t.defect() {
@@ -446,6 +449,10 @@ func (c *PageProductController) bulkChoices(r *http.Request, user *model.User, p
 		}
 		return "Pyramid level", choices
 	case service.BulkAssign, service.BulkUnassign:
+		// Developers assign and unassign themselves only (UR-171).
+		if _, role, err := c.loadProductWithRole(r, user, productID); err == nil && !user.IsAdmin && role != model.RoleOwner {
+			return "Team member", []templates.SelectOption{{Value: user.ID, Label: user.DisplayName}}
+		}
 		for _, m := range c.buildTeamMembers(r, user, productID) {
 			choices = append(choices, templates.SelectOption{Value: m.UserID, Label: m.DisplayName})
 		}
