@@ -58,3 +58,20 @@ func TestStringPrefersLinkTimeVersion(t *testing.T) {
 		t.Fatalf("String() = %q, want v9.9.9", got)
 	}
 }
+
+func TestRelease(t *testing.T) {
+	for v, want := range map[string]string{
+		"v1.2.3":                        "v1.2.3",
+		"v1.2.3-rc.1":                   "v1.2.3-rc.1",
+		"v1.2.3+dirty":                  "v1.2.3",
+		"v1.2.3+dev":                    "",
+		"v1.2.3+dev.4161949abcde":       "",
+		"v1.2.3+dev.4161949abcde.dirty": "",
+		"(devel)":                       "",
+		"":                              "",
+	} {
+		if got := release(v); got != want {
+			t.Errorf("release(%q) = %q, want %q", v, got, want)
+		}
+	}
+}

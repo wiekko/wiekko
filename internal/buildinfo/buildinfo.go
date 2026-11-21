@@ -8,6 +8,7 @@ package buildinfo
 
 import (
 	_ "embed"
+	"regexp"
 	"runtime/debug"
 	"strings"
 )
@@ -84,4 +85,24 @@ func compose(src string, settings []debug.BuildSetting, linkRevision string) str
 		v += ".dirty"
 	}
 	return v
+}
+
+// releasePattern matches a release version without build metadata, as the
+// install scripts accept it ("v1.2.3", "v1.2.3-rc.1").
+var releasePattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
+
+// Release returns the release this build is ("v1.2.3"), or "" for a build
+// between releases. A modified tree ("v1.2.3+dirty") still names its release:
+// its documentation and a CLI of that release match it. Those of a "+dev"
+// build may not exist yet, so it has none (UR-172).
+func Release() string {
+	return release(String())
+}
+
+func release(v string) string {
+	base, meta, _ := strings.Cut(v, "+")
+	if strings.HasPrefix(meta, "dev") || !releasePattern.MatchString(base) {
+		return ""
+	}
+	return base
 }

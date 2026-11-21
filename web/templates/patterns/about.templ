@@ -1,0 +1,104 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
+package patterns
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/buildinfo"
+	"nexmap.net/web/templates/ui"
+)
+
+// The running version, its documentation and the CLI that matches it
+// (UR-172).
+
+const (
+	// docsBase is the documentation site, with a directory per release tag
+	// and /latest/ for the main branch.
+	docsBase = "https://docs.nexmap.net/"
+	// WebsiteURL is the project website.
+	WebsiteURL = "https://nexmap.net/"
+	// LicenseName and LicenseURL name the licence Nexmap is published under.
+	LicenseName = "EUPL 1.2"
+	LicenseURL  = "https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12"
+	// Copyright is the copyright line of the source files' SPDX headers.
+	Copyright = "© 2026 Jesco Freund (daemotron)"
+	// AboutModalID is the About dialog's element.
+	AboutModalID = "about-modal"
+)
+
+// DocsURL is the page of the documentation of the running release, or of
+// /latest/ for a build between releases, whose docs do not exist yet. page is
+// relative to the version's root ("cli/setup.html"); empty is its start page.
+func DocsURL(page string) string {
+	dir := "latest"
+	if r := buildinfo.Release(); r != "" {
+		dir = r
+	}
+	return docsBase + dir + "/" + page
+}
+
+// InstallCommand is one way to install the CLI.
+type InstallCommand struct {
+	Label   string
+	Command string
+}
+
+// InstallCommands are the CLI install commands for release, pinned to it so
+// the CLI never needs a higher API level than this server implements, or
+// unpinned (the latest release) when release is empty.
+func InstallCommands(release string) []InstallCommand {
+	sh := "curl -fsSL https://nexmap.net/install.sh | sh"
+	ps := "irm https://nexmap.net/install.ps1 | iex"
+	if release != "" {
+		sh = "curl -fsSL https://nexmap.net/install.sh | NEXMAP_VERSION=" + release + " sh"
+		ps = "$env:NEXMAP_VERSION='" + release + "'; irm https://nexmap.net/install.ps1 | iex"
+	}
+	return []InstallCommand{
+		{Label: "Linux and macOS", Command: sh},
+		{Label: "Windows (PowerShell)", Command: ps},
+	}
+}
+
+// AboutModal names the running version, its API level, copyright and
+// licence. The documentation is the user menu's Help entry, not repeated here.
+templ AboutModal() {
+	@ui.Modal(AboutModalID, "About Nexmap", "sm") {
+		<div class="space-y-4 text-sm">
+			<div class="flex items-center gap-3">
+				<img src="/static/img/logo-icon.svg" alt="" class="h-10 w-10"/>
+				<div>
+					<p class="text-base font-semibold text-gray-900 dark:text-gray-100">Nexmap</p>
+					<p class="text-gray-500 dark:text-gray-400">Product definition, backlog and QA</p>
+				</div>
+			</div>
+			<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+				<dt class="text-gray-500 dark:text-gray-400">Version</dt>
+				<dd class="font-mono break-all text-gray-900 dark:text-gray-100" data-version>{ buildinfo.String() }</dd>
+				<dt class="text-gray-500 dark:text-gray-400">API level</dt>
+				<dd class="font-mono text-gray-900 dark:text-gray-100">{ fmt.Sprintf("%d", buildinfo.APILevel) }</dd>
+			</dl>
+			<div class="border-t border-gray-200 pt-4 text-gray-600 dark:border-gray-700 dark:text-gray-400">
+				<p>{ Copyright }</p>
+				<p class="mt-1">
+					Licensed under the{ " " }
+					@externalLink(LicenseURL) {
+						{ LicenseName }
+					}
+				</p>
+				<p class="mt-1">
+					@externalLink(WebsiteURL) {
+						nexmap.net
+					}
+				</p>
+			</div>
+		</div>
+	}
+}
+
+templ externalLink(href string) {
+	<a href={ templ.SafeURL(href) } target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+		{ children... }
+	</a>
+}

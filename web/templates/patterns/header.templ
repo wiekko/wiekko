@@ -48,6 +48,29 @@ templ AppHeader(displayName, csrfToken, productID, productName, activeSection st
 						@ui.DropdownItem("Admin", "/admin/users", "users", false)
 					}
 					@ui.DropdownDivider()
+					<!-- Documentation of the running version, and the version itself (UR-172) -->
+					<a
+						href={ templ.SafeURL(DocsURL("")) }
+						target="_blank"
+						rel="noopener noreferrer"
+						class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+						role="menuitem"
+					>
+						@ui.Icon("circle-help", "sm")
+						Help
+					</a>
+					<button
+						type="button"
+						hx-get="/about"
+						hx-target="#modal"
+						hx-swap="innerHTML"
+						class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+						role="menuitem"
+					>
+						@ui.Icon("info", "sm")
+						About
+					</button>
+					@ui.DropdownDivider()
 					<form method="POST" action="/logout">
 						<input type="hidden" name="_csrf" value={ csrfToken }/>
 						<button

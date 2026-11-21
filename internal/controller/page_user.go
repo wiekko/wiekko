@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"nexmap.net/internal/access"
+	"nexmap.net/internal/buildinfo"
+	"nexmap.net/internal/httputil"
 	"nexmap.net/internal/middleware"
 	"nexmap.net/internal/model"
 	"nexmap.net/internal/service"
@@ -23,11 +25,29 @@ type PageUserController struct {
 	pat       *service.PATService
 	twoFactor *service.TwoFactorService
 	product   *service.ProductService
+	// publicURL is the configured address of the server; empty: the one the
+	// request used.
+	publicURL string
 }
 
 // NewPageUser creates a PageUserController.
 func NewPageUser(user *service.UserService, pat *service.PATService, twoFactor *service.TwoFactorService, product *service.ProductService) *PageUserController {
 	return &PageUserController{user: user, pat: pat, twoFactor: twoFactor, product: product}
+}
+
+// WithPublicURL sets the server address the API Tokens page tells the CLI to
+// sign in to (UR-172).
+func (c *PageUserController) WithPublicURL(u string) *PageUserController {
+	c.publicURL = u
+	return c
+}
+
+// serverURL is the address the CLI should use for this server.
+func (c *PageUserController) serverURL(r *http.Request) string {
+	if c.publicURL != "" {
+		return c.publicURL
+	}
+	return httputil.RequestBaseURL(r)
 }
 
 // Profile renders GET /user/profile.
@@ -134,6 +154,11 @@ func (c *PageUserController) Tokens(w http.ResponseWriter, r *http.Request) {
 		IsAdmin:     user.IsAdmin,
 		Tokens:      c.tokenViews(r, user),
 		Form:        form,
+		CLI: userpage.CLIProps{
+			ServerURL: c.serverURL(r),
+			Release:   buildinfo.Release(),
+			Version:   buildinfo.String(),
+		},
 	}).Render(r.Context(), w)
 }
 

@@ -11,13 +11,13 @@ import (
 	"nexmap.net/internal/service"
 )
 
-func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64) {
+func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, maxUploadBytes int64, publicURL string) {
 	loginCtrl := controller.NewPageLogin(svc.Auth, svc.Setting, svc.PasswordReset, cookieSecure)
 	registerCtrl := controller.NewPageRegister(svc.User, loginCtrl)
 	resetCtrl := controller.NewPagePasswordReset(svc.PasswordReset)
 	dashCtrl := controller.NewPageDashboard(svc.Dashboard, svc.Setting)
 	adminCtrl := controller.NewPageAdmin(svc.User, svc.Setting, svc.Invitation, svc.TwoFactor, svc.Audit, svc.Product)
-	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product)
+	userCtrl := controller.NewPageUser(svc.User, svc.PAT, svc.TwoFactor, svc.Product).WithPublicURL(publicURL)
 	productCtrl := controller.NewPageProduct(svc.Product, svc.Dashboard, svc.Setting, svc.User, svc.Invitation, svc.Milestone, svc.Component, svc.Testing, svc.Backlog, svc.Category, svc.Constraint, svc.Discussion, svc.Audit, maxUploadBytes).WithBulk(svc.Bulk)
 	productCtrl.UseDocuments(svc.Document)
 	upload := pageUpload(productCtrl)
@@ -52,6 +52,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("POST /user/2fa/disable", pageAuthed(http.HandlerFunc(userCtrl.TwoFactorDisable)))
 	mux.Handle("POST /user/2fa/recovery-codes", pageAuthed(http.HandlerFunc(userCtrl.TwoFactorRegenerate)))
 	mux.Handle("GET /user/tokens", pageAuthed(http.HandlerFunc(userCtrl.Tokens)))
+	mux.Handle("GET /about", pageAuthed(http.HandlerFunc(controller.About)))
 	mux.Handle("POST /user/tokens", pageAuthed(http.HandlerFunc(userCtrl.CreateToken)))
 	mux.Handle("DELETE /user/tokens/{id}", pageAuthed(http.HandlerFunc(userCtrl.RevokeToken)))
 

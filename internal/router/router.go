@@ -38,7 +38,7 @@ func New(svc *service.Services, opts Options) (http.Handler, error) {
 	}
 
 	mountStatic(mux)
-	mountPages(mux, svc, opts.CookieSecure, opts.MaxUploadBytes)
+	mountPages(mux, svc, opts.CookieSecure, opts.MaxUploadBytes, opts.PublicURL)
 	mountAPIv1(mux, svc, opts.CookieSecure)
 
 	if opts.DevMode {

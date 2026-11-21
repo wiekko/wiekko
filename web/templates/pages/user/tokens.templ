@@ -11,6 +11,7 @@ import (
 	"nexmap.net/internal/model"
 	"nexmap.net/web/templates"
 	layout "nexmap.net/web/templates/layout"
+	"nexmap.net/web/templates/patterns"
 	"nexmap.net/web/templates/ui"
 )
 
@@ -27,6 +28,19 @@ type TokensProps struct {
 	IsAdmin     bool
 	Tokens      []TokenView
 	Form        CreateTokenFormProps
+	CLI         CLIProps
+}
+
+// CLIProps describes the CLI that matches this server (UR-172).
+type CLIProps struct {
+	// ServerURL is the address the CLI signs in to.
+	ServerURL string
+	// Release is the server's release ("v1.2.3"), empty for a build between
+	// releases, which then gets the latest CLI.
+	Release string
+	// Version is the server's full version, for the note on a build between
+	// releases.
+	Version string
 }
 
 // ProductOption is a product a token can be restricted to.
@@ -155,6 +169,7 @@ templ TokensPage(props TokensProps) {
 					}
 				}
 			}
+			@CommandLine(props.CLI)
 		</div>
 		<!-- Create token modal -->
 		<div id="create-token-modal" class="hidden relative z-50">
@@ -464,6 +479,42 @@ templ copyTokenScript() {
 			var selected = document.querySelector('input[name="products_mode"][value="selected"]');
 			document.getElementById('token-products').classList.toggle('hidden', !selected.checked);
 		}
+		// copyCommand copies a CLI command (UR-172). The Clipboard API needs a
+		// secure context and permission; without them a hidden text field and
+		// execCommand still copy, and failing that the command is selected so
+		// the user can copy it with their keyboard.
+		function copyCommand(button) {
+			var label = button.querySelector('[data-copy-label]');
+			var text = button.dataset.copy;
+			function show(msg) {
+				label.textContent = msg;
+				setTimeout(function() { label.textContent = 'Copy'; }, 2000);
+			}
+			function fallback() {
+				var area = document.createElement('textarea');
+				area.value = text;
+				area.setAttribute('readonly', '');
+				area.style.position = 'fixed';
+				area.style.opacity = '0';
+				document.body.appendChild(area);
+				area.select();
+				var ok = false;
+				try { ok = document.execCommand('copy'); } catch (e) {}
+				document.body.removeChild(area);
+				if (ok) { show('Copied'); return; }
+				var range = document.createRange();
+				range.selectNodeContents(button.parentElement.querySelector('code'));
+				var sel = window.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+				show('Selected');
+			}
+			if (navigator.clipboard && window.isSecureContext) {
+				navigator.clipboard.writeText(text).then(function() { show('Copied'); }, fallback);
+			} else {
+				fallback();
+			}
+		}
 		function copyToken() {
 			var token = document.getElementById('raw-token-value').textContent;
 			navigator.clipboard.writeText(token).then(function() {
@@ -480,4 +531,65 @@ func formatDate(rfc3339 string) string {
 		return rfc3339[:10]
 	}
 	return rfc3339
+}
+
+// CommandLine tells how to install the CLI that matches this server and sign
+// it in, with commands to copy (UR-172). A release pins the install to the
+// server's own version: the latest CLI may need a higher API level than this
+// server implements.
+templ CommandLine(props CLIProps) {
+	@ui.Card() {
+		@ui.CardHeader("Command line") {
+			<a href={ templ.SafeURL(patterns.DocsURL("cli/setup.html")) } target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+				Setup guide
+				@ui.Icon("external-link", "sm")
+			</a>
+		}
+		@ui.CardBody() {
+			<div id="cli-setup" class="space-y-5 text-sm">
+				<div class="space-y-2">
+					<h4 class="font-medium text-gray-900 dark:text-gray-100">1. Install the CLI</h4>
+					if props.Release != "" {
+						<p class="text-gray-500 dark:text-gray-400">
+							These commands install <span class="font-mono">nexmap { props.Release }</span>, the version of this server.
+						</p>
+					} else {
+						<p class="text-gray-500 dark:text-gray-400">
+							This server is a development build (<span class="font-mono break-all">{ props.Version }</span>), so these commands install the latest release.
+						</p>
+					}
+					for _, c := range patterns.InstallCommands(props.Release) {
+						@copyableCommand(c.Label, c.Command)
+					}
+				</div>
+				<div class="space-y-2">
+					<h4 class="font-medium text-gray-900 dark:text-gray-100">2. Sign in to this server</h4>
+					<p class="text-gray-500 dark:text-gray-400">Run this and paste a token created on this page when asked.</p>
+					@copyableCommand("", "nexmap login --server "+props.ServerURL)
+				</div>
+			</div>
+		}
+	}
+}
+
+// copyableCommand shows a shell command with a button that copies it.
+templ copyableCommand(label, command string) {
+	<div>
+		if label != "" {
+			<p class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{ label }</p>
+		}
+		<div class="flex items-stretch gap-2">
+			<code class="min-w-0 flex-1 overflow-x-auto rounded-md bg-gray-100 px-3 py-2 font-mono text-xs whitespace-nowrap text-gray-900 dark:bg-gray-800 dark:text-gray-100">{ command }</code>
+			<button
+				type="button"
+				data-copy={ command }
+				onclick="copyCommand(this)"
+				aria-label={ "Copy: " + command }
+				class="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-white px-3 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
+			>
+				@ui.Icon("copy", "sm")
+				<span data-copy-label aria-live="polite">Copy</span>
+			</button>
+		</div>
+	</div>
 }
