@@ -262,18 +262,15 @@ func (s *Session) ListConstraints(ctx context.Context, q ConstraintQuery) ([]Con
 
 // ShowConstraint returns one constraint by identifier ("AC-42") or ID.
 func (s *Session) ShowConstraint(ctx context.Context, ref string) (*ConstraintDetail, error) {
-	c, err := s.C.Constraint(ctx, s.ProductID, ref)
+	c, err := s.constraint(ctx, ref)
 	if err != nil {
-		if client.IsNotFound(err) {
-			return nil, &NotFoundError{Kind: "constraint", Ref: ref}
-		}
 		return nil, err
 	}
 	sum, err := s.constraintSummary(ctx, *c)
 	if err != nil {
 		return nil, err
 	}
-	d := &ConstraintDetail{ConstraintSummary: sum, Description: c.Description, Capabilities: []Ref{}, Documents: documentRefs(c.Documents)}
+	d := &ConstraintDetail{ConstraintSummary: sum, Description: c.Description, Capabilities: []Ref{}, TestCases: []EvidenceView{}, Documents: documentRefs(c.Documents)}
 	if c.MilestoneID != "" {
 		ms, err := s.milestoneNames(ctx)
 		if err != nil {
@@ -292,10 +289,53 @@ func (s *Session) ShowConstraint(ctx context.Context, ref string) (*ConstraintDe
 	for _, l := range links {
 		d.Capabilities = append(d.Capabilities, Ref{ID: l.CapabilityID, Title: capNames[l.CapabilityID]})
 	}
+	if d.TestCases, err = s.constraintTestCases(ctx, c.ID); err != nil {
+		return nil, err
+	}
 	if d.Comments, err = s.comments(ctx, "constraint", c.ID); err != nil {
 		return nil, err
 	}
 	return d, nil
+}
+
+// constraint finds a constraint by identifier ("SC-30") or ID.
+func (s *Session) constraint(ctx context.Context, ref string) (*client.Constraint, error) {
+	c, err := s.C.Constraint(ctx, s.ProductID, strings.TrimSpace(ref))
+	if err != nil {
+		if client.IsNotFound(err) {
+			return nil, &NotFoundError{Kind: "constraint", Ref: ref}
+		}
+		return nil, err
+	}
+	return c, nil
+}
+
+// constraintTestCases lists the test cases of a constraint with their latest
+// results (FR-150).
+func (s *Session) constraintTestCases(ctx context.Context, constraintID string) ([]EvidenceView, error) {
+	items, err := s.C.ConstraintTestCases(ctx, s.ProductID, constraintID)
+	if err != nil {
+		return nil, err
+	}
+	cases := make([]client.TestCase, len(items))
+	for i, item := range items {
+		cases[i] = item.TestCase
+	}
+	sums, err := s.testCaseSummaries(ctx, cases)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EvidenceView, len(items))
+	for i, item := range items {
+		out[i] = EvidenceView{TestCaseSummary: sums[i]}
+		if item.LatestResult != nil {
+			out[i].LatestResult, out[i].LatestAt = item.LatestResult.Status, item.LatestResult.ExecutedAt
+		}
+		for _, via := range item.Via {
+			out[i].Via = append(out[i].Via, via.Name)
+		}
+	}
+	return out, nil
 }
 
 func (s *Session) constraintSummary(ctx context.Context, c client.Constraint) (ConstraintSummary, error) {

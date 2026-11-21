@@ -46,6 +46,7 @@ type TestSync struct {
 	Component       string   `json:"component,omitempty" jsonschema:"component (name or ID) to file the new test cases under"`
 	PyramidLevel    string   `json:"pyramid_level,omitempty" jsonschema:"pyramid level (name or ID) of the new test cases, e.g. unit"`
 	Requirement     string   `json:"requirement,omitempty" jsonschema:"requirement the new test cases verify, e.g. FR-12"`
+	Constraints     []string `json:"constraints,omitempty" jsonschema:"constraints the new test cases verify, e.g. SC-30"`
 	DryRun          bool     `json:"dry_run,omitempty" jsonschema:"only list the test cases that would be created"`
 }
 
@@ -113,6 +114,14 @@ func (s *Session) SyncTestCases(ctx context.Context, in TestSync) (*SyncResult, 
 		}
 		reqID = r.ID
 	}
+	constraintIDs := make([]string, 0, len(in.Constraints))
+	for _, ref := range in.Constraints {
+		c, err := s.constraint(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		constraintIDs = append(constraintIDs, c.ID)
+	}
 
 	existing, err := s.C.TestCases(ctx, s.ProductID, "")
 	if err != nil {
@@ -159,6 +168,11 @@ func (s *Session) SyncTestCases(ctx context.Context, in TestSync) (*SyncResult, 
 		if reqID != "" {
 			if err := s.C.LinkTestCaseRequirement(ctx, s.ProductID, tc.ID, reqID); err != nil {
 				return res, fmt.Errorf("test case %s was created, but linking it to %s failed: %w", id, in.Requirement, err)
+			}
+		}
+		for i, conID := range constraintIDs {
+			if err := s.C.LinkTestCaseConstraint(ctx, s.ProductID, tc.ID, conID); err != nil {
+				return res, fmt.Errorf("test case %s was created, but linking it to %s failed: %w", id, in.Constraints[i], err)
 			}
 		}
 		sums, err := s.testCaseSummaries(ctx, []client.TestCase{*tc})

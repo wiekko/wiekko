@@ -137,6 +137,21 @@ whatever is current.
   too, `?archived=only` lists only them. Every other read, such as the linked items of a capability, a
   milestone or a test case, includes them.
 
+### Test cases and constraints
+
+A test case can verify a constraint, or part of it, e.g. that session cookies are HttpOnly. Passing it
+is evidence for the constraint's compliance; compliance itself stays the owner's decision.
+
+- `GET`, `POST` (with `{"constraint_id": …}`, an ID or an identifier such as `SC-30`) and
+  `DELETE …/{conId}` on `/api/v1/products/{p}/test-cases/{id}/constraints` read and change the links
+  (developer; tokens need `tests:write` and `backlog:read`). Linking a linked pair again changes
+  nothing. The list holds the linked constraints.
+- `GET /api/v1/products/{p}/constraints/{id}/test-cases` (`backlog:read` and `tests:read`) lists the
+  linked test cases, then the test cases of the constraint's capabilities that are not linked to it.
+  Each carries `latest_result` (its most recently executed result in any campaign, with `status`,
+  `executed_at`, `campaign_id` and `environment_name`, or `null`) and `via`: empty for a linked test
+  case, the capabilities (`id`, `name`) it comes through otherwise.
+
 ### Documents
 
 Documents are the protocols, schemas and other texts that define the product. Nexmap holds them; a

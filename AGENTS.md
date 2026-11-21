@@ -75,8 +75,8 @@ into a sprint). An item's `active` field says whether it is.
 | `nexmap task create --title … --parent FR-12 [--priority 2] [--body-file -] [--dod …]` | Split a requirement into tasks | owner |
 | `nexmap req update FR-12 [--parent FR-3] [--priority 1]` / `task update MT-4 …` | Move an item below another one (`--parent ""` moves it to the top level) or change its priority | owner |
 | `nexmap defect update DF-17 --priority 1` | Change a defect's priority (1 is the highest, 0 none) | owner |
-| `go test -json ./... \| nexmap test sync [--req FR-12] [--capability <name>] [--pyramid-level unit] --dry-run` | Register new tests as test cases (drop `--dry-run` once the list looks right) | developer |
-| `nexmap test link <test identifier> --req FR-12 [--capability <name>]` / `test unlink …` | Record which requirement a test verifies and which capability it belongs to | developer |
+| `go test -json ./... \| nexmap test sync [--req FR-12] [--constraint SC-30] [--capability <name>] [--pyramid-level unit] --dry-run` | Register new tests as test cases (drop `--dry-run` once the list looks right) | developer |
+| `nexmap test link <test identifier> --req FR-12 [--constraint SC-30] [--capability <name>]` / `test unlink …` | Record which requirement or constraints a test verifies and which capability it belongs to | developer |
 | `nexmap constraint update AC-3 --compliance met\|violated` | Record whether a constraint holds after checking it | owner |
 | `nexmap constraint create --title … [--category SC] [--compliance …]` | Add a rule the product must follow | owner |
 | `nexmap component create --name …` / `component update <name> …` | Change the product structure | owner |

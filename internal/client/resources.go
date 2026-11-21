@@ -155,6 +155,22 @@ type TestCase struct {
 	Documents []DocumentRef `json:"documents,omitempty"`
 }
 
+// ConstraintTestCase is a test case of a constraint (FR-150): linked to it,
+// or, with Via set, reached through its capabilities.
+type ConstraintTestCase struct {
+	TestCase
+	LatestResult *LatestResult `json:"latest_result"`
+	Via          []NamedRef    `json:"via"`
+}
+
+// LatestResult is a test case's most recently executed result.
+type LatestResult struct {
+	CampaignID      string `json:"campaign_id"`
+	EnvironmentName string `json:"environment_name"`
+	Status          string `json:"status"`
+	ExecutedAt      string `json:"executed_at"`
+}
+
 // TestCaseRequirement links a test case to a requirement or its definition of done.
 type TestCaseRequirement struct {
 	RequirementID string `json:"requirement_id"`
@@ -456,6 +472,17 @@ func (c *Client) TestCases(ctx context.Context, productID, testIdentifier string
 // TestCase returns a test case by ID.
 func (c *Client) TestCase(ctx context.Context, productID, id string) (*TestCase, error) {
 	return getOne[TestCase](ctx, c, productPath(productID, "test-cases", id))
+}
+
+// TestCaseConstraints lists the constraints a test case is linked to (FR-150).
+func (c *Client) TestCaseConstraints(ctx context.Context, productID, id string) ([]Constraint, error) {
+	return getList[Constraint](ctx, c, productPath(productID, "test-cases", id, "constraints"))
+}
+
+// ConstraintTestCases lists the test cases of a constraint: the linked ones,
+// then those of its capabilities (FR-150).
+func (c *Client) ConstraintTestCases(ctx context.Context, productID, id string) ([]ConstraintTestCase, error) {
+	return getList[ConstraintTestCase](ctx, c, productPath(productID, "constraints", id, "test-cases"))
 }
 
 // TestCaseRequirements lists the requirement links of a test case.

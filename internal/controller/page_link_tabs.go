@@ -125,16 +125,20 @@ func (c *PageProductController) taskTabCounts(r *http.Request, user *model.User,
 
 func (c *PageProductController) constraintTabCounts(r *http.Request, user *model.User, productID, id string) map[string]int {
 	caps, capsErr := c.loadConstraintCapabilitiesTabProps(r, user, productID, id)
+	tcs, tcsErr := c.loadConstraintTestCasesTabProps(r, user, productID, id)
 	return c.discussionCounts(r, user, productID, model.OwnerTypeConstraint, id, map[string]int{
 		"capabilities": countOf(caps, capsErr, func(p productpage.ConstraintCapabilitiesTabProps) int { return len(p.Capabilities) }),
+		"test-cases":   countOf(tcs, tcsErr, func(p productpage.ConstraintTestCasesTabProps) int { return len(p.Linked) + len(p.Derived) }),
 		"documents":    len(c.linkedDocuments(r, user, productID, model.DocumentLinkConstraint, id)),
 	})
 }
 
 func (c *PageProductController) testCaseTabCounts(r *http.Request, user *model.User, productID, id string) map[string]int {
 	reqs, reqsErr := c.loadTestCaseRequirementsTabProps(r, user, productID, id)
+	cons, consErr := c.loadTestCaseConstraintsTabProps(r, user, productID, id)
 	return c.discussionCounts(r, user, productID, model.OwnerTypeTestCase, id, map[string]int{
 		"requirements": countOf(reqs, reqsErr, func(p productpage.TestCaseRequirementsTabProps) int { return len(p.Requirements) }),
+		"constraints":  countOf(cons, consErr, func(p productpage.TestCaseConstraintsTabProps) int { return len(p.Constraints) }),
 		"documents":    len(c.linkedDocuments(r, user, productID, model.DocumentLinkTestCase, id)),
 	})
 }

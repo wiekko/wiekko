@@ -15,6 +15,9 @@ type TestingController struct {
 	testing   *service.TestingService
 	defectRef refResolver
 	documents *service.DocumentService
+	// constraints names and resolves linked constraints (FR-150); nil
+	// accepts constraint IDs only.
+	constraints *service.ConstraintService
 }
 
 // UseDocuments makes single-item responses name the documents linked to the

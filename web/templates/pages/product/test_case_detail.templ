@@ -60,6 +60,9 @@ templ TestCaseDetailPage(props TestCaseDetailProps) {
 			@ui.TabPanelHidden("requirements") {
 				@ui.LoadingSpinner("md")
 			}
+			@ui.TabPanelHidden("constraints") {
+				@ui.LoadingSpinner("md")
+			}
 			@ui.TabPanelHidden("documents") {
 				@ui.LoadingSpinner("md")
 			}
@@ -439,6 +442,7 @@ func testCaseDetailTabs(productID, testCaseID string) []templates.TabDef {
 	return []templates.TabDef{
 		{ID: "overview", Label: "Overview", HxGet: base + "/overview", Active: true},
 		{ID: "requirements", Label: "Requirements", HxGet: base + "/requirements"},
+		{ID: "constraints", Label: "Constraints", HxGet: base + "/constraints"},
 		{ID: "documents", Label: "Documents", HxGet: base + "/documents"},
 		{ID: "campaigns", Label: "Campaigns", HxGet: base + "/campaigns"},
 		{ID: "comments", Label: "Comments", HxGet: base + "/comments"},

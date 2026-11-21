@@ -880,6 +880,10 @@ type MockTestCaseStore struct {
 	UnlinkRequirementFunc              func(ctx context.Context, testCaseID, requirementID string) error
 	ListRequirementLinksFunc           func(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
 	ListTestCaseLinksByRequirementFunc func(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error)
+	LinkConstraintFunc                 func(ctx context.Context, link *model.TestCaseConstraint) error
+	UnlinkConstraintFunc               func(ctx context.Context, testCaseID, constraintID string) error
+	ListConstraintLinksFunc            func(ctx context.Context, testCaseID string) ([]*model.TestCaseConstraint, error)
+	ListLinksByConstraintFunc          func(ctx context.Context, constraintID string) ([]*model.TestCaseConstraint, error)
 	AddEnvironmentFunc                 func(ctx context.Context, id, testCaseID, environmentID string) error
 	RemoveEnvironmentFunc              func(ctx context.Context, testCaseID, environmentID string) error
 	ListEnvironmentsFunc               func(ctx context.Context, testCaseID string) ([]string, error)
@@ -934,6 +938,30 @@ func (m *MockTestCaseStore) ListTestCaseLinksByRequirement(ctx context.Context, 
 		return nil, nil
 	}
 	return m.ListTestCaseLinksByRequirementFunc(ctx, requirementID)
+}
+func (m *MockTestCaseStore) LinkConstraint(ctx context.Context, link *model.TestCaseConstraint) error {
+	if m.LinkConstraintFunc == nil {
+		return nil
+	}
+	return m.LinkConstraintFunc(ctx, link)
+}
+func (m *MockTestCaseStore) UnlinkConstraint(ctx context.Context, testCaseID, constraintID string) error {
+	if m.UnlinkConstraintFunc == nil {
+		return nil
+	}
+	return m.UnlinkConstraintFunc(ctx, testCaseID, constraintID)
+}
+func (m *MockTestCaseStore) ListConstraintLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseConstraint, error) {
+	if m.ListConstraintLinksFunc == nil {
+		return nil, nil
+	}
+	return m.ListConstraintLinksFunc(ctx, testCaseID)
+}
+func (m *MockTestCaseStore) ListLinksByConstraint(ctx context.Context, constraintID string) ([]*model.TestCaseConstraint, error) {
+	if m.ListLinksByConstraintFunc == nil {
+		return nil, nil
+	}
+	return m.ListLinksByConstraintFunc(ctx, constraintID)
 }
 func (m *MockTestCaseStore) AddEnvironment(ctx context.Context, id, testCaseID, environmentID string) error {
 	return m.AddEnvironmentFunc(ctx, id, testCaseID, environmentID)

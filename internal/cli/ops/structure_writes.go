@@ -264,13 +264,14 @@ func (s *Session) LinkCapability(ctx context.Context, in CapabilityLinks) (*Capa
 	return s.ShowCapability(ctx, c.ID)
 }
 
-// TestCaseLinks links a test case to a requirement, a capability or a
-// component, or removes those links.
+// TestCaseLinks links a test case to a requirement, constraints, a
+// capability or a component, or removes those links.
 type TestCaseLinks struct {
-	TestCase    string `json:"test_case" jsonschema:"the test case: test identifier, short ID or ID"`
-	Requirement string `json:"requirement,omitempty" jsonschema:"requirement the test case verifies, e.g. FR-12"`
-	Capability  string `json:"capability,omitempty" jsonschema:"capability (name or ID) the test case belongs to; replaces its current one"`
-	Component   string `json:"component,omitempty" jsonschema:"component (name or ID) the test case belongs to; replaces its current one"`
+	TestCase    string   `json:"test_case" jsonschema:"the test case: test identifier, short ID or ID"`
+	Requirement string   `json:"requirement,omitempty" jsonschema:"requirement the test case verifies, e.g. FR-12"`
+	Constraints []string `json:"constraints,omitempty" jsonschema:"constraints the test case verifies, e.g. SC-30"`
+	Capability  string   `json:"capability,omitempty" jsonschema:"capability (name or ID) the test case belongs to; replaces its current one"`
+	Component   string   `json:"component,omitempty" jsonschema:"component (name or ID) the test case belongs to; replaces its current one"`
 	// Unlink removes the named links instead; set by the unlink tool and
 	// command. A capability or component is only cleared if it is the
 	// test case's current one.
@@ -278,10 +279,10 @@ type TestCaseLinks struct {
 }
 
 // LinkTestCase links (or unlinks) a test case (developer role; FR-21,
-// FR-22).
+// FR-22, FR-150).
 func (s *Session) LinkTestCase(ctx context.Context, in TestCaseLinks) (*TestCaseDetail, error) {
-	if in.Requirement == "" && in.Capability == "" && in.Component == "" {
-		return nil, errors.New("name a requirement, capability or component")
+	if in.Requirement == "" && len(in.Constraints) == 0 && in.Capability == "" && in.Component == "" {
+		return nil, errors.New("name a requirement, constraint, capability or component")
 	}
 	tc, err := s.findTestCase(ctx, in.TestCase)
 	if err != nil {
@@ -294,6 +295,14 @@ func (s *Session) LinkTestCase(ctx context.Context, in TestCaseLinks) (*TestCase
 			return nil, err
 		}
 		reqID = r.ID
+	}
+	constraintIDs := make([]string, 0, len(in.Constraints))
+	for _, ref := range in.Constraints {
+		con, err := s.constraint(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		constraintIDs = append(constraintIDs, con.ID)
 	}
 	var patch client.TestCasePatch
 	if in.Capability != "" {
@@ -328,6 +337,16 @@ func (s *Session) LinkTestCase(ctx context.Context, in TestCaseLinks) (*TestCase
 			err = s.C.UnlinkTestCaseRequirement(ctx, s.ProductID, tc.ID, reqID)
 		} else {
 			err = s.C.LinkTestCaseRequirement(ctx, s.ProductID, tc.ID, reqID)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, id := range constraintIDs {
+		if in.Unlink {
+			err = s.C.UnlinkTestCaseConstraint(ctx, s.ProductID, tc.ID, id)
+		} else {
+			err = s.C.LinkTestCaseConstraint(ctx, s.ProductID, tc.ID, id)
 		}
 		if err != nil {
 			return nil, err

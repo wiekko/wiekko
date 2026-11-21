@@ -17,7 +17,14 @@ verified, and **testing campaigns** that record the results of one round of test
 | Environments | The runtime environments the test runs in. A campaign tracks one result per selected environment; with none selected, there is a single result |
 
 On a test case's **Requirements** tab, link the requirements it verifies, either the requirement as a whole
-or its definition of done. The **Campaigns** tab shows how the test case fared across campaigns.
+or its definition of done. On the **Constraints** tab, link the constraints it verifies, or verifies in
+part, such as a test that checks that session cookies are HttpOnly. The **Campaigns** tab shows how the
+test case fared across campaigns.
+
+A constraint's **Test Cases** tab lists the test cases linked to it, with each one's latest result, and
+lets developers and product owners link more or create one. Below them, under **Via capabilities**, it
+shows the test cases of the constraint's capabilities that are not linked to it. Passing tests are
+evidence for a constraint's compliance; the compliance state itself is still set by a product owner.
 
 Automated tests can be registered in bulk from a test run with `nexmap test sync`; see
 [CI integration](../cli/ci-integration.md#setting-up).

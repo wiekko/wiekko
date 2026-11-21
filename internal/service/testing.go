@@ -17,6 +17,8 @@ type TestingService struct {
 	// tx groups multi-step writes into one transaction (nil in unit tests).
 	tx              store.Transactor
 	testCases       store.TestCaseStore
+	constraints     store.ConstraintStore // constraints a test case verifies (FR-150)
+	capabilities    store.CapabilityStore // for test cases derived from a constraint's capabilities
 	campaigns       store.TestingCampaignStore
 	campaignResults store.CampaignResultStore
 	campaignEvents  store.CampaignResultEventStore

@@ -118,3 +118,12 @@ type TestCaseRequirement struct {
 	LinkType      string // "requirement" or "definition_of_done"
 	CreatedAt     string // RFC 3339
 }
+
+// TestCaseConstraint links a test case to a constraint it verifies, or part
+// of it (FR-150).
+type TestCaseConstraint struct {
+	ID           string
+	TestCaseID   string
+	ConstraintID string
+	CreatedAt    string // RFC 3339
+}

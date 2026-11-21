@@ -83,6 +83,14 @@ type TestCaseStore interface {
 	UnlinkRequirement(ctx context.Context, testCaseID, requirementID string) error
 	ListRequirementLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseRequirement, error)
 	ListTestCaseLinksByRequirement(ctx context.Context, requirementID string) ([]*model.TestCaseRequirement, error)
+	// LinkConstraint links a test case to a constraint (FR-150); linking a
+	// linked pair again changes nothing.
+	LinkConstraint(ctx context.Context, link *model.TestCaseConstraint) error
+	UnlinkConstraint(ctx context.Context, testCaseID, constraintID string) error
+	// ListConstraintLinks and ListLinksByConstraint list the links of a test
+	// case and of a constraint, oldest first.
+	ListConstraintLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseConstraint, error)
+	ListLinksByConstraint(ctx context.Context, constraintID string) ([]*model.TestCaseConstraint, error)
 	AddEnvironment(ctx context.Context, id, testCaseID, environmentID string) error
 	RemoveEnvironment(ctx context.Context, testCaseID, environmentID string) error
 	ListEnvironments(ctx context.Context, testCaseID string) ([]string, error)
@@ -275,6 +283,54 @@ func (s *testCaseStore) ListTestCaseLinksByRequirement(ctx context.Context, requ
 	for rows.Next() {
 		var l model.TestCaseRequirement
 		if err := rows.Scan(&l.ID, &l.TestCaseID, &l.RequirementID, &l.LinkType, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		links = append(links, &l)
+	}
+	return links, rows.Err()
+}
+
+func (s *testCaseStore) LinkConstraint(ctx context.Context, link *model.TestCaseConstraint) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO test_case_constraints (id, test_case_id, constraint_id, created_at)
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT (test_case_id, constraint_id) DO NOTHING`,
+		link.ID, link.TestCaseID, link.ConstraintID, link.CreatedAt,
+	)
+	return err
+}
+
+func (s *testCaseStore) UnlinkConstraint(ctx context.Context, testCaseID, constraintID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM test_case_constraints WHERE test_case_id = ? AND constraint_id = ?`,
+		testCaseID, constraintID)
+	return err
+}
+
+func (s *testCaseStore) ListConstraintLinks(ctx context.Context, testCaseID string) ([]*model.TestCaseConstraint, error) {
+	return s.constraintLinks(ctx, "test_case_id", testCaseID)
+}
+
+func (s *testCaseStore) ListLinksByConstraint(ctx context.Context, constraintID string) ([]*model.TestCaseConstraint, error) {
+	return s.constraintLinks(ctx, "constraint_id", constraintID)
+}
+
+// constraintLinks lists the test case to constraint links whose column (a
+// constant, never user input) holds id.
+func (s *testCaseStore) constraintLinks(ctx context.Context, column, id string) ([]*model.TestCaseConstraint, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, test_case_id, constraint_id, created_at
+		 FROM test_case_constraints WHERE `+column+` = ? ORDER BY created_at, id`,
+		id)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var links []*model.TestCaseConstraint
+	for rows.Next() {
+		var l model.TestCaseConstraint
+		if err := rows.Scan(&l.ID, &l.TestCaseID, &l.ConstraintID, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		links = append(links, &l)

@@ -70,6 +70,8 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 	testingSvc := &TestingService{
 		tx:              st.Tx,
 		testCases:       st.TestCase,
+		constraints:     st.Constraint,
+		capabilities:    st.Capability,
 		campaigns:       st.TestingCampaign,
 		campaignResults: st.CampaignResult,
 		campaignEvents:  st.CampaignEvent,

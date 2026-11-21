@@ -37,12 +37,14 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	backlogCtrl.UseDocuments(svc.Document)
 	constraintCtrl.UseDocuments(svc.Document)
 	testingCtrl.UseDocuments(svc.Document)
+	testingCtrl.UseConstraints(svc.Constraint)
 
 	// Requirement and constraint routes accept identifiers ("FR-12", "AC-42")
 	// wherever they take an ID in the path.
 	reqRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "id")
 	reqParamRef := controller.ResolveRefs(svc.Backlog.ResolveRequirementRef, "reqId")
 	conRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "id")
+	conParamRef := controller.ResolveRefs(svc.Constraint.ResolveConstraintRef, "conId")
 	// Defect routes accept defect identifiers ("DF-17", FR-49) likewise.
 	defRef := controller.ResolveRefs(svc.Backlog.ResolveDefectRef, "id")
 	// Document routes accept document identifiers ("DOC-3", FR-56), and
@@ -212,6 +214,7 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/constraints/{id}/capabilities", need(access.R(access.Backlog), access.R(access.Structure)), conRef(http.HandlerFunc(constraintCtrl.ListConstraintCapabilities)))
 	api.authed("POST /products/{productId}/constraints/{id}/capabilities", need(access.W(access.Backlog), access.R(access.Structure)), conRef(csrf(http.HandlerFunc(constraintCtrl.LinkConstraintCapability))))
 	api.authed("DELETE /products/{productId}/constraints/{id}/capabilities/{capId}", need(access.W(access.Backlog), access.R(access.Structure)), conRef(csrf(http.HandlerFunc(constraintCtrl.UnlinkConstraintCapability))))
+	api.authed("GET /products/{productId}/constraints/{id}/test-cases", need(access.R(access.Backlog), access.R(access.Tests)), conRef(http.HandlerFunc(testingCtrl.ListConstraintTestCases)))
 
 	// Defects.
 	api.authed("GET /products/{productId}/defects", need(access.R(access.Defects)), http.HandlerFunc(backlogCtrl.ListDefects))
@@ -235,6 +238,9 @@ func mountAPIv1(mux *http.ServeMux, svc *service.Services, cookieSecure bool) ma
 	api.authed("GET /products/{productId}/test-cases/{id}/requirements", need(access.R(access.Tests), access.R(access.Backlog)), http.HandlerFunc(testingCtrl.ListTestCaseRequirements))
 	api.authed("POST /products/{productId}/test-cases/{id}/requirements", need(access.W(access.Tests), access.R(access.Backlog)), csrf(http.HandlerFunc(testingCtrl.LinkRequirement)))
 	api.authed("DELETE /products/{productId}/test-cases/{id}/requirements/{reqId}", need(access.W(access.Tests), access.R(access.Backlog)), reqParamRef(csrf(http.HandlerFunc(testingCtrl.UnlinkRequirement))))
+	api.authed("GET /products/{productId}/test-cases/{id}/constraints", need(access.R(access.Tests), access.R(access.Backlog)), http.HandlerFunc(testingCtrl.ListTestCaseConstraints))
+	api.authed("POST /products/{productId}/test-cases/{id}/constraints", need(access.W(access.Tests), access.R(access.Backlog)), csrf(http.HandlerFunc(testingCtrl.LinkConstraint)))
+	api.authed("DELETE /products/{productId}/test-cases/{id}/constraints/{conId}", need(access.W(access.Tests), access.R(access.Backlog)), conParamRef(csrf(http.HandlerFunc(testingCtrl.UnlinkConstraint))))
 	api.authed("GET /products/{productId}/test-cases/{id}/environments", need(access.R(access.Tests)), http.HandlerFunc(testingCtrl.ListTestCaseEnvironments))
 	api.authed("POST /products/{productId}/test-cases/{id}/environments", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.AddEnvironment)))
 	api.authed("DELETE /products/{productId}/test-cases/{id}/environments/{envId}", need(access.W(access.Tests)), csrf(http.HandlerFunc(testingCtrl.RemoveEnvironment)))

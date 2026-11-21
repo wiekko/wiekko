@@ -23,6 +23,7 @@ import (
 // would not exercise it.
 type activationEnv struct {
 	svc      *Services
+	st       *store.Store // for users, which services do not create directly
 	owner    *model.User
 	dev      *model.User
 	product  *model.Product
@@ -51,7 +52,7 @@ func newActivationEnv(t *testing.T, driver string, conn *sql.DB) *activationEnv 
 		return u
 	}
 	e := &activationEnv{
-		svc: svc, owner: mkUser("olga", true), dev: mkUser("dev", false),
+		svc: svc, st: st, owner: mkUser("olga", true), dev: mkUser("dev", false),
 		statuses: map[string]map[string]*model.Status{},
 	}
 

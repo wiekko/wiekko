@@ -321,7 +321,7 @@ func (s *Session) ShowTestCase(ctx context.Context, ref string) (*TestCaseDetail
 	if err != nil {
 		return nil, err
 	}
-	d := &TestCaseDetail{TestCaseSummary: sums[0], Description: tc.Description, Requirements: []CoverageRef{}, Environments: []string{}, Results: []ResultView{}, Documents: []Ref{}}
+	d := &TestCaseDetail{TestCaseSummary: sums[0], Description: tc.Description, Requirements: []CoverageRef{}, Constraints: []Ref{}, Environments: []string{}, Results: []ResultView{}, Documents: []Ref{}}
 	// Lists carry no links; the single test case names its documents.
 	if full, err := s.C.TestCase(ctx, s.ProductID, tc.ID); err == nil {
 		d.Documents = documentRefs(full.Documents)
@@ -339,6 +339,14 @@ func (s *Session) ShowTestCase(ctx context.Context, ref string) (*TestCaseDetail
 			return nil, err
 		}
 		d.Requirements = append(d.Requirements, CoverageRef{Ref: ref, LinkType: l.LinkType})
+	}
+
+	cons, err := s.C.TestCaseConstraints(ctx, s.ProductID, tc.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range cons {
+		d.Constraints = append(d.Constraints, Ref{ID: c.ID, Identifier: c.Identifier, Title: c.Title})
 	}
 
 	envNames, err := s.environmentNames(ctx)

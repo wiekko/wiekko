@@ -60,11 +60,26 @@ type ConstraintSummary struct {
 // ConstraintDetail adds the description, links and discussion.
 type ConstraintDetail struct {
 	ConstraintSummary
-	Description  string        `json:"description"`
-	Milestone    string        `json:"milestone,omitempty"`
-	Capabilities []Ref         `json:"capabilities"`
-	Documents    []Ref         `json:"documents"`
-	Comments     []CommentView `json:"comments"`
+	Description  string `json:"description"`
+	Milestone    string `json:"milestone,omitempty"`
+	Capabilities []Ref  `json:"capabilities"`
+	// TestCases verify the constraint (FR-150): the linked ones, then,
+	// with Via set, those of its capabilities.
+	TestCases []EvidenceView `json:"test_cases"`
+	Documents []Ref          `json:"documents"`
+	Comments  []CommentView  `json:"comments"`
+}
+
+// EvidenceView is a test case of a constraint with its latest result.
+type EvidenceView struct {
+	TestCaseSummary
+	// LatestResult is the status of the most recently executed result,
+	// empty if the test case never ran; LatestAt is when it ran.
+	LatestResult string `json:"latest_result,omitempty"`
+	LatestAt     string `json:"latest_at,omitempty"`
+	// Via names the constraint's capabilities a test case that is not
+	// linked to the constraint comes through; empty for a linked one.
+	Via []string `json:"via,omitempty"`
 }
 
 // DefectSummary is one row of a defect list.
@@ -117,6 +132,7 @@ type TestCaseDetail struct {
 	TestCaseSummary
 	Description  string          `json:"description"`
 	Requirements []CoverageRef   `json:"requirements"`
+	Constraints  []Ref           `json:"constraints"` // the constraints the test case verifies (FR-150)
 	Environments []string        `json:"environments"`
 	Results      []ResultView    `json:"results"`
 	Defects      []DefectSummary `json:"defects"`

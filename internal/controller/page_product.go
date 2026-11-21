@@ -6490,9 +6490,7 @@ func (c *PageProductController) RequirementTestCaseLink(w http.ResponseWriter, r
 // RequirementTestCaseCreateModal renders GET /products/{id}/requirements/{requirementId}/test-cases/create-modal.
 func (c *PageProductController) RequirementTestCaseCreateModal(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
-	requirementID := r.PathValue("requirementId")
 
 	p, _, err := c.loadProductWithRole(r, user, productID)
 	if err != nil {
@@ -6503,91 +6501,22 @@ func (c *PageProductController) RequirementTestCaseCreateModal(w http.ResponseWr
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-
-	components, _ := c.component.ListComponents(r.Context(), user, productID)
-	capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
-	pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
-		Meta:          templates.PageMeta{CSRFToken: csrfToken},
-		DisplayName:   user.DisplayName,
-		IsAdmin:       user.IsAdmin,
-		Product:       p,
-		Components:    components,
-		Capabilities:  capabilities,
-		PyramidLevels: pyramidLevels,
-		LinkTo:        "requirement:" + requirementID,
-	}).Render(r.Context(), w)
+	c.renderTestCaseFormModal(w, r, user, productpage.TestCaseFormProps{
+		Product: p,
+		LinkTo:  "requirement:" + r.PathValue("requirementId"),
+	})
 }
 
 // RequirementTestCaseCreateAndLink handles POST /products/{id}/requirements/{requirementId}/test-cases.
 func (c *PageProductController) RequirementTestCaseCreateAndLink(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())
-	csrfToken := middleware.CSRFTokenFromContext(r.Context())
 	productID := r.PathValue("id")
 	requirementID := r.PathValue("requirementId")
-
-	p, _, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-
-	title := r.FormValue("title")
-	description := r.FormValue("description")
-	executionMode := r.FormValue("execution_mode")
-	testIdentifier := r.FormValue("test_identifier")
-	componentID := r.FormValue("component_id")
-	capabilityID := r.FormValue("capability_id")
-	pyramidLevelID := r.FormValue("pyramid_level_id")
-
-	rerenderForm := func(errMsg string) {
-		components, _ := c.component.ListComponents(r.Context(), user, productID)
-		capabilities, _ := c.component.ListCapabilities(r.Context(), user, productID)
-		pyramidLevels, _ := c.milestone.ListPyramidLevels(r.Context(), user, productID)
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = productpage.TestCaseFormModal(productpage.TestCaseFormProps{
-			Meta:           templates.PageMeta{CSRFToken: csrfToken},
-			DisplayName:    user.DisplayName,
-			IsAdmin:        user.IsAdmin,
-			Product:        p,
-			Components:     components,
-			Capabilities:   capabilities,
-			PyramidLevels:  pyramidLevels,
-			LinkTo:         "requirement:" + requirementID,
-			Title:          title,
-			Description:    description,
-			ExecutionMode:  executionMode,
-			TestIdentifier: testIdentifier,
-			ComponentID:    componentID,
-			CapabilityID:   capabilityID,
-			PyramidLevelID: pyramidLevelID,
-			Error:          errMsg,
-		}).Render(r.Context(), w)
-	}
-
-	tc, err := c.testing.CreateTestCase(r.Context(), user, service.CreateTestCaseInput{
-		ProductID:      productID,
-		Title:          title,
-		Description:    description,
-		ExecutionMode:  executionMode,
-		TestIdentifier: testIdentifier,
-		ComponentID:    componentID,
-		CapabilityID:   capabilityID,
-		PyramidLevelID: pyramidLevelID,
-	})
-	if err != nil {
-		rerenderForm(errorText(err))
-		return
-	}
-
-	if err := c.testing.LinkRequirement(r.Context(), user, productID, tc.ID, requirementID, "requirement"); err != nil {
-		rerenderForm("created test case but failed to link: " + errorText(err))
-		return
-	}
-
-	c.writeRequirementTestCasesTabOOB(w, r, user, productID, requirementID)
+	c.createTestCaseAndLink(w, r, user, productID, "requirement:"+requirementID,
+		func(testCaseID string) error {
+			return c.testing.LinkRequirement(r.Context(), user, productID, testCaseID, requirementID, "requirement")
+		},
+		func() { c.writeRequirementTestCasesTabOOB(w, r, user, productID, requirementID) })
 }
 
 // RequirementTestCaseUnlink handles DELETE /products/{id}/requirements/{requirementId}/test-cases/{testCaseId}.

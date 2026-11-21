@@ -188,6 +188,7 @@ nexmap capability create --name "Offline queue" --component "Sync engine"
 nexmap capability link Offline queue FR-12 AC-3
 nexmap constraint update AC-3 --compliance violated
 nexmap test link TestQueue_Replay --req FR-12 --capability "Offline queue"
+nexmap test link TestSessionCookie --constraint SC-30
 ```
 
 Names with spaces need no quotes where they are the command's only argument. For `capability link`,

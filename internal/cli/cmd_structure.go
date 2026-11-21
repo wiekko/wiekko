@@ -415,9 +415,9 @@ func constraintUpdateCommand() *command {
 
 func testLinkCommand(unlink bool) *command {
 	var in ops.TestCaseLinks
-	verb, summary := "link", "link a test case to a requirement, capability or component (developer role)"
+	verb, summary := "link", "link a test case to a requirement, constraints, capability or component (developer role)"
 	if unlink {
-		verb, summary = "unlink", "remove a test case's link to a requirement, capability or component (developer role)"
+		verb, summary = "unlink", "remove a test case's link to a requirement, constraints, capability or component (developer role)"
 	}
 	name := "test " + verb
 	return &command{
@@ -426,15 +426,16 @@ func testLinkCommand(unlink bool) *command {
 		summary: summary,
 		flags: func(fs *flag.FlagSet) {
 			fs.StringVar(&in.Requirement, "req", "", "requirement, e.g. FR-12")
+			fs.Var((*listFlag)(&in.Constraints), "constraint", "constraint the test verifies, e.g. SC-30 (repeatable or comma-separated)")
 			fs.StringVar(&in.Capability, "capability", "", "capability name or ID")
 			fs.StringVar(&in.Component, "component", "", "component name or ID")
 		},
 		run: func(ctx context.Context, a *app, args []string) error {
 			if len(args) != 1 {
-				return usageErr(fmt.Errorf("usage: nexmap %s <test> [--req FR-12] [--capability …] [--component …]", name))
+				return usageErr(fmt.Errorf("usage: nexmap %s <test> [--req FR-12] [--constraint SC-30] [--capability …] [--component …]", name))
 			}
-			if in.Requirement == "" && in.Capability == "" && in.Component == "" {
-				return usageErr(errors.New("give --req, --capability or --component"))
+			if in.Requirement == "" && len(in.Constraints) == 0 && in.Capability == "" && in.Component == "" {
+				return usageErr(errors.New("give --req, --constraint, --capability or --component"))
 			}
 			in.TestCase, in.Unlink = args[0], unlink
 			s, err := a.session()

@@ -1,0 +1,322 @@
+package product
+
+import (
+	"fmt"
+
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/patterns"
+	"nexmap.net/web/templates/ui"
+)
+
+// Test case to constraint links (FR-150): a constraint's Test cases tab and a
+// test case's Constraints tab.
+
+// TestCaseEvidenceView is a test case with its latest result and, for one
+// reached through the constraint's capabilities, those capabilities.
+type TestCaseEvidenceView struct {
+	TestCase *model.TestCase
+	Latest   *model.CampaignResult // nil if never executed
+	Via      []*model.Capability
+}
+
+// ConstraintTestCasesTabProps holds data for the constraint test cases tab.
+type ConstraintTestCasesTabProps struct {
+	ProductID    string
+	ConstraintID string
+	CanWrite     bool
+	Linked       []TestCaseEvidenceView
+	Derived      []TestCaseEvidenceView
+}
+
+templ ConstraintTestCasesTabContent(props ConstraintTestCasesTabProps) {
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Linked) + len(props.Derived)) }>
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/constraints/%s/test-cases/link-modal", props.ProductID, props.ConstraintID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+				@ui.Button(ui.ButtonProps{
+					Label:    "Create new",
+					Variant:  "primary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/constraints/%s/test-cases/create-modal", props.ProductID, props.ConstraintID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("plus", "sm")
+				}
+			</div>
+		}
+		if len(props.Linked) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("beaker", "No linked test cases", "Test cases that verify this constraint will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Mode
+						}
+						@ui.TableHeader() {
+							Latest Result
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, ev := range props.Linked {
+							@ui.TableRow("") {
+								@testCaseTitleCell(props.ProductID, ev.TestCase)
+								@ui.TableCellMuted() {
+									@patterns.ExecutionModeBadge(ev.TestCase.ExecutionMode)
+								}
+								@ui.TableCellMuted() {
+									@latestResult(ev.Latest)
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink test case"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/constraints/%s/test-cases/%s", props.ProductID, props.ConstraintID, ev.TestCase.ID) }
+											hx-target="#tab-panel-test-cases"
+											hx-swap="innerHTML"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink test case", "Unlink", "Unlink test case "+ui.ItemName("", ev.TestCase.Title)+" from this constraint?")... }
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if len(props.Derived) > 0 {
+			<div class="space-y-2" data-derived="test-cases">
+				<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Via capabilities</h3>
+				<p class="text-xs text-gray-500 dark:text-gray-400">Test cases of this constraint's capabilities. They are not linked to the constraint; link one to count it as evidence.</p>
+				@ui.Card() {
+					@ui.Table() {
+						@ui.TableHead() {
+							@ui.TableHeader() {
+								Title
+							}
+							@ui.TableHeader() {
+								Mode
+							}
+							@ui.TableHeader() {
+								Latest Result
+							}
+							@ui.TableHeader() {
+								Via
+							}
+						}
+						@ui.TableBody("") {
+							for _, ev := range props.Derived {
+								@ui.TableRow("") {
+									@testCaseTitleCell(props.ProductID, ev.TestCase)
+									@ui.TableCellMuted() {
+										@patterns.ExecutionModeBadge(ev.TestCase.ExecutionMode)
+									}
+									@ui.TableCellMuted() {
+										@latestResult(ev.Latest)
+									}
+									@ui.TableCellMuted() {
+										@viaCapabilities(props.ProductID, ev.Via)
+									}
+								}
+							}
+						}
+					}
+				}
+			</div>
+		}
+	</div>
+}
+
+templ testCaseTitleCell(productID string, tc *model.TestCase) {
+	@ui.TableCell() {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/products/%s/test-cases/%s", productID, tc.ID)) }
+			class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+		>
+			{ tc.Title }
+		</a>
+	}
+}
+
+// latestResult shows a test case's most recently executed result with its
+// date (UC-80 icons), or a dash if it has never run.
+templ latestResult(r *model.CampaignResult) {
+	if r == nil {
+		<span class="text-gray-400 dark:text-gray-500" title="Never executed">&mdash;</span>
+	} else {
+		<span class="inline-flex items-center gap-1 whitespace-nowrap">
+			@campaignResultIcon(r.Status)
+			{ campaignResultLabel(r.Status) }
+			<span class="text-xs text-gray-400 dark:text-gray-500">{ formatDate(r.ExecutedAt) }</span>
+		</span>
+	}
+}
+
+// TestCaseConstraintsTabProps holds data for the test case constraints tab.
+type TestCaseConstraintsTabProps struct {
+	ProductID        string
+	TestCaseID       string
+	CanWrite         bool
+	Constraints      []*model.Constraint
+	CategoryPrefixes map[string]string // category ID → prefix
+}
+
+templ TestCaseConstraintsTabContent(props TestCaseConstraintsTabProps) {
+	<div class="space-y-4" data-tab-count={ fmt.Sprint(len(props.Constraints)) }>
+		if props.CanWrite {
+			<div class="flex items-center justify-end gap-2">
+				@ui.Button(ui.ButtonProps{
+					Label:    "Link existing",
+					Variant:  "secondary",
+					Size:     "sm",
+					HxGet:    fmt.Sprintf("/products/%s/test-cases/%s/constraints/link-modal", props.ProductID, props.TestCaseID),
+					HxTarget: "#modal",
+					HxSwap:   "innerHTML",
+				}) {
+					@ui.Icon("link", "sm")
+				}
+			</div>
+		}
+		if len(props.Constraints) == 0 {
+			@ui.Card() {
+				@ui.EmptyState("shield-check", "No linked constraints", "Constraints this test case verifies will appear here.", "", "")
+			}
+		} else {
+			@ui.Card() {
+				@ui.Table() {
+					@ui.TableHead() {
+						@ui.TableHeader() {
+							ID
+						}
+						@ui.TableHeader() {
+							Title
+						}
+						@ui.TableHeader() {
+							Compliance
+						}
+						if props.CanWrite {
+							@ui.TableHeader() {
+							}
+						}
+					}
+					@ui.TableBody("") {
+						for _, con := range props.Constraints {
+							@ui.TableRow("") {
+								@ui.TableCellMuted() {
+									<span class="whitespace-nowrap">{ constraintIdentifier(props.CategoryPrefixes, con) }</span>
+								}
+								@ui.TableCell() {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/products/%s/constraints/%s", props.ProductID, con.ID)) }
+										class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+									>
+										{ con.Title }
+									</a>
+								}
+								@ui.TableCellMuted() {
+									@patterns.ComplianceBadge(con.ComplianceState)
+								}
+								if props.CanWrite {
+									<td class="whitespace-nowrap px-6 py-4 text-right text-sm">
+										<button
+											type="button"
+											aria-label="Unlink constraint"
+											class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-red-400"
+											hx-delete={ fmt.Sprintf("/products/%s/test-cases/%s/constraints/%s", props.ProductID, props.TestCaseID, con.ID) }
+											hx-target="#tab-panel-constraints"
+											hx-swap="innerHTML"
+											{ ui.Confirm(ui.ConfirmNeutral, "Unlink constraint", "Unlink", "Unlink constraint "+ui.ItemName(constraintIdentifier(props.CategoryPrefixes, con), con.Title)+" from this test case?")... }
+										>
+											@ui.Icon("trash", "sm")
+										</button>
+									</td>
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	</div>
+}
+
+templ TestCaseConstraintLinkModal(productID, testCaseID string) {
+	@ui.Modal("constraint-link-modal", "Link existing constraint", "md") {
+		<div class="space-y-4">
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+					@ui.Icon("search", "sm")
+				</div>
+				<input
+					type="search"
+					name="q"
+					placeholder="Search constraints..."
+					autofocus
+					class="block w-full rounded-md border-0 py-2 pl-10 pr-3 text-gray-900 shadow-sm ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-600 dark:placeholder:text-gray-500"
+					hx-get={ fmt.Sprintf("/products/%s/test-cases/%s/constraints/link-search", productID, testCaseID) }
+					hx-target="#constraint-link-results"
+					hx-swap="innerHTML"
+					hx-trigger="keyup changed delay:300ms, search, load"
+				/>
+			</div>
+			<div id="constraint-link-results" class="min-h-[6rem]">
+				@ui.LoadingSpinner("sm")
+			</div>
+		</div>
+	}
+}
+
+templ TestCaseConstraintLinkResults(productID, testCaseID string, candidates []*model.Constraint, prefixes map[string]string) {
+	if len(candidates) == 0 {
+		<p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No matching constraints.</p>
+	} else {
+		<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+			for _, con := range candidates {
+				<li class="flex items-center justify-between gap-4 py-3">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+							{ constraintIdentifier(prefixes, con) } &mdash; { con.Title }
+						</p>
+					</div>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+						hx-post={ fmt.Sprintf("/products/%s/test-cases/%s/constraints/link", productID, testCaseID) }
+						hx-vals={ fmt.Sprintf(`{"constraint_id":"%s"}`, con.ID) }
+						hx-target="#modal"
+						hx-swap="innerHTML"
+					>
+						Link
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+func constraintIdentifier(prefixes map[string]string, c *model.Constraint) string {
+	return model.EntityIdentifier(constraintPrefix(prefixes, c.CategoryID), c.SequenceNumber)
+}

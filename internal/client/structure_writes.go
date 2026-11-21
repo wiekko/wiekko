@@ -87,6 +87,18 @@ func (c *Client) UnlinkTestCaseRequirement(ctx context.Context, productID, testC
 	return c.Do(ctx, http.MethodDelete, productPath(productID, "test-cases", testCaseID, "requirements", requirementID), nil, nil)
 }
 
+// LinkTestCaseConstraint links a test case to a constraint it verifies
+// (FR-150); constraintID may be an identifier such as SC-30.
+func (c *Client) LinkTestCaseConstraint(ctx context.Context, productID, testCaseID, constraintID string) error {
+	return c.Do(ctx, http.MethodPost, productPath(productID, "test-cases", testCaseID, "constraints"),
+		map[string]string{"constraint_id": constraintID}, nil)
+}
+
+// UnlinkTestCaseConstraint removes that link.
+func (c *Client) UnlinkTestCaseConstraint(ctx context.Context, productID, testCaseID, constraintID string) error {
+	return c.Do(ctx, http.MethodDelete, productPath(productID, "test-cases", testCaseID, "constraints", constraintID), nil, nil)
+}
+
 // TestCasePatch is a partial update of a test case.
 type TestCasePatch struct {
 	ComponentID  *string `json:"component_id,omitempty"`

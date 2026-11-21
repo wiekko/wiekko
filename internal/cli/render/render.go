@@ -226,6 +226,16 @@ func Constraint(w io.Writer, c *ops.ConstraintDetail) error {
 		caps = append(caps, x.Title)
 	}
 	d.list(caps)
+	d.h(2, "Test cases")
+	rows := make([][]string, 0, len(c.TestCases))
+	for _, t := range c.TestCases {
+		via := "linked"
+		if len(t.Via) > 0 {
+			via = "via " + strings.Join(t.Via, ", ")
+		}
+		rows = append(rows, []string{t.ShortID, t.Title, t.Mode, dash(t.LatestResult), dash(t.LatestAt), via})
+	}
+	d.table([]string{"ID", "Title", "Mode", "Latest result", "Executed", "Link"}, rows)
 	documentsSection(&d, c.Documents)
 	comments(&d, c.Comments)
 	return d.write(w)
@@ -314,6 +324,12 @@ func TestCase(w io.Writer, t *ops.TestCaseDetail) error {
 		reqs = append(reqs, s)
 	}
 	d.list(reqs)
+	d.h(2, "Verifies constraints")
+	cons := make([]string, 0, len(t.Constraints))
+	for _, c := range t.Constraints {
+		cons = append(cons, strings.TrimSpace(c.Identifier+" "+c.Title))
+	}
+	d.list(cons)
 	d.h(2, "Results")
 	rows := make([][]string, 0, len(t.Results))
 	for _, r := range t.Results {

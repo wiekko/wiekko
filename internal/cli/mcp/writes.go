@@ -153,15 +153,15 @@ func registerStructureWriteTools(s *sdk.Server, h *handlers) {
 			return v, func(w io.Writer) error { return render.Capability(w, v) }, err
 		})
 	writeTool(s, h, "link_test_case", "Link a test case",
-		"Link a test case to the requirement it verifies, and/or set the capability or component it belongs to "+
-			"(replacing the current one). Requires the developer role. Returns the test case.",
+		"Link a test case to the requirement and/or the constraints it verifies, and/or set the capability or component "+
+			"it belongs to (replacing the current one). Requires the developer role. Returns the test case.",
 		true,
 		func(ctx context.Context, sess *ops.Session, in ops.TestCaseLinks) (*ops.TestCaseDetail, func(io.Writer) error, error) {
 			v, err := sess.LinkTestCase(ctx, in)
 			return v, func(w io.Writer) error { return render.TestCase(w, v) }, err
 		})
 	writeTool(s, h, "unlink_test_case", "Unlink a test case",
-		"Remove a test case's link to a requirement, or clear its capability or component if it is the one named. "+
+		"Remove a test case's link to a requirement or constraints, or clear its capability or component if it is the one named. "+
 			"Requires the developer role.",
 		true,
 		func(ctx context.Context, sess *ops.Session, in ops.TestCaseLinks) (*ops.TestCaseDetail, func(io.Writer) error, error) {
@@ -172,7 +172,7 @@ func registerStructureWriteTools(s *sdk.Server, h *handlers) {
 	writeTool(s, h, "sync_test_cases", "Create test cases from a test run",
 		"Create an automatic test case for every test in a run that has none yet, from a test report (go test -json or -v "+
 			"output, JUnit XML) or a list of test identifiers. Subtests roll up into their parent. Optionally files the new "+
-			"test cases under a capability or component, gives them a pyramid level, and links them to a requirement. "+
+			"test cases under a capability or component, gives them a pyramid level, and links them to a requirement and constraints. "+
 			"Use dry_run first to review. Requires the developer role.",
 		false,
 		func(ctx context.Context, sess *ops.Session, in ops.TestSync) (*ops.SyncResult, func(io.Writer) error, error) {

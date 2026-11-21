@@ -387,6 +387,7 @@ func testSyncCommand() *command {
 			fs.StringVar(&in.Component, "component", "", "component (name or ID) to file new test cases under")
 			fs.StringVar(&in.PyramidLevel, "pyramid-level", "", "pyramid level (name or ID) of new test cases, e.g. unit")
 			fs.StringVar(&in.Requirement, "req", "", "requirement the new test cases verify, e.g. FR-12")
+			fs.Var((*listFlag)(&in.Constraints), "constraint", "constraint the new test cases verify, e.g. SC-30 (repeatable or comma-separated)")
 			fs.BoolVar(&in.DryRun, "dry-run", false, "list the test cases that would be created")
 		},
 		run: func(ctx context.Context, a *app, files []string) error {
