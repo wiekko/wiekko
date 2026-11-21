@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package model
 
 // Constraint represents a non-functional requirement (architecture, security, UX rule)

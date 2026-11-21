@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package update
 
 import (
@@ -114,7 +117,7 @@ func zipOf(t *testing.T, files map[string][]byte) []byte {
 
 func TestExtract(t *testing.T) {
 	bin := []byte("binary")
-	files := map[string][]byte{"LICENSE": []byte("MIT"), "nexmap": bin, "nexmap.exe": bin}
+	files := map[string][]byte{"LICENSE": []byte("EUPL-1.2"), "nexmap": bin, "nexmap.exe": bin}
 	for name, data := range map[string][]byte{"a.tar.gz": tarGz(t, files), "a.zip": zipOf(t, files)} {
 		got, err := Extract(name, data, "nexmap")
 		if err != nil || !bytes.Equal(got, bin) {

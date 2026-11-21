@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package model
 
 // Document is a long-form reference text that defines part of the product,

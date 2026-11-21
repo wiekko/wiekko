@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package dbtest gives integration tests a migrated database on every
 // supported engine: SQLite in a temp file, and PostgreSQL on a server named by
 // NEXMAP_TEST_POSTGRES_DSN.

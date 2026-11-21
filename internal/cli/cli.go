@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package cli implements the nexmap command line client. It talks to a Nexmap
 // server exclusively through internal/client (AC-16) and never imports server
 // packages.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package gotest parses `go test -json` events and `go test -v` text.
 package gotest
 

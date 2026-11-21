@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Command nexmap is the Nexmap command line client: repository and CI
 // integration, and an entry point for AI agents. It talks to a Nexmap server
 // (nexmapd) through the REST API only.

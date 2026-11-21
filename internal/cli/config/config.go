@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package config resolves the CLI's settings from the user config file, the
 // repository config file, the environment and command line flags, in that
 // order of increasing precedence.

@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
 # Runs the tests with the PostgreSQL runs included: starts a throwaway server
 # in a container (data on tmpfs, durability off), points the tests at it and
 # removes it afterwards.

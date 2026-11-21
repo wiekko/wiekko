@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Version switcher and "unreleased" banner of the documentation site.
 //
 // The site serves every version under its own top-level path (/latest/,

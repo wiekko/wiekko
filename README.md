@@ -2,6 +2,9 @@
 
 Nexmap Product Management Solution
 
+> Nexmap is developed in a private repository; the public repository on GitHub is a read-only mirror.
+> Pull requests and issues are not accepted at this time.
+
 Nexmap keeps a product's requirements, constraints, backlog, test cases, testing campaigns and defects in
 one place. It consists of a server (`nexmapd`) with a web UI and REST API, and a command line client
 (`nexmap`) for repositories, CI pipelines and AI agents.
@@ -37,3 +40,8 @@ registers `nexmap mcp --read-only` in the repository's `.mcp.json` and appends t
 `CLAUDE.md` (or `AGENTS.md`). The server reuses the CLI's configuration, so nothing else is needed.
 Agents can also change things within their user's role: `req status`, `defect status`, `comment add`,
 `defect create` and `task create` (CLI), and the matching MCP tools unless the server runs with `--read-only`.
+
+## License
+
+Nexmap is licensed under the [European Union Public Licence v1.2](LICENSE) (`EUPL-1.2`). Outside contributions
+are not accepted at this time; see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package ingest turns test runner reports into test results for upload to a
 // Nexmap campaign (FR-118). Format-specific parsers live in subpackages; this
 // package holds the shared result type, format detection and the dispatcher.

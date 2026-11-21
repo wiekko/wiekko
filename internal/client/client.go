@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package client is a typed client for the Nexmap REST API (/api/v1). It is the
 // only way the CLI talks to a server (AC-16) and must not import any server
 // package: the JSON wire format is the contract.

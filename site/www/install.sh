@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
 # Installs the Nexmap CLI (nexmap) on Linux or macOS:
 #
 #   curl -fsSL https://nexmap.net/install.sh | sh

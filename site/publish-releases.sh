@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
 # Entrypoint hook of the download site (site/Dockerfile): publishes the release
 # built into the image on the persistent volume, before nginx starts.
 #

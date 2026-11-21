@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package buildinfo reports the version of the running binary. It is shared by
 // the server (nexmapd) and the CLI (nexmap), so it must stay free of any
 // dependency beyond the standard library.

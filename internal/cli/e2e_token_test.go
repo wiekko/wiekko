@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package cli_test
 
 // Restricted personal access tokens (SC-51 – SC-56) through the CLI.

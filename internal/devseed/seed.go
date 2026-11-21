@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package devseed populates a brand-new database with a coherent demo data set
 // so that dev-mode instances have something to look at without clicking every
 // entity into existence first.

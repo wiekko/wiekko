@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
 # Builds the documentation site with every version:
 #
 #   /latest/     the checked-out tree (main, when Coolify deploys)

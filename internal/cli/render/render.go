@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package render turns ops views into markdown (for agent context windows)
 // and plain tables (for people). JSON output needs no renderer: it is the view
 // itself. Detail views render as markdown in both text formats, since a

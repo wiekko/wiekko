@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package update finds, downloads and installs CLI releases from the download
 // site (nexmap.net/releases, see site/ in the repository). It only uses the
 // standard library.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package cli_test
 
 // `nexmap mcp` end to end: the command runs in-process through cli.Run with

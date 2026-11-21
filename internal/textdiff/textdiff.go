@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package textdiff computes line-based differences between two texts, for
 // comparing document revisions (FR-57). It implements Myers' O(ND)
 // algorithm with a bound on the edit distance it explores: two texts that

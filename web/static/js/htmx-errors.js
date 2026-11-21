@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Surfaces failed htmx requests to the user.
 //
 // htmx's default responseHandling treats 4xx/5xx as "error, do not swap", which

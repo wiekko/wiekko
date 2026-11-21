@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package mcp serves the agent operations of internal/cli/ops as Model Context
 // Protocol tools, so MCP-capable agents get typed tools instead of shelling
 // out to the CLI.

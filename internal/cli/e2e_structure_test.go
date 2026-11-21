@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package cli_test
 
 // Structure, constraint and link writes (FR-134 – FR-136) end to end, as the

@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
 # Makes a release: see CONTRIBUTING.md, "Releasing".
 #
 # Usage: scripts/release.sh VERSION [push]      (usually: just release VERSION [push])

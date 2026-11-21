@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package cli_test
 
 // `nexmap utest` and `nexmap test sync` end to end against the seeded Aviary

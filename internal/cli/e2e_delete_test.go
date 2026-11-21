@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package cli_test
 
 // Deleting backlog items and defects from the CLI (FR-153). Like every

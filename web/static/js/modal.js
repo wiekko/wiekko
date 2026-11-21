@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Keyboard, touch and confirmation behaviour of the application modal
 // (ui.Modal, UR-154).
 //

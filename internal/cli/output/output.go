@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package output renders command results as a human table, markdown, or JSON.
 // JSON output is the stable, machine-readable contract; table and markdown are
 // for people and for agent context windows respectively.

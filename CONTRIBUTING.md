@@ -1,5 +1,37 @@
 # Contributing
 
+## License and sign-off
+
+Nexmap is licensed under the [European Union Public Licence v1.2](LICENSE) (`EUPL-1.2`).
+
+Nexmap does not accept outside contributions at this time: the public repository on GitHub is a read-only
+mirror, and pull requests and issues there are not reviewed. The rules below apply to every commit in the
+development repository and to any contribution accepted in the future, which is licensed under the same
+terms.
+
+Every commit must be signed off under the [Developer Certificate of Origin 1.1](DCO): the sign-off states
+that you wrote the change or otherwise have the right to submit it under the project's licence. Add it with
+`git commit -s`, which appends a line with your name and email from `git config`:
+
+```text
+Signed-off-by: Jane Doe <jane@example.org>
+```
+
+Use your real name. Commits without a sign-off are not merged; to add one afterwards, run
+`git commit --amend -s` for the last commit or `git rebase --signoff main` for a branch.
+
+Every source file starts with an SPDX header naming its copyright holder and licence:
+
+```go
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+```
+
+Add it to new files with the comment syntax of their language (`#` for shell, PowerShell and config files,
+`/* */` for CSS, `<!-- -->` for HTML, after a shebang or doctype line). Released database migrations are
+the exception: they must never change, so they carry no header. Third-party files (the vendored
+`*.min.js` libraries and the fonts) keep their own licences.
+
 ## Building
 
 Nexmap needs Go 1.26 or newer (the `go` line in `go.mod`); the `toolchain` line names the release it is

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
+
 # Installs the Nexmap CLI (nexmap.exe) on Windows:
 #
 #   irm https://nexmap.net/install.ps1 | iex

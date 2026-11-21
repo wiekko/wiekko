@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
+
 # mdBook configuration of the documentation site (docs.nexmap.net).
 # The pages live in ../docs; this directory only holds the site tooling, so
 # none of it ends up on the site. See CONTRIBUTING.md, "Documentation site".

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package ops holds the agent-facing read (and later write) operations. Each
 // operation takes an input, talks to the server through internal/client and
 // returns a view with IDs resolved to names and identifiers. CLI commands and

@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+# SPDX-License-Identifier: EUPL-1.2
 # Builds the CLI release archives for every platform: run by site/Dockerfile
 # (stage dist), which pins the Go toolchain. Not meant to run on a host.
 #

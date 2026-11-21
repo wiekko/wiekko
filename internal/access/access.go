@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package access models the restrictions a personal access token can carry
 // (SC-51 – SC-59): the products it reaches, a cap on the role it acts with,
 // and the scopes it may read or write. It is shared by the middleware, which

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package totp implements time-based one-time passwords (RFC 6238) with the
 // parameters every common authenticator app supports: HMAC-SHA1, 6 digits,
 // 30-second steps. It also provides one-time recovery codes and a QR code

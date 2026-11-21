@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 package service_test
 
 // Automated test run ingestion (FR-118, FR-121, FR-123) through the real

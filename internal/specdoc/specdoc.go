@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package specdoc renders a product specification as Markdown (FR-137): the
 // product structure, constraints, requirements and, on request, tasks, in
 // the style of Nexmap's former docs/spec/requirements.md.

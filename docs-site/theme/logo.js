@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Nexmap logo at the top of the sidebar, linking to the start page of the
 // version being read. The SVG is a copy of web/static/img/logo.svg, inlined
 // rather than loaded as an image so that "map" takes the sidebar's text

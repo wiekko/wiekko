@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jesco Freund (daemotron)
+// SPDX-License-Identifier: EUPL-1.2
+
 // Package junit parses JUnit XML reports as written by pytest, jest-junit,
 // Maven Surefire, gotestsum and most other runners.
 package junit
