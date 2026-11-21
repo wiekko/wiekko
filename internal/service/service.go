@@ -110,6 +110,17 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 		owns:         owns,
 	}
 
+	// Built ahead for the bulk operations, which apply its changes (FR-170).
+	constraintSvc := &ConstraintService{
+		tx:          st.Tx,
+		constraints: st.Constraint,
+		categories:  st.Category,
+		comments:    discussionSvc,
+		audit:       st.Audit,
+		authz:       authz,
+		owns:        owns,
+	}
+
 	userSvc := &UserService{
 		tx:           st.Tx,
 		users:        st.User,
@@ -210,7 +221,7 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			owns:         owns,
 		},
 		Backlog: backlogSvc,
-		Bulk:    &BulkService{tx: st.Tx, backlog: backlogSvc, testing: testingSvc, authz: authz, productRoles: st.ProductRole},
+		Bulk:    &BulkService{tx: st.Tx, backlog: backlogSvc, testing: testingSvc, constraints: constraintSvc, authz: authz, productRoles: st.ProductRole},
 		Document: &DocumentService{
 			tx:           st.Tx,
 			documents:    st.Document,
@@ -235,16 +246,8 @@ func NewWithMail(st *store.Store, provider auth.Provider, cfg *config.Config, bl
 			testCases:    st.TestCase,
 			authz:        authz,
 		},
-		Constraint: &ConstraintService{
-			tx:          st.Tx,
-			constraints: st.Constraint,
-			categories:  st.Category,
-			comments:    discussionSvc,
-			audit:       st.Audit,
-			authz:       authz,
-			owns:        owns,
-		},
-		Testing: testingSvc,
+		Constraint: constraintSvc,
+		Testing:    testingSvc,
 		TestRun: &TestRunService{
 			tx:           st.Tx,
 			testCases:    st.TestCase,

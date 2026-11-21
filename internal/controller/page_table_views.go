@@ -82,16 +82,9 @@ func constraintTable(categories map[string]*model.Category) rowTable[*model.Cons
 	}
 }
 
-// Constraints renders GET /products/{id}/constraints.
-func (c *PageProductController) Constraints(w http.ResponseWriter, r *http.Request) {
-	user := middleware.UserFromContext(r.Context())
-	productID := r.PathValue("id")
-	p, role, err := c.loadProductWithRole(r, user, productID)
-	if err != nil {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
+// constraintRows loads a product's constraints with the table that sorts and
+// filters them, and the constraint categories.
+func (c *PageProductController) constraintRows(r *http.Request, user *model.User, productID string) ([]*model.Constraint, rowTable[*model.Constraint], []*model.Category, map[string]string) {
 	all, _ := c.constraint.ListConstraints(r.Context(), user, productID, store.ConstraintFilter{})
 	categories, _ := c.category.ListCategories(r.Context(), user, productID, "constraint")
 	byID := make(map[string]*model.Category, len(categories))
@@ -100,12 +93,21 @@ func (c *PageProductController) Constraints(w http.ResponseWriter, r *http.Reque
 		byID[cat.ID] = cat
 		prefixes[cat.ID] = cat.Prefix
 	}
+	return all, constraintTable(byID), categories, prefixes
+}
 
-	table := constraintTable(byID)
+// loadConstraintsProps assembles the constraints list for the page and the
+// fragment alike.
+func (c *PageProductController) loadConstraintsProps(r *http.Request, user *model.User, productID string) (productpage.ConstraintsProps, error) {
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		return productpage.ConstraintsProps{}, err
+	}
+	all, table, categories, prefixes := c.constraintRows(r, user, productID)
 	state := table.readState(r, "/products/"+productID+"/constraints")
 	rows, total := table.apply(all, &state)
 
-	props := productpage.ConstraintsProps{
+	return productpage.ConstraintsProps{
 		Meta: templates.PageMeta{
 			Title:     p.Name + " - Constraints",
 			CSRFToken: middleware.CSRFTokenFromContext(r.Context()),
@@ -118,6 +120,17 @@ func (c *PageProductController) Constraints(w http.ResponseWriter, r *http.Reque
 		CanEdit:          c.canEditConstraints(user, role),
 		TableView:        tableView(state, total, len(all)),
 		CategoryOptions:  categories,
+		Bulk:             constraintBulkBar(p, user, role, total),
+	}, nil
+}
+
+// Constraints renders GET /products/{id}/constraints.
+func (c *PageProductController) Constraints(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	props, err := c.loadConstraintsProps(r, user, r.PathValue("id"))
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
 	}
 	renderTableView(w, r, productpage.ConstraintsTableID, &props.TableView,
 		func() templ.Component { return productpage.ConstraintsTableContent(props) },

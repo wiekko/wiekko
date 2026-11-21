@@ -212,3 +212,79 @@ func TestBulkTestCasesPage(t *testing.T) {
 		}
 	})
 }
+
+// TestBulkConstraintsPage drives the bulk operations of the constraints table
+// (FR-170): owners select and set compliance; developers cannot select.
+func TestBulkConstraintsPage(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, driver string, db *sql.DB) {
+		e := newAccountEnv(t, driver, db)
+		ctx := context.Background()
+		pid := e.product.ID
+		cats, err := e.svc.Category.ListCategories(ctx, e.admin, pid, "constraint")
+		if err != nil || len(cats) == 0 {
+			t.Fatalf("constraint categories: %v", err)
+		}
+		con, err := e.svc.Constraint.CreateConstraint(ctx, e.admin, service.CreateConstraintInput{ProductID: pid, CategoryID: cats[0].ID, Title: "Runs offline"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		page := "/products/" + pid + "/constraints"
+		get := adminPageGetter(t, e)
+		body := get(page, nil)
+		for _, want := range []string{`data-bulk-toggle="constraints-table"`, `data-bulk-bar="constraints-table"`, `data-bulk-id="` + con.ID + `"`, `data-bulk-action="compliance"`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("owner's constraints table lacks %s", want)
+			}
+		}
+
+		resp, _ := e.post("/login", url.Values{"username": {"root"}, "password": {goodPassword}})
+		var admin *http.Cookie
+		for _, c := range resp.Cookies() {
+			if c.Name == "nexmap_session" && c.Value != "" {
+				admin = c
+			}
+		}
+		post := func(step string, form url.Values) string {
+			t.Helper()
+			r, err := http.NewRequest(http.MethodPost, e.srv.URL+page+"/bulk/"+step, strings.NewReader(form.Encode()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.AddCookie(admin)
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			r.Header.Set("X-CSRF-Token", csrfToken(t, e, admin))
+			r.Header.Set("HX-Request", "true")
+			resp, err := e.client().Do(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return readBody(t, resp)
+		}
+		// All matching, with the table's search narrowing it to the one.
+		body = post("preview", url.Values{"action": {"compliance"}, "scope": {"matching"}, "state": {"q=offline"}, "value": {model.ComplianceViolated}})
+		if !strings.Contains(body, "Set the compliance of 1 constraint to “Violated”") || !strings.Contains(body, `name="ids" value="`+con.ID+`"`) {
+			t.Errorf("compliance preview:\n%s", body)
+		}
+		body = post("apply", url.Values{"action": {"compliance"}, "ids": {con.ID}, "value": {model.ComplianceViolated}, "state": {""}})
+		if !strings.Contains(body, "Changed 1 constraint.") || !strings.Contains(body, "Violated") {
+			t.Errorf("compliance apply:\n%s", body)
+		}
+		if got, _ := e.svc.Constraint.GetConstraint(ctx, e.admin, pid, con.ID); got.ComplianceState != model.ComplianceViolated {
+			t.Errorf("compliance %q", got.ComplianceState)
+		}
+
+		dev := e.invite("dev", model.RoleDeveloper)
+		r, err := http.NewRequest(http.MethodGet, e.srv.URL+page, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.AddCookie(dev)
+		dresp, err := e.client().Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body := readBody(t, dresp); strings.Contains(body, "data-bulk-toggle") {
+			t.Error("a developer is offered selection on constraints")
+		}
+	})
+}

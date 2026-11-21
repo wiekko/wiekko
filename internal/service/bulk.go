@@ -10,9 +10,10 @@ import (
 	"nexmap.net/internal/store"
 )
 
-// Bulk operations (FR-130, FR-131, FR-169) change many requirements, tasks,
-// defects or test cases at once. They hold to SC-92: every item goes through
-// the same BacklogService or TestingService call as the individual change, so the role checks, activation rules, kanban
+// Bulk operations (FR-130, FR-131, FR-169, FR-170) change many requirements,
+// tasks, defects, test cases or constraints at once. They hold to SC-92:
+// every item goes through the same BacklogService, TestingService or
+// ConstraintService call as the individual change, so the role checks, activation rules, kanban
 // columns, archive cascade and history entries apply unchanged, and one
 // item's refusal never blocks the others.
 
@@ -47,8 +48,16 @@ const (
 	BulkPyramidLevel      BulkAction = "pyramid_level"
 )
 
-// BulkKindTestCase is the BulkRequest.Kind of test cases.
-const BulkKindTestCase = "test_case"
+// BulkCompliance sets the compliance of constraints (FR-170); Value is the
+// state. Constraints also take BulkCategory, BulkPriority and BulkDelete.
+const BulkCompliance BulkAction = "compliance"
+
+// BulkKindTestCase and BulkKindConstraint are the BulkRequest.Kind of test
+// cases and constraints.
+const (
+	BulkKindTestCase   = "test_case"
+	BulkKindConstraint = "constraint"
+)
 
 // BulkMaxItems caps one bulk operation. Selecting everything that matches a
 // filter can reach far more items than anyone means to change in one go.
@@ -90,6 +99,7 @@ type BulkService struct {
 	tx           store.Transactor
 	backlog      *BacklogService
 	testing      *TestingService
+	constraints  *ConstraintService
 	authz        *Authorizer
 	productRoles store.ProductRoleStore
 }
@@ -149,7 +159,7 @@ func (s *BulkService) Apply(ctx context.Context, user *model.User, req BulkReque
 // deletedAlong reports whether an item that is gone may have been deleted
 // with its parent earlier in the same request.
 func (s *BulkService) deletedAlong(_ context.Context, _ *model.User, req BulkRequest, done []BulkOutcome) bool {
-	if req.Kind == "defect" || req.Kind == BulkKindTestCase || req.Children != DeleteChildren {
+	if req.Kind != model.RequirementKindRequirement && req.Kind != model.RequirementKindTask || req.Children != DeleteChildren {
 		return false
 	}
 	for _, o := range done {
@@ -168,6 +178,9 @@ func (s *BulkService) validate(ctx context.Context, req BulkRequest) error {
 	}
 	if req.Kind == BulkKindTestCase {
 		return validateTestCaseBulk(req)
+	}
+	if req.Kind == BulkKindConstraint {
+		return validateConstraintBulk(req)
 	}
 	defect := req.Kind == "defect"
 	if !defect && req.Kind != model.RequirementKindRequirement && req.Kind != model.RequirementKindTask {
@@ -218,6 +231,30 @@ func validateTestCaseBulk(req BulkRequest) error {
 	return nil
 }
 
+// validateConstraintBulk checks the operations of constraints (FR-170).
+func validateConstraintBulk(req BulkRequest) error {
+	switch req.Action {
+	case BulkCompliance:
+		switch req.Value {
+		case model.ComplianceNotAssessed, model.ComplianceMet, model.ComplianceViolated:
+		default:
+			return fmt.Errorf("%w: compliance %q", errBulkInvalid, req.Value)
+		}
+	case BulkCategory:
+		if req.Value == "" {
+			return fmt.Errorf("%w: category needs a value", errBulkInvalid)
+		}
+	case BulkPriority:
+		if _, err := priorityValue(req.Value); err != nil {
+			return err
+		}
+	case BulkDelete:
+	default:
+		return fmt.Errorf("%w: constraints have no bulk %q", errBulkInvalid, req.Action)
+	}
+	return nil
+}
+
 // priorityValue reads a priority: 0 for none, 1 the highest (FR-149).
 func priorityValue(v string) (int, error) {
 	p, err := strconv.Atoi(v)
@@ -237,6 +274,9 @@ func IsBulkInvalid(err error) bool {
 func (s *BulkService) one(ctx context.Context, user *model.User, req BulkRequest, id string) error {
 	if req.Kind == BulkKindTestCase {
 		return s.oneTestCase(ctx, user, req, id)
+	}
+	if req.Kind == BulkKindConstraint {
+		return s.oneConstraint(ctx, user, req, id)
 	}
 	if req.Kind == "defect" {
 		return s.oneDefect(ctx, user, req, id)
@@ -339,6 +379,29 @@ func (s *BulkService) oneTestCase(ctx context.Context, user *model.User, req Bul
 	return err
 }
 
+// oneConstraint applies the operation to one constraint.
+func (s *BulkService) oneConstraint(ctx context.Context, user *model.User, req BulkRequest, id string) error {
+	if _, err := s.constraints.GetConstraint(ctx, user, req.ProductID, id); err != nil {
+		return err
+	}
+	if req.Action == BulkDelete {
+		return s.constraints.DeleteConstraint(ctx, user, req.ProductID, id)
+	}
+	value := req.Value
+	var in UpdateConstraintInput
+	switch req.Action {
+	case BulkCompliance:
+		in.ComplianceState = &value
+	case BulkCategory:
+		in.CategoryID = &value
+	case BulkPriority:
+		p, _ := priorityValue(value) // validated
+		in.Priority = &p
+	}
+	_, err := s.constraints.UpdateConstraint(ctx, user, req.ProductID, id, in)
+	return err
+}
+
 // previewDelete checks what deleting one item checks: the role (owner for
 // backlog items, developer for test cases) and that the item exists and is of
 // the kind.
@@ -348,6 +411,13 @@ func (s *BulkService) previewDelete(ctx context.Context, user *model.User, req B
 			return err
 		}
 		_, err := s.testing.GetTestCase(ctx, user, req.ProductID, id)
+		return err
+	}
+	if req.Kind == BulkKindConstraint {
+		if _, err := s.authz.RequireRole(ctx, user, req.ProductID, model.RoleOwner); err != nil {
+			return err
+		}
+		_, err := s.constraints.GetConstraint(ctx, user, req.ProductID, id)
 		return err
 	}
 	if _, err := s.authz.RequireRole(ctx, user, req.ProductID, model.RoleOwner); err != nil {

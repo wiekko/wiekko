@@ -17,8 +17,8 @@ import (
 	"nexmap.net/web/templates/patterns"
 )
 
-// Bulk operations on the requirements, tasks, defects and test cases tables
-// (FR-130, FR-131, FR-169). The selection bar asks for a preview, which answers with a
+// Bulk operations on the requirements, tasks, defects, test cases and
+// constraints tables (FR-130, FR-131, FR-169, FR-170). The selection bar asks for a preview, which answers with a
 // confirmation naming what will change and what cannot (SC-92, UC-91); the
 // confirmation applies the operation to the items it previewed, then
 // re-renders the table as it was.
@@ -36,6 +36,7 @@ var bulkTables = map[string]bulkTable{
 	"tasks":        {kind: model.RequirementKindTask, collection: "tasks", singular: "task", plural: "tasks"},
 	"defects":      {kind: "defect", collection: "defects", singular: "defect", plural: "defects"},
 	"test-cases":   {kind: service.BulkKindTestCase, collection: "test-cases", singular: "test case", plural: "test cases"},
+	"constraints":  {kind: service.BulkKindConstraint, collection: "constraints", singular: "constraint", plural: "constraints"},
 }
 
 func bulkTableOf(kind string) bulkTable {
@@ -46,6 +47,8 @@ func bulkTableOf(kind string) bulkTable {
 		return bulkTables["defects"]
 	case service.BulkKindTestCase:
 		return bulkTables["test-cases"]
+	case service.BulkKindConstraint:
+		return bulkTables["constraints"]
 	default:
 		return bulkTables["requirements"]
 	}
@@ -55,12 +58,16 @@ func (t bulkTable) defect() bool { return t.kind == "defect" }
 
 func (t bulkTable) testCase() bool { return t.kind == service.BulkKindTestCase }
 
+func (t bulkTable) constraint() bool { return t.kind == service.BulkKindConstraint }
+
 func (t bulkTable) region() string {
 	switch {
 	case t.defect():
 		return "defects-table"
 	case t.testCase():
 		return "test-cases-table"
+	case t.constraint():
+		return productpage.ConstraintsTableID
 	}
 	return productpage.BacklogItemsTableID(t.kind)
 }
@@ -141,6 +148,28 @@ func testCaseBulkBar(p *model.Product, user *model.User, role string, total int,
 	return props
 }
 
+// constraintBulkBar configures the selection bar of the constraints table:
+// constraints are the owners' and admins' to change (SC-92).
+func constraintBulkBar(p *model.Product, user *model.User, role string, total int) patterns.BulkBarProps {
+	t := bulkTables["constraints"]
+	props := patterns.BulkBarProps{
+		Region:     t.region(),
+		PreviewURL: "/products/" + p.ID + "/" + t.collection + "/bulk/preview",
+		Noun:       t.plural,
+		Total:      total,
+	}
+	if !user.IsAdmin && role != model.RoleOwner {
+		return props
+	}
+	props.Actions = []patterns.BulkAction{
+		{Action: string(service.BulkCompliance), Label: "Compliance", Icon: "shield-check"},
+		{Action: string(service.BulkCategory), Label: "Category", Icon: "tag"},
+		{Action: string(service.BulkPriority), Label: "Priority", Icon: "chevrons-up"},
+		{Action: string(service.BulkDelete), Label: "Delete", Icon: "trash-2"},
+	}
+	return props
+}
+
 // bulkForm is a bulk request as the selection bar or the confirmation sends
 // it.
 type bulkForm struct {
@@ -204,6 +233,13 @@ func bulkTableFromPath(r *http.Request) (bulkTable, bool) {
 func (c *PageProductController) matchingIDs(r *http.Request, user *model.User, productID string, t bulkTable, state string) ([]string, error) {
 	sr := stateRequest(r, state)
 	var ids []string
+	if t.constraint() {
+		all, table, _, _ := c.constraintRows(r, user, productID)
+		for _, con := range table.matching(all, table.readState(sr, "")) {
+			ids = append(ids, con.ID)
+		}
+		return ids, nil
+	}
 	if t.testCase() {
 		filter, ls := parseTestCaseListState(sr, "")
 		params := listParams(ls)
@@ -254,6 +290,15 @@ type bulkNamer struct {
 
 func (n *bulkNamer) item(id string) patterns.BulkItem {
 	ctx := n.r.Context()
+	if n.table.constraint() {
+		if n.prefixes == nil {
+			n.prefixes = n.c.buildCategoryPrefixMap(n.r, n.user, n.product, "constraint")
+		}
+		if con, err := n.c.constraint.GetConstraint(ctx, n.user, n.product, id); err == nil {
+			return patterns.BulkItem{Identifier: model.EntityIdentifier(requirementPrefixOf(n.prefixes, con.CategoryID), con.SequenceNumber), Title: con.Title}
+		}
+		return patterns.BulkItem{Title: "(no longer exists)"}
+	}
 	if n.table.testCase() {
 		if tc, err := n.c.testing.GetTestCase(ctx, n.user, n.product, id); err == nil {
 			return patterns.BulkItem{Identifier: shortID(tc.ID), Title: tc.Title}
@@ -321,6 +366,11 @@ func (c *PageProductController) bulkChoices(r *http.Request, user *model.User, p
 			choices = append(choices, templates.SelectOption{Value: s.ID, Label: s.Name})
 		}
 		return "New status", choices
+	case service.BulkCompliance:
+		for _, s := range []string{model.ComplianceMet, model.ComplianceViolated, model.ComplianceNotAssessed} {
+			choices = append(choices, templates.SelectOption{Value: s, Label: complianceLabels[s]})
+		}
+		return "New compliance", choices
 	case service.BulkCategory:
 		cats, _ := c.category.ListCategories(ctx, user, productID, t.kind)
 		for _, cat := range cats {
@@ -432,6 +482,8 @@ func bulkWording(t bulkTable, action service.BulkAction, n int, valueLabel strin
 	switch action {
 	case service.BulkStatus:
 		return "Change status", "Change the status of " + items + " to " + quoted + ":", "Change", false
+	case service.BulkCompliance:
+		return "Set compliance", "Set the compliance of " + items + " to " + quoted + ":", "Set", false
 	case service.BulkCategory:
 		return "Change category", "Change the category of " + items + " to " + quoted + ":", "Change", false
 	case service.BulkCriticality:
@@ -591,7 +643,7 @@ func fieldWording(field, items, valueLabel string) (title, question, verb string
 
 func needsChoice(a service.BulkAction) bool {
 	switch a {
-	case service.BulkStatus, service.BulkCategory, service.BulkPriority, service.BulkAssign, service.BulkUnassign,
+	case service.BulkStatus, service.BulkCompliance, service.BulkCategory, service.BulkPriority, service.BulkAssign, service.BulkUnassign,
 		service.BulkLinkRequirement, service.BulkUnlinkRequirement, service.BulkLinkConstraint, service.BulkUnlinkConstraint:
 		return true
 	}
@@ -678,6 +730,14 @@ func (c *PageProductController) BulkApply(w http.ResponseWriter, r *http.Request
 // operation changed its items.
 func (c *PageProductController) bulkTableContent(r *http.Request, user *model.User, productID string, t bulkTable, state string) (templ.Component, error) {
 	sr := stateRequest(r, state)
+	if t.constraint() {
+		props, err := c.loadConstraintsProps(sr, user, productID)
+		if err != nil {
+			return nil, err
+		}
+		props.Fragment = true
+		return productpage.ConstraintsTableContent(props), nil
+	}
 	if t.testCase() {
 		props, err := c.loadTestCasesProps(sr, user, productID)
 		if err != nil {

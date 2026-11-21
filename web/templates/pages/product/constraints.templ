@@ -22,6 +22,9 @@ type ConstraintsProps struct {
 	Constraints      []*model.Constraint
 	CategoryPrefixes map[string]string // category ID → prefix
 	CanEdit          bool              // owner or admin
+	// Bulk configures selection and bulk operations; no actions, no selection
+	// (FR-170).
+	Bulk patterns.BulkBarProps
 	patterns.TableView
 	CategoryOptions []*model.Category
 }
@@ -49,6 +52,7 @@ templ ConstraintsPage(props ConstraintsProps) {
 				}
 			} else {
 				@patterns.TableHeader("Constraints", "constraints-count", props.CountLabel()) {
+					@patterns.BulkSelectButton(props.Bulk)
 					if props.CanEdit {
 						@ui.LinkButton("/products/"+props.Product.ID+"/constraints/new", "New Constraint", "primary", "md") {
 							@ui.Icon("plus", "sm")
@@ -67,7 +71,9 @@ templ ConstraintsPage(props ConstraintsProps) {
 // (UR-145); it is what the table's htmx requests return.
 templ ConstraintsTableContent(props ConstraintsProps) {
 	{{ target := "#" + ConstraintsTableID }}
-	@patterns.TableFrame(props.Frame(constraintsControls(props), "constraints-count", len(props.Constraints), constraintsEmpty(props))) {
+	{{ frame := props.Frame(constraintsControls(props), "constraints-count", len(props.Constraints), constraintsEmpty(props)) }}
+	{{ frame.Bulk = props.Bulk }}
+	@patterns.TableFrame(frame) {
 		@ui.Table() {
 			@ui.TableHead() {
 				@ui.SortHeader("ID", "identifier", props.State, target)
@@ -84,7 +90,7 @@ templ ConstraintsTableContent(props ConstraintsProps) {
 			}
 			@ui.TableBody("") {
 				for _, c := range props.Constraints {
-					@ui.TableRow("") {
+					@ui.SelectableRow(c.ID) {
 						@ui.TableCellMuted() {
 							{ model.EntityIdentifier(constraintPrefix(props.CategoryPrefixes, c.CategoryID), c.SequenceNumber) }
 						}

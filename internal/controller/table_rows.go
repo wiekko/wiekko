@@ -48,6 +48,24 @@ func (t rowTable[T]) readState(r *http.Request, baseURL string) ui.ListState {
 // the end moves the state to the last page. Rows keep their given order where
 // the sort sees them as equal, and when no column is sorted.
 func (t rowTable[T]) apply(rows []T, state *ui.ListState) (page []T, total int) {
+	matched := t.matching(rows, *state)
+	total = len(matched)
+	// ListState reads pages below 1 as page 1.
+	if state.Page < 1 {
+		state.Page = 1
+	}
+	pageBeyondEnd(state, total)
+	start := (state.Page - 1) * tablePageSize
+	if start >= total {
+		return nil, total
+	}
+	end := min(start+tablePageSize, total)
+	return matched[start:end], total
+}
+
+// matching narrows rows to the state's search and facets and sorts them, all
+// pages at once: what "select all matching" selects (FR-170).
+func (t rowTable[T]) matching(rows []T, state ui.ListState) []T {
 	needle := strings.ToLower(strings.TrimSpace(state.Search))
 	matched := make([]T, 0, len(rows))
 	for _, row := range rows {
@@ -65,19 +83,7 @@ func (t rowTable[T]) apply(rows []T, state *ui.ListState) (page []T, total int) 
 			return less(a, b)
 		})
 	}
-
-	total = len(matched)
-	// ListState reads pages below 1 as page 1.
-	if state.Page < 1 {
-		state.Page = 1
-	}
-	pageBeyondEnd(state, total)
-	start := (state.Page - 1) * tablePageSize
-	if start >= total {
-		return nil, total
-	}
-	end := min(start+tablePageSize, total)
-	return matched[start:end], total
+	return matched
 }
 
 func (t rowTable[T]) matches(row T, filters map[string]string, needle string) bool {
