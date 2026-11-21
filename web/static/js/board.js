@@ -1,6 +1,13 @@
 (function () {
   "use strict";
 
+  // updateCount sets a column's counter (the [data-board-count] in its header,
+  // a sibling of the drop target) to the number of cards it holds.
+  function updateCount(col) {
+    var counter = col.parentElement && col.parentElement.querySelector("[data-board-count]");
+    if (counter) counter.textContent = col.querySelectorAll("[data-entity-type]").length;
+  }
+
   function initColumn(col) {
     if (col.dataset.sortableInit === "1") return;
     col.dataset.sortableInit = "1";
@@ -17,6 +24,10 @@
         var from = evt.from;
         var to = evt.to;
         if (from === to) return;
+        // The counters were rendered with the page; recount both columns at
+        // once (DF-5). A failed move reloads the page, which recounts anyway.
+        updateCount(from);
+        updateCount(to);
 
         var entity = card.dataset.entityType;
         var url = card.dataset.moveUrl;
