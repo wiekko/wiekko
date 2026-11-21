@@ -241,7 +241,8 @@ func (s *defectStore) ListByMilestoneID(ctx context.Context, milestoneID string)
 func (s *defectStore) Assign(ctx context.Context, a *model.Assignment) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO defect_assignments (id, defect_id, user_id, created_at)
-		 VALUES (?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT (defect_id, user_id) DO NOTHING`,
 		a.ID, a.TargetID, a.UserID, a.CreatedAt,
 	)
 	return err
@@ -278,7 +279,8 @@ func (s *defectStore) ListAssignees(ctx context.Context, defectID string) ([]*mo
 func (s *defectStore) AddLink(ctx context.Context, link *model.DefectLink) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO defect_links (id, defect_id, target_type, target_id, created_at)
-		 VALUES (?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT (defect_id, target_type, target_id) DO NOTHING`,
 		link.ID, link.DefectID, link.TargetType, link.TargetID, link.CreatedAt,
 	)
 	return err

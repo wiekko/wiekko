@@ -96,6 +96,14 @@ change is based on. If the item has been changed since, nothing is written and t
 `409 CONFLICT`; read it again and reapply the change. Without `if_updated_at` the change applies to
 whatever is current.
 
+## Links and assignments
+
+Creating a link or an assignment that already exists succeeds and changes nothing, so a request can
+safely be repeated. This holds for every `POST` that links two items or assigns a user, e.g.
+`…/defects/{id}/links`, `…/test-cases/{id}/requirements`, `…/test-cases/{id}/environments` and
+`…/assignees`. A test case's link to a requirement carries a `link_type`, `requirement` (the default)
+or `definition_of_done`: linking the pair again with a `link_type` changes it, without one keeps it.
+
 ## Endpoints
 
 ### Team, workflow and campaign scope

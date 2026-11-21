@@ -115,9 +115,16 @@ type TestCaseRequirement struct {
 	ID            string
 	TestCaseID    string
 	RequirementID string
-	LinkType      string // "requirement" or "definition_of_done"
+	LinkType      string // TestCaseLinkRequirement or TestCaseLinkDefinitionOfDone
 	CreatedAt     string // RFC 3339
 }
+
+// What a test case verifies of a requirement: the requirement as a whole, or
+// its definition of done.
+const (
+	TestCaseLinkRequirement      = "requirement"
+	TestCaseLinkDefinitionOfDone = "definition_of_done"
+)
 
 // TestCaseConstraint links a test case to a constraint it verifies, or part
 // of it (FR-150).

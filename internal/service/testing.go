@@ -268,10 +268,18 @@ func (s *TestingService) CountTestCases(ctx context.Context, user *model.User, p
 	return s.testCases.CountByProductID(ctx, productID, store.TestCaseFilter{}, "")
 }
 
-// LinkRequirement links a test case to a requirement. Requires developer role.
+// LinkRequirement links a test case to a requirement, linkType saying what it
+// verifies of it. Linking a linked pair again changes nothing but, when
+// linkType is given, the type; an empty linkType links a new pair as
+// "requirement" (FR-167). Requires developer role.
 func (s *TestingService) LinkRequirement(ctx context.Context, user *model.User, productID, tcID, reqID, linkType string) error {
 	if _, err := s.authz.RequireRole(ctx, user, productID, model.RoleDeveloper); err != nil {
 		return err
+	}
+	switch linkType {
+	case "", model.TestCaseLinkRequirement, model.TestCaseLinkDefinitionOfDone:
+	default:
+		return fmt.Errorf("invalid link type %q (want %s or %s)", linkType, model.TestCaseLinkRequirement, model.TestCaseLinkDefinitionOfDone)
 	}
 	if err := s.owns.require(ctx, productID, ref{kindTestCase, tcID}, ref{kindRequirement, reqID}); err != nil {
 		return err

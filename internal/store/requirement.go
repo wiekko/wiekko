@@ -222,7 +222,8 @@ func (s *requirementStore) ListByMilestoneID(ctx context.Context, milestoneID st
 func (s *requirementStore) Assign(ctx context.Context, a *model.Assignment) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO requirement_assignments (id, requirement_id, user_id, created_at)
-		 VALUES (?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT (requirement_id, user_id) DO NOTHING`,
 		a.ID, a.TargetID, a.UserID, a.CreatedAt,
 	)
 	return err

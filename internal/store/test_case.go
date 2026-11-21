@@ -233,10 +233,18 @@ func (s *testCaseStore) ListByComponentID(ctx context.Context, componentID strin
 }
 
 func (s *testCaseStore) LinkRequirement(ctx context.Context, link *model.TestCaseRequirement) error {
+	// A pair links once (FR-167). Linking it again with a type changes the
+	// type; without one it keeps the type it has.
+	onConflict := `DO UPDATE SET link_type = excluded.link_type`
+	linkType := link.LinkType
+	if linkType == "" {
+		onConflict, linkType = `DO NOTHING`, model.TestCaseLinkRequirement
+	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO test_case_requirements (id, test_case_id, requirement_id, link_type, created_at)
-		 VALUES (?, ?, ?, ?, ?)`,
-		link.ID, link.TestCaseID, link.RequirementID, link.LinkType, link.CreatedAt,
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT (test_case_id, requirement_id) `+onConflict,
+		link.ID, link.TestCaseID, link.RequirementID, linkType, link.CreatedAt,
 	)
 	return err
 }
@@ -340,7 +348,8 @@ func (s *testCaseStore) constraintLinks(ctx context.Context, column, id string) 
 
 func (s *testCaseStore) AddEnvironment(ctx context.Context, id, testCaseID, environmentID string) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO test_case_environments (id, test_case_id, environment_id) VALUES (?, ?, ?)`,
+		`INSERT INTO test_case_environments (id, test_case_id, environment_id) VALUES (?, ?, ?)
+		 ON CONFLICT (test_case_id, environment_id) DO NOTHING`,
 		id, testCaseID, environmentID,
 	)
 	return err
