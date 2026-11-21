@@ -1,0 +1,79 @@
+package patterns
+
+import (
+	"nexmap.net/internal/model"
+	"nexmap.net/web/templates/ui"
+)
+
+// ComplianceMenuID is the element the compliance menu of a constraint's page
+// header is swapped into after a change.
+const ComplianceMenuID = "constraint-compliance"
+
+// ComplianceFieldID is the overview's Compliance field, updated out of band
+// with the menu.
+const ComplianceFieldID = "constraint-compliance-field"
+
+// complianceStates lists the states in the order the menu offers them.
+var complianceStates = []string{model.ComplianceNotAssessed, model.ComplianceMet, model.ComplianceViolated}
+
+// ComplianceMenu shows a constraint's compliance in its page header (UR-168).
+// People who may edit the constraint get a menu that sets it without opening
+// the edit form, by a POST of compliance_state to url; everyone else sees the
+// badge alone. No confirmation: the change is undone the same way (UC-91).
+templ ComplianceMenu(url, state string, canEdit bool) {
+	<div id={ ComplianceMenuID } class="inline-flex">
+		if canEdit {
+			@ui.DropdownMenu(ComplianceMenuID + "-menu") {
+				@ui.DropdownTrigger() {
+					<button
+						type="button"
+						class="flex cursor-pointer items-center gap-1 rounded-md py-1 pr-1.5 pl-1 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:hover:bg-gray-800"
+						aria-haspopup="menu"
+						aria-label={ "Compliance: " + complianceLabel(state) + ". Change compliance" }
+						title="Change compliance"
+					>
+						@ComplianceBadge(state)
+						<span class="text-gray-500 dark:text-gray-400">
+							@ui.Icon("chevron-down", "sm")
+						</span>
+					</button>
+				}
+				@ui.DropdownContent() {
+					for _, s := range complianceStates {
+						@ui.DropdownAction(s == state, templ.Attributes{
+							"hx-post":   url,
+							"hx-vals":   `{"compliance_state":"` + s + `"}`,
+							"hx-target": "#" + ComplianceMenuID,
+							"hx-swap":   "outerHTML",
+							// The badge alone does not name the item to screen readers.
+							"aria-label": complianceLabel(s),
+						}) {
+							@ComplianceBadge(s)
+						}
+					}
+				}
+			}
+		} else {
+			@ComplianceBadge(state)
+		}
+	</div>
+}
+
+// ComplianceFieldOOB replaces the overview's Compliance field after the menu
+// changed it, so both show the same state.
+templ ComplianceFieldOOB(state string) {
+	<dd id={ ComplianceFieldID } hx-swap-oob="true" class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+		@ComplianceBadge(state)
+	</dd>
+}
+
+func complianceLabel(state string) string {
+	switch state {
+	case model.ComplianceMet:
+		return "Met"
+	case model.ComplianceViolated:
+		return "Violated"
+	default:
+		return "Not Assessed"
+	}
+}

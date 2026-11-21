@@ -432,6 +432,7 @@ func mountPages(mux *http.ServeMux, svc *service.Services, cookieSecure bool, ma
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/edit", pageAuthed(http.HandlerFunc(productCtrl.ConstraintEditForm)))
 	mux.Handle("POST /products/{id}/constraints/{constraintId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintUpdate)))
 	mux.Handle("DELETE /products/{id}/constraints/{constraintId}", pageAuthed(http.HandlerFunc(productCtrl.ConstraintDelete)))
+	mux.Handle("POST /products/{id}/constraints/{constraintId}/compliance", pageAuthed(http.HandlerFunc(productCtrl.ConstraintSetCompliance)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/delete/confirm", pageAuthed(http.HandlerFunc(productCtrl.ConstraintDeleteConfirm)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/overview", pageAuthed(http.HandlerFunc(productCtrl.ConstraintOverviewTab)))
 	mux.Handle("GET /products/{id}/constraints/{constraintId}/tabs/documents", pageAuthed(http.HandlerFunc(productCtrl.ConstraintDocumentsTab)))

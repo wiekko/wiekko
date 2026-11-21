@@ -8219,6 +8219,54 @@ func (c *PageProductController) ConstraintDetail(w http.ResponseWriter, r *http.
 	}).Render(r.Context(), w)
 }
 
+// ConstraintSetCompliance handles POST
+// /products/{id}/constraints/{constraintId}/compliance, the page header's
+// compliance menu (UR-168): it sets compliance_state alone and answers with
+// the menu showing the new state, plus the overview's Compliance field out of
+// band. The change goes through UpdateConstraint like any other edit, so it is
+// checked and recorded the same way; it sends no version, since it touches a
+// single field and must not be refused over another field changed meanwhile.
+func (c *PageProductController) ConstraintSetCompliance(w http.ResponseWriter, r *http.Request) {
+	user := middleware.UserFromContext(r.Context())
+	productID := r.PathValue("id")
+	constraintID := r.PathValue("constraintId")
+
+	state := r.FormValue("compliance_state")
+	switch state {
+	case model.ComplianceNotAssessed, model.ComplianceMet, model.ComplianceViolated:
+	default:
+		http.Error(w, "unknown compliance state", http.StatusUnprocessableEntity)
+		return
+	}
+
+	p, role, err := c.loadProductWithRole(r, user, productID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !c.canEditConstraints(user, role) {
+		http.Error(w, "only product owners can change constraints", http.StatusForbidden)
+		return
+	}
+
+	con, err := c.constraint.UpdateConstraint(r.Context(), user, p.ID, constraintID, service.UpdateConstraintInput{ComplianceState: &state})
+	if err != nil {
+		status := http.StatusUnprocessableEntity
+		switch {
+		case errors.Is(err, service.ErrForbidden):
+			status = http.StatusForbidden
+		case errors.Is(err, service.ErrNotFound):
+			status = http.StatusNotFound
+		}
+		http.Error(w, errorText(err), status)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = patterns.ComplianceMenu(productpage.ConstraintComplianceURL(p.ID, con.ID), con.ComplianceState, true).Render(r.Context(), w)
+	_ = patterns.ComplianceFieldOOB(con.ComplianceState).Render(r.Context(), w)
+}
+
 // ConstraintCreateForm renders GET /products/{id}/constraints/new.
 func (c *PageProductController) ConstraintCreateForm(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFromContext(r.Context())

@@ -55,6 +55,26 @@ templ DropdownItem(label, href, icon string, danger bool) {
 	}
 }
 
+// DropdownAction renders a menu item that acts in place, e.g. by an htmx
+// request named in attrs, where DropdownItem only links. Its content is the
+// children, so an item can show a badge. checked marks the current choice of
+// a menu that picks one value.
+templ DropdownAction(checked bool, attrs templ.Attributes) {
+	<button
+		type="button"
+		class={ "flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm",
+			dropdownItemColor(false) }
+		role="menuitemradio"
+		aria-checked={ ariaBool(checked) }
+		{ attrs... }
+	>
+		<span class={ "inline-flex h-4 w-4 shrink-0", templ.KV("invisible", !checked) }>
+			@Icon("check", "sm")
+		</span>
+		{ children... }
+	</button>
+}
+
 // DropdownDivider renders a separator line between menu items.
 templ DropdownDivider() {
 	<div class="my-1 border-t border-gray-100 dark:border-gray-700"></div>
@@ -65,4 +85,11 @@ func dropdownItemColor(danger bool) string {
 		return "text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
 	}
 	return "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+}
+
+func ariaBool(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

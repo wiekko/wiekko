@@ -49,6 +49,7 @@ templ ConstraintDetailPage(props ConstraintDetailProps) {
 				props.Meta.CSRFToken,
 			) {
 				@patterns.CategoryBadge(constraintPrefix(props.CategoryPrefixes, props.Constraint.CategoryID), "constraint")
+				@patterns.ComplianceMenu(ConstraintComplianceURL(props.Product.ID, props.Constraint.ID), props.Constraint.ComplianceState, props.CanEdit)
 			}
 			<!-- Tabs -->
 			@ui.TabGroup(templates.WithCounts(constraintDetailTabs(props.Product.ID, props.Constraint.ID), props.TabCounts))
@@ -88,7 +89,7 @@ templ ConstraintOverviewTabContent(props ConstraintDetailProps) {
 				}
 				<div>
 					<dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Compliance</dt>
-					<dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">
+					<dd id={ patterns.ComplianceFieldID } class="mt-1 text-sm text-gray-900 dark:text-gray-100">
 						@patterns.ComplianceBadge(props.Constraint.ComplianceState)
 					</dd>
 				</div>
@@ -316,4 +317,10 @@ func constraintCategoryName(names map[string]string, categoryID string) string {
 		}
 	}
 	return "Unknown"
+}
+
+// ConstraintComplianceURL is where the page header's compliance menu sets a
+// constraint's compliance (UR-168).
+func ConstraintComplianceURL(productID, constraintID string) string {
+	return "/products/" + productID + "/constraints/" + constraintID + "/compliance"
 }
