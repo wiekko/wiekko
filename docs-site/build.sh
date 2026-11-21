@@ -51,7 +51,7 @@ tags=""
 # case there; the repository is private, so it needs a read-only access token,
 # given as the BuildKit secret DOCS_GIT_TOKEN (preferred: a file in
 # /run/secrets) or the environment variable DOCS_GIT_TOKEN.
-remote=${DOCS_GIT_URL:-https://forge.my-universe.com/daemotron/nexmap.git}
+remote=${DOCS_GIT_URL:-https://forge.my-universe.com/wiekko/wiekko.git}
 token=${DOCS_GIT_TOKEN:-}
 token_file=${DOCS_GIT_TOKEN_FILE:-/run/secrets/DOCS_GIT_TOKEN}
 if [ -z "$token" ] && [ -s "$token_file" ]; then

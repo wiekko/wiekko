@@ -3,8 +3,8 @@
 
 // Wiekko logo at the top of the sidebar, linking to the start page of the
 // version being read. The SVG is a copy of web/static/img/logo.svg, inlined
-// rather than loaded as an image so that "map" takes the sidebar's text
-// colour (currentColor) and "Nex" can be lightened in the dark themes (see
+// rather than loaded as an image so that "ko" takes the sidebar's text
+// colour (currentColor) and "Wiek" can be lightened in the dark themes (see
 // logo.css). mdBook fills the sidebar (mdbook-sidebar-scrollbox) from toc.js
 // in <head>, so it is complete by the time this script runs.
 (function () {
@@ -23,7 +23,7 @@
     '<circle cx="37.36" cy="32.64" r="4" fill="#c7d2fe"/>' +
     '<circle cx="30" cy="44" r="2" fill="#c7d2fe" opacity="0.5"/>' +
     '<text x="76" y="42" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">' +
-    '<tspan class="logo-nex" fill="#4f46e5">Nex</tspan><tspan fill="currentColor">map</tspan>' +
+    '<tspan class="logo-nex" fill="#4f46e5">Wiek</tspan><tspan fill="currentColor">ko</tspan>' +
     "</text></svg>";
 
   var box = document.querySelector("#mdbook-sidebar .sidebar-scrollbox");
